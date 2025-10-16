@@ -1,0 +1,109 @@
+// Types for Subasta Argenta
+
+export interface User {
+  id: string;
+  email: string;
+  username: string;
+  avatar?: string;
+  isAdmin: boolean;
+  address?: {
+    street: string;
+    locality: string;
+    province: string;
+    location: { lat: number; lng: number };
+  };
+  dni: string;
+  createdAt: Date;
+}
+
+export interface Auction {
+  id: string;
+  title: string;
+  description: string;
+  images: string[];
+  startPrice: number;
+  currentPrice: number;
+  buyNowPrice?: number;
+  endTime: Date;
+  status: 'active' | 'ended' | 'sold';
+  categoryId: string;
+  bids: Bid[];
+  winnerId?: string;
+}
+
+export interface Bid {
+  id: string;
+  auctionId: string;
+  userId: string;
+  username: string;
+  amount: number;
+  createdAt: Date;
+  isBot?: boolean;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  description: string;
+  images: string[];
+  price: number;
+  stock: number;
+  categoryId: string;
+  ratings: Rating[];
+  averageRating: number;
+}
+
+export interface Rating {
+  userId: string;
+  username: string;
+  rating: number;
+  comment: string;
+  createdAt: Date;
+}
+
+export interface CartItem {
+  productId: string;
+  product: Product;
+  quantity: number;
+}
+
+export interface Order {
+  id: string;
+  userId: string;
+  items: CartItem[];
+  total: number;
+  status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
+  paymentMethod: 'mercadopago';
+  createdAt: Date;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: 'auction_won' | 'auction_outbid' | 'purchase' | 'payment_reminder';
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: Date;
+  link?: string;
+}
+
+export interface Bot {
+  id: string;
+  name: string;
+  balance: number;
+  intervalMin: number;
+  intervalMax: number;
+  maxBidAmount: number;
+  isActive: boolean;
+  targetAuctions: string[];
+}
+
+export type Theme = 'light' | 'dark';
