@@ -1,4 +1,4 @@
-import { User, Mail, MapPin, FileText, Award, ShoppingBag, Gavel } from 'lucide-react';
+import { Mail, MapPin, FileText, Award, ShoppingBag, Gavel } from 'lucide-react';
 import { useStore } from '../store/useStore';
 
 const Perfil = () => {
