@@ -198,7 +198,8 @@ const handleDeleteProduct = (productId: string) => {
               </div>
             </div>
           </div>
-        )}
+         )
+        }
 
         {/* Bots Tab */}
         {activeTab === 'bots' && (
