@@ -58,7 +58,7 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
               <span>Últimas ofertas</span>
             </div>
             <div className="bids-list">
-              {lastThreeBids.map((bid, index) => (
+              {lastThreeBids.map((bid) => (
                 <div key={bid.id} className="bid-item">
                   <span className="bid-username">{bid.username}</span>
                   <span className="bid-amount">{formatCurrency(bid.amount)}</span>
