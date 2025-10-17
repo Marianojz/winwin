@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Users, Gavel, Package, Bot, TrendingUp, DollarSign, Plus, Edit, Trash2, RefreshCw, AlertCircle, ShoppingCart, Calendar, Clock, Award, BarChart3, Activity, Eye } from 'lucide-react';
+import { Users, Gavel, Package, Bot, TrendingUp, DollarSign, Plus, Edit, Trash2, RefreshCw, AlertCircle, Calendar, Award, BarChart3, Activity, Eye } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { formatCurrency, formatTimeAgo } from '../utils/helpers';
-import { Product, Auction, User as UserType } from '../types';
+import { formatCurrency } from '../utils/helpers';
+import { Product, Auction } from '../types';
 
 const AdminPanel = () => {
   const { user, auctions, products, bots, addBot, updateBot, deleteBot, setProducts, setAuctions, notifications } = useStore();
