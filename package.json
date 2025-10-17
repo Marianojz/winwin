@@ -23,4 +23,12 @@
     "typescript": "^5.2.2",
     "vite": "^5.0.8"
   }
+"dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.1",
+    "zustand": "^4.4.7",
+    "date-fns": "^3.0.0",
+    "lucide-react": "^0.300.0"
+  }
 }
