@@ -6,7 +6,9 @@ import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Subastas from './pages/Subastas';
 import AuctionDetail from './pages/AuctionDetail';
+import ProductDetail from './pages/ProductDetail';
 import Tienda from './pages/Tienda';
+<Route path="/producto/:id" element={<ProductDetail />} />
 import Login from './pages/Login';
 import Registro from './pages/Registro';
 import Carrito from './pages/Carrito';
