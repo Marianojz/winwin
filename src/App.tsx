@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useStore } from './store/useStore';
 import { mockAuctions, mockProducts } from './utils/mockData';
 import Navbar from './components/Navbar';
+import ScrollToTop from './components/ScrollToTop';
 import Home from './pages/Home';
 import Subastas from './pages/Subastas';
 import AuctionDetail from './pages/AuctionDetail';
@@ -38,6 +39,7 @@ function App() {
     <Router>
       <div className="app">
         <Navbar />
+        <ScrollToTop />
         <main className="main-content">
           <Routes>
             <Route path="/" element={<Home />} />
