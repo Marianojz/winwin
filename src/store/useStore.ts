@@ -88,41 +88,41 @@ export const useStore = create<AppState>((set, get) => ({
   // Cart
   cart: [],
   addToCart: (product, quantity) => {
-    const cart = get().cart;
-    const existingItem = cart.find(item => item.productId === product.id);
-    
-    if (existingItem) {
-      set({
-        cart: cart.map(item =>
-          item.productId === product.id
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        )
-      });
-    } else {
-      set({
-        cart: [...cart, { productId: product.id, product, quantity }]
-      });
-    }
-  },
+  const cart = get().cart;
+  const existingItem = cart.find(item => item.productId === product.id);
+  
+  let newCart;
+  if (existingItem) {
+    newCart = cart.map(item =>
+      item.productId === product.id
+        ? { ...item, quantity: item.quantity + quantity }
+        : item
+    );
+  } else {
+    newCart = [...cart, { productId: product.id, product, quantity }];
+  }
+  
+  const newTotal = newCart.reduce((total, item) => total + (item.product.price * item.quantity), 0);
+  set({ cart: newCart, cartTotal: newTotal });
+},
   removeFromCart: (productId) => {
-    set({ cart: get().cart.filter(item => item.productId !== productId) });
-  },
+  const newCart = get().cart.filter(item => item.productId !== productId);
+  const newTotal = newCart.reduce((total, item) => total + (item.product.price * item.quantity), 0);
+  set({ cart: newCart, cartTotal: newTotal });
+},
   updateQuantity: (productId, quantity) => {
-    if (quantity <= 0) {
-      get().removeFromCart(productId);
-    } else {
-      set({
-        cart: get().cart.map(item =>
-          item.productId === productId ? { ...item, quantity } : item
-        )
-      });
-    }
-  },
-  clearCart: () => set({ cart: [] }),
-  get cartTotal() {
-    return get().cart.reduce((total, item) => total + (item.product.price * item.quantity), 0);
-  },
+  if (quantity <= 0) {
+    get().removeFromCart(productId);
+  } else {
+    const newCart = get().cart.map(item =>
+      item.productId === productId ? { ...item, quantity } : item
+    );
+    const newTotal = newCart.reduce((total, item) => total + (item.product.price * item.quantity), 0);
+    set({ cart: newCart, cartTotal: newTotal });
+  }
+},
+  clearCart: () => set({ cart: [], cartTotal: 0 }),
+  cartTotal: 0,
 
   // Notifications
   notifications: [],
