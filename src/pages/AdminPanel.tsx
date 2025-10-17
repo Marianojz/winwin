@@ -1,11 +1,20 @@
 import { useState } from 'react';
 import { Users, Gavel, Package, Bot, TrendingUp, DollarSign, Plus, Edit, Trash2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { Product } from '../types';
 import { formatCurrency } from '../utils/helpers';
 
 const AdminPanel = () => {
   const { user, auctions, products, bots, addBot, updateBot, deleteBot } = useStore();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+const [productForm, setProductForm] = useState({
+  name: '',
+  description: '',
+  price: 0,
+  stock: 0,
+  categoryId: '1'
+});
   const [botForm, setBotForm] = useState({
     name: '',
     balance: 10000,
@@ -46,7 +55,40 @@ const AdminPanel = () => {
       });
     }
   };
+const handleEditProduct = (product: Product) => {
+  setEditingProduct(product);
+  setProductForm({
+    name: product.name,
+    description: product.description,
+    price: product.price,
+    stock: product.stock,
+    categoryId: product.categoryId
+  });
+  setActiveTab('edit-product');
+};
 
+const handleSaveProduct = () => {
+  if (editingProduct) {
+    // Actualizar producto existente
+    const updatedProducts = products.map(p => 
+      p.id === editingProduct.id 
+        ? { ...p, ...productForm }
+        : p
+    );
+    setProducts(updatedProducts);
+    alert('Producto actualizado correctamente');
+    setEditingProduct(null);
+    setActiveTab('products');
+  }
+};
+
+const handleDeleteProduct = (productId: string) => {
+  if (window.confirm('¿Estás seguro de eliminar este producto?')) {
+    const updatedProducts = products.filter(p => p.id !== productId);
+    setProducts(updatedProducts);
+    alert('Producto eliminado correctamente');
+  }
+};
   return (
     <div style={{ minHeight: 'calc(100vh - 80px)', padding: '3rem 0' }}>
       <div className="container-fluid" style={{ maxWidth: '1400px' }}>
@@ -305,36 +347,153 @@ const AdminPanel = () => {
         )}
 
         {/* Products Tab */}
-        {activeTab === 'products' && (
-          <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem' }}>
-            <h3 style={{ marginBottom: '1.5rem' }}>Gestión de Productos</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
-              {products.map(product => (
-                <div key={product.id} style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
-                  <h4>{product.name}</h4>
-                  <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: '0.5rem 0' }}>
-                    Precio: {formatCurrency(product.price)}
-                  </p>
-                  <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                    Stock: {product.stock} unidades
-                  </p>
-                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                    <button className="btn btn-outline" style={{ flex: 1, padding: '0.5rem' }}>
-                      <Edit size={16} />
-                      Editar
-                    </button>
-                    <button style={{ padding: '0.5rem', background: 'var(--error)', color: 'white', borderRadius: '0.5rem' }}>
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+{activeTab === 'products' && (
+  <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+      <h3>Gestión de Productos</h3>
+      <button className="btn btn-primary" onClick={() => alert('Función de crear producto en desarrollo')}>
+        <Plus size={18} />
+        Nuevo Producto
+      </button>
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+      {products.map(product => (
+        <div key={product.id} style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
+          <img 
+            src={product.images[0]} 
+            alt={product.name}
+            style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '0.5rem', marginBottom: '0.75rem' }}
+          />
+          <h4 style={{ marginBottom: '0.5rem' }}>{product.name}</h4>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: '0.5rem 0' }}>
+            Precio: {formatCurrency(product.price)}
+          </p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+            Stock: {product.stock} unidades
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+            <button 
+              onClick={() => handleEditProduct(product)}
+              className="btn btn-outline" 
+              style={{ flex: 1, padding: '0.5rem' }}
+            >
+              <Edit size={16} />
+              Editar
+            </button>
+            <button 
+              onClick={() => handleDeleteProduct(product.id)}
+              style={{ padding: '0.5rem', background: 'var(--error)', color: 'white', borderRadius: '0.5rem' }}
+            >
+              <Trash2 size={16} />
+            </button>
           </div>
-        )}
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
+{/* Edit Product Tab */}
+{activeTab === 'edit-product' && editingProduct && (
+  <div>
+    <button 
+      onClick={() => { setActiveTab('products'); setEditingProduct(null); }}
+      style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '0.5rem', 
+        background: 'transparent',
+        color: 'var(--text-secondary)',
+        padding: '0.5rem 0',
+        marginBottom: '1.5rem',
+        border: 'none',
+        cursor: 'pointer'
+      }}
+    >
+      ← Volver a Productos
+    </button>
+
+    <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem' }}>
+      <h3 style={{ marginBottom: '1.5rem' }}>Editar Producto: {editingProduct.name}</h3>
+      
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Nombre del Producto</label>
+          <input 
+            type="text" 
+            value={productForm.name}
+            onChange={(e) => setProductForm({...productForm, name: e.target.value})}
+            style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
+          />
+        </div>
+
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Descripción</label>
+          <textarea 
+            value={productForm.description}
+            onChange={(e) => setProductForm({...productForm, description: e.target.value})}
+            rows={4}
+            style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
+          />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Precio</label>
+            <input 
+              type="number" 
+              value={productForm.price}
+              onChange={(e) => setProductForm({...productForm, price: Number(e.target.value)})}
+              style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Stock</label>
+            <input 
+              type="number" 
+              value={productForm.stock}
+              onChange={(e) => setProductForm({...productForm, stock: Number(e.target.value)})}
+              style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Categoría</label>
+            <select 
+              value={productForm.categoryId}
+              onChange={(e) => setProductForm({...productForm, categoryId: e.target.value})}
+              style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
+            >
+              <option value="1">Electrónica</option>
+              <option value="2">Moda</option>
+              <option value="3">Hogar</option>
+              <option value="4">Deportes</option>
+              <option value="5">Juguetes</option>
+              <option value="6">Libros</option>
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+          <button 
+            onClick={handleSaveProduct}
+            className="btn btn-primary" 
+            style={{ flex: 1, padding: '1rem' }}
+          >
+            💾 Guardar Cambios
+          </button>
+          <button 
+            onClick={() => { setActiveTab('products'); setEditingProduct(null); }}
+            className="btn btn-outline" 
+            style={{ padding: '1rem' }}
+          >
+            Cancelar
+          </button>
+        </div>
       </div>
     </div>
-  );
-};
+  </div>
+)}
 
 export default AdminPanel;
