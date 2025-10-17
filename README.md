@@ -148,7 +148,7 @@ La aplicación incluye modo día y noche con los siguientes colores:
 **Modo Día:**
 - Primary: #FF6B00 (Naranja)
 - Secondary: #0044AA (Azul Argentino)
-- Background: #FFFFFF
+- Background: #cac8c8ff
 
 **Modo Noche:**
 - Primary: #FF8533
