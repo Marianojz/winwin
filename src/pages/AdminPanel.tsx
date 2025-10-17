@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Users, Gavel, Package, Bot, TrendingUp, DollarSign, ShoppingCart, Award, Plus, Edit, Trash2 } from 'lucide-react';
+import { Users, Gavel, Package, Bot, TrendingUp, DollarSign, Plus, Edit, Trash2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { formatCurrency } from '../utils/helpers';
 
