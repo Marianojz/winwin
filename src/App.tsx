@@ -1,10 +1,11 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useStore } from './store/useStore';
-import { mockAuctions, mockProducts, mockUser } from './utils/mockData';
+import { mockAuctions, mockProducts } from './utils/mockData';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Subastas from './pages/Subastas';
+import AuctionDetail from './pages/AuctionDetail';
 import Tienda from './pages/Tienda';
 import Login from './pages/Login';
 import Registro from './pages/Registro';
@@ -39,6 +40,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/subastas" element={<Subastas />} />
+            <Route path="/subastas/:id" element={<AuctionDetail />} />
             <Route path="/tienda" element={<Tienda />} />
             <Route path="/login" element={<Login />} />
             <Route path="/registro" element={<Registro />} />
