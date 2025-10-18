@@ -11,6 +11,7 @@ import ProductDetail from './pages/ProductDetail';
 import Tienda from './pages/Tienda';
 import Login from './pages/Login';
 import Registro from './pages/Registro';
+import Cleanup from './pages/Cleanup';
 import Carrito from './pages/Carrito';
 import Notificaciones from './pages/Notificaciones';
 import Perfil from './pages/Perfil';
@@ -56,6 +57,7 @@ function App() {
             <Route path="/producto/:id" element={<ProductDetail />} />
             <Route path="/login" element={<Login />} />
             <Route path="/registro" element={<Registro />} />
+            <Route path="/cleanup" element={<Cleanup />} />
             <Route path="/carrito" element={<Carrito />} />
             <Route path="/notificaciones" element={<Notificaciones />} />
             <Route path="/perfil" element={<Perfil />} />
