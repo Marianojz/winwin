@@ -20,19 +20,27 @@ function App() {
   const { setAuctions, setProducts, setUser, theme } = useStore();
 
   useEffect(() => {
-    // Initialize mock data
-    setAuctions(mockAuctions);
-    setProducts(mockProducts);
-    
-    // Auto-login for demo purposes
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
+  console.log('🔍 App.tsx - useEffect ejecutándose');
+  
+  // Initialize mock data
+  setAuctions(mockAuctions);
+  setProducts(mockProducts);
+  
+  // Auto-login for demo purposes
+  const savedUser = localStorage.getItem('user');
+  console.log('🔍 Usuario guardado en localStorage:', savedUser);
+  
+  if (savedUser) {
+    const parsedUser = JSON.parse(savedUser);
+    console.log('🔍 Usuario parseado:', parsedUser);
+    setUser(parsedUser);
+  } else {
+    console.log('✅ No hay usuario en localStorage');
+  }
 
-    // Apply theme
-    document.documentElement.setAttribute('data-theme', theme);
-  }, []);
+  // Apply theme
+  document.documentElement.setAttribute('data-theme', theme);
+}, []);
 
   return (
     <Router>
