@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, LogIn } from 'lucide-react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../config/firebase';
 import { useStore } from '../store/useStore';
-import { mockUser, mockAdminUser } from '../utils/mockData';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -10,22 +12,67 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
-    // Simple demo login
-    if (email === 'admin@subastaargenta.com') {
-      setUser(mockAdminUser);
-      localStorage.setItem('user', JSON.stringify(mockAdminUser));
-      navigate('/admin');
-    } else if (email && password.length >= 6) {
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
-      navigate('/');
-    } else {
-      setError('Credenciales inválidas');
+    try {
+      // Login con Firebase
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Verificar que el email esté verificado
+      if (!user.emailVerified) {
+        setError('Por favor, verificá tu email antes de iniciar sesión. Revisá tu bandeja de entrada.');
+        await auth.signOut();
+        setLoading(false);
+        return;
+      }
+
+      // Obtener datos del usuario de Firestore
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const fullUser = {
+          id: user.uid,
+          email: user.email!,
+          username: userData.username,
+          role: userData.role || 'user',
+          ...userData
+        };
+
+        setUser(fullUser);
+        localStorage.setItem('user', JSON.stringify(fullUser));
+        
+        // Redirigir según rol
+        if (fullUser.role === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/');
+        }
+      } else {
+        setError('No se encontraron datos del usuario');
+      }
+    } catch (err: any) {
+      console.error('Error en login:', err);
+      
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        setError('Email o contraseña incorrectos');
+      } else if (err.code === 'auth/invalid-credential') {
+        setError('Email o contraseña incorrectos');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Demasiados intentos fallidos. Intentá más tarde.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Email inválido');
+      } else {
+        setError('Error al iniciar sesión. Intentá nuevamente.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -55,6 +102,7 @@ const Login = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
 
@@ -70,12 +118,17 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
 
-            <button type="submit" className="btn btn-primary btn-block">
+            <button 
+              type="submit" 
+              className="btn btn-primary btn-block"
+              disabled={loading}
+            >
               <LogIn size={20} />
-              Iniciar Sesión
+              {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </button>
           </form>
 
@@ -84,8 +137,8 @@ const Login = () => {
           </div>
 
           <div className="demo-info">
-            <p><strong>Demo:</strong> Usá cualquier email y contraseña (mínimo 6 caracteres)</p>
-            <p><strong>Admin:</strong> admin@subastaargenta.com</p>
+            <p><strong>Nota:</strong> Ahora el sistema usa Firebase Authentication.</p>
+            <p>Debes registrarte y verificar tu email para poder acceder.</p>
           </div>
         </div>
       </div>
@@ -158,9 +211,19 @@ const Login = () => {
           font-size: 1rem;
         }
 
+        .form-group input:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
         .btn-block {
           width: 100%;
           margin-top: 0.5rem;
+        }
+
+        .btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
         }
 
         .auth-footer {
