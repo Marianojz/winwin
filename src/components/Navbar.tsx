@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ShoppingCart, Bell, User, Home, Store, Gavel, LogOut, LayoutDashboard } from 'lucide-react';
+import { ShoppingCart, Bell, Home, Store, Gavel, LogOut, LayoutDashboard } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import ThemeToggle from './ThemeToggle';
 import './Navbar.css';
