@@ -10,7 +10,11 @@ const Navbar = () => {
 
   const handleLogout = () => {
     setUser(null);
+    localStorage.removeItem('user');
   };
+
+  // Generar avatar URL
+  const avatarUrl = user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.username || 'U')}&size=40&background=FF6B00&color=fff&bold=true`;
 
   return (
     <nav className="navbar">
@@ -24,18 +28,18 @@ const Navbar = () => {
           <span className="navbar-logo-text">Subasta Argenta</span>
         </Link>
 
-        <div className="navbar-menu">
+        <div className="navbar-links">
           <Link to="/" className="navbar-link">
-            <Home size={20} />
-            <span>Inicio</span>
+            <Home size={18} />
+            Inicio
           </Link>
           <Link to="/subastas" className="navbar-link">
-            <Gavel size={20} />
-            <span>Subastas</span>
+            <Gavel size={18} />
+            Subastas
           </Link>
           <Link to="/tienda" className="navbar-link">
-            <Store size={20} />
-            <span>Tienda</span>
+            <Store size={18} />
+            Tienda
           </Link>
         </div>
 
@@ -43,45 +47,47 @@ const Navbar = () => {
           <ThemeToggle />
           
           {isAuthenticated ? (
-  <div className="navbar-actions">
-    <Link to="/carrito" className="navbar-icon">
-      <ShoppingCart size={20} />
-      {cartItemsCount > 0 && <span className="badge">{cartItemsCount}</span>}
-    </Link>
-    
-    <Link to="/notificaciones" className="navbar-icon">
-      <Bell size={20} />
-      {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
-    </Link>
+            <>
+              <Link to="/carrito" className="navbar-icon">
+                <ShoppingCart size={20} />
+                {cartItemsCount > 0 && <span className="badge">{cartItemsCount}</span>}
+              </Link>
+              
+              <Link to="/notificaciones" className="navbar-icon">
+                <Bell size={20} />
+                {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
+              </Link>
 
-    <div className="navbar-user-menu">
-      <Link to="/perfil" className="navbar-avatar">
-        <img 
-          src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.username || 'U')}&size=40&background=FF6B00&color=fff&bold=true`}
-          alt={user?.username}
-          className="avatar-img"
-        />
-        <span>{user?.username}</span>
-      </Link>
-      
-      {user?.isAdmin && (
-        <Link to="/admin" className="navbar-link">
-          <LayoutDashboard size={18} />
-          Admin
-        </Link>
-      )}
-      
-      <button onClick={handleLogout} className="navbar-link logout-btn">
-        <LogOut size={18} />
-        Salir
-      </button>
-    </div>
-  </div>
-) : (
-  <Link to="/login" className="btn btn-primary">
-    Iniciar Sesión
-  </Link>
-)}
+              <div className="navbar-user-menu">
+                <Link to="/perfil" className="navbar-avatar">
+                  <img 
+                    src={avatarUrl}
+                    alt={user?.username}
+                    className="avatar-img"
+                  />
+                  <span className="navbar-username">{user?.username}</span>
+                </Link>
+                
+                {user?.isAdmin && (
+                  <Link to="/admin" className="navbar-link">
+                    <LayoutDashboard size={18} />
+                    Admin
+                  </Link>
+                )}
+                
+                <button onClick={handleLogout} className="navbar-link logout-btn">
+                  <LogOut size={18} />
+                  Salir
+                </button>
+              </div>
+            </>
+          ) : (
+            <Link to="/login" className="btn btn-primary">
+              Iniciar Sesión
+            </Link>
+          )}
+        </div>
+      </div>
     </nav>
   );
 };
