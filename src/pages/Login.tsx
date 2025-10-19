@@ -37,22 +37,37 @@ const Login = () => {
       
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        const fullUser = {
+        
+        const fullUser: User = {
           id: user.uid,
           email: user.email!,
-          username: userData.username,
-          role: userData.role || 'user',
-          ...userData
+          username: userData.username || 'Usuario',
+          isAdmin: userData.role === 'admin',
+          dni: userData.dni || '',
+          createdAt: userData.createdAt ? new Date(userData.createdAt) : new Date(),
+          avatar: userData.avatar,
+          address: userData.address ? {
+            street: userData.address,
+            locality: userData.locality,
+            province: userData.province,
+            location: {
+              lat: userData.latitude || 0,
+              lng: userData.longitude || 0
+            }
+          } : undefined
         };
 
         setUser(fullUser);
         localStorage.setItem('user', JSON.stringify(fullUser));
         
-        // Redirigir según rol
-        if (fullUser.role === 'admin') {
+        if (fullUser.isAdmin) {
           navigate('/admin');
         } else {
           navigate('/');
+        }
+      } else {
+        setError('No se encontraron datos del usuario');
+      }
         }
       } else {
         setError('No se encontraron datos del usuario');
