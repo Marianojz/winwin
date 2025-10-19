@@ -10,11 +10,24 @@ const Perfil = () => {
 
   const myBids = auctions.filter(a => a.bids.some(b => b.userId === user.id));
 
+  // Generar avatar URL (Gravatar con fallback a ui-avatars)
+  const avatarUrl = user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || 'U')}&size=200&background=FF6B00&color=fff&bold=true`;
+
   return (
     <div style={{ minHeight: 'calc(100vh - 80px)', padding: '3rem 0' }}>
       <div className="container" style={{ maxWidth: '1000px' }}>
         <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1.5rem', marginBottom: '2rem', display: 'flex', gap: '2rem', alignItems: 'center' }}>
-          <img src={user.avatar} alt={user.username} style={{ width: '120px', height: '120px', borderRadius: '50%', objectFit: 'cover', border: '4px solid var(--primary)' }} />
+          <img 
+            src={avatarUrl} 
+            alt={user.username} 
+            style={{ 
+              width: '120px', 
+              height: '120px', 
+              borderRadius: '50%', 
+              objectFit: 'cover', 
+              border: '4px solid var(--primary)' 
+            }} 
+          />
           <div style={{ flex: 1 }}>
             <h1 style={{ marginBottom: '0.5rem' }}>{user.username}</h1>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', color: 'var(--text-secondary)' }}>
