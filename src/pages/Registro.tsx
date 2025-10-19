@@ -142,6 +142,7 @@ const Registro = () => {
         createdAt: new Date().toISOString(),
         emailVerified: false,
         role: 'user',
+        isAdmin: false,
         active: true
       });
 
