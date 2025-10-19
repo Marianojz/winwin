@@ -40,6 +40,8 @@ const Login = () => {
           id: user.uid,
           email: user.email!,
           username: userData.username || 'Usuario',
+          username: userData.username || 'Usuario',
+avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username || user.email?.split('@')[0] || 'U')}&size=200&background=FF6B00&color=fff&bold=true`,
           isAdmin: userData.role === 'admin',
           dni: userData.dni || '',
           createdAt: userData.createdAt ? new Date(userData.createdAt) : new Date(),
