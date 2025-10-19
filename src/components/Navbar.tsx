@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ShoppingCart, Bell, Home, Store, Gavel, LogOut, LayoutDashboard } from 'lucide-react';
+import { ShoppingCart, Bell, User, Home, Store, Gavel, LogOut, LayoutDashboard } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import ThemeToggle from './ThemeToggle';
 import './Navbar.css';
@@ -58,28 +58,26 @@ const Navbar = () => {
                 {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
               </Link>
 
-              <div className="navbar-user-menu">
-                <Link to="/perfil" className="navbar-avatar">
-                  <img 
-                    src={avatarUrl}
-                    alt={user?.username}
-                    className="avatar-img"
-                  />
-                  <span className="navbar-username">{user?.username}</span>
+              <Link to="/perfil" className="navbar-icon navbar-user">
+                <img 
+                  src={avatarUrl}
+                  alt={user?.username}
+                  className="navbar-avatar-img"
+                />
+                <span className="navbar-username">{user?.username}</span>
+              </Link>
+              
+              {user?.isAdmin && (
+                <Link to="/admin" className="navbar-link">
+                  <LayoutDashboard size={18} />
+                  Admin
                 </Link>
-                
-                {user?.isAdmin && (
-                  <Link to="/admin" className="navbar-link">
-                    <LayoutDashboard size={18} />
-                    Admin
-                  </Link>
-                )}
-                
-                <button onClick={handleLogout} className="navbar-link logout-btn">
-                  <LogOut size={18} />
-                  Salir
-                </button>
-              </div>
+              )}
+              
+              <button onClick={handleLogout} className="navbar-link navbar-logout">
+                <LogOut size={18} />
+                Salir
+              </button>
             </>
           ) : (
             <Link to="/login" className="btn btn-primary">
