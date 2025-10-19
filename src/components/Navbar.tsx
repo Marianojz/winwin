@@ -43,63 +43,45 @@ const Navbar = () => {
           <ThemeToggle />
           
           {isAuthenticated ? (
-            <>
-              <Link to="/notificaciones" className="navbar-icon-btn">
-                <Bell size={22} />
-                {unreadCount > 0 && (
-                  <span className="navbar-badge">{unreadCount}</span>
-                )}
-              </Link>
+  <div className="navbar-actions">
+    <Link to="/carrito" className="navbar-icon">
+      <ShoppingCart size={20} />
+      {cartItemsCount > 0 && <span className="badge">{cartItemsCount}</span>}
+    </Link>
+    
+    <Link to="/notificaciones" className="navbar-icon">
+      <Bell size={20} />
+      {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
+    </Link>
 
-              <Link to="/carrito" className="navbar-icon-btn">
-                <ShoppingCart size={22} />
-                {cartItemsCount > 0 && (
-                  <span className="navbar-badge">{cartItemsCount}</span>
-                )}
-              </Link>
-
-              <div className="navbar-user-menu">
-                <button className="navbar-icon-btn">
-                  <User size={22} />
-                </button>
-                <div className="navbar-dropdown">
-                  <div className="navbar-dropdown-header">
-                    <img src={user?.avatar} alt={user?.username} />
-                    <div>
-                      <div className="navbar-dropdown-name">{user?.username}</div>
-                      <div className="navbar-dropdown-email">{user?.email}</div>
-                    </div>
-                  </div>
-                  <div className="navbar-dropdown-divider" />
-                  <Link to="/perfil" className="navbar-dropdown-item">
-                    <User size={18} />
-                    Mi Perfil
-                  </Link>
-                  {user?.isAdmin && (
-                    <Link to="/admin" className="navbar-dropdown-item">
-                      <LayoutDashboard size={18} />
-                      Panel Admin
-                    </Link>
-                  )}
-                  <button onClick={handleLogout} className="navbar-dropdown-item">
-                    <LogOut size={18} />
-                    Cerrar Sesión
-                  </button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <Link to="/login" className="btn btn-outline">
-                Ingresar
-              </Link>
-              <Link to="/registro" className="btn btn-primary">
-                Registrarse
-              </Link>
-            </>
-          )}
-        </div>
-      </div>
+    <div className="navbar-user-menu">
+      <Link to="/perfil" className="navbar-avatar">
+        <img 
+          src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.username || 'U')}&size=40&background=FF6B00&color=fff&bold=true`}
+          alt={user?.username}
+          className="avatar-img"
+        />
+        <span>{user?.username}</span>
+      </Link>
+      
+      {user?.isAdmin && (
+        <Link to="/admin" className="navbar-link">
+          <LayoutDashboard size={18} />
+          Admin
+        </Link>
+      )}
+      
+      <button onClick={handleLogout} className="navbar-link logout-btn">
+        <LogOut size={18} />
+        Salir
+      </button>
+    </div>
+  </div>
+) : (
+  <Link to="/login" className="btn btn-primary">
+    Iniciar Sesión
+  </Link>
+)}
     </nav>
   );
 };
