@@ -5,6 +5,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { useStore } from '../store/useStore';
+import { User } from '../types';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -20,11 +21,9 @@ const Login = () => {
     setLoading(true);
 
     try {
-      // Login con Firebase
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Verificar que el email esté verificado
       if (!user.emailVerified) {
         setError('Por favor, verificá tu email antes de iniciar sesión. Revisá tu bandeja de entrada.');
         await auth.signOut();
@@ -32,7 +31,6 @@ const Login = () => {
         return;
       }
 
-      // Obtener datos del usuario de Firestore
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       
       if (userDoc.exists()) {
@@ -64,10 +62,6 @@ const Login = () => {
           navigate('/admin');
         } else {
           navigate('/');
-        }
-      } else {
-        setError('No se encontraron datos del usuario');
-      }
         }
       } else {
         setError('No se encontraron datos del usuario');
