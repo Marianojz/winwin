@@ -132,6 +132,7 @@ const Registro = () => {
       await setDoc(doc(db, 'users', user.uid), {
         username: formData.username,
         email: formData.email,
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.username)}&size=200&background=FF6B00&color=fff&bold=true`,
         dni: formData.dni,
         address: formData.address,
         locality: formData.locality,
