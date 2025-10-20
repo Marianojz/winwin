@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { User, Auction, Product, CartItem, Notification, Theme, Bot, Order, OrderStatus } from '../types';
+
 interface AppState {
   // Theme
   theme: Theme;
@@ -39,11 +40,12 @@ interface AppState {
   addBot: (bot: Bot) => void;
   updateBot: (botId: string, updates: Partial<Bot>) => void;
   deleteBot: (botId: string) => void;
-}
-// Orders (Admin)
+
+  // Orders (Admin)
   orders: Order[];
   addOrder: (order: Order) => void;
   updateOrderStatus: (orderId: string, status: OrderStatus, updates?: Partial<Order>) => void;
+}
 
 export const useStore = create<AppState>((set, get) => ({
   // Theme
@@ -91,39 +93,39 @@ export const useStore = create<AppState>((set, get) => ({
   // Cart
   cart: [],
   addToCart: (product, quantity) => {
-  const cart = get().cart;
-  const existingItem = cart.find(item => item.productId === product.id);
-  
-  let newCart;
-  if (existingItem) {
-    newCart = cart.map(item =>
-      item.productId === product.id
-        ? { ...item, quantity: item.quantity + quantity }
-        : item
-    );
-  } else {
-    newCart = [...cart, { productId: product.id, product, quantity }];
-  }
-  
-  const newTotal = newCart.reduce((total, item) => total + (item.product.price * item.quantity), 0);
-  set({ cart: newCart, cartTotal: newTotal });
-},
-  removeFromCart: (productId) => {
-  const newCart = get().cart.filter(item => item.productId !== productId);
-  const newTotal = newCart.reduce((total, item) => total + (item.product.price * item.quantity), 0);
-  set({ cart: newCart, cartTotal: newTotal });
-},
-  updateQuantity: (productId, quantity) => {
-  if (quantity <= 0) {
-    get().removeFromCart(productId);
-  } else {
-    const newCart = get().cart.map(item =>
-      item.productId === productId ? { ...item, quantity } : item
-    );
+    const cart = get().cart;
+    const existingItem = cart.find(item => item.productId === product.id);
+    
+    let newCart;
+    if (existingItem) {
+      newCart = cart.map(item =>
+        item.productId === product.id
+          ? { ...item, quantity: item.quantity + quantity }
+          : item
+      );
+    } else {
+      newCart = [...cart, { productId: product.id, product, quantity }];
+    }
+    
     const newTotal = newCart.reduce((total, item) => total + (item.product.price * item.quantity), 0);
     set({ cart: newCart, cartTotal: newTotal });
-  }
-},
+  },
+  removeFromCart: (productId) => {
+    const newCart = get().cart.filter(item => item.productId !== productId);
+    const newTotal = newCart.reduce((total, item) => total + (item.product.price * item.quantity), 0);
+    set({ cart: newCart, cartTotal: newTotal });
+  },
+  updateQuantity: (productId, quantity) => {
+    if (quantity <= 0) {
+      get().removeFromCart(productId);
+    } else {
+      const newCart = get().cart.map(item =>
+        item.productId === productId ? { ...item, quantity } : item
+      );
+      const newTotal = newCart.reduce((total, item) => total + (item.product.price * item.quantity), 0);
+      set({ cart: newCart, cartTotal: newTotal });
+    }
+  },
   clearCart: () => set({ cart: [], cartTotal: 0 }),
   cartTotal: 0,
 
@@ -162,7 +164,8 @@ export const useStore = create<AppState>((set, get) => ({
   },
   deleteBot: (botId) => {
     set({ bots: get().bots.filter(bot => bot.id !== botId) });
-  }
+  },
+
   // Orders
   orders: [],
   addOrder: (order) => set({ orders: [...get().orders, order] }),
