@@ -20,12 +20,72 @@ const MapPicker = ({ onLocationSelect, initialPosition = [-34.6037, -58.3816] }:
   const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
-    // Esperar a que Leaflet esté disponible
-    const checkLeaflet = setInterval(() => {
-      if (window.L) {
-        clearInterval(checkLeaflet);
-        setMapReady(true);
+    const initMap = async () => {
+      let centerPosition = initialPosition || [-34.6037, -58.3816]; // Buenos Aires por defecto
+      
+      // Si hay localidad y provincia, intentar geocodificar
+      if (locality && province) {
+        try {
+          const searchQuery = `${locality}, ${province}, Argentina`;
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`
+          );
+          const data = await response.json();
+          
+          if (data && data.length > 0) {
+            centerPosition = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+            console.log('📍 Mapa centrado en:', locality, province, centerPosition);
+          }
+        } catch (error) {
+          console.error('Error al geocodificar localidad:', error);
+        }
       }
+
+      const mapContainer = document.getElementById('map');
+      if (!mapContainer) return;
+
+      const map = L.map('map').setView(centerPosition, 13);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+
+      const markerIcon = L.divIcon({
+        html: '<div style="font-size: 2rem;">📍</div>',
+        className: 'custom-marker',
+        iconSize: [32, 32],
+        iconAnchor: [16, 32]
+      });
+
+      const marker = L.marker(centerPosition, { 
+        icon: markerIcon,
+        draggable: true 
+      }).addTo(map);
+
+      marker.on('dragend', () => {
+        const position = marker.getLatLng();
+        handleLocationSelect(position.lat, position.lng);
+      });
+
+      map.on('click', (e: L.LeafletMouseEvent) => {
+        marker.setLatLng(e.latlng);
+        handleLocationSelect(e.latlng.lat, e.latlng.lng);
+      });
+
+      // Seleccionar ubicación inicial
+      handleLocationSelect(centerPosition[0], centerPosition[1]);
+
+      setMapInstance(map);
+    };
+
+    initMap();
+
+    return () => {
+      if (mapInstance) {
+        mapInstance.remove();
+      }
+    };
+  }, [locality, province]);
     }, 100);
 
     return () => clearInterval(checkLeaflet);
