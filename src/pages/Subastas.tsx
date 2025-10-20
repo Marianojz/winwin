@@ -55,7 +55,6 @@ const Subastas = () => {
             <li>Cada oferta debe ser múltiplo de $500</li>
             <li>Podés comprar directamente con el precio de "Compra Ya"</li>
             <li>Si ganás, tenés 48hs para pagar o la subasta se republica</li>
-            <li>Los últimos 3 oferentes se muestran en cada subasta</li>
           </ul>
         </div>
 
