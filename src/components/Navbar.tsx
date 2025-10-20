@@ -28,18 +28,15 @@ const Navbar = () => {
           <span className="navbar-logo-text">Subasta Argenta</span>
         </Link>
 
-        <div className="navbar-links">
-          <Link to="/" className="navbar-link">
-            <Home size={18} />
-            Inicio
+        <div className="navbar-menu">
+          <Link to="/" className="navbar-link" title="Inicio">
+            <Home size={20} />
           </Link>
-          <Link to="/subastas" className="navbar-link">
-            <Gavel size={18} />
-            Subastas
+          <Link to="/subastas" className="navbar-link" title="Subastas">
+            <Gavel size={20} />
           </Link>
-          <Link to="/tienda" className="navbar-link">
-            <Store size={18} />
-            Tienda
+          <Link to="/tienda" className="navbar-link" title="Tienda">
+            <Store size={20} />
           </Link>
         </div>
 
@@ -48,36 +45,51 @@ const Navbar = () => {
           
           {isAuthenticated ? (
             <>
-              <Link to="/carrito" className="navbar-icon">
+              <Link to="/carrito" className="navbar-icon-btn" title="Carrito">
                 <ShoppingCart size={20} />
-                {cartItemsCount > 0 && <span className="badge">{cartItemsCount}</span>}
+                {cartItemsCount > 0 && <span className="navbar-badge">{cartItemsCount}</span>}
               </Link>
               
-              <Link to="/notificaciones" className="navbar-icon">
+              <Link to="/notificaciones" className="navbar-icon-btn" title="Notificaciones">
                 <Bell size={20} />
-                {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
+                {unreadCount > 0 && <span className="navbar-badge">{unreadCount}</span>}
               </Link>
 
-              <Link to="/perfil" className="navbar-icon navbar-user">
-                <img 
-                  src={avatarUrl}
-                  alt={user?.username}
-                  className="navbar-avatar-img"
-                />
-                <span className="navbar-username">{user?.username}</span>
-              </Link>
+              <div className="navbar-user-menu">
+                <button className="navbar-icon-btn" title="Mi cuenta">
+                  <img 
+                    src={avatarUrl}
+                    alt={user?.username}
+                    className="navbar-avatar-img"
+                  />
+                </button>
+                <div className="navbar-dropdown">
+                  <div className="navbar-dropdown-header">
+                    <img src={avatarUrl} alt={user?.username} />
+                    <div>
+                      <div className="navbar-dropdown-name">{user?.username}</div>
+                      <div className="navbar-dropdown-email">{user?.email}</div>
+                    </div>
+                  </div>
+                  <div className="navbar-dropdown-divider" />
+                  <Link to="/perfil" className="navbar-dropdown-item">
+                    <Home size={18} />
+                    Mi Perfil
+                  </Link>
+                  {user?.isAdmin && (
+                    <Link to="/admin" className="navbar-dropdown-item">
+                      <LayoutDashboard size={18} />
+                      Panel Admin
+                    </Link>
+                  )}
+                  <button onClick={handleLogout} className="navbar-dropdown-item">
+                    <LogOut size={18} />
+                    Cerrar Sesión
+                  </button>
+                </div>
+              </div>
               
-              {user?.isAdmin && (
-                <Link to="/admin" className="navbar-link">
-                  <LayoutDashboard size={18} />
-                  Admin
-                </Link>
-              )}
-              
-              <button onClick={handleLogout} className="navbar-link navbar-logout">
-                <LogOut size={18} />
-                Salir
-              </button>
+            
             </>
           ) : (
             <Link to="/login" className="btn btn-primary">
