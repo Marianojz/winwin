@@ -17,7 +17,6 @@ import Cleanup from './pages/Cleanup';
 import Carrito from './pages/Carrito';
 import Notificaciones from './pages/Notificaciones';
 import Perfil from './pages/Perfil';
-import AdminPanel from './pages/AdminPanel';
 import AdminPanelPro from './pages/AdminPanelPro';
 
 function App() {
@@ -64,7 +63,6 @@ function App() {
             <Route path="/carrito" element={<Carrito />} />
             <Route path="/notificaciones" element={<Notificaciones />} />
             <Route path="/perfil" element={<Perfil />} />
-            <Route path="/admin" element={<AdminPanel />} />
             <Route path="/terminos" element={<Terminos />} />
 <Route path="/preguntas" element={<Preguntas />} />
             <Route path="/admin-pro" element={<AdminPanelPro />} />
