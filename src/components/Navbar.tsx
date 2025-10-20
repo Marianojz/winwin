@@ -88,8 +88,6 @@ const Navbar = () => {
                   </button>
                 </div>
               </div>
-              
-            
             </>
           ) : (
             <Link to="/login" className="btn btn-primary">
