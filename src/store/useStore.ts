@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { User, Auction, Product, CartItem, Notification, Theme, Bot } from '../types';
-
+import { User, Auction, Product, CartItem, Notification, Theme, Bot, Order, OrderStatus } from '../types';
 interface AppState {
   // Theme
   theme: Theme;
