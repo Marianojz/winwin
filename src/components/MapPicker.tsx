@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 interface MapPickerProps {
   onLocationSelect: (lat: number, lng: number, address: string) => void;
   initialPosition?: [number, number];
+  locality?: string;
+  province?: string;
 }
 
 declare global {
