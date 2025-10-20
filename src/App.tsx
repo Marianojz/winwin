@@ -18,6 +18,7 @@ import Carrito from './pages/Carrito';
 import Notificaciones from './pages/Notificaciones';
 import Perfil from './pages/Perfil';
 import AdminPanel from './pages/AdminPanel';
+import AdminPanelPro from './pages/AdminPanelPro';
 
 function App() {
   const { setAuctions, setProducts, setUser, theme } = useStore();
@@ -66,6 +67,7 @@ function App() {
             <Route path="/admin" element={<AdminPanel />} />
             <Route path="/terminos" element={<Terminos />} />
 <Route path="/preguntas" element={<Preguntas />} />
+            <Route path="/admin-pro" element={<AdminPanelPro />} />
           </Routes>
         </main>
         <footer className="footer">
