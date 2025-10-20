@@ -378,9 +378,11 @@ const Registro = () => {
             </div>
 
             <MapPicker 
-              onLocationSelect={handleLocationSelect}
-              initialPosition={[-34.6037, -58.3816]}
-            />
+  onLocationSelect={handleLocationSelect}
+  initialPosition={[-34.6037, -58.3816]}
+  locality={formData.locality}
+  province={formData.province}
+/>
 
             <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
               <button 
