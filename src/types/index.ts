@@ -1,17 +1,19 @@
 // Types for Subasta Argenta
 
+export interface Address {
+  street: string;
+  locality: string;
+  province: string;
+  location: { lat: number; lng: number };
+}
+
 export interface User {
   id: string;
   email: string;
   username: string;
   avatar?: string;
   isAdmin: boolean;
-  address?: {
-    street: string;
-    locality: string;
-    province: string;
-    location: { lat: number; lng: number };
-  };
+  address?: Address;
   dni: string;
   createdAt: Date;
 }
@@ -67,16 +69,6 @@ export interface CartItem {
   quantity: number;
 }
 
-export interface Order {
-  id: string;
-  userId: string;
-  items: CartItem[];
-  total: number;
-  status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
-  paymentMethod: 'mercadopago';
-  createdAt: Date;
-}
-
 export interface Category {
   id: string;
   name: string;
@@ -107,7 +99,8 @@ export interface Bot {
 }
 
 export type Theme = 'light' | 'dark';
-// ========== NUEVOS TIPOS PARA EL SISTEMA DE PEDIDOS ==========
+
+// ========== SISTEMA DE PEDIDOS (NUEVO) ==========
 
 export type OrderStatus = 
   | 'pending_payment'      // Esperando pago (48hs para subastas)
