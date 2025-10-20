@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
   Users, Gavel, Package, TrendingUp, DollarSign, AlertCircle, 
   Clock, CheckCircle, XCircle, Truck, FileText, Download,
