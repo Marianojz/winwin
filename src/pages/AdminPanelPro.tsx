@@ -1058,3 +1058,535 @@ const AdminPanelPro = () => {
             </div>
           </div>
         )}
+{/* INVENTORY TAB */}
+        {activeTab === 'inventory' && (
+          <div>
+            <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)', marginBottom: '2rem' }}>
+              <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <BarChart3 size={28} />
+                Control de Inventario
+              </h3>
+
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+                <button 
+                  onClick={() => setInventoryFilter('all')}
+                  className={inventoryFilter === 'all' ? 'btn btn-primary' : 'btn btn-outline'}
+                  style={{ padding: '0.75rem 1.25rem' }}
+                >
+                  Todos ({products.length})
+                </button>
+                <button 
+                  onClick={() => setInventoryFilter('low')}
+                  className={inventoryFilter === 'low' ? 'btn btn-primary' : 'btn btn-outline'}
+                  style={{ padding: '0.75rem 1.25rem' }}
+                >
+                  Stock Bajo ({lowStockProducts.length})
+                </button>
+                <button 
+                  onClick={() => setInventoryFilter('out')}
+                  className={inventoryFilter === 'out' ? 'btn btn-primary' : 'btn btn-outline'}
+                  style={{ padding: '0.75rem 1.25rem' }}
+                >
+                  Sin Stock ({outOfStockProducts.length})
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+                <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center' }}>
+                  <Package size={24} color="var(--primary)" style={{ marginBottom: '0.5rem' }} />
+                  <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--primary)' }}>
+                    {products.length}
+                  </div>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Total Productos</div>
+                </div>
+                <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center' }}>
+                  <DollarSign size={24} color="var(--success)" style={{ marginBottom: '0.5rem' }} />
+                  <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--success)' }}>
+                    {formatCurrency(totalInventoryValue)}
+                  </div>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Valor Total</div>
+                </div>
+                <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center' }}>
+                  <AlertCircle size={24} color="var(--warning)" style={{ marginBottom: '0.5rem' }} />
+                  <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--warning)' }}>
+                    {lowStockProducts.length}
+                  </div>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Stock Bajo</div>
+                </div>
+                <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center' }}>
+                  <AlertCircle size={24} color="var(--error)" style={{ marginBottom: '0.5rem' }} />
+                  <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--error)' }}>
+                    {outOfStockProducts.length}
+                  </div>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Sin Stock</div>
+                </div>
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--bg-tertiary)', borderBottom: '2px solid var(--border)' }}>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600 }}>Producto</th>
+                      <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 600 }}>Stock</th>
+                      <th style={{ padding: '1rem', textAlign: 'right', fontWeight: 600 }}>Precio Unit.</th>
+                      <th style={{ padding: '1rem', textAlign: 'right', fontWeight: 600 }}>Valor Total</th>
+                      <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 600 }}>Estado</th>
+                      <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 600 }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products
+                      .filter(p => {
+                        if (inventoryFilter === 'low') return p.stock < 5 && p.stock > 0;
+                        if (inventoryFilter === 'out') return p.stock === 0;
+                        return true;
+                      })
+                      .map(product => (
+                        <tr key={product.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                              <img 
+                                src={product.images[0]} 
+                                alt={product.name}
+                                style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '0.5rem' }}
+                              />
+                              <div>
+                                <div style={{ fontWeight: 600 }}>{product.name}</div>
+                                <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>ID: {product.id}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'center', fontWeight: 600, fontSize: '1.125rem' }}>
+                            {product.stock}
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 600 }}>
+                            {formatCurrency(product.price)}
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 700, color: 'var(--primary)' }}>
+                            {formatCurrency(product.price * product.stock)}
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'center' }}>
+                            {product.stock === 0 ? (
+                              <span className="badge badge-error">Sin Stock</span>
+                            ) : product.stock < 5 ? (
+                              <span className="badge badge-warning">Bajo</span>
+                            ) : (
+                              <span className="badge badge-success">OK</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'center' }}>
+                            <button 
+                              onClick={() => handleEditProduct(product)}
+                              className="btn btn-outline"
+                              style={{ padding: '0.5rem 0.75rem' }}
+                            >
+                              <Edit size={16} />
+                              Editar
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* BOTS TAB */}
+        {activeTab === 'bots' && (
+          <div>
+            <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', marginBottom: '2rem', boxShadow: '0 2px 8px var(--shadow)' }}>
+              <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Plus size={24} />
+                Crear Nuevo Bot
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Nombre del Bot</label>
+                  <input 
+                    type="text" 
+                    placeholder="Bot 1" 
+                    value={botForm.name}
+                    onChange={(e) => setBotForm({...botForm, name: e.target.value})}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Saldo Disponible</label>
+                  <input 
+                    type="number" 
+                    value={botForm.balance}
+                    onChange={(e) => setBotForm({...botForm, balance: Number(e.target.value)})}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Intervalo Mín (min)</label>
+                  <input 
+                    type="number" 
+                    value={botForm.intervalMin}
+                    onChange={(e) => setBotForm({...botForm, intervalMin: Number(e.target.value)})}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Intervalo Máx (min)</label>
+                  <input 
+                    type="number" 
+                    value={botForm.intervalMax}
+                    onChange={(e) => setBotForm({...botForm, intervalMax: Number(e.target.value)})}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Oferta Máxima</label>
+                  <input 
+                    type="number" 
+                    value={botForm.maxBidAmount}
+                    onChange={(e) => setBotForm({...botForm, maxBidAmount: Number(e.target.value)})}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                  <button onClick={handleAddBot} className="btn btn-primary" style={{ width: '100%' }}>
+                    <Plus size={18} />
+                    Crear Bot
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
+              <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Bot size={24} />
+                Bots Activos ({bots.length})
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {bots.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                    <Bot size={64} color="var(--text-tertiary)" style={{ marginBottom: '1rem' }} />
+                    <p>No hay bots configurados. Crea tu primer bot arriba.</p>
+                  </div>
+                ) : (
+                  bots.map(bot => (
+                    <div key={bot.id} style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: '250px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+                          <Bot size={24} color="var(--primary)" />
+                          <h4 style={{ margin: 0 }}>{bot.name}</h4>
+                          <span className={bot.isActive ? 'badge badge-success' : 'badge badge-error'}>
+                            {bot.isActive ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                          <div>Saldo: <strong>{formatCurrency(bot.balance)}</strong></div>
+                          <div>Intervalo: <strong>{bot.intervalMin}-{bot.intervalMax}min</strong></div>
+                          <div>Oferta Máx: <strong>{formatCurrency(bot.maxBidAmount)}</strong></div>
+                          <div>Subastas: <strong>{bot.targetAuctions.length || 'Todas'}</strong></div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button 
+                          onClick={() => updateBot(bot.id, { isActive: !bot.isActive })}
+                          className="btn btn-outline"
+                          style={{ padding: '0.625rem 1rem' }}
+                        >
+                          {bot.isActive ? 'Pausar' : 'Activar'}
+                        </button>
+                        <button 
+                          onClick={() => {
+                            if (window.confirm(`¿Eliminar el bot "${bot.name}"?`)) {
+                              deleteBot(bot.id);
+                            }
+                          }}
+                          style={{ padding: '0.625rem', background: 'var(--error)', color: 'white', borderRadius: '0.5rem', border: 'none', cursor: 'pointer' }}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* REPORTS TAB */}
+        {activeTab === 'reports' && (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+              <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem' }}>
+                <h3 style={{ marginBottom: '1.5rem' }}>Resumen de Ventas</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
+                    <span>Total Vendido</span>
+                    <strong style={{ color: 'var(--primary)' }}>{formatCurrency(totalRevenue)}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
+                    <span>Pedidos Completados</span>
+                    <strong>{delivered}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
+                    <span>En Proceso</span>
+                    <strong>{inTransit + orders.filter(o => o.status === 'preparing').length}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Ticket Promedio</span>
+                    <strong style={{ color: 'var(--success)' }}>
+                      {delivered > 0 ? formatCurrency(totalRevenue / delivered) : '$0'}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem' }}>
+                <h3 style={{ marginBottom: '1.5rem' }}>Estado de Pedidos</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {[
+                    { status: 'pending_payment' as OrderStatus, label: 'Pendiente de Pago' },
+                    { status: 'payment_confirmed' as OrderStatus, label: 'Pago Confirmado' },
+                    { status: 'preparing' as OrderStatus, label: 'Preparando' },
+                    { status: 'in_transit' as OrderStatus, label: 'En Tránsito' },
+                    { status: 'delivered' as OrderStatus, label: 'Entregado' }
+                  ].map(({ status, label }) => {
+                    const count = orders.filter(o => o.status === status).length;
+                    const percentage = orders.length > 0 ? (count / orders.length) * 100 : 0;
+                    
+                    return (
+                      <div key={status}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <span style={{ fontSize: '0.875rem' }}>{label}</span>
+                          <strong>{count}</strong>
+                        </div>
+                        <div style={{ width: '100%', height: '8px', background: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden' }}>
+                          <div style={{ 
+                            width: `${percentage}%`, 
+                            height: '100%', 
+                            background: getStatusColor(status),
+                            transition: 'width 0.3s'
+                          }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h3>Exportar Reportes</h3>
+                <button className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Download size={18} />
+                  Descargar Excel
+                </button>
+              </div>
+              <p style={{ color: 'var(--text-secondary)' }}>
+                Exporta todos los datos de pedidos, productos y subastas en formato Excel para análisis detallado.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Modal de Detalle de Orden */}
+      {selectedOrder && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '2rem'
+          }}
+          onClick={() => setSelectedOrder(null)}
+        >
+          <div 
+            style={{
+              background: 'var(--bg-secondary)',
+              borderRadius: '1rem',
+              padding: '2rem',
+              maxWidth: '600px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2>Detalle del Pedido</h2>
+              <button 
+                onClick={() => setSelectedOrder(null)}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  fontSize: '1.5rem', 
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <img 
+                src={selectedOrder.productImage} 
+                alt={selectedOrder.productName}
+                style={{ width: '100%', height: '250px', objectFit: 'cover', borderRadius: '0.75rem' }}
+              />
+
+              <div>
+                <h3 style={{ marginBottom: '0.5rem' }}>{selectedOrder.productName}</h3>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                  {selectedOrder.productType === 'auction' ? '🔨 Subasta' : '🛒 Tienda'} • ID: {selectedOrder.id}
+                </div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>
+                  {formatCurrency(selectedOrder.amount)}
+                </div>
+              </div>
+
+              <div style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
+                <h4 style={{ marginBottom: '0.75rem' }}>Cliente</h4>
+                <div style={{ fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div>
+                    <Users size={16} style={{ display: 'inline', marginRight: '0.5rem' }} />
+                    {selectedOrder.userName}
+                  </div>
+                  <div>
+                    <MapPin size={16} style={{ display: 'inline', marginRight: '0.5rem' }} />
+                    {selectedOrder.address.street}, {selectedOrder.address.locality}, {selectedOrder.address.province}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
+                <h4 style={{ marginBottom: '0.75rem' }}>Estado Actual</h4>
+                <div style={{ 
+                  padding: '1rem', 
+                  background: getStatusColor(selectedOrder.status) + '20', 
+                  color: getStatusColor(selectedOrder.status),
+                  borderRadius: '0.5rem',
+                  fontWeight: 600,
+                  textAlign: 'center',
+                  fontSize: '1.125rem'
+                }}>
+                  {getStatusText(selectedOrder.status)}
+                </div>
+
+                {selectedOrder.status === 'pending_payment' && selectedOrder.expiresAt && (
+                  <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+                    <Clock size={20} style={{ display: 'inline', marginRight: '0.5rem' }} />
+                    <strong>Expira en: {getTimeRemaining(selectedOrder.expiresAt)}</strong>
+                  </div>
+                )}
+
+                {selectedOrder.trackingNumber && (
+                  <div style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.875rem' }}>
+                    <Truck size={16} style={{ display: 'inline', marginRight: '0.5rem' }} />
+                    Tracking: <strong>{selectedOrder.trackingNumber}</strong>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h4 style={{ marginBottom: '0.75rem' }}>Cambiar Estado</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  {selectedOrder.status === 'pending_payment' && (
+                    <button 
+                      onClick={() => handleStatusChange(selectedOrder.id, 'payment_confirmed')}
+                      className="btn"
+                      style={{ background: 'var(--success)', color: 'white', padding: '0.75rem' }}
+                    >
+                      <CheckCircle size={16} />
+                      Confirmar Pago
+                    </button>
+                  )}
+                  {selectedOrder.status === 'payment_confirmed' && (
+                    <button 
+                      onClick={() => handleStatusChange(selectedOrder.id, 'preparing')}
+                      className="btn btn-primary"
+                      style={{ padding: '0.75rem' }}
+                    >
+                      Preparar Envío
+                    </button>
+                  )}
+                  {selectedOrder.status === 'preparing' && (
+                    <button 
+                      onClick={() => handleStatusChange(selectedOrder.id, 'in_transit')}
+                      className="btn"
+                      style={{ background: 'var(--secondary)', color: 'white', padding: '0.75rem' }}
+                    >
+                      <Truck size={16} />
+                      En Tránsito
+                    </button>
+                  )}
+                  {selectedOrder.status === 'in_transit' && (
+                    <button 
+                      onClick={() => handleStatusChange(selectedOrder.id, 'delivered')}
+                      className="btn"
+                      style={{ background: 'var(--success)', color: 'white', padding: '0.75rem' }}
+                    >
+                      <CheckCircle size={16} />
+                      Entregado
+                    </button>
+                  )}
+                  {['pending_payment', 'payment_confirmed', 'preparing'].includes(selectedOrder.status) && (
+                    <button 
+                      onClick={() => handleStatusChange(selectedOrder.id, 'cancelled')}
+                      className="btn"
+                      style={{ background: 'var(--error)', color: 'white', padding: '0.75rem' }}
+                    >
+                      <XCircle size={16} />
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {(selectedOrder.paidAt || selectedOrder.shippedAt || selectedOrder.deliveredAt) && (
+                <div style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
+                  <h4 style={{ marginBottom: '0.75rem' }}>Historial</h4>
+                  <div style={{ fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div>
+                      <Calendar size={16} style={{ display: 'inline', marginRight: '0.5rem' }} />
+                      Creado: {new Date(selectedOrder.createdAt).toLocaleString('es-AR')}
+                    </div>
+                    {selectedOrder.paidAt && (
+                      <div>
+                        <CheckCircle size={16} style={{ display: 'inline', marginRight: '0.5rem', color: 'var(--success)' }} />
+                        Pagado: {new Date(selectedOrder.paidAt).toLocaleString('es-AR')}
+                      </div>
+                    )}
+                    {selectedOrder.shippedAt && (
+                      <div>
+                        <Truck size={16} style={{ display: 'inline', marginRight: '0.5rem', color: 'var(--secondary)' }} />
+                        Enviado: {new Date(selectedOrder.shippedAt).toLocaleString('es-AR')}
+                      </div>
+                    )}
+                    {selectedOrder.deliveredAt && (
+                      <div>
+                        <CheckCircle size={16} style={{ display: 'inline', marginRight: '0.5rem', color: 'var(--primary)' }} />
+                        Entregado: {new Date(selectedOrder.deliveredAt).toLocaleString('es-AR')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AdminPanelPro;
