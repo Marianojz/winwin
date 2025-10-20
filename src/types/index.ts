@@ -107,3 +107,47 @@ export interface Bot {
 }
 
 export type Theme = 'light' | 'dark';
+// ========== NUEVOS TIPOS PARA EL SISTEMA DE PEDIDOS ==========
+
+export type OrderStatus = 
+  | 'pending_payment'      // Esperando pago (48hs para subastas)
+  | 'payment_confirmed'    // Pago confirmado
+  | 'preparing'            // Preparando envío
+  | 'in_transit'           // En camino
+  | 'delivered'            // Entregado
+  | 'cancelled'            // Cancelado
+  | 'expired';             // Expiró el plazo de pago
+
+export type ProductType = 'store' | 'auction';
+
+export interface Order {
+  id: string;
+  userId: string;
+  userName: string;
+  productId: string;
+  productName: string;
+  productImage: string;
+  productType: ProductType;
+  amount: number;
+  status: OrderStatus;
+  paymentMethod?: string;
+  createdAt: Date;
+  paidAt?: Date;
+  shippedAt?: Date;
+  deliveredAt?: Date;
+  expiresAt?: Date;        // Para subastas: fecha límite de pago (48hs)
+  trackingNumber?: string;
+  notes?: string;
+  address: Address;
+}
+
+export interface Report {
+  totalSales: number;
+  totalRevenue: number;
+  pendingPayments: number;
+  inTransit: number;
+  delivered: number;
+  cancelled: number;
+  avgDeliveryTime: number;
+  topSellingProducts: { id: string; name: string; sales: number }[];
+}
