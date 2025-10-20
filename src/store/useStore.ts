@@ -40,6 +40,10 @@ interface AppState {
   updateBot: (botId: string, updates: Partial<Bot>) => void;
   deleteBot: (botId: string) => void;
 }
+// Orders (Admin)
+  orders: Order[];
+  addOrder: (order: Order) => void;
+  updateOrderStatus: (orderId: string, status: OrderStatus, updates?: Partial<Order>) => void;
 
 export const useStore = create<AppState>((set, get) => ({
   // Theme
@@ -158,5 +162,24 @@ export const useStore = create<AppState>((set, get) => ({
   },
   deleteBot: (botId) => {
     set({ bots: get().bots.filter(bot => bot.id !== botId) });
+  }
+  // Orders
+  orders: [],
+  addOrder: (order) => set({ orders: [...get().orders, order] }),
+  updateOrderStatus: (orderId, status, updates = {}) => {
+    set({
+      orders: get().orders.map(order =>
+        order.id === orderId
+          ? {
+              ...order,
+              status,
+              ...(status === 'payment_confirmed' && !order.paidAt && { paidAt: new Date() }),
+              ...(status === 'in_transit' && !order.shippedAt && { shippedAt: new Date() }),
+              ...(status === 'delivered' && !order.deliveredAt && { deliveredAt: new Date() }),
+              ...updates
+            }
+          : order
+      )
+    });
   }
 }));
