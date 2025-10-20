@@ -64,6 +64,8 @@ function App() {
             <Route path="/notificaciones" element={<Notificaciones />} />
             <Route path="/perfil" element={<Perfil />} />
             <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/terminos" element={<Terminos />} />
+<Route path="/preguntas" element={<Preguntas />} />
           </Routes>
         </main>
         <footer className="footer">
