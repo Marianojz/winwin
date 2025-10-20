@@ -65,7 +65,7 @@ function App() {
             <Route path="/perfil" element={<Perfil />} />
             <Route path="/terminos" element={<Terminos />} />
 <Route path="/preguntas" element={<Preguntas />} />
-            <Route path="/admin-pro" element={<AdminPanelPro />} />
+            <Route path="/admin" element={<AdminPanelPro />} />
           </Routes>
         </main>
         <footer className="footer">
