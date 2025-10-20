@@ -24,65 +24,349 @@ const Carrito = () => {
   }
 
   return (
-    <div style={{ minHeight: 'calc(100vh - 80px)', padding: '3rem 0' }}>
+    <div style={{ minHeight: 'calc(100vh - 80px)', padding: '1.5rem 0' }}>
       <div className="container">
-        <h1 style={{ marginBottom: '2rem' }}>
-          <ShoppingCart size={36} style={{ display: 'inline', marginRight: '0.75rem' }} />
+        <h1 style={{ marginBottom: '1.5rem', fontSize: 'clamp(1.5rem, 5vw, 2.25rem)' }}>
+          <ShoppingCart size={32} style={{ display: 'inline', marginRight: '0.75rem', verticalAlign: 'middle' }} />
           Carrito de Compras
         </h1>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem', alignItems: 'start' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div className="carrito-layout">
+          {/* Lista de productos */}
+          <div className="carrito-items">
             {cart.map(item => (
-              <div key={item.productId} style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', display: 'flex', gap: '1.5rem' }}>
-                <img src={item.product.images[0]} alt={item.product.name} style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: '0.75rem' }} />
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ marginBottom: '0.5rem' }}>{item.product.name}</h3>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', marginBottom: '1rem' }}>{item.product.description}</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-tertiary)', padding: '0.5rem', borderRadius: '0.5rem' }}>
-                      <button onClick={() => updateQuantity(item.productId, item.quantity - 1)} style={{ padding: '0.25rem 0.5rem', background: 'transparent', color: 'var(--text-primary)' }}>
+              <div key={item.productId} className="cart-item-card">
+                <img 
+                  src={item.product.images[0]} 
+                  alt={item.product.name} 
+                  className="cart-item-image"
+                />
+                <div className="cart-item-content">
+                  <h3 className="cart-item-title">{item.product.name}</h3>
+                  <p className="cart-item-description">{item.product.description}</p>
+                  
+                  <div className="cart-item-actions">
+                    <div className="quantity-selector">
+                      <button 
+                        onClick={() => updateQuantity(item.productId, item.quantity - 1)} 
+                        className="quantity-btn"
+                        aria-label="Disminuir cantidad"
+                      >
                         <Minus size={16} />
                       </button>
-                      <span style={{ fontWeight: 600, minWidth: '30px', textAlign: 'center' }}>{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.productId, item.quantity + 1)} style={{ padding: '0.25rem 0.5rem', background: 'transparent', color: 'var(--text-primary)' }}>
+                      <span className="quantity-value">{item.quantity}</span>
+                      <button 
+                        onClick={() => updateQuantity(item.productId, item.quantity + 1)} 
+                        className="quantity-btn"
+                        aria-label="Aumentar cantidad"
+                      >
                         <Plus size={16} />
                       </button>
                     </div>
-                    <span style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)' }}>{formatCurrency(item.product.price * item.quantity)}</span>
+                    <span className="cart-item-price">
+                      {formatCurrency(item.product.price * item.quantity)}
+                    </span>
                   </div>
                 </div>
-                <button onClick={() => removeFromCart(item.productId)} style={{ padding: '0.5rem', background: 'var(--error)', color: 'white', borderRadius: '0.5rem', height: 'fit-content' }}>
+                <button 
+                  onClick={() => removeFromCart(item.productId)} 
+                  className="remove-btn"
+                  aria-label="Eliminar producto"
+                >
                   <Trash2 size={20} />
                 </button>
               </div>
             ))}
           </div>
 
-          <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', position: 'sticky', top: '100px' }}>
-            <h3 style={{ marginBottom: '1.5rem' }}>Resumen del Pedido</h3>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
-              <span>Subtotal ({cart.length} items)</span>
-              <span style={{ fontWeight: 600 }}>{formatCurrency(cartTotal)}</span>
+          {/* Resumen del pedido */}
+          <div className="order-summary">
+            <h3 style={{ marginBottom: '1.5rem', fontSize: '1.25rem' }}>Resumen del Pedido</h3>
+            
+            <div className="summary-row">
+              <span>Subtotal ({cart.length} {cart.length === 1 ? 'item' : 'items'})</span>
+              <span className="summary-value">{formatCurrency(cartTotal)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
+            
+            <div className="summary-row">
               <span>Envío</span>
-              <span style={{ fontWeight: 600, color: 'var(--success)' }}>Gratis</span>
+              <span className="summary-value summary-free">Gratis</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem', paddingTop: '0.75rem' }}>
-              <span style={{ fontSize: '1.25rem', fontWeight: 700 }}>Total</span>
-              <span style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>{formatCurrency(cartTotal)}</span>
+            
+            <div className="summary-total">
+              <span>Total</span>
+              <span className="total-value">{formatCurrency(cartTotal)}</span>
             </div>
-            <button onClick={handleCheckout} className="btn btn-primary" style={{ width: '100%', padding: '1rem', fontSize: '1.125rem' }}>
+            
+            <button 
+              onClick={handleCheckout} 
+              className="btn btn-primary checkout-btn"
+            >
               <CreditCard size={22} />
               Pagar con MercadoPago
             </button>
-            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '1rem', textAlign: 'center' }}>
+            
+            <p className="cart-disclaimer">
               El carrito no asegura el stock
             </p>
           </div>
         </div>
       </div>
+
+      <style>{`
+        .carrito-layout {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 1.5rem;
+        }
+
+        @media (min-width: 768px) {
+          .carrito-layout {
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+          }
+        }
+
+        .carrito-items {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        .cart-item-card {
+          background: var(--bg-secondary);
+          padding: 1rem;
+          border-radius: 1rem;
+          display: grid;
+          grid-template-columns: 80px 1fr auto;
+          gap: 1rem;
+          align-items: start;
+        }
+
+        @media (min-width: 640px) {
+          .cart-item-card {
+            grid-template-columns: 120px 1fr auto;
+            padding: 1.5rem;
+            gap: 1.5rem;
+          }
+        }
+
+        .cart-item-image {
+          width: 80px;
+          height: 80px;
+          object-fit: cover;
+          border-radius: 0.75rem;
+        }
+
+        @media (min-width: 640px) {
+          .cart-item-image {
+            width: 120px;
+            height: 120px;
+          }
+        }
+
+        .cart-item-content {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .cart-item-title {
+          margin-bottom: 0.5rem;
+          font-size: 1rem;
+          font-weight: 600;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+        }
+
+        @media (min-width: 640px) {
+          .cart-item-title {
+            font-size: 1.125rem;
+          }
+        }
+
+        .cart-item-description {
+          color: var(--text-secondary);
+          font-size: 0.875rem;
+          margin-bottom: 1rem;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+        }
+
+        @media (min-width: 640px) {
+          .cart-item-description {
+            font-size: 0.9375rem;
+          }
+        }
+
+        .cart-item-actions {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+
+        @media (min-width: 640px) {
+          .cart-item-actions {
+            flex-direction: row;
+            align-items: center;
+            gap: 1rem;
+          }
+        }
+
+        .quantity-selector {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          background: var(--bg-tertiary);
+          padding: 0.5rem;
+          border-radius: 0.5rem;
+          width: fit-content;
+        }
+
+        .quantity-btn {
+          padding: 0.25rem 0.5rem;
+          background: transparent;
+          color: var(--text-primary);
+          border: none;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: opacity 0.2s;
+        }
+
+        .quantity-btn:hover {
+          opacity: 0.7;
+        }
+
+        .quantity-value {
+          font-weight: 600;
+          min-width: 30px;
+          text-align: center;
+        }
+
+        .cart-item-price {
+          font-size: 1.125rem;
+          font-weight: 700;
+          color: var(--primary);
+        }
+
+        @media (min-width: 640px) {
+          .cart-item-price {
+            font-size: 1.25rem;
+          }
+        }
+
+        .remove-btn {
+          padding: 0.5rem;
+          background: var(--error);
+          color: white;
+          border: none;
+          border-radius: 0.5rem;
+          cursor: pointer;
+          height: fit-content;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: opacity 0.2s;
+        }
+
+        .remove-btn:hover {
+          opacity: 0.9;
+        }
+
+        .order-summary {
+          background: var(--bg-secondary);
+          padding: 1.5rem;
+          border-radius: 1rem;
+          height: fit-content;
+        }
+
+        @media (min-width: 768px) {
+          .order-summary {
+            position: sticky;
+            top: 100px;
+            padding: 2rem;
+          }
+        }
+
+        .summary-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 0.75rem;
+          padding-bottom: 0.75rem;
+          border-bottom: 1px solid var(--border);
+          font-size: 0.9375rem;
+        }
+
+        .summary-value {
+          font-weight: 600;
+        }
+
+        .summary-free {
+          color: var(--success);
+        }
+
+        .summary-total {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 1.5rem;
+          padding-top: 0.75rem;
+        }
+
+        .summary-total > span:first-child {
+          font-size: 1.125rem;
+          font-weight: 700;
+        }
+
+        @media (min-width: 640px) {
+          .summary-total > span:first-child {
+            font-size: 1.25rem;
+          }
+        }
+
+        .total-value {
+          font-size: 1.25rem;
+          font-weight: 700;
+          color: var(--primary);
+        }
+
+        @media (min-width: 640px) {
+          .total-value {
+            font-size: 1.5rem;
+          }
+        }
+
+        .checkout-btn {
+          width: 100%;
+          padding: 1rem;
+          font-size: 1rem;
+        }
+
+        @media (min-width: 640px) {
+          .checkout-btn {
+            font-size: 1.125rem;
+          }
+        }
+
+        .cart-disclaimer {
+          font-size: 0.8125rem;
+          color: var(--text-secondary);
+          margin-top: 1rem;
+          text-align: center;
+        }
+
+        @media (min-width: 640px) {
+          .cart-disclaimer {
+            font-size: 0.875rem;
+          }
+        }
+      `}</style>
     </div>
   );
 };
