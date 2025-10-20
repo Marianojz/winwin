@@ -10,7 +10,7 @@ import { Product, Auction, Order, OrderStatus } from '../types';
 
 const AdminPanelPro = () => {
   const { 
-    user, auctions, products, bots, orders, notifications,
+    user, auctions, products, bots, orders,
     addBot, updateBot, deleteBot, setProducts, setAuctions, updateOrderStatus 
   } = useStore();
   
