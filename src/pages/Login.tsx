@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, LogIn } from 'lucide-react';
+import GoogleSignIn from '../components/GoogleSignIn';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
@@ -139,6 +140,19 @@ const Login = () => {
               <LogIn size={20} />
               {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </button>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '1rem', 
+              margin: '1.5rem 0',
+              color: 'var(--text-secondary)'
+            }}>
+              <div style={{ flex: 1, height: '1px', background: 'var(--border)' }}></div>
+              <span style={{ fontSize: '0.875rem' }}>O continuar con</span>
+              <div style={{ flex: 1, height: '1px', background: 'var(--border)' }}></div>
+            </div>
+
+            <GoogleSignIn />
           </form>
 
           <div className="auth-footer">
