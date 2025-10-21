@@ -1633,15 +1633,16 @@ useEffect(() => {
                         <CheckCircle size={16} style={{ display: 'inline', marginRight: '0.5rem', color: 'var(--primary)' }} />
                         Entregado: {new Date(selectedOrder.deliveredAt).toLocaleString('es-AR')}
                       </div>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           </div>
         </div>
       )}
 
-        </div>  {
-          
-{/* Modal de Detalles de Usuario */}
+      {/* Modal de Detalles de Usuario */}
       {selectedUser && (
         <UserDetailsModal 
           user={selectedUser}
