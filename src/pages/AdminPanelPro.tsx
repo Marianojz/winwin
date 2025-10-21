@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Eye, Edit, Trash2, Users, Award, Clock } from 'lucide-react';
+import { 
+  Eye, Edit, Trash2, Users, Award, Clock, AlertCircle, Activity, RefreshCw,
+  Gavel, Package, Bot, TrendingUp, DollarSign, Plus, CheckCircle, XCircle, 
+  Truck, FileText, Download, Search, Filter, Calendar, ShoppingBag, Timer, 
+  AlertTriangle, MapPin, BarChart3
+} from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import UserDetailsModal from '../components/UserDetailsModal';
@@ -719,7 +724,7 @@ useEffect(() => {
         </h3>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <span style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>
-            Total: <strong style={{ color: 'var(--primary)' }}>{activeUsers}</strong> usuarios
+            Total: <strong style={{ color: 'var(--primary)' }}>{realUsers.length}</strong> usuarios
           </span>
         </div>
       </div>
@@ -728,67 +733,85 @@ useEffect(() => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
           <div style={{ textAlign: 'center', padding: '1rem' }}>
             <Award size={24} color="var(--primary)" style={{ marginBottom: '0.5rem' }} />
-            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--primary)' }}>5</div>
+            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--primary)' }}>
+              {realUsers.filter(u => u.role === 'admin').length}
+            </div>
             <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Administradores</div>
           </div>
           <div style={{ textAlign: 'center', padding: '1rem' }}>
             <Users size={24} color="var(--success)" style={{ marginBottom: '0.5rem' }} />
-            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--success)' }}>{activeUsers}</div>
+            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--success)' }}>
+              {realUsers.filter(u => u.active).length}
+            </div>
             <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Usuarios Activos</div>
           </div>
           <div style={{ textAlign: 'center', padding: '1rem' }}>
             <Clock size={24} color="var(--warning)" style={{ marginBottom: '0.5rem' }} />
-            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--warning)' }}>23</div>
-            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Nuevos Hoy</div>
+            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--warning)' }}>
+              {realUsers.length}
+            </div>
+            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Total Registrados</div>
           </div>
         </div>
       </div>
 
       <div style={{ overflowX: 'auto' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {[
-            { id: '1', name: 'Juan Pérez', email: 'juan@email.com', role: 'Usuario', status: 'Activo', orders: 12 },
-            { id: '2', name: 'María García', email: 'maria@email.com', role: 'Usuario', status: 'Activo', orders: 8 },
-            { id: '3', name: 'Carlos López', email: 'carlos@email.com', role: 'Usuario', status: 'Activo', orders: 15 },
-            { id: '4', name: user?.username || 'Admin', email: user?.email || 'admin@email.com', role: 'Admin', status: 'Activo', orders: 0 }
-          ].map((mockUser) => (
-            <div key={mockUser.id} style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: '200px' }}>
-                <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{mockUser.name}</div>
-                <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{mockUser.email}</div>
-              </div>
-              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                {mockUser.orders} pedidos
-              </div>
-              <span className={mockUser.role === 'Admin' ? 'badge badge-warning' : 'badge badge-success'}>
-                {mockUser.role}
-              </span>
-              <span className={mockUser.status === 'Activo' ? 'badge badge-success' : 'badge badge-error'}>
-                {mockUser.status}
-              </span>
-              <button 
-                className="btn btn-outline" 
-                style={{ padding: '0.5rem 0.75rem', fontSize: '0.875rem' }}
-                onClick={() => alert(`Ver detalles de ${mockUser.name}`)}
-              >
-                <Eye size={16} />
-                Ver
-              </button>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button className="btn btn-outline" style={{ padding: '0.5rem' }}>
-                  <Edit size={16} />
-                </button>
-                {mockUser.role !== 'Admin' && (
-                  <button style={{ padding: '0.5rem', background: 'var(--error)', color: 'white', borderRadius: '0.5rem', border: 'none', cursor: 'pointer' }}>
-                    <Trash2 size={16} />
-                  </button>
-                )}
-              </div>
+          {loadingUsers ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+              Cargando usuarios...
             </div>
-          ))}
+          ) : realUsers.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+              No hay usuarios registrados
+            </div>
+          ) : (
+            realUsers.map((realUser) => (
+              <div key={realUser.id} style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <div style={{ fontWeight: 600, marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <img 
+                      src={realUser.avatar} 
+                      alt={realUser.username} 
+                      style={{ 
+                        width: '30px', 
+                        height: '30px', 
+                        borderRadius: '50%',
+                        border: '2px solid var(--primary)'
+                      }} 
+                    />
+                    {realUser.username}
+                  </div>
+                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{realUser.email}</div>
+                </div>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  DNI: {realUser.dni || 'Sin DNI'}
+                </div>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  {realUser.locality || 'Sin localidad'}, {realUser.province || 'Sin provincia'}
+                </div>
+                <span className={realUser.role === 'admin' ? 'badge badge-warning' : 'badge badge-success'}>
+                  {realUser.role === 'admin' ? 'Admin' : 'Usuario'}
+                </span>
+                <span className={realUser.active ? 'badge badge-success' : 'badge badge-error'}>
+                  {realUser.active ? 'Activo' : 'Suspendido'}
+                </span>
+                <button 
+                  className="btn btn-outline" 
+                  style={{ padding: '0.5rem 0.75rem', fontSize: '0.875rem' }}
+                  onClick={() => setSelectedUser(realUser)}
+                >
+                  <Eye size={16} />
+                  Ver
+                </button>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
+  </div>
+)}
 
     <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
       <p style={{ marginBottom: '0.5rem' }}>💡 <strong>Nota:</strong> Esta es una vista previa con datos de ejemplo.</p>
@@ -1623,6 +1646,20 @@ useEffect(() => {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+};
+{/* Modal de Detalles de Usuario */}
+      {selectedUser && (
+        <UserDetailsModal 
+          user={selectedUser}
+          onClose={() => setSelectedUser(null)}
+          onUpdate={() => {
+            loadUsers();
+            setSelectedUser(null);
+          }}
+        />
       )}
     </div>
   );
