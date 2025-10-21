@@ -1647,9 +1647,9 @@ useEffect(() => {
           </div>
         </div>
       )}
-    </div>
-  );
-};
+
+        </div>  {
+          
 {/* Modal de Detalles de Usuario */}
       {selectedUser && (
         <UserDetailsModal 
