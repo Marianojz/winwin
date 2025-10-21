@@ -200,14 +200,24 @@ const MapPicker = ({ onLocationSelect, initialPosition = [-34.6037, -58.3816], l
       />
       {address && (
         <div style={{ 
-          padding: '0.75rem', 
+          padding: '1rem', 
           background: 'var(--bg-tertiary)', 
-          borderRadius: '0.5rem',
-          fontSize: '0.875rem',
-          color: 'var(--text-secondary)'
+          borderRadius: '0.75rem',
+          fontSize: '0.9rem',
+          color: 'var(--text-primary)',
+          border: '1px solid var(--border-color)'
         }}>
-          <strong>📍 Ubicación seleccionada:</strong><br />
-          {address}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+            <span style={{ fontSize: '1.2rem' }}>📍</span>
+            <div>
+              <strong style={{ color: 'var(--primary)', display: 'block', marginBottom: '0.25rem' }}>
+                Ubicación seleccionada:
+              </strong>
+              <span style={{ color: 'var(--text-secondary)' }}>
+                {address}
+              </span>
+            </div>
+          </div>
         </div>
       )}
       <p style={{ 
