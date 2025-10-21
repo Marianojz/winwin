@@ -280,7 +280,7 @@ const UserDetailsModal = ({ user, onClose, onUpdate }: UserDetailsModalProps) =>
 
               {/* Fecha de Registro */}
               <div>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <label style={{ fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Calendar size={16} />
                   Fecha de Registro
                 </label>
