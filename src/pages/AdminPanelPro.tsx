@@ -799,11 +799,6 @@ useEffect(() => {
                 </div>
               </div>
             </div>
-
-            <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              <p style={{ marginBottom: '0.5rem' }}>💡 <strong>Nota:</strong> Esta es una vista previa con datos de ejemplo.</p>
-              <p style={{ fontSize: '0.875rem' }}>La gestión completa de usuarios estará disponible en la próxima actualización.</p>
-            </div>
           </div>
         )}
 
@@ -1391,6 +1386,18 @@ useEffect(() => {
                   ].map(({ status, label }) => {
                     const count = orders.filter(o => o.status === status).length;
                     const percentage = orders.length > 0 ? (count / orders.length) * 100 : 0;
+
+                  {/* Modal de Detalles de Usuario */}
+      {selectedUser && (
+        <UserDetailsModal 
+          user={selectedUser}
+          onClose={() => setSelectedUser(null)}
+          onUpdate={() => {
+            loadUsers();
+            setSelectedUser(null);
+          }}
+        />
+      )}
                     
                     return (
                       <div key={status}>
