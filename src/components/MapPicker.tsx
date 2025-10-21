@@ -136,14 +136,53 @@ const MapPicker = ({ onLocationSelect, initialPosition = [-34.6037, -58.3816], l
         }
       );
       const data = await response.json();
-      const addr = data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-      setAddress(addr);
-      onLocationSelect(lat, lng, addr);
+      
+      // Extraer los componentes de la dirección de forma detallada
+      const addressDetails = data.address || {};
+      
+      // Construir dirección detallada
+      let detailedAddress = '';
+      
+      // Calle y número
+      if (addressDetails.road) {
+        detailedAddress += addressDetails.road;
+        if (addressDetails.house_number) {
+          detailedAddress += ' ' + addressDetails.house_number;
+        }
+      }
+      
+      // Barrio o localidad
+      if (addressDetails.suburb || addressDetails.neighbourhood) {
+        if (detailedAddress) detailedAddress += ', ';
+        detailedAddress += addressDetails.suburb || addressDetails.neighbourhood;
+      }
+      
+      // Ciudad
+      if (addressDetails.city || addressDetails.town || addressDetails.village) {
+        if (detailedAddress) detailedAddress += ', ';
+        detailedAddress += addressDetails.city || addressDetails.town || addressDetails.village;
+      }
+      
+      // Provincia
+      if (addressDetails.state) {
+        if (detailedAddress) detailedAddress += ', ';
+        detailedAddress += addressDetails.state;
+      }
+      
+      // Si no se pudo construir una dirección detallada, usar la dirección completa o coordenadas
+      if (!detailedAddress) {
+        detailedAddress = data.display_name || `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
+      }
+      
+      console.log('📍 Dirección encontrada:', detailedAddress);
+      setAddress(detailedAddress);
+      onLocationSelect(lat, lng, detailedAddress);
+      
     } catch (error) {
       console.error('Error al obtener dirección:', error);
-      const addr = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-      setAddress(addr);
-      onLocationSelect(lat, lng, addr);
+      const fallbackAddr = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
+      setAddress(fallbackAddr);
+      onLocationSelect(lat, lng, fallbackAddr);
     }
   };
 
