@@ -13,22 +13,43 @@ declare global {
   }
 }
 
-const MapPicker = ({ onLocationSelect, initialPosition = [-34.6037, -58.3816] }: MapPickerProps) => {
+const MapPicker = ({ onLocationSelect, initialPosition = [-34.6037, -58.3816], locality, province }: MapPickerProps) => {
   const mapRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
   const [address, setAddress] = useState('');
   const [mapReady, setMapReady] = useState(false);
 
+  // Verificar que Leaflet esté cargado
   useEffect(() => {
+    const checkLeaflet = setInterval(() => {
+      if (window.L) {
+        console.log('✅ Leaflet cargado correctamente');
+        setMapReady(true);
+        clearInterval(checkLeaflet);
+      }
+    }, 100);
+
+    return () => clearInterval(checkLeaflet);
+  }, []);
+
+  // Inicializar mapa cuando Leaflet esté listo
+  useEffect(() => {
+    if (!mapReady || mapRef.current) return;
+
     const initMap = async () => {
-      let centerPosition = initialPosition || [-34.6037, -58.3816]; // Buenos Aires por defecto
+      let centerPosition = initialPosition || [-34.6037, -58.3816];
       
-      // Si hay localidad y provincia, intentar geocodificar
+      // Geocodificar si hay localidad y provincia
       if (locality && province) {
         try {
           const searchQuery = `${locality}, ${province}, Argentina`;
           const response = await fetch(
-            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`
+            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`,
+            {
+              headers: {
+                'User-Agent': 'SubastaArgenta/1.0'
+              }
+            }
           );
           const data = await response.json();
           
@@ -37,19 +58,27 @@ const MapPicker = ({ onLocationSelect, initialPosition = [-34.6037, -58.3816] }:
             console.log('📍 Mapa centrado en:', locality, province, centerPosition);
           }
         } catch (error) {
-          console.error('Error al geocodificar localidad:', error);
+          console.error('Error al geocodificar:', error);
         }
       }
 
       const mapContainer = document.getElementById('map');
-      if (!mapContainer) return;
+      if (!mapContainer) {
+        console.error('❌ No se encontró el contenedor del mapa');
+        return;
+      }
 
+      const L = window.L;
+
+      // Crear el mapa
       const map = L.map('map').setView(centerPosition, 13);
-
+      
+      // Agregar capa de tiles
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
       }).addTo(map);
 
+      // Crear icono personalizado
       const markerIcon = L.divIcon({
         html: '<div style="font-size: 2rem;">📍</div>',
         className: 'custom-marker',
@@ -57,77 +86,43 @@ const MapPicker = ({ onLocationSelect, initialPosition = [-34.6037, -58.3816] }:
         iconAnchor: [16, 32]
       });
 
+      // Crear marcador
       const marker = L.marker(centerPosition, { 
         icon: markerIcon,
         draggable: true 
       }).addTo(map);
 
+      // Evento al arrastrar el marcador
       marker.on('dragend', () => {
         const position = marker.getLatLng();
-        handleLocationSelect(position.lat, position.lng);
+        updateLocation(position.lat, position.lng);
       });
 
-      map.on('click', (e: L.LeafletMouseEvent) => {
+      // Evento al hacer clic en el mapa
+      map.on('click', (e: any) => {
         marker.setLatLng(e.latlng);
-        handleLocationSelect(e.latlng.lat, e.latlng.lng);
+        updateLocation(e.latlng.lat, e.latlng.lng);
       });
 
       // Seleccionar ubicación inicial
-      handleLocationSelect(centerPosition[0], centerPosition[1]);
+      updateLocation(centerPosition[0], centerPosition[1]);
 
-      setMapInstance(map);
+      mapRef.current = map;
+      markerRef.current = marker;
+
+      console.log('✅ Mapa inicializado correctamente');
     };
 
     initMap();
 
+    // Cleanup al desmontar
     return () => {
-      if (mapInstance) {
-        mapInstance.remove();
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
       }
     };
-  }, [locality, province]);
-    }, 100);
-
-    return () => clearInterval(checkLeaflet);
-  }, []);
-
-  useEffect(() => {
-    if (!mapReady || mapRef.current) return;
-
-    const L = window.L;
-
-    // Crear mapa
-    const map = L.map('map').setView(initialPosition, 13);
-    
-    // Agregar tiles de OpenStreetMap
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
-
-    // Crear marcador
-    const marker = L.marker(initialPosition, { draggable: true }).addTo(map);
-
-    // Evento al mover el marcador
-    marker.on('dragend', async function(e: any) {
-      const position = e.target.getLatLng();
-      await updateLocation(position.lat, position.lng);
-    });
-
-    // Evento al hacer click en el mapa
-    map.on('click', async function(e: any) {
-      const { lat, lng } = e.latlng;
-      marker.setLatLng([lat, lng]);
-      await updateLocation(lat, lng);
-    });
-
-    mapRef.current = map;
-    markerRef.current = marker;
-
-    // Cleanup
-    return () => {
-      map.remove();
-    };
-  }, [mapReady]);
+  }, [mapReady, locality, province]);
 
   const updateLocation = async (lat: number, lng: number) => {
     try {
@@ -135,7 +130,8 @@ const MapPicker = ({ onLocationSelect, initialPosition = [-34.6037, -58.3816] }:
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
         {
           headers: {
-            'Accept-Language': 'es'
+            'Accept-Language': 'es',
+            'User-Agent': 'SubastaArgenta/1.0'
           }
         }
       );
@@ -144,6 +140,7 @@ const MapPicker = ({ onLocationSelect, initialPosition = [-34.6037, -58.3816] }:
       setAddress(addr);
       onLocationSelect(lat, lng, addr);
     } catch (error) {
+      console.error('Error al obtener dirección:', error);
       const addr = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       setAddress(addr);
       onLocationSelect(lat, lng, addr);
