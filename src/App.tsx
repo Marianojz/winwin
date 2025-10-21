@@ -18,6 +18,7 @@ import Carrito from './pages/Carrito';
 import Notificaciones from './pages/Notificaciones';
 import Perfil from './pages/Perfil';
 import AdminPanelPro from './pages/AdminPanelPro';
+import CompletarPerfil from './pages/CompletarPerfil';
 
 function App() {
   const { setAuctions, setProducts, setUser, theme } = useStore();
@@ -66,6 +67,7 @@ function App() {
             <Route path="/terminos" element={<Terminos />} />
 <Route path="/preguntas" element={<Preguntas />} />
             <Route path="/admin" element={<AdminPanelPro />} />
+            <Route path="/completar-perfil" element={<CompletarPerfil />} />
           </Routes>
         </main>
         <footer className="footer">
