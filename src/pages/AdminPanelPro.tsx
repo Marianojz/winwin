@@ -709,99 +709,93 @@ useEffect(() => {
         )}
 
        {/* USERS TAB */}
-        {activeTab === 'users' && (
-          <div>
-            <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)', marginBottom: '2rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <Users size={28} />
-                  Gestión de Usuarios
-                </h3>
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>
-                    Total: <strong style={{ color: 'var(--primary)' }}>{activeUsers}</strong> usuarios
-                  </span>
-                </div>
-              </div>
+{activeTab === 'users' && (
+  <div>
+    <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)', marginBottom: '2rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Users size={28} />
+          Gestión de Usuarios
+        </h3>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>
+            Total: <strong style={{ color: 'var(--primary)' }}>{activeUsers}</strong> usuarios
+          </span>
+        </div>
+      </div>
 
-              <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem', marginBottom: '1.5rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                  <div style={{ textAlign: 'center', padding: '1rem' }}>
-                    <Award size={24} color="var(--primary)" style={{ marginBottom: '0.5rem' }} />
-                    <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--primary)' }}>5</div>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Administradores</div>
-                  </div>
-                  <div style={{ textAlign: 'center', padding: '1rem' }}>
-                    <Users size={24} color="var(--success)" style={{ marginBottom: '0.5rem' }} />
-                    <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--success)' }}>{activeUsers}</div>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Usuarios Activos</div>
-                  </div>
-                  <div style={{ textAlign: 'center', padding: '1rem' }}>
-                    <Clock size={24} color="var(--warning)" style={{ marginBottom: '0.5rem' }} />
-                    <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--warning)' }}>23</div>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Nuevos Hoy</div>
-                  </div>
-                </div>
-              </div>
+      <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+          <div style={{ textAlign: 'center', padding: '1rem' }}>
+            <Award size={24} color="var(--primary)" style={{ marginBottom: '0.5rem' }} />
+            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--primary)' }}>5</div>
+            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Administradores</div>
+          </div>
+          <div style={{ textAlign: 'center', padding: '1rem' }}>
+            <Users size={24} color="var(--success)" style={{ marginBottom: '0.5rem' }} />
+            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--success)' }}>{activeUsers}</div>
+            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Usuarios Activos</div>
+          </div>
+          <div style={{ textAlign: 'center', padding: '1rem' }}>
+            <Clock size={24} color="var(--warning)" style={{ marginBottom: '0.5rem' }} />
+            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--warning)' }}>23</div>
+            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Nuevos Hoy</div>
+          </div>
+        </div>
+      </div>
 
-              <div style={{ overflowX: 'auto' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {loadingUsers ? (
-  <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-    <div className="loader" style={{ margin: '0 auto 1rem' }}></div>
-    Cargando usuarios...
-  </div>
-) : realUsers.length === 0 ? (
-  <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-    No hay usuarios registrados
-  </div>
-) : (
-  realUsers.map((realUser) => (
-                    <div key={realUser.id} style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-  <div style={{ flex: 1, minWidth: '200px' }}>
-    <div style={{ fontWeight: 600, marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-      <img 
-        src={realUser.avatar} 
-        alt={realUser.username} 
-        style={{ 
-          width: '30px', 
-          height: '30px', 
-          borderRadius: '50%',
-          border: '2px solid var(--primary)'
-        }} 
-      />
-      {realUser.username}
-    </div>
-    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{realUser.email}</div>
-  </div>
-  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-    DNI: {realUser.dni || 'Sin DNI'}
-  </div>
-  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-    {realUser.locality || 'Sin localidad'}, {realUser.province || 'Sin provincia'}
-  </div>
-  <span className={realUser.role === 'admin' ? 'badge badge-warning' : 'badge badge-success'}>
-    {realUser.role === 'admin' ? 'Admin' : 'Usuario'}
-  </span>
-  <span className={realUser.active ? 'badge badge-success' : 'badge badge-error'}>
-    {realUser.active ? 'Activo' : 'Suspendido'}
-  </span>
-  <button 
-    className="btn btn-outline" 
-    style={{ padding: '0.5rem 0.75rem', fontSize: '0.875rem' }}
-    onClick={() => setSelectedUser(realUser)}
-  >
-    <Eye size={16} />
-    Ver
-  </button>
-</div>
-                  ))}
-                </div>
+      <div style={{ overflowX: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {[
+            { id: '1', name: 'Juan Pérez', email: 'juan@email.com', role: 'Usuario', status: 'Activo', orders: 12 },
+            { id: '2', name: 'María García', email: 'maria@email.com', role: 'Usuario', status: 'Activo', orders: 8 },
+            { id: '3', name: 'Carlos López', email: 'carlos@email.com', role: 'Usuario', status: 'Activo', orders: 15 },
+            { id: '4', name: user?.username || 'Admin', email: user?.email || 'admin@email.com', role: 'Admin', status: 'Activo', orders: 0 }
+          ].map((mockUser) => (
+            <div key={mockUser.id} style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '200px' }}>
+                <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{mockUser.name}</div>
+                <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{mockUser.email}</div>
+              </div>
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                {mockUser.orders} pedidos
+              </div>
+              <span className={mockUser.role === 'Admin' ? 'badge badge-warning' : 'badge badge-success'}>
+                {mockUser.role}
+              </span>
+              <span className={mockUser.status === 'Activo' ? 'badge badge-success' : 'badge badge-error'}>
+                {mockUser.status}
+              </span>
+              <button 
+                className="btn btn-outline" 
+                style={{ padding: '0.5rem 0.75rem', fontSize: '0.875rem' }}
+                onClick={() => alert(`Ver detalles de ${mockUser.name}`)}
+              >
+                <Eye size={16} />
+                Ver
+              </button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="btn btn-outline" style={{ padding: '0.5rem' }}>
+                  <Edit size={16} />
+                </button>
+                {mockUser.role !== 'Admin' && (
+                  <button style={{ padding: '0.5rem', background: 'var(--error)', color: 'white', borderRadius: '0.5rem', border: 'none', cursor: 'pointer' }}>
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
             </div>
-          </div>
-        )}
+          ))}
+        </div>
+      </div>
+    </div>
 
+    <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+      <p style={{ marginBottom: '0.5rem' }}>💡 <strong>Nota:</strong> Esta es una vista previa con datos de ejemplo.</p>
+      <p style={{ fontSize: '0.875rem' }}>La gestión completa de usuarios estará disponible en la próxima actualización.</p>
+    </div>
+  </div>
+)}
         {/* AUCTIONS TAB */}
         {activeTab === 'auctions' && (
           <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
