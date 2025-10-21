@@ -1,9 +1,8 @@
-import { useState } from 'react';
-import { 
-  Users, Gavel, Package, Bot, TrendingUp, DollarSign, Plus, Edit, Trash2, RefreshCw, AlertCircle, 
-  Clock, CheckCircle, XCircle, Truck, FileText, Download, Eye, Search, Filter, Calendar, Activity,
-  ShoppingBag, Timer, AlertTriangle, MapPin, BarChart3, Award
-} from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Eye, Edit, Trash2, Users, Award, Clock } from 'lucide-react';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import UserDetailsModal from '../components/UserDetailsModal';
 import { useStore } from '../store/useStore';
 import { formatCurrency } from '../utils/helpers';
 import { Product, Auction, Order, OrderStatus } from '../types';
@@ -15,6 +14,9 @@ const AdminPanelPro = () => {
   } = useStore();
   
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [realUsers, setRealUsers] = useState<any[]>([]);
+const [selectedUser, setSelectedUser] = useState<any>(null);
+const [loadingUsers, setLoadingUsers] = useState(true);
   
   // Estados para productos
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -54,6 +56,32 @@ const AdminPanelPro = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<OrderStatus | 'all'>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  // Cargar usuarios reales de Firebase
+const loadUsers = async () => {
+  setLoadingUsers(true);
+  try {
+    const usersQuery = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+    const usersSnapshot = await getDocs(usersQuery);
+    const usersData = usersSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    setRealUsers(usersData);
+    console.log('✅ Usuarios cargados:', usersData.length);
+  } catch (error) {
+    console.error('❌ Error al cargar usuarios:', error);
+  } finally {
+    setLoadingUsers(false);
+  }
+};
+
+// useEffect para cargar usuarios al montar el componente
+useEffect(() => {
+  if (activeTab === 'users') {
+    loadUsers();
+  }
+}, [activeTab]);
 
   // Protección de acceso
   if (!user?.isAdmin) {
@@ -718,45 +746,55 @@ const AdminPanelPro = () => {
 
               <div style={{ overflowX: 'auto' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {[
-                    { id: '1', name: 'Juan Pérez', email: 'juan@email.com', role: 'Usuario', status: 'Activo', orders: 12 },
-                    { id: '2', name: 'María García', email: 'maria@email.com', role: 'Usuario', status: 'Activo', orders: 8 },
-                    { id: '3', name: 'Carlos López', email: 'carlos@email.com', role: 'Usuario', status: 'Activo', orders: 15 },
-                    { id: '4', name: user?.username || 'Admin', email: user?.email || 'admin@email.com', role: 'Admin', status: 'Activo', orders: 0 }
-                  ].map((mockUser) => (
-                    <div key={mockUser.id} style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                      <div style={{ flex: 1, minWidth: '200px' }}>
-                        <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{mockUser.name}</div>
-                        <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{mockUser.email}</div>
-                      </div>
-                      <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                        {mockUser.orders} pedidos
-                      </div>
-                      <span className={mockUser.role === 'Admin' ? 'badge badge-warning' : 'badge badge-success'}>
-                        {mockUser.role}
-                      </span>
-                      <span className={mockUser.status === 'Activo' ? 'badge badge-success' : 'badge badge-error'}>
-                        {mockUser.status}
-                      </span>
-                      <button 
-                        className="btn btn-outline" 
-                        style={{ padding: '0.5rem 0.75rem', fontSize: '0.875rem' }}
-                        onClick={() => alert(`Ver detalles de ${mockUser.name}`)}
-                      >
-                        <Eye size={16} />
-                        Ver
-                      </button>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button className="btn btn-outline" style={{ padding: '0.5rem' }}>
-                          <Edit size={16} />
-                        </button>
-                        {mockUser.role !== 'Admin' && (
-                          <button style={{ padding: '0.5rem', background: 'var(--error)', color: 'white', borderRadius: '0.5rem', border: 'none', cursor: 'pointer' }}>
-                            <Trash2 size={16} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                  {loadingUsers ? (
+  <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+    <div className="loader" style={{ margin: '0 auto 1rem' }}></div>
+    Cargando usuarios...
+  </div>
+) : realUsers.length === 0 ? (
+  <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+    No hay usuarios registrados
+  </div>
+) : (
+  realUsers.map((realUser) => (
+                    <div key={realUser.id} style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+  <div style={{ flex: 1, minWidth: '200px' }}>
+    <div style={{ fontWeight: 600, marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <img 
+        src={realUser.avatar} 
+        alt={realUser.username} 
+        style={{ 
+          width: '30px', 
+          height: '30px', 
+          borderRadius: '50%',
+          border: '2px solid var(--primary)'
+        }} 
+      />
+      {realUser.username}
+    </div>
+    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{realUser.email}</div>
+  </div>
+  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+    DNI: {realUser.dni || 'Sin DNI'}
+  </div>
+  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+    {realUser.locality || 'Sin localidad'}, {realUser.province || 'Sin provincia'}
+  </div>
+  <span className={realUser.role === 'admin' ? 'badge badge-warning' : 'badge badge-success'}>
+    {realUser.role === 'admin' ? 'Admin' : 'Usuario'}
+  </span>
+  <span className={realUser.active ? 'badge badge-success' : 'badge badge-error'}>
+    {realUser.active ? 'Activo' : 'Suspendido'}
+  </span>
+  <button 
+    className="btn btn-outline" 
+    style={{ padding: '0.5rem 0.75rem', fontSize: '0.875rem' }}
+    onClick={() => setSelectedUser(realUser)}
+  >
+    <Eye size={16} />
+    Ver
+  </button>
+</div>
                   ))}
                 </div>
               </div>
