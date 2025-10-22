@@ -189,12 +189,15 @@ useEffect(() => {
   buyNowPrice: 0,
   categoryId: '1',
   images: [],
-  durationDays: 7,
+  durationDays: 0,
   durationHours: 0,
-  durationMinutes: 0,
+  durationMinutes: 30,
   condition: 'new',
   featured: false,
-  allowExtension: true
+  allowExtension: true,
+  scheduled: false,
+  scheduledDate: '',
+  scheduledTime: ''
 });
     setActiveTab('edit-auction');
   };
