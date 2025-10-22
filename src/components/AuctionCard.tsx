@@ -13,31 +13,74 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
   const lastThreeBids = auction.bids.slice(-3).reverse();
 
   return (
-    <Link to={`/subastas/${auction.id}`} className="auction-card">
-      const AuctionCard = ({ auction }: AuctionCardProps) => {
-  const navigate = useNavigate();
-
-  return (
-    <div 
+    <Link 
+      to={`/subastas/${auction.id}`} 
       className={`auction-card ${auction.featured ? 'featured-auction' : ''} ${auction.isFlash ? 'flash-auction' : ''}`}
       style={{
         ...(auction.featured && {
           border: '3px solid var(--primary)',
           boxShadow: '0 8px 24px rgba(255, 107, 0, 0.3)',
-          transform: 'scale(1.02)'
         }),
         ...(auction.isFlash && {
           background: 'linear-gradient(135deg, var(--bg-secondary) 0%, rgba(255, 107, 0, 0.1) 100%)',
-          animation: 'pulse-border 2s infinite'
         })
       }}
-          </div>
-        )}
+    >
+      <div className="auction-card-image">
+        <img src={auction.images[0]} alt={auction.title} loading="lazy" />
+        
+        {/* Badges de estado (izquierda) */}
+        <div style={{ position: 'absolute', top: '0.75rem', left: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', zIndex: 10 }}>
+          {auction.featured && (
+            <div style={{
+              background: 'linear-gradient(135deg, #FFD700, #FFA500)',
+              color: '#000',
+              padding: '0.5rem 0.75rem',
+              borderRadius: '0.5rem',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+              boxShadow: '0 4px 12px rgba(255, 215, 0, 0.5)',
+              animation: 'shine 3s infinite'
+            }}>
+              ⭐ DESTACADA
+            </div>
+          )}
+          {auction.isFlash && (
+            <div style={{
+              background: 'linear-gradient(135deg, #FF4444, #FF6B00)',
+              color: '#fff',
+              padding: '0.5rem 0.75rem',
+              borderRadius: '0.5rem',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+              boxShadow: '0 4px 12px rgba(255, 68, 68, 0.5)',
+              animation: 'flash-pulse 1s infinite'
+            }}>
+              ⚡ RELÁMPAGO
+            </div>
+          )}
+          {auction.status === 'active' && !auction.featured && !auction.isFlash && (
+            <div className="auction-card-badge badge-success">
+              <Gavel size={14} />
+              Activa
+            </div>
+          )}
+        </div>
+
+        {/* Badge de compra directa (derecha) */}
         {auction.buyNowPrice && (
           <div className="auction-card-buynow">
             <DollarSign size={16} />
             Compra Directa
           </div>
+        )}
+      </div>
         )}
       </div>
 
