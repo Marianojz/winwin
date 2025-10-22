@@ -974,7 +974,23 @@ useEffect(() => {
         {activeTab === 'create-auction' && (
           <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
             <button 
-              onClick={() => setActiveTab('auctions')}
+              onClick={() => {
+                if (auctionForm.title || auctionForm.description || auctionForm.startPrice > 0) {
+                  if (window.confirm('¿Descartar los cambios y volver?')) {
+                    setAuctionForm({
+                      title: '',
+                      description: '',
+                      startPrice: 0,
+                      currentPrice: 0,
+                      buyNowPrice: 0,
+                      categoryId: '1'
+                    });
+                    setActiveTab('auctions');
+                  }
+                } else {
+                  setActiveTab('auctions');
+                }
+              }}
               style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
@@ -997,37 +1013,184 @@ useEffect(() => {
             </h3>
             
             <div style={{ display: 'grid', gap: '1.5rem' }}>
+              {/* Título */}
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Título de la Subasta</label>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                  Título de la Subasta *
+                </label>
                 <input 
                   type="text" 
-                  placeholder="Ej: iPhone 14 Pro Max 256GB Nuevo"
+                  placeholder="Ej: iPhone 14 Pro Max 256GB Nuevo en Caja"
                   value={auctionForm.title}
                   onChange={(e) => setAuctionForm({...auctionForm, title: e.target.value})}
                   style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                  maxLength={100}
                 />
+                <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                  {auctionForm.title.length}/100 caracteres
+                </div>
               </div>
 
+              {/* Descripción */}
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Descripción Completa</label>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                  Descripción Completa *
+                </label>
                 <textarea 
-                  placeholder="Describe el producto en detalle: características, estado, accesorios incluidos..."
+                  placeholder="Describe el producto en detalle: características técnicas, estado, accesorios incluidos, garantía, etc..."
                   value={auctionForm.description}
                   onChange={(e) => setAuctionForm({...auctionForm, description: e.target.value})}
-                  rows={5}
+                  rows={6}
                   style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem', resize: 'vertical' }}
+                  maxLength={1000}
                 />
+                <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                  {auctionForm.description.length}/1000 caracteres
+                </div>
               </div>
 
+              {/* Carga de Imágenes */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                  Imágenes del Producto * (Máximo 3)
+                </label>
+                <div style={{ 
+                  border: '2px dashed var(--border)', 
+                  borderRadius: '0.75rem', 
+                  padding: '2rem',
+                  textAlign: 'center',
+                  background: 'var(--bg-tertiary)'
+                }}>
+                  <input 
+                    type="file" 
+                    id="auction-images"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    multiple
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      
+                      // Validar cantidad
+                      if (files.length > 3) {
+                        alert('⚠️ Máximo 3 imágenes permitidas');
+                        e.target.value = '';
+                        return;
+                      }
+
+                      // Validar tamaño (máximo 2MB por imagen)
+                      const maxSize = 2 * 1024 * 1024; // 2MB
+                      const oversizedFiles = files.filter(f => f.size > maxSize);
+                      
+                      if (oversizedFiles.length > 0) {
+                        alert('⚠️ Cada imagen debe pesar menos de 2MB\n\nImágenes rechazadas:\n' + 
+                          oversizedFiles.map(f => `• ${f.name} (${(f.size / 1024 / 1024).toFixed(2)}MB)`).join('\n'));
+                        e.target.value = '';
+                        return;
+                      }
+
+                      // Procesar imágenes válidas
+                      const readers = files.map(file => {
+                        return new Promise<string>((resolve) => {
+                          const reader = new FileReader();
+                          reader.onload = (e) => resolve(e.target?.result as string);
+                          reader.readAsDataURL(file);
+                        });
+                      });
+
+                      Promise.all(readers).then(images => {
+                        setAuctionForm({...auctionForm, images: images as any});
+                      });
+                    }}
+                    style={{ display: 'none' }}
+                  />
+                  <label 
+                    htmlFor="auction-images" 
+                    style={{ 
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '1rem'
+                    }}
+                  >
+                    <Package size={48} color="var(--primary)" />
+                    <div>
+                      <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.5rem' }}>
+                        Haz clic para seleccionar imágenes
+                      </div>
+                      <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                        JPG, PNG o WEBP • Máximo 2MB por imagen • Hasta 3 imágenes
+                      </div>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Preview de imágenes */}
+                {(auctionForm as any).images && (auctionForm as any).images.length > 0 && (
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', 
+                    gap: '1rem',
+                    marginTop: '1rem' 
+                  }}>
+                    {(auctionForm as any).images.map((img: string, idx: number) => (
+                      <div key={idx} style={{ position: 'relative', borderRadius: '0.5rem', overflow: 'hidden' }}>
+                        <img 
+                          src={img} 
+                          alt={`Preview ${idx + 1}`}
+                          style={{ width: '100%', height: '150px', objectFit: 'cover' }}
+                        />
+                        <button
+                          onClick={() => {
+                            const newImages = [...(auctionForm as any).images];
+                            newImages.splice(idx, 1);
+                            setAuctionForm({...auctionForm, images: newImages as any});
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: '0.5rem',
+                            right: '0.5rem',
+                            background: 'var(--error)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '28px',
+                            height: '28px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '1.125rem',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Precios */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Precio Inicial</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                    Precio Inicial * (en pesos)
+                  </label>
                   <input 
                     type="number" 
                     placeholder="10000"
-                    value={auctionForm.startPrice}
-                    onChange={(e) => setAuctionForm({...auctionForm, startPrice: Number(e.target.value), currentPrice: Number(e.target.value)})}
+                    value={auctionForm.startPrice || ''}
+                    onChange={(e) => {
+                      const value = e.target.value === '' ? 0 : Number(e.target.value);
+                      setAuctionForm({
+                        ...auctionForm, 
+                        startPrice: value,
+                        currentPrice: value
+                      });
+                    }}
                     style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                    min="0"
                   />
                   <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                     Precio con el que inicia la subasta
@@ -1035,22 +1198,108 @@ useEffect(() => {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Precio Compra Directa (opcional)</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                    Precio Compra Directa (opcional)
+                  </label>
                   <input 
                     type="number" 
-                    placeholder="0 = sin compra directa"
-                    value={auctionForm.buyNowPrice}
-                    onChange={(e) => setAuctionForm({...auctionForm, buyNowPrice: Number(e.target.value)})}
+                    placeholder="Dejar vacío si no aplica"
+                    value={auctionForm.buyNowPrice || ''}
+                    onChange={(e) => {
+                      const value = e.target.value === '' ? 0 : Number(e.target.value);
+                      setAuctionForm({...auctionForm, buyNowPrice: value});
+                    }}
                     style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                    min="0"
                   />
                   <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                    Dejar en 0 si no quieres esta opción
+                    Dejar en 0 o vacío para desactivar
                   </div>
                 </div>
               </div>
 
+              {/* Duración de la Subasta */}
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Categoría del Producto</label>
+                <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 600 }}>
+                  Duración de la Subasta *
+                </label>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
+                  gap: '1rem',
+                  background: 'var(--bg-tertiary)',
+                  padding: '1.25rem',
+                  borderRadius: '0.75rem'
+                }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
+                      Días
+                    </label>
+                    <input 
+                      type="number" 
+                      placeholder="7"
+                      value={(auctionForm as any).durationDays || 7}
+                      onChange={(e) => setAuctionForm({...auctionForm, durationDays: Number(e.target.value) as any})}
+                      style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                      min="0"
+                      max="30"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
+                      Horas
+                    </label>
+                    <input 
+                      type="number" 
+                      placeholder="0"
+                      value={(auctionForm as any).durationHours || 0}
+                      onChange={(e) => setAuctionForm({...auctionForm, durationHours: Number(e.target.value) as any})}
+                      style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                      min="0"
+                      max="23"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
+                      Minutos
+                    </label>
+                    <input 
+                      type="number" 
+                      placeholder="0"
+                      value={(auctionForm as any).durationMinutes || 0}
+                      onChange={(e) => setAuctionForm({...auctionForm, durationMinutes: Number(e.target.value) as any})}
+                      style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                      min="0"
+                      max="59"
+                    />
+                  </div>
+                </div>
+                <div style={{ 
+                  fontSize: '0.875rem', 
+                  color: 'var(--primary)', 
+                  marginTop: '0.75rem',
+                  fontWeight: 600 
+                }}>
+                  ⏱️ Duración total: {
+                    (() => {
+                      const days = (auctionForm as any).durationDays || 7;
+                      const hours = (auctionForm as any).durationHours || 0;
+                      const minutes = (auctionForm as any).durationMinutes || 0;
+                      const parts = [];
+                      if (days > 0) parts.push(`${days} día${days > 1 ? 's' : ''}`);
+                      if (hours > 0) parts.push(`${hours} hora${hours > 1 ? 's' : ''}`);
+                      if (minutes > 0) parts.push(`${minutes} minuto${minutes > 1 ? 's' : ''}`);
+                      return parts.length > 0 ? parts.join(', ') : '0 minutos';
+                    })()
+                  }
+                </div>
+              </div>
+
+              {/* Categoría */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                  Categoría del Producto *
+                </label>
                 <select 
                   value={auctionForm.categoryId}
                   onChange={(e) => setAuctionForm({...auctionForm, categoryId: e.target.value})}
@@ -1065,37 +1314,96 @@ useEffect(() => {
                 </select>
               </div>
 
+              {/* Estado del Producto */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                  Estado del Producto *
+                </label>
+                <select 
+                  value={(auctionForm as any).condition || 'new'}
+                  onChange={(e) => setAuctionForm({...auctionForm, condition: e.target.value as any})}
+                  style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                >
+                  <option value="new">🆕 Nuevo (sin usar)</option>
+                  <option value="like-new">✨ Como Nuevo (usado 1-2 veces)</option>
+                  <option value="excellent">⭐ Excelente (usado, impecable)</option>
+                  <option value="good">👍 Muy Bueno (señales leves de uso)</option>
+                  <option value="fair">👌 Bueno (usado, funcional)</option>
+                </select>
+              </div>
+
+              {/* Opciones adicionales */}
               <div style={{ 
-                background: 'var(--warning)', 
+                background: 'var(--bg-tertiary)', 
+                padding: '1.25rem', 
+                borderRadius: '0.75rem'
+              }}>
+                <h4 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Opciones Adicionales</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+                    <input 
+                      type="checkbox"
+                      checked={(auctionForm as any).featured || false}
+                      onChange={(e) => setAuctionForm({...auctionForm, featured: e.target.checked as any})}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    />
+                    <span>⭐ Marcar como Destacada (aparecerá primero en la lista)</span>
+                  </label>
+                  
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+                    <input 
+                      type="checkbox"
+                      checked={(auctionForm as any).allowExtension || true}
+                      onChange={(e) => setAuctionForm({...auctionForm, allowExtension: e.target.checked as any})}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    />
+                    <span>🕐 Permitir extensión automática (si hay ofertas en los últimos 5 min)</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Cuadro de Importante */}
+              <div style={{ 
+                background: '#FFA500', 
+                color: '#000',
                 padding: '1.25rem', 
                 borderRadius: '0.75rem',
                 display: 'flex',
                 gap: '1rem',
                 alignItems: 'start',
-                border: '2px solid var(--primary)'
+                border: '2px solid #FF8C00'
               }}>
                 <AlertCircle size={22} style={{ flexShrink: 0, marginTop: '2px' }} />
                 <div style={{ fontSize: '0.9375rem' }}>
                   <strong>📝 Importante:</strong>
                   <ul style={{ marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.25rem' }}>
-                    <li>La subasta durará <strong>7 días</strong> desde su creación</li>
-                    <li>Se creará automáticamente en estado <strong>"activa"</strong></li>
-                    <li>Las imágenes serán de ejemplo hasta implementar carga personalizada</li>
+                    <li>La subasta se creará en estado <strong>"activa"</strong> inmediatamente</li>
                     <li>Las ofertas deben ser múltiplos de <strong>$500</strong></li>
+                    <li>Si no subes imágenes, se usarán imágenes de ejemplo</li>
+                    <li>La duración mínima recomendada es <strong>1 día</strong></li>
                   </ul>
                 </div>
               </div>
 
+              {/* Botones */}
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button 
                   onClick={() => {
-                    // Validación
+                    // Validaciones
                     if (!auctionForm.title.trim()) {
                       alert('⚠️ Por favor ingresa un título para la subasta');
                       return;
                     }
+                    if (auctionForm.title.trim().length < 10) {
+                      alert('⚠️ El título debe tener al menos 10 caracteres');
+                      return;
+                    }
                     if (!auctionForm.description.trim()) {
                       alert('⚠️ Por favor ingresa una descripción');
+                      return;
+                    }
+                    if (auctionForm.description.trim().length < 20) {
+                      alert('⚠️ La descripción debe tener al menos 20 caracteres');
                       return;
                     }
                     if (auctionForm.startPrice <= 0) {
@@ -1107,19 +1415,36 @@ useEffect(() => {
                       return;
                     }
 
+                    // Calcular duración
+                    const days = (auctionForm as any).durationDays || 7;
+                    const hours = (auctionForm as any).durationHours || 0;
+                    const minutes = (auctionForm as any).durationMinutes || 0;
+                    const totalMinutes = (days * 24 * 60) + (hours * 60) + minutes;
+
+                    if (totalMinutes < 60) {
+                      alert('⚠️ La duración mínima de la subasta es 1 hora');
+                      return;
+                    }
+
+                    // Preparar imágenes
+                    let images = (auctionForm as any).images || [];
+                    if (images.length === 0) {
+                      images = [
+                        'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800',
+                        'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800'
+                      ];
+                    }
+
                     // Crear nueva subasta
                     const newAuction = {
                       id: Date.now().toString(),
                       title: auctionForm.title.trim(),
                       description: auctionForm.description.trim(),
-                      images: [
-                        'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800',
-                        'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800'
-                      ],
+                      images: images,
                       startPrice: auctionForm.startPrice,
                       currentPrice: auctionForm.startPrice,
                       buyNowPrice: auctionForm.buyNowPrice > 0 ? auctionForm.buyNowPrice : undefined,
-                      endTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días
+                      endTime: new Date(Date.now() + totalMinutes * 60 * 1000),
                       status: 'active' as const,
                       categoryId: auctionForm.categoryId,
                       bids: [],
@@ -1139,7 +1464,11 @@ useEffect(() => {
                       categoryId: '1'
                     });
 
-                    // Notificar y volver
+                    // Limpiar input de imágenes
+                    const imageInput = document.getElementById('auction-images') as HTMLInputElement;
+                    if (imageInput) imageInput.value = '';
+
+                    // Notificar
                     alert('✅ ¡Subasta creada exitosamente!\n\n📌 La subasta está ahora activa y visible para todos los usuarios.');
                     setActiveTab('auctions');
                   }}
@@ -1160,6 +1489,8 @@ useEffect(() => {
                           buyNowPrice: 0,
                           categoryId: '1'
                         });
+                        const imageInput = document.getElementById('auction-images') as HTMLInputElement;
+                        if (imageInput) imageInput.value = '';
                         setActiveTab('auctions');
                       }
                     } else {
