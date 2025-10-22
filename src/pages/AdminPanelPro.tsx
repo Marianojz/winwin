@@ -1688,7 +1688,19 @@ useEffect(() => {
                     if (imageInput) imageInput.value = '';
 
                     // Notificar
-                    alert('✅ ¡Subasta creada exitosamente!\n\n📌 La subasta está ahora activa y visible para todos los usuarios.');
+                    const successMessage = auctionForm.scheduled
+                      ? `✅ ¡Subasta programada exitosamente!\n\n📅 Se activará el ${new Date(`${auctionForm.scheduledDate}T${auctionForm.scheduledTime}`).toLocaleString('es-AR')}\n⏱️ Durará ${
+                          (() => {
+                            const parts = [];
+                            if (auctionForm.durationDays > 0) parts.push(`${auctionForm.durationDays} día${auctionForm.durationDays > 1 ? 's' : ''}`);
+                            if (auctionForm.durationHours > 0) parts.push(`${auctionForm.durationHours} hora${auctionForm.durationHours > 1 ? 's' : ''}`);
+                            if (auctionForm.durationMinutes > 0) parts.push(`${auctionForm.durationMinutes} minuto${auctionForm.durationMinutes > 1 ? 's' : ''}`);
+                            return parts.join(', ');
+                          })()
+                        }`
+                      : '✅ ¡Subasta creada exitosamente!\n\n📌 La subasta está ahora activa y visible para todos los usuarios.';
+                    
+                    alert(successMessage);
                     setActiveTab('auctions');
                   }}
                   className="btn btn-primary" 
