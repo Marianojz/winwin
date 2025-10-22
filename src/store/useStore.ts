@@ -62,7 +62,20 @@ export const useStore = create<AppState>((set, get) => ({
   isAuthenticated: false,
 
   // Auctions
-  auctions: JSON.parse(localStorage.getItem('auctions') || '[]'),
+  auctions: (() => {
+    const saved = localStorage.getItem('auctions');
+    if (!saved) return [];
+    const parsed = JSON.parse(saved);
+    // Convertir las fechas de string a Date
+    return parsed.map((a: any) => ({
+      ...a,
+      endTime: new Date(a.endTime),
+      bids: a.bids?.map((b: any) => ({
+        ...b,
+        createdAt: new Date(b.createdAt)
+      })) || []
+    }));
+  })(),
   setAuctions: (auctions) => {
     localStorage.setItem('auctions', JSON.stringify(auctions));
     set({ auctions });
