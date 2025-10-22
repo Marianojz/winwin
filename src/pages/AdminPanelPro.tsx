@@ -1169,7 +1169,9 @@ useEffect(() => {
                     <Package size={48} color="var(--primary)" />
                     <div>
                       <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.5rem' }}>
-                        Haz clic para seleccionar imágenes
+                        {auctionForm.images && auctionForm.images.length > 0 
+                          ? `Agregar más imágenes (${auctionForm.images.length}/3)` 
+                          : 'Haz clic para seleccionar imágenes'}
                       </div>
                       <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                         JPG, PNG o WEBP • Máximo 2MB por imagen • Hasta 3 imágenes
