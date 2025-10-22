@@ -1536,7 +1536,7 @@ useEffect(() => {
                   Estado del Producto *
                 </label>
                 <select 
-                  value={(auctionForm as any).condition || 'new'}
+                  value={auctionForm.condition}
                   onChange={(e) => setAuctionForm({...auctionForm, condition: e.target.value as any})}
                   style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
                 >
@@ -1559,8 +1559,8 @@ useEffect(() => {
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
                     <input 
                       type="checkbox"
-                      checked={(auctionForm as any).featured || false}
-                      onChange={(e) => setAuctionForm({...auctionForm, featured: e.target.checked as any})}
+                      checked={auctionForm.featured}
+                      onChange={(e) => setAuctionForm({...auctionForm, featured: e.target.checked})}
                       style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                     />
                     <span>⭐ Marcar como Destacada (aparecerá primero en la lista)</span>
@@ -1569,8 +1569,8 @@ useEffect(() => {
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
                     <input 
                       type="checkbox"
-                      checked={(auctionForm as any).allowExtension || true}
-                      onChange={(e) => setAuctionForm({...auctionForm, allowExtension: e.target.checked as any})}
+                      checked={auctionForm.allowExtension}
+                      onChange={(e) => setAuctionForm({...auctionForm, allowExtension: e.target.checked})}
                       style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                     />
                     <span>🕐 Permitir extensión automática (si hay ofertas en los últimos 5 min)</span>
