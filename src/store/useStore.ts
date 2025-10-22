@@ -62,8 +62,11 @@ export const useStore = create<AppState>((set, get) => ({
   isAuthenticated: false,
 
   // Auctions
-  auctions: [],
-  setAuctions: (auctions) => set({ auctions }),
+  auctions: JSON.parse(localStorage.getItem('auctions') || '[]'),
+  setAuctions: (auctions) => {
+    localStorage.setItem('auctions', JSON.stringify(auctions));
+    set({ auctions });
+  },
   addBid: (auctionId, amount, userId, username) => {
     const auctions = get().auctions.map(auction => {
       if (auction.id === auctionId) {
