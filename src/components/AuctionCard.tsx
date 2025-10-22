@@ -29,8 +29,15 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
       <div className="auction-card-image">
         <img src={auction.images[0]} alt={auction.title} loading="lazy" />
         
-        {/* Badges de estado (izquierda) */}
-        <div style={{ position: 'absolute', top: '0.75rem', left: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', zIndex: 10 }}>
+        <div style={{ 
+          position: 'absolute', 
+          top: '0.75rem', 
+          left: '0.75rem', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '0.5rem', 
+          zIndex: 10 
+        }}>
           {auction.featured && (
             <div style={{
               background: 'linear-gradient(135deg, #FFD700, #FFA500)',
@@ -73,14 +80,11 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
           )}
         </div>
 
-        {/* Badge de compra directa (derecha) */}
         {auction.buyNowPrice && (
           <div className="auction-card-buynow">
             <DollarSign size={16} />
             Compra Directa
           </div>
-        )}
-      </div>
         )}
       </div>
 
