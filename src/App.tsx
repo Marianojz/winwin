@@ -26,9 +26,17 @@ function App() {
   useEffect(() => {
   console.log('🔍 App.tsx - useEffect ejecutándose');
   
-  // Initialize mock data
-  setAuctions(mockAuctions);
-  setProducts(mockProducts);
+  // Initialize mock data only if empty
+  const savedAuctions = localStorage.getItem('auctions');
+  const savedProducts = localStorage.getItem('products');
+  
+  if (!savedAuctions || JSON.parse(savedAuctions).length === 0) {
+    setAuctions(mockAuctions);
+  }
+  
+  if (!savedProducts || JSON.parse(savedProducts).length === 0) {
+    setProducts(mockProducts);
+  }
   
   // Auto-login for demo purposes
   const savedUser = localStorage.getItem('user');
