@@ -1636,6 +1636,9 @@ useEffect(() => {
                       status = 'active';
                     }
 
+                    // Determinar si es subasta relámpago (menos de 2 horas)
+                    const isFlash = totalMinutes < 120;
+
                     // Crear nueva subasta
                     const newAuction = {
                       id: Date.now().toString(),
@@ -1649,7 +1652,10 @@ useEffect(() => {
                       status: status,
                       categoryId: auctionForm.categoryId,
                       bids: [],
-                      winnerId: undefined
+                      winnerId: undefined,
+                      featured: auctionForm.featured,
+                      isFlash: isFlash,
+                      condition: auctionForm.condition
                     };
 
                     // Agregar al estado
