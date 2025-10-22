@@ -1527,13 +1527,10 @@ useEffect(() => {
                   <option value="4">⚽ Deportes</option>
                   <option value="5">🧸 Juguetes</option>
                   <option value="6">📚 Libros</option>
-                </select>
+</select>
               </div>
 
               {/* Estado del Producto */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                  {/* Estado del Producto */}
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
                   Estado del Producto *
