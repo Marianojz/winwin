@@ -826,7 +826,7 @@ useEffect(() => {
                   Activas: <strong style={{ color: 'var(--success)' }}>{activeAuctions}</strong> | 
                   Finalizadas: <strong style={{ color: 'var(--text-secondary)' }}>{endedAuctions}</strong>
                 </span>
-                <button className="btn btn-primary" onClick={() => alert('Función de crear subasta en desarrollo')}>
+                <button className="btn btn-primary" onClick={() => setActiveTab('create-auction')}>
                   <Plus size={18} />
                   Nueva Subasta
                 </button>
@@ -970,6 +970,212 @@ useEffect(() => {
           </div>
         )}
 
+        {/* CREATE AUCTION TAB */}
+        {activeTab === 'create-auction' && (
+          <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
+            <button 
+              onClick={() => setActiveTab('auctions')}
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem', 
+                background: 'transparent',
+                color: 'var(--text-secondary)',
+                padding: '0.5rem 0',
+                marginBottom: '1.5rem',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '0.9375rem'
+              }}
+            >
+              ← Volver a Subastas
+            </button>
+
+            <h3 style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <Plus size={28} />
+              Crear Nueva Subasta
+            </h3>
+            
+            <div style={{ display: 'grid', gap: '1.5rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Título de la Subasta</label>
+                <input 
+                  type="text" 
+                  placeholder="Ej: iPhone 14 Pro Max 256GB Nuevo"
+                  value={auctionForm.title}
+                  onChange={(e) => setAuctionForm({...auctionForm, title: e.target.value})}
+                  style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Descripción Completa</label>
+                <textarea 
+                  placeholder="Describe el producto en detalle: características, estado, accesorios incluidos..."
+                  value={auctionForm.description}
+                  onChange={(e) => setAuctionForm({...auctionForm, description: e.target.value})}
+                  rows={5}
+                  style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem', resize: 'vertical' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Precio Inicial</label>
+                  <input 
+                    type="number" 
+                    placeholder="10000"
+                    value={auctionForm.startPrice}
+                    onChange={(e) => setAuctionForm({...auctionForm, startPrice: Number(e.target.value), currentPrice: Number(e.target.value)})}
+                    style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                  />
+                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                    Precio con el que inicia la subasta
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Precio Compra Directa (opcional)</label>
+                  <input 
+                    type="number" 
+                    placeholder="0 = sin compra directa"
+                    value={auctionForm.buyNowPrice}
+                    onChange={(e) => setAuctionForm({...auctionForm, buyNowPrice: Number(e.target.value)})}
+                    style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                  />
+                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                    Dejar en 0 si no quieres esta opción
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Categoría del Producto</label>
+                <select 
+                  value={auctionForm.categoryId}
+                  onChange={(e) => setAuctionForm({...auctionForm, categoryId: e.target.value})}
+                  style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                >
+                  <option value="1">📱 Electrónica</option>
+                  <option value="2">👕 Moda</option>
+                  <option value="3">🏠 Hogar</option>
+                  <option value="4">⚽ Deportes</option>
+                  <option value="5">🧸 Juguetes</option>
+                  <option value="6">📚 Libros</option>
+                </select>
+              </div>
+
+              <div style={{ 
+                background: 'var(--warning)', 
+                padding: '1.25rem', 
+                borderRadius: '0.75rem',
+                display: 'flex',
+                gap: '1rem',
+                alignItems: 'start',
+                border: '2px solid var(--primary)'
+              }}>
+                <AlertCircle size={22} style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ fontSize: '0.9375rem' }}>
+                  <strong>📝 Importante:</strong>
+                  <ul style={{ marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.25rem' }}>
+                    <li>La subasta durará <strong>7 días</strong> desde su creación</li>
+                    <li>Se creará automáticamente en estado <strong>"activa"</strong></li>
+                    <li>Las imágenes serán de ejemplo hasta implementar carga personalizada</li>
+                    <li>Las ofertas deben ser múltiplos de <strong>$500</strong></li>
+                  </ul>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button 
+                  onClick={() => {
+                    // Validación
+                    if (!auctionForm.title.trim()) {
+                      alert('⚠️ Por favor ingresa un título para la subasta');
+                      return;
+                    }
+                    if (!auctionForm.description.trim()) {
+                      alert('⚠️ Por favor ingresa una descripción');
+                      return;
+                    }
+                    if (auctionForm.startPrice <= 0) {
+                      alert('⚠️ El precio inicial debe ser mayor a $0');
+                      return;
+                    }
+                    if (auctionForm.buyNowPrice > 0 && auctionForm.buyNowPrice <= auctionForm.startPrice) {
+                      alert('⚠️ El precio de compra directa debe ser mayor al precio inicial');
+                      return;
+                    }
+
+                    // Crear nueva subasta
+                    const newAuction = {
+                      id: Date.now().toString(),
+                      title: auctionForm.title.trim(),
+                      description: auctionForm.description.trim(),
+                      images: [
+                        'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800',
+                        'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800'
+                      ],
+                      startPrice: auctionForm.startPrice,
+                      currentPrice: auctionForm.startPrice,
+                      buyNowPrice: auctionForm.buyNowPrice > 0 ? auctionForm.buyNowPrice : undefined,
+                      endTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días
+                      status: 'active' as const,
+                      categoryId: auctionForm.categoryId,
+                      bids: [],
+                      winnerId: undefined
+                    };
+
+                    // Agregar al estado
+                    setAuctions([...auctions, newAuction]);
+                    
+                    // Resetear formulario
+                    setAuctionForm({
+                      title: '',
+                      description: '',
+                      startPrice: 0,
+                      currentPrice: 0,
+                      buyNowPrice: 0,
+                      categoryId: '1'
+                    });
+
+                    // Notificar y volver
+                    alert('✅ ¡Subasta creada exitosamente!\n\n📌 La subasta está ahora activa y visible para todos los usuarios.');
+                    setActiveTab('auctions');
+                  }}
+                  className="btn btn-primary" 
+                  style={{ flex: 1, padding: '1.125rem', fontSize: '1.0625rem', fontWeight: 600 }}
+                >
+                  ✨ Crear Subasta
+                </button>
+                <button 
+                  onClick={() => {
+                    if (auctionForm.title || auctionForm.description || auctionForm.startPrice > 0) {
+                      if (window.confirm('¿Descartar los cambios y volver?')) {
+                        setAuctionForm({
+                          title: '',
+                          description: '',
+                          startPrice: 0,
+                          currentPrice: 0,
+                          buyNowPrice: 0,
+                          categoryId: '1'
+                        });
+                        setActiveTab('auctions');
+                      }
+                    } else {
+                      setActiveTab('auctions');
+                    }
+                  }}
+                  className="btn btn-outline" 
+                  style={{ padding: '1.125rem', minWidth: '140px', fontSize: '1rem' }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* PRODUCTS TAB */}
         {activeTab === 'products' && (
           <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
