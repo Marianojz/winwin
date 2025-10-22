@@ -14,12 +14,23 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
 
   return (
     <Link to={`/subastas/${auction.id}`} className="auction-card">
-      <div className="auction-card-image">
-        <img src={auction.images[0]} alt={auction.title} loading="lazy" />
-        {auction.status === 'active' && (
-          <div className="auction-card-badge badge-success">
-            <Gavel size={14} />
-            Activa
+      const AuctionCard = ({ auction }: AuctionCardProps) => {
+  const navigate = useNavigate();
+
+  return (
+    <div 
+      className={`auction-card ${auction.featured ? 'featured-auction' : ''} ${auction.isFlash ? 'flash-auction' : ''}`}
+      style={{
+        ...(auction.featured && {
+          border: '3px solid var(--primary)',
+          boxShadow: '0 8px 24px rgba(255, 107, 0, 0.3)',
+          transform: 'scale(1.02)'
+        }),
+        ...(auction.isFlash && {
+          background: 'linear-gradient(135deg, var(--bg-secondary) 0%, rgba(255, 107, 0, 0.1) 100%)',
+          animation: 'pulse-border 2s infinite'
+        })
+      }}
           </div>
         )}
         {auction.buyNowPrice && (
