@@ -1605,9 +1605,22 @@ useEffect(() => {
                     const minutes = (auctionForm as any).durationMinutes || 0;
                     const totalMinutes = (days * 24 * 60) + (hours * 60) + minutes;
 
-                    if (totalMinutes < 60) {
-                      alert('⚠️ La duración mínima de la subasta es 1 hora');
+                    if (totalMinutes < 5) {
+                      alert('⚠️ La duración mínima de la subasta es 5 minutos');
                       return;
+                    }
+
+                    // Validar fecha programada
+                    if (auctionForm.scheduled) {
+                      if (!auctionForm.scheduledDate || !auctionForm.scheduledTime) {
+                        alert('⚠️ Debes seleccionar fecha y hora para la subasta programada');
+                        return;
+                      }
+                      const scheduledDateTime = new Date(`${auctionForm.scheduledDate}T${auctionForm.scheduledTime}`);
+                      if (scheduledDateTime <= new Date()) {
+                        alert('⚠️ La fecha programada debe ser en el futuro');
+                        return;
+                      }
                     }
 
                     // Preparar imágenes
