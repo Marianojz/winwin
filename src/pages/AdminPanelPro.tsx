@@ -1081,6 +1081,47 @@ useEffect(() => {
                     multiple
                     onChange={(e) => {
                       const files = Array.from(e.target.files || []);
+                      const currentImages = auctionForm.images || [];
+                      
+                      // Validar que no excedan 3 imágenes en total
+                      if (currentImages.length + files.length > 3) {
+                        alert(`⚠️ Máximo 3 imágenes permitidas. Ya tienes ${currentImages.length} imagen${currentImages.length > 1 ? 'es' : ''}. Puedes agregar solo ${3 - currentImages.length} más.`);
+                        e.target.value = '';
+                        return;
+                      }
+
+                      // Validar tamaño (máximo 2MB por imagen)
+                      const maxSize = 2 * 1024 * 1024; // 2MB
+                      const oversizedFiles = files.filter(f => f.size > maxSize);
+                      
+                      if (oversizedFiles.length > 0) {
+                        alert('⚠️ Cada imagen debe pesar menos de 2MB\n\nImágenes rechazadas:\n' + 
+                          oversizedFiles.map(f => `• ${f.name} (${(f.size / 1024 / 1024).toFixed(2)}MB)`).join('\n'));
+                        e.target.value = '';
+                        return;
+                      }
+
+                      // Procesar imágenes válidas
+                      const readers = files.map(file => {
+                        return new Promise<string>((resolve) => {
+                          const reader = new FileReader();
+                          reader.onload = (e) => resolve(e.target?.result as string);
+                          reader.readAsDataURL(file);
+                        });
+                      });
+
+                      Promise.all(readers).then(newImages => {
+                        // Agregar a las imágenes existentes
+                        setAuctionForm({
+                          ...auctionForm, 
+                          images: [...currentImages, ...newImages]
+                        });
+                        // Limpiar input para permitir seleccionar las mismas imágenes de nuevo
+                        e.target.value = '';
+                      });
+                    }}
+                    style={{ display: 'none' }}
+                  />
                       
                       // Validar cantidad
                       if (files.length > 3) {
