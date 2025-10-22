@@ -997,21 +997,7 @@ useEffect(() => {
               onClick={() => {
                 if (auctionForm.title || auctionForm.description || auctionForm.startPrice > 0) {
                   if (window.confirm('¿Descartar los cambios y volver?')) {
-                    setAuctionForm({
-  title: '',
-  description: '',
-  startPrice: 0,
-  currentPrice: 0,
-  buyNowPrice: 0,
-  categoryId: '1',
-  images: [],
-  durationDays: 7,
-  durationHours: 0,
-  durationMinutes: 0,
-  condition: 'new',
-  featured: false,
-  allowExtension: true
-});
+                    setAuctionForm
                     setActiveTab('auctions');
                   }
                 } else {
