@@ -5,10 +5,20 @@ import AuctionCard from '../components/AuctionCard';
 import ProductCard from '../components/ProductCard';
 
 const Home = () => {
-  const { auctions, products } = useStore();
+  const { auctions } = useStore();
+  const navigate = useNavigate();
   
-  const featuredAuction = auctions.find(a => a.status === 'active');
-  const featuredProducts = products.slice(0, 6);
+  // Primero las destacadas, luego las normales
+  const featuredAuctions = auctions
+    .filter(a => a.status === 'active')
+    .sort((a, b) => {
+      // Prioridad: destacadas primero
+      if (a.featured && !b.featured) return -1;
+      if (!a.featured && b.featured) return 1;
+      // Luego por fecha más reciente
+      return new Date(b.endTime).getTime() - new Date(a.endTime).getTime();
+    })
+    .slice(0, 6);
 
   return (
     <div className="home-page">
