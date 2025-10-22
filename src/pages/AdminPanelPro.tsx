@@ -36,13 +36,20 @@ const [loadingUsers, setLoadingUsers] = useState(true);
   // Estados para subastas
   const [editingAuction, setEditingAuction] = useState<Auction | null>(null);
   const [auctionForm, setAuctionForm] = useState({
-    title: '',
-    description: '',
-    startPrice: 0,
-    currentPrice: 0,
-    buyNowPrice: 0,
-    categoryId: '1'
-  });
+  title: '',
+  description: '',
+  startPrice: 0,
+  currentPrice: 0,
+  buyNowPrice: 0,
+  categoryId: '1',
+  images: [] as string[],
+  durationDays: 7,
+  durationHours: 0,
+  durationMinutes: 0,
+  condition: 'new' as 'new' | 'like-new' | 'excellent' | 'good' | 'fair',
+  featured: false,
+  allowExtension: true
+});
 
   // Estados para bots
   const [botForm, setBotForm] = useState({
