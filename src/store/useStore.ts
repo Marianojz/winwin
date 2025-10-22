@@ -90,8 +90,11 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   // Products
-  products: [],
-  setProducts: (products) => set({ products }),
+  products: JSON.parse(localStorage.getItem('products') || '[]'),
+  setProducts: (products) => {
+    localStorage.setItem('products', JSON.stringify(products));
+    set({ products });
+  },
 
   // Cart
   cart: [],
