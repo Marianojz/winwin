@@ -43,12 +43,15 @@ const [loadingUsers, setLoadingUsers] = useState(true);
   buyNowPrice: 0,
   categoryId: '1',
   images: [] as string[],
-  durationDays: 7,
+  durationDays: 0,
   durationHours: 0,
-  durationMinutes: 0,
+  durationMinutes: 30,
   condition: 'new' as 'new' | 'like-new' | 'excellent' | 'good' | 'fair',
   featured: false,
-  allowExtension: true
+  allowExtension: true,
+  scheduled: false,
+  scheduledDate: '',
+  scheduledTime: ''
 });
 
   // Estados para bots
@@ -1244,6 +1247,111 @@ useEffect(() => {
                 <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 600 }}>
                   Duración de la Subasta *
                 </label>
+                
+                {/* Sugerencias rápidas */}
+                <div style={{ 
+                  display: 'flex', 
+                  gap: '0.5rem', 
+                  marginBottom: '1rem',
+                  flexWrap: 'wrap'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => setAuctionForm({
+                      ...auctionForm, 
+                      durationDays: 0, 
+                      durationHours: 0, 
+                      durationMinutes: 15
+                    })}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '0.5rem',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    ⚡ 15 min (Relámpago)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuctionForm({
+                      ...auctionForm, 
+                      durationDays: 0, 
+                      durationHours: 0, 
+                      durationMinutes: 30
+                    })}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '0.5rem',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    ⚡ 30 min
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuctionForm({
+                      ...auctionForm, 
+                      durationDays: 0, 
+                      durationHours: 1, 
+                      durationMinutes: 0
+                    })}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '0.5rem',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    🕐 1 hora
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuctionForm({
+                      ...auctionForm, 
+                      durationDays: 1, 
+                      durationHours: 0, 
+                      durationMinutes: 0
+                    })}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '0.5rem',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    📅 1 día
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuctionForm({
+                      ...auctionForm, 
+                      durationDays: 7, 
+                      durationHours: 0, 
+                      durationMinutes: 0
+                    })}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '0.5rem',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    📅 7 días
+                  </button>
+                </div>
+
                 <div style={{ 
                   display: 'grid', 
                   gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
@@ -1258,9 +1366,9 @@ useEffect(() => {
                     </label>
                     <input 
                       type="number" 
-                      placeholder="7"
-                      value={(auctionForm as any).durationDays || 7}
-                      onChange={(e) => setAuctionForm({...auctionForm, durationDays: Number(e.target.value) as any})}
+                      placeholder="0"
+                      value={auctionForm.durationDays}
+                      onChange={(e) => setAuctionForm({...auctionForm, durationDays: Number(e.target.value)})}
                       style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
                       min="0"
                       max="30"
@@ -1273,8 +1381,8 @@ useEffect(() => {
                     <input 
                       type="number" 
                       placeholder="0"
-                      value={(auctionForm as any).durationHours || 0}
-                      onChange={(e) => setAuctionForm({...auctionForm, durationHours: Number(e.target.value) as any})}
+                      value={auctionForm.durationHours}
+                      onChange={(e) => setAuctionForm({...auctionForm, durationHours: Number(e.target.value)})}
                       style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
                       min="0"
                       max="23"
@@ -1287,8 +1395,8 @@ useEffect(() => {
                     <input 
                       type="number" 
                       placeholder="0"
-                      value={(auctionForm as any).durationMinutes || 0}
-                      onChange={(e) => setAuctionForm({...auctionForm, durationMinutes: Number(e.target.value) as any})}
+                      value={auctionForm.durationMinutes}
+                      onChange={(e) => setAuctionForm({...auctionForm, durationMinutes: Number(e.target.value)})}
                       style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
                       min="0"
                       max="59"
@@ -1303,17 +1411,72 @@ useEffect(() => {
                 }}>
                   ⏱️ Duración total: {
                     (() => {
-                      const days = (auctionForm as any).durationDays || 7;
-                      const hours = (auctionForm as any).durationHours || 0;
-                      const minutes = (auctionForm as any).durationMinutes || 0;
+                      const days = auctionForm.durationDays;
+                      const hours = auctionForm.durationHours;
+                      const minutes = auctionForm.durationMinutes;
                       const parts = [];
                       if (days > 0) parts.push(`${days} día${days > 1 ? 's' : ''}`);
                       if (hours > 0) parts.push(`${hours} hora${hours > 1 ? 's' : ''}`);
                       if (minutes > 0) parts.push(`${minutes} minuto${minutes > 1 ? 's' : ''}`);
-                      return parts.length > 0 ? parts.join(', ') : '0 minutos';
+                      return parts.length > 0 ? parts.join(', ') : '⚠️ Debes definir una duración';
                     })()
                   }
                 </div>
+              </div>
+
+              {/* Programar Subasta */}
+              <div style={{ 
+                background: 'var(--bg-tertiary)', 
+                padding: '1.25rem', 
+                borderRadius: '0.75rem'
+              }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', marginBottom: '1rem' }}>
+                  <input 
+                    type="checkbox"
+                    checked={auctionForm.scheduled}
+                    onChange={(e) => setAuctionForm({...auctionForm, scheduled: e.target.checked})}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontWeight: 600 }}>📅 Programar inicio de subasta</span>
+                </label>
+
+                {auctionForm.scheduled && (
+                  <div>
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                      gap: '1rem',
+                      marginBottom: '0.75rem'
+                    }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
+                          Fecha de inicio
+                        </label>
+                        <input 
+                          type="date" 
+                          value={auctionForm.scheduledDate}
+                          min={new Date().toISOString().split('T')[0]}
+                          onChange={(e) => setAuctionForm({...auctionForm, scheduledDate: e.target.value})}
+                          style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
+                          Hora de inicio
+                        </label>
+                        <input 
+                          type="time" 
+                          value={auctionForm.scheduledTime}
+                          onChange={(e) => setAuctionForm({...auctionForm, scheduledTime: e.target.value})}
+                          style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                      💡 La subasta se activará automáticamente en la fecha y hora programada
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Categoría */}
