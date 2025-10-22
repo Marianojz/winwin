@@ -179,13 +179,20 @@ useEffect(() => {
   const handleEditAuction = (auction: Auction) => {
     setEditingAuction(auction);
     setAuctionForm({
-      title: auction.title,
-      description: auction.description,
-      startPrice: auction.startPrice,
-      currentPrice: auction.currentPrice,
-      buyNowPrice: auction.buyNowPrice || 0,
-      categoryId: auction.categoryId
-    });
+  title: '',
+  description: '',
+  startPrice: 0,
+  currentPrice: 0,
+  buyNowPrice: 0,
+  categoryId: '1',
+  images: [],
+  durationDays: 7,
+  durationHours: 0,
+  durationMinutes: 0,
+  condition: 'new',
+  featured: false,
+  allowExtension: true
+});
     setActiveTab('edit-auction');
   };
 
@@ -985,13 +992,20 @@ useEffect(() => {
                 if (auctionForm.title || auctionForm.description || auctionForm.startPrice > 0) {
                   if (window.confirm('¿Descartar los cambios y volver?')) {
                     setAuctionForm({
-                      title: '',
-                      description: '',
-                      startPrice: 0,
-                      currentPrice: 0,
-                      buyNowPrice: 0,
-                      categoryId: '1'
-                    });
+  title: '',
+  description: '',
+  startPrice: 0,
+  currentPrice: 0,
+  buyNowPrice: 0,
+  categoryId: '1',
+  images: [],
+  durationDays: 7,
+  durationHours: 0,
+  durationMinutes: 0,
+  condition: 'new',
+  featured: false,
+  allowExtension: true
+});
                     setActiveTab('auctions');
                   }
                 } else {
@@ -1463,13 +1477,20 @@ useEffect(() => {
                     
                     // Resetear formulario
                     setAuctionForm({
-                      title: '',
-                      description: '',
-                      startPrice: 0,
-                      currentPrice: 0,
-                      buyNowPrice: 0,
-                      categoryId: '1'
-                    });
+  title: '',
+  description: '',
+  startPrice: 0,
+  currentPrice: 0,
+  buyNowPrice: 0,
+  categoryId: '1',
+  images: [],
+  durationDays: 7,
+  durationHours: 0,
+  durationMinutes: 0,
+  condition: 'new',
+  featured: false,
+  allowExtension: true
+});
 
                     // Limpiar input de imágenes
                     const imageInput = document.getElementById('auction-images') as HTMLInputElement;
