@@ -1533,6 +1533,9 @@ useEffect(() => {
               {/* Estado del Producto */}
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                  {/* Estado del Producto */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
                   Estado del Producto *
                 </label>
                 <select 
@@ -1589,6 +1592,19 @@ useEffect(() => {
                 alignItems: 'start',
                 border: '2px solid #FF8C00'
               }}>
+                <div style={{ fontSize: '1.5rem' }}>⚠️</div>
+                <div>
+                  <h4 style={{ marginBottom: '0.5rem', fontSize: '1rem', fontWeight: 700 }}>
+                    Importante - Reglas de la Subasta
+                  </h4>
+                  <ul style={{ margin: 0, paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.375rem', fontSize: '0.875rem' }}>
+                    <li>Las ofertas deben ser múltiplos de $500</li>
+                    <li>El ganador tiene 48 horas para completar el pago</li>
+                    <li>Las imágenes deben ser claras y representativas del producto</li>
+                    <li>La descripción debe ser honesta y detallada</li>
+                  </ul>
+                </div>
+              </div>
                 <AlertCircle size={22} style={{ flexShrink: 0, marginTop: '2px' }} />
                 <div style={{ fontSize: '0.9375rem' }}>
                   <strong>📝 Importante:</strong>
