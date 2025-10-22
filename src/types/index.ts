@@ -31,6 +31,9 @@ export interface Auction {
   categoryId: string;
   bids: Bid[];
   winnerId?: string;
+  featured?: boolean;
+  isFlash?: boolean;
+  condition?: 'new' | 'like-new' | 'excellent' | 'good' | 'fair';
 }
 
 export interface Bid {
