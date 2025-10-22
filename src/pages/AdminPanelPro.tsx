@@ -1632,6 +1632,21 @@ useEffect(() => {
                       ];
                     }
 
+                    // Calcular fechas
+                    let startTime: Date;
+                    let endTime: Date;
+                    let status: 'active' | 'ended' | 'sold' = 'active';
+
+                    if (auctionForm.scheduled) {
+                      startTime = new Date(`${auctionForm.scheduledDate}T${auctionForm.scheduledTime}`);
+                      endTime = new Date(startTime.getTime() + totalMinutes * 60 * 1000);
+                      status = 'active'; // Cambiar a 'scheduled' si implementas ese estado
+                    } else {
+                      startTime = new Date();
+                      endTime = new Date(Date.now() + totalMinutes * 60 * 1000);
+                      status = 'active';
+                    }
+
                     // Crear nueva subasta
                     const newAuction = {
                       id: Date.now().toString(),
@@ -1641,8 +1656,8 @@ useEffect(() => {
                       startPrice: auctionForm.startPrice,
                       currentPrice: auctionForm.startPrice,
                       buyNowPrice: auctionForm.buyNowPrice > 0 ? auctionForm.buyNowPrice : undefined,
-                      endTime: new Date(Date.now() + totalMinutes * 60 * 1000),
-                      status: 'active' as const,
+                      endTime: endTime,
+                      status: status,
                       categoryId: auctionForm.categoryId,
                       bids: [],
                       winnerId: undefined
