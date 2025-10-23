@@ -39,6 +39,11 @@ const AuctionDetail = () => {
 
   const handleBid = () => {
     if (!isAuthenticated) {
+      // Verificar que la subasta esté activa
+if (auction.status !== 'active') {
+  alert('Esta subasta ya finalizó. No se pueden realizar más ofertas.');
+  return;
+}
       navigate('/login');
       return;
     }
