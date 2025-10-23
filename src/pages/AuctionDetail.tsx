@@ -80,6 +80,11 @@ if (auction.status !== 'active') {
 
   const handleBuyNow = () => {
     if (!isAuthenticated) {
+      // Verificar que la subasta esté activa
+if (auction.status !== 'active') {
+  alert('Esta subasta ya finalizó. No se puede realizar la compra directa.');
+  return;
+}
       navigate('/login');
       return;
     }
