@@ -994,50 +994,6 @@ useEffect(() => {
         {/* CREATE AUCTION TAB */}
         {activeTab === 'create-auction' && (
           <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
-            <button 
-              onClick={() => {
-                if (auctionForm.title || auctionForm.description || auctionForm.startPrice > 0) {
-                  if (window.confirm('¿Descartar los cambios y volver?')) {
-                    setAuctionForm({
-                      title: '',
-                      description: '',
-                      startPrice: 0,
-                      currentPrice: 0,
-                      buyNowPrice: 0,
-                      categoryId: '1',
-                      images: [],
-                      durationDays: 0,
-                      durationHours: 0,
-                      durationMinutes: 30,
-                      condition: 'new',
-                      featured: false,
-                      allowExtension: true,
-                      scheduled: false,
-                      scheduledDate: '',
-                      scheduledTime: ''
-                    });
-                    setActiveTab('auctions');
-                  }
-                } else {
-                  setActiveTab('auctions');
-                }
-              }}
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '0.5rem', 
-                background: 'transparent',
-                color: 'var(--text-secondary)',
-                padding: '0.5rem 0',
-                marginBottom: '1.5rem',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '0.9375rem'
-              }}
-            >
-              ← Volver a Subastas
-            </button>
-
             <h3 style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <Plus size={28} />
               Crear Nueva Subasta
@@ -1051,65 +1007,63 @@ useEffect(() => {
                 </label>
                 <input 
                   type="text" 
-                  placeholder="Ej: iPhone 14 Pro Max 256GB Nuevo en Caja"
+                  placeholder="Ej: iPhone 15 Pro Max 256GB Nuevo en Caja"
                   value={auctionForm.title}
                   onChange={(e) => setAuctionForm({...auctionForm, title: e.target.value})}
                   style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                  maxLength={100}
                 />
                 <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                  {auctionForm.title.length}/100 caracteres
+                  Mínimo 10 caracteres - Sé descriptivo y claro
                 </div>
               </div>
 
               {/* Descripción */}
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                  Descripción Completa *
+                  Descripción Detallada *
                 </label>
                 <textarea 
-                  placeholder="Describe el producto en detalle: características técnicas, estado, accesorios incluidos, garantía, etc..."
+                  placeholder="Describe el producto en detalle: características, estado, accesorios incluidos, etc."
                   value={auctionForm.description}
                   onChange={(e) => setAuctionForm({...auctionForm, description: e.target.value})}
-                  rows={6}
+                  rows={5}
                   style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem', resize: 'vertical' }}
-                  maxLength={1000}
                 />
                 <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                  {auctionForm.description.length}/1000 caracteres
+                  Mínimo 20 caracteres - Incluye toda la información relevante
                 </div>
               </div>
 
               {/* Carga de Imágenes */}
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                  Imágenes del Producto * (Máximo 3)
+                  Imágenes del Producto (hasta 3)
                 </label>
                 <div style={{ 
                   border: '2px dashed var(--border)', 
                   borderRadius: '0.75rem', 
-                  padding: '2rem',
+                  padding: '2rem', 
                   textAlign: 'center',
                   background: 'var(--bg-tertiary)'
                 }}>
                   <input 
                     type="file" 
-                    id="auction-images"
+                    id="auction-images" 
                     accept="image/jpeg,image/jpg,image/png,image/webp"
                     multiple
                     onChange={(e) => {
                       const files = Array.from(e.target.files || []);
+                      if (files.length === 0) return;
+
                       const currentImages = auctionForm.images || [];
-                      
-                      // Validar que no excedan 3 imágenes en total
+
                       if (currentImages.length + files.length > 3) {
-                        alert(`⚠️ Máximo 3 imágenes permitidas. Ya tienes ${currentImages.length} imagen${currentImages.length > 1 ? 'es' : ''}. Puedes agregar solo ${3 - currentImages.length} más.`);
+                        alert(`⚠️ Solo puedes agregar ${3 - currentImages.length} imagen(es) más. Máximo total: 3 imágenes`);
                         e.target.value = '';
                         return;
                       }
 
-                      // Validar tamaño (máximo 2MB por imagen)
-                      const maxSize = 2 * 1024 * 1024; // 2MB
+                      const maxSize = 2 * 1024 * 1024;
                       const oversizedFiles = files.filter(f => f.size > maxSize);
                       
                       if (oversizedFiles.length > 0) {
@@ -1119,7 +1073,6 @@ useEffect(() => {
                         return;
                       }
 
-                      // Procesar imágenes válidas
                       const readers = files.map(file => {
                         return new Promise<string>((resolve) => {
                           const reader = new FileReader();
@@ -1129,12 +1082,10 @@ useEffect(() => {
                       });
 
                       Promise.all(readers).then(newImages => {
-                        // Agregar a las imágenes existentes
                         setAuctionForm({
                           ...auctionForm, 
                           images: [...currentImages, ...newImages]
                         });
-                        // Limpiar input para permitir seleccionar las mismas imágenes de nuevo
                         e.target.value = '';
                       });
                     }}
@@ -1164,15 +1115,14 @@ useEffect(() => {
                   </label>
                 </div>
 
-                {/* Preview de imágenes */}
-                {(auctionForm as any).images && (auctionForm as any).images.length > 0 && (
+                {auctionForm.images && auctionForm.images.length > 0 && (
                   <div style={{ 
                     display: 'grid', 
                     gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', 
                     gap: '1rem',
                     marginTop: '1rem' 
                   }}>
-                    {(auctionForm as any).images.map((img: string, idx: number) => (
+                    {auctionForm.images.map((img: string, idx: number) => (
                       <div key={idx} style={{ position: 'relative', borderRadius: '0.5rem', overflow: 'hidden' }}>
                         <img 
                           src={img} 
@@ -1181,9 +1131,9 @@ useEffect(() => {
                         />
                         <button
                           onClick={() => {
-                            const newImages = [...(auctionForm as any).images];
+                            const newImages = [...auctionForm.images];
                             newImages.splice(idx, 1);
-                            setAuctionForm({...auctionForm, images: newImages as any});
+                            setAuctionForm({...auctionForm, images: newImages});
                           }}
                           style={{
                             position: 'absolute',
@@ -1264,7 +1214,6 @@ useEffect(() => {
                   Duración de la Subasta *
                 </label>
                 
-                {/* Sugerencias rápidas */}
                 <div style={{ 
                   display: 'flex', 
                   gap: '0.5rem', 
@@ -1455,50 +1404,45 @@ useEffect(() => {
                   />
                   <span style={{ fontWeight: 600 }}>📅 Programar inicio de subasta</span>
                 </label>
-
+                
                 {auctionForm.scheduled && (
-                  <div>
-                    <div style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                      gap: '1rem',
-                      marginBottom: '0.75rem'
-                    }}>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
-                          Fecha de inicio
-                        </label>
-                        <input 
-                          type="date" 
-                          value={auctionForm.scheduledDate}
-                          min={new Date().toISOString().split('T')[0]}
-                          onChange={(e) => setAuctionForm({...auctionForm, scheduledDate: e.target.value})}
-                          style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
-                          Hora de inicio
-                        </label>
-                        <input 
-                          type="time" 
-                          value={auctionForm.scheduledTime}
-                          onChange={(e) => setAuctionForm({...auctionForm, scheduledTime: e.target.value})}
-                          style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                        />
-                      </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
+                        Fecha de inicio
+                      </label>
+                      <input 
+                        type="date" 
+                        value={auctionForm.scheduledDate}
+                        onChange={(e) => setAuctionForm({...auctionForm, scheduledDate: e.target.value})}
+                        style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                        min={new Date().toISOString().split('T')[0]}
+                      />
                     </div>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                      💡 La subasta se activará automáticamente en la fecha y hora programada
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
+                        Hora de inicio
+                      </label>
+                      <input 
+                        type="time" 
+                        value={auctionForm.scheduledTime}
+                        onChange={(e) => setAuctionForm({...auctionForm, scheduledTime: e.target.value})}
+                        style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                      />
                     </div>
                   </div>
                 )}
+                <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.75rem' }}>
+                  {auctionForm.scheduled 
+                    ? 'La subasta se activará automáticamente en la fecha y hora seleccionadas' 
+                    : 'Si no programas, la subasta se activará inmediatamente al crearla'}
+                </div>
               </div>
 
               {/* Categoría */}
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                  Categoría del Producto *
+                  Categoría *
                 </label>
                 <select 
                   value={auctionForm.categoryId}
@@ -1511,7 +1455,7 @@ useEffect(() => {
                   <option value="4">⚽ Deportes</option>
                   <option value="5">🧸 Juguetes</option>
                   <option value="6">📚 Libros</option>
-</select>
+                </select>
               </div>
 
               {/* Estado del Producto */}
@@ -1586,23 +1530,11 @@ useEffect(() => {
                   </ul>
                 </div>
               </div>
-                <AlertCircle size={22} style={{ flexShrink: 0, marginTop: '2px' }} />
-                <div style={{ fontSize: '0.9375rem' }}>
-                  <strong>📝 Importante:</strong>
-                  <ul style={{ marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.25rem' }}>
-                    <li>La subasta se creará en estado <strong>"activa"</strong> inmediatamente</li>
-                    <li>Las ofertas deben ser múltiplos de <strong>$500</strong></li>
-                    <li>Si no subes imágenes, se usarán imágenes de ejemplo</li>
-                    <li>La duración mínima recomendada es <strong>1 día</strong></li>
-                  </ul>
-                </div>
-              </div>
 
               {/* Botones */}
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button 
                   onClick={() => {
-                    // Validaciones
                     if (!auctionForm.title.trim()) {
                       alert('⚠️ Por favor ingresa un título para la subasta');
                       return;
@@ -1628,10 +1560,9 @@ useEffect(() => {
                       return;
                     }
 
-                    // Calcular duración
-                    const days = (auctionForm as any).durationDays || 7;
-                    const hours = (auctionForm as any).durationHours || 0;
-                    const minutes = (auctionForm as any).durationMinutes || 0;
+                    const days = auctionForm.durationDays || 0;
+                    const hours = auctionForm.durationHours || 0;
+                    const minutes = auctionForm.durationMinutes || 0;
                     const totalMinutes = (days * 24 * 60) + (hours * 60) + minutes;
 
                     if (totalMinutes < 5) {
@@ -1639,7 +1570,6 @@ useEffect(() => {
                       return;
                     }
 
-                    // Validar fecha programada
                     if (auctionForm.scheduled) {
                       if (!auctionForm.scheduledDate || !auctionForm.scheduledTime) {
                         alert('⚠️ Debes seleccionar fecha y hora para la subasta programada');
@@ -1652,8 +1582,7 @@ useEffect(() => {
                       }
                     }
 
-                    // Preparar imágenes
-                    let images = (auctionForm as any).images || [];
+                    let images = auctionForm.images || [];
                     if (images.length === 0) {
                       images = [
                         'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800',
@@ -1661,7 +1590,6 @@ useEffect(() => {
                       ];
                     }
 
-                    // Calcular fechas
                     let startTime: Date;
                     let endTime: Date;
                     let status: 'active' | 'ended' | 'sold' = 'active';
@@ -1669,17 +1597,15 @@ useEffect(() => {
                     if (auctionForm.scheduled) {
                       startTime = new Date(`${auctionForm.scheduledDate}T${auctionForm.scheduledTime}`);
                       endTime = new Date(startTime.getTime() + totalMinutes * 60 * 1000);
-                      status = 'active'; // Cambiar a 'scheduled' si implementas ese estado
+                      status = 'active';
                     } else {
                       startTime = new Date();
                       endTime = new Date(Date.now() + totalMinutes * 60 * 1000);
                       status = 'active';
                     }
 
-                    // Determinar si es subasta relámpago (menos de 2 horas)
                     const isFlash = totalMinutes < 120;
 
-                    // Crear nueva subasta
                     const newAuction = {
                       id: Date.now().toString(),
                       title: auctionForm.title.trim(),
@@ -1698,34 +1624,30 @@ useEffect(() => {
                       condition: auctionForm.condition
                     };
 
-                    // Agregar al estado
                     setAuctions([...auctions, newAuction]);
                     
-                    // Resetear formulario
                     setAuctionForm({
-  title: '',
-  description: '',
-  startPrice: 0,
-  currentPrice: 0,
-  buyNowPrice: 0,
-  categoryId: '1',
-  images: [],
-  durationDays: 0,
-  durationHours: 0,
-  durationMinutes: 30,
-  condition: 'new',
-  featured: false,
-  allowExtension: true,
-  scheduled: false,
-  scheduledDate: '',
-  scheduledTime: ''
-});
+                      title: '',
+                      description: '',
+                      startPrice: 0,
+                      currentPrice: 0,
+                      buyNowPrice: 0,
+                      categoryId: '1',
+                      images: [],
+                      durationDays: 0,
+                      durationHours: 0,
+                      durationMinutes: 30,
+                      condition: 'new',
+                      featured: false,
+                      allowExtension: true,
+                      scheduled: false,
+                      scheduledDate: '',
+                      scheduledTime: ''
+                    });
 
-                    // Limpiar input de imágenes
                     const imageInput = document.getElementById('auction-images') as HTMLInputElement;
                     if (imageInput) imageInput.value = '';
 
-                    // Notificar
                     const successMessage = auctionForm.scheduled
                       ? `✅ ¡Subasta programada exitosamente!\n\n📅 Se activará el ${new Date(`${auctionForm.scheduledDate}T${auctionForm.scheduledTime}`).toLocaleString('es-AR')}\n⏱️ Durará ${
                           (() => {
@@ -1751,23 +1673,23 @@ useEffect(() => {
                     if (auctionForm.title || auctionForm.description || auctionForm.startPrice > 0) {
                       if (window.confirm('¿Descartar los cambios y volver?')) {
                         setAuctionForm({
-  title: '',
-  description: '',
-  startPrice: 0,
-  currentPrice: 0,
-  buyNowPrice: 0,
-  categoryId: '1',
-  images: [],
-  durationDays: 0,
-  durationHours: 0,
-  durationMinutes: 30,
-  condition: 'new',
-  featured: false,
-  allowExtension: true,
-  scheduled: false,
-  scheduledDate: '',
-  scheduledTime: ''
-});
+                          title: '',
+                          description: '',
+                          startPrice: 0,
+                          currentPrice: 0,
+                          buyNowPrice: 0,
+                          categoryId: '1',
+                          images: [],
+                          durationDays: 0,
+                          durationHours: 0,
+                          durationMinutes: 30,
+                          condition: 'new',
+                          featured: false,
+                          allowExtension: true,
+                          scheduled: false,
+                          scheduledDate: '',
+                          scheduledTime: ''
+                        });
                         const imageInput = document.getElementById('auction-images') as HTMLInputElement;
                         if (imageInput) imageInput.value = '';
                         setActiveTab('auctions');
