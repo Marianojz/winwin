@@ -97,12 +97,13 @@ if (isWinningBid && auction.buyNowPrice) {
 
   const handleBuyNow = () => {
     if (!isAuthenticated) {
-      // Verificar que la subasta esté activa
-if (auction.status !== 'active') {
-  alert('Esta subasta ya finalizó. No se puede realizar la compra directa.');
-  return;
-}
       navigate('/login');
+      return;
+    }
+
+    // Verificar que la subasta esté activa
+    if (auction.status !== 'active') {
+      alert('Esta subasta ya finalizó. No se puede realizar la compra directa.');
       return;
     }
 
@@ -112,14 +113,30 @@ if (auction.status !== 'active') {
       );
       
       if (confirm) {
+        // Crear notificación de compra ganada
         addNotification({
           userId: user!.id,
-          type: 'purchase',
-          title: 'Compra realizada',
-          message: `Compraste "${auction.title}" por ${formatCurrency(auction.buyNowPrice)}`,
-          read: false
+          type: 'auction_won',
+          title: '¡Compra realizada con éxito!',
+          message: `Compraste "${auction.title}" por ${formatCurrency(auction.buyNowPrice)}. Tenés 48hs para completar el pago en MercadoPago.`,
+          read: false,
+          link: '/notificaciones'
         });
-        alert('Redirigiendo a MercadoPago...');
+        
+        // Cambiar estado de subasta a 'sold'
+        const updatedAuctions = auctions.map(a => 
+          a.id === auction.id 
+            ? { ...a, status: 'sold' as const, winnerId: user!.id }
+            : a
+        );
+        
+        // Simular link de pago de MercadoPago
+        const mercadopagoLink = `https://www.mercadopago.com.ar/checkout/v1/payment?preference_id=MOCK-${auction.id}-${Date.now()}`;
+        
+        alert(`🎉 ¡COMPRA EXITOSA!\n\nProducto: ${auction.title}\nMonto: ${formatCurrency(auction.buyNowPrice)}\n\nTenés 48 horas para completar el pago.\n\n📧 Revisá tus notificaciones para ver el ticket de pago.\n\n🔗 Link de pago: ${mercadopagoLink}`);
+        
+        // Opcional: abrir MercadoPago en nueva pestaña
+        // window.open(mercadopagoLink, '_blank');
       }
     }
   };
