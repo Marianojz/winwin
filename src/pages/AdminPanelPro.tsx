@@ -998,7 +998,24 @@ useEffect(() => {
               onClick={() => {
                 if (auctionForm.title || auctionForm.description || auctionForm.startPrice > 0) {
                   if (window.confirm('¿Descartar los cambios y volver?')) {
-                    setAuctionForm
+                    setAuctionForm({
+                      title: '',
+                      description: '',
+                      startPrice: 0,
+                      currentPrice: 0,
+                      buyNowPrice: 0,
+                      categoryId: '1',
+                      images: [],
+                      durationDays: 0,
+                      durationHours: 0,
+                      durationMinutes: 30,
+                      condition: 'new',
+                      featured: false,
+                      allowExtension: true,
+                      scheduled: false,
+                      scheduledDate: '',
+                      scheduledTime: ''
+                    });
                     setActiveTab('auctions');
                   }
                 } else {
@@ -2395,6 +2412,41 @@ useEffect(() => {
                     </button>
                   )}
                   {['pending_payment', 'payment_confirmed', 'preparing'].includes(selectedOrder.status) && (
+                    <button 
+                      onClick={() => handleStatusChange(selectedOrder.id, 'cancelled')}
+                      className="btn"
+                      style={{ background: 'var(--error)', color: 'white', padding: '0.75rem' }}
+                    >
+                      <XCircle size={16} />
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {(selectedOrder.paidAt || selectedOrder.shippedAt || selectedOrder.deliveredAt) && (
+                <div style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
+                  <h4 style={{ marginBottom: '0.75rem' }}>Historial</h4>
+                  <div style={{ fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div>
+                      <Calendar size={16} style={{ display: 'inline', marginRight: '0.5rem' }} />
+                      Creado: {new Date(selectedOrder.createdAt).toLocaleString('es-AR')}
+                    </div>
+                    {selectedOrder.paidAt && (
+                      <div>
+                        <CheckCircle size={16} style={{ display: 'inline', marginRight: '0.5rem', color: 'var(--success)' }} />
+                        Pagado: {new Date(selectedOrder.paidAt).toLocaleString('es-AR')}
+                      </div>
+                    )}
+                    {selectedOrder.shippedAt && (
+                      <div>
+                        <Truck size={16} style={{ display: 'inline', marginRight: '0.5rem', color: 'var(--secondary)' }} />
+                        Enviado: {new Date(selectedOrder.shippedAt).toLocaleString('es-AR')}
+                      </div>
+                    )}
+                    {selectedOrder.deliveredAt && (
+                      <div>
+                        <CheckCircle size={16} style={{ display: 'inline', marginRight: '0.5rem'                  {['pending_payment', 'payment_confirmed', 'preparing'].includes(selectedOrder.status) && (
                     <button 
                       onClick={() => handleStatusChange(selectedOrder.id, 'cancelled')}
                       className="btn"
