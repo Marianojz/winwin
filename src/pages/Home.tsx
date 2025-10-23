@@ -5,8 +5,8 @@ import AuctionCard from '../components/AuctionCard';
 import ProductCard from '../components/ProductCard';
 
 const Home = () => {
-  const { auctions } = useStore();
   const navigate = useNavigate();
+  const { auctions, products } = useStore();
   
   // Primero las destacadas, luego las normales
   const featuredAuctions = auctions
