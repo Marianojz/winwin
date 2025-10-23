@@ -359,6 +359,7 @@ useEffect(() => {
             { id: 'orders', label: 'Pedidos', icon: <ShoppingBag size={18} /> },
             { id: 'users', label: 'Usuarios', icon: <Users size={18} /> },
             { id: 'auctions', label: 'Subastas', icon: <Gavel size={18} /> },
+      { id: 'create-auction', label: 'Crear Subasta', icon: <Plus size={18} /> },
             { id: 'products', label: 'Productos', icon: <Package size={18} /> },
             { id: 'inventory', label: 'Inventario', icon: <BarChart3 size={18} /> },
             { id: 'bots', label: 'Bots', icon: <Bot size={18} /> },
