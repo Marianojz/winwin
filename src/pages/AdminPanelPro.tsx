@@ -359,7 +359,7 @@ useEffect(() => {
             { id: 'orders', label: 'Pedidos', icon: <ShoppingBag size={18} /> },
             { id: 'users', label: 'Usuarios', icon: <Users size={18} /> },
             { id: 'auctions', label: 'Subastas', icon: <Gavel size={18} /> },
-      { id: 'create-auction', label: 'Crear Subasta', icon: <Plus size={18} /> },
+            { id: 'create-auction', label: 'Crear Subasta', icon: <Plus size={18} /> },
             { id: 'products', label: 'Productos', icon: <Package size={18} /> },
             { id: 'inventory', label: 'Inventario', icon: <BarChart3 size={18} /> },
             { id: 'bots', label: 'Bots', icon: <Bot size={18} /> },
@@ -1096,7 +1096,7 @@ useEffect(() => {
                       const oversizedFiles = files.filter(f => f.size > maxSize);
                       
                       if (oversizedFiles.length > 0) {
-                        alert('⚠️ Cad a imagen debe pesar menos de 2MB\n\nImágenes rechazadas:\n' + 
+                        alert('⚠️ Cada imagen debe pesar menos de 2MB\n\nImágenes rechazadas:\n' + 
                           oversizedFiles.map(f => `• ${f.name} (${(f.size / 1024 / 1024).toFixed(2)}MB)`).join('\n'));
                         e.target.value = '';
                         return;
