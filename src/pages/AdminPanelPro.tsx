@@ -541,7 +541,7 @@ useEffect(() => {
               <h3 style={{ marginBottom: '1rem' }}>Acciones Rápidas</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <button 
-                  onClick={() => setActiveTab('create-auction')}
+                  onClick={() => setActiveTab('auctions')}
                   className="btn btn-primary" 
                   style={{ width: '100%', justifyContent: 'flex-start', padding: '0.75rem' }}
                 >
@@ -2412,41 +2412,6 @@ useEffect(() => {
                     </button>
                   )}
                   {['pending_payment', 'payment_confirmed', 'preparing'].includes(selectedOrder.status) && (
-                    <button 
-                      onClick={() => handleStatusChange(selectedOrder.id, 'cancelled')}
-                      className="btn"
-                      style={{ background: 'var(--error)', color: 'white', padding: '0.75rem' }}
-                    >
-                      <XCircle size={16} />
-                      Cancelar
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {(selectedOrder.paidAt || selectedOrder.shippedAt || selectedOrder.deliveredAt) && (
-                <div style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
-                  <h4 style={{ marginBottom: '0.75rem' }}>Historial</h4>
-                  <div style={{ fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <div>
-                      <Calendar size={16} style={{ display: 'inline', marginRight: '0.5rem' }} />
-                      Creado: {new Date(selectedOrder.createdAt).toLocaleString('es-AR')}
-                    </div>
-                    {selectedOrder.paidAt && (
-                      <div>
-                        <CheckCircle size={16} style={{ display: 'inline', marginRight: '0.5rem', color: 'var(--success)' }} />
-                        Pagado: {new Date(selectedOrder.paidAt).toLocaleString('es-AR')}
-                      </div>
-                    )}
-                    {selectedOrder.shippedAt && (
-                      <div>
-                        <Truck size={16} style={{ display: 'inline', marginRight: '0.5rem', color: 'var(--secondary)' }} />
-                        Enviado: {new Date(selectedOrder.shippedAt).toLocaleString('es-AR')}
-                      </div>
-                    )}
-                    {selectedOrder.deliveredAt && (
-                      <div>
-                        <CheckCircle size={16} style={{ display: 'inline', marginRight: '0.5rem'                  {['pending_payment', 'payment_confirmed', 'preparing'].includes(selectedOrder.status) && (
                     <button 
                       onClick={() => handleStatusChange(selectedOrder.id, 'cancelled')}
                       className="btn"
