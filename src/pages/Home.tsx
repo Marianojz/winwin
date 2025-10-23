@@ -141,7 +141,7 @@ const Home = () => {
             </Link>
           </div>
           <div className="products-grid">
-            {featuredProducts.map(product => (
+            {.map((product: any) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
