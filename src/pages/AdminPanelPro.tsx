@@ -1096,7 +1096,7 @@ useEffect(() => {
                       const oversizedFiles = files.filter(f => f.size > maxSize);
                       
                       if (oversizedFiles.length > 0) {
-                        alert('⚠️ Cada imagen debe pesar menos de 2MB\n\nImágenes rechazadas:\n' + 
+                        alert('⚠️ Cad a imagen debe pesar menos de 2MB\n\nImágenes rechazadas:\n' + 
                           oversizedFiles.map(f => `• ${f.name} (${(f.size / 1024 / 1024).toFixed(2)}MB)`).join('\n'));
                         e.target.value = '';
                         return;
@@ -1123,7 +1123,6 @@ useEffect(() => {
                     }}
                     style={{ display: 'none' }}
                   />
-                      
                   <label 
                     htmlFor="auction-images" 
                     style={{ 
