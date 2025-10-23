@@ -541,7 +541,7 @@ useEffect(() => {
               <h3 style={{ marginBottom: '1rem' }}>Acciones Rápidas</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <button 
-                  onClick={() => setActiveTab('auctions')}
+                  onClick={() => setActiveTab('create-auction')}
                   className="btn btn-primary" 
                   style={{ width: '100%', justifyContent: 'flex-start', padding: '0.75rem' }}
                 >
