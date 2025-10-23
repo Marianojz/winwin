@@ -75,7 +75,24 @@ if (auction.status !== 'active') {
     });
 
     setShowBidError('');
-    alert('¡Oferta realizada con éxito! 🎉');
+
+// Verificar si es la oferta ganadora (cuando se cierra la subasta)
+const isWinningBid = amount >= (auction.buyNowPrice || Infinity);
+
+if (isWinningBid && auction.buyNowPrice) {
+  // Si alcanza el precio de compra directa, finalizar subasta
+  addNotification({
+    userId: user!.id,
+    type: 'auction_won',
+    title: '¡ Ganaste la subasta!',
+    message: `Ganaste "${auction.title}" por ${formatCurrency(amount)}. Tenés 48hs para pagar.`,
+    read: false,
+    link: '/notificaciones'
+  });
+  alert(`🎉 ¡GANASTE LA SUBASTA!\n\nProducto: ${auction.title}\nMonto final: ${formatCurrency(amount)}\n\nTenés 48 horas para completar el pago.\nRevisá tus notificaciones para ver el ticket de pago.`);
+} else {
+  alert(`✅ Oferta realizada con éxito!\n\nMonto: ${formatCurrency(amount)}\n\nSos el mejor postor actual.`);
+}
   };
 
   const handleBuyNow = () => {
