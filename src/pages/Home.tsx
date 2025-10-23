@@ -1,18 +1,14 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Gavel, Store, TrendingUp, Shield, Clock, Award } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import AuctionCard from '../components/AuctionCard';
 import ProductCard from '../components/ProductCard';
+import { Product } from '../types';
 
 const Home = () => {
-  const navigate = useNavigate();
   const { auctions, products } = useStore();
   
-  // Filtrar subastas y productos destacados
-  const featuredAuctions = auctions.filter(a => a.featured && a.status === 'active').slice(0, 4);
-  const featuredProducts = products.filter(p => p.stock > 0).slice(0, 4);
-  
-  // Primero las destacadas, luego las normales
+  // Filtrar subastas destacadas y activas (primero destacadas, luego por fecha)
   const featuredAuctions = auctions
     .filter(a => a.status === 'active')
     .sort((a, b) => {
@@ -23,6 +19,12 @@ const Home = () => {
       return new Date(b.endTime).getTime() - new Date(a.endTime).getTime();
     })
     .slice(0, 6);
+
+  // Primera subasta destacada para mostrar
+  const featuredAuction = featuredAuctions[0];
+
+  // Productos destacados con stock disponible
+  const featuredProducts = products.filter(p => p.stock > 0).slice(0, 4);
 
   return (
     <div className="home-page">
@@ -141,7 +143,7 @@ const Home = () => {
             </Link>
           </div>
           <div className="products-grid">
-            {.map((product: any) => (
+            {featuredProducts.map((product: Product) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
