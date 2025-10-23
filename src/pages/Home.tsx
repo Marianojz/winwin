@@ -8,6 +8,10 @@ const Home = () => {
   const navigate = useNavigate();
   const { auctions, products } = useStore();
   
+  // Filtrar subastas y productos destacados
+  const featuredAuctions = auctions.filter(a => a.featured && a.status === 'active').slice(0, 4);
+  const featuredProducts = products.filter(p => p.stock > 0).slice(0, 4);
+  
   // Primero las destacadas, luego las normales
   const featuredAuctions = auctions
     .filter(a => a.status === 'active')
