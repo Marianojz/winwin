@@ -1,9 +1,9 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
-// IMPORTANTE: Reemplaza TODOS estos valores con los de TU proyecto Firebase
-// Ve a: https://console.firebase.google.com/ → Tu proyecto → Configuración
+// Configuración de Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyDZjD0_YSivgYk2Kta4sFyV6ZFKM-RUYCM",
   authDomain: "subasta-argenta-winwin.firebaseapp.com",
@@ -19,3 +19,4 @@ const app = initializeApp(firebaseConfig);
 // Exportar servicios
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const storage = getStorage(app);
