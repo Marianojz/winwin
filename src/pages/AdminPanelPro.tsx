@@ -11,6 +11,7 @@ import UserDetailsModal from '../components/UserDetailsModal';
 import { useStore } from '../store/useStore';
 import { formatCurrency } from '../utils/helpers';
 import { Product, Auction, Order, OrderStatus } from '../types';
+import ImageUploader from '../components/ImageUploader';
 
 const AdminPanelPro = () => {
   const { 
