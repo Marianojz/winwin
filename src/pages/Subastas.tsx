@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Filter } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import AuctionCard from '../components/AuctionCard';
@@ -7,6 +7,19 @@ const Subastas = () => {
   const { auctions } = useStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
+  // Actualizar estado de subastas al montar el componente
+  useEffect(() => {
+    const updateAuctionStatuses = () => {
+      const now = new Date();
+      auctions.forEach(auction => {
+        if (auction.status === 'active' && new Date(auction.endTime) <= now) {
+          // La subasta debería estar finalizada
+          console.log(`Subasta ${auction.id} debería estar finalizada`);
+        }
+      });
+    };
+    updateAuctionStatuses();
+  }, [auctions]);
 
   const filteredAuctions = auctions.filter(auction => {
     const matchesSearch = auction.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
