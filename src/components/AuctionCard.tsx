@@ -17,6 +17,37 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
       to={`/subastas/${auction.id}`} 
       className={`auction-card ${auction.featured ? 'featured-auction' : ''} ${auction.isFlash ? 'flash-auction' : ''}`}
       style={{
+        {/* Mostrar si está finalizada */}
+        {auction.status === 'ended' && (
+          <div style={{
+            background: '#666',
+            color: '#fff',
+            padding: '0.5rem 0.75rem',
+            borderRadius: '0.5rem',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.25rem'
+          }}>
+            ⏰ FINALIZADA
+          </div>
+        )}
+        {auction.status === 'sold' && (
+          <div style={{
+            background: '#28a745',
+            color: '#fff',
+            padding: '0.5rem 0.75rem',
+            borderRadius: '0.5rem',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.25rem'
+          }}>
+            ✅ VENDIDA
+          </div>
+        )}
         ...(auction.featured && {
           border: '3px solid var(--primary)',
           boxShadow: '0 8px 24px rgba(255, 107, 0, 0.3)',
