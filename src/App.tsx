@@ -19,6 +19,7 @@ import Notificaciones from './pages/Notificaciones';
 import Perfil from './pages/Perfil';
 import AdminPanelPro from './pages/AdminPanelPro';
 import CompletarPerfil from './pages/CompletarPerfil';
+import { seedAuctionsToFirebase } from './utils/seedFirebase';
 
 function App() {
   const { setAuctions, setProducts, setUser, theme } = useStore();
@@ -46,7 +47,9 @@ function App() {
   if (!savedAuctions || JSON.parse(savedAuctions).length === 0) {
     setAuctions(mockAuctions);
   }
-  
+
+    seedAuctionsToFirebase();
+    
   if (!savedProducts || JSON.parse(savedProducts).length === 0) {
     setProducts(mockProducts);
   }
