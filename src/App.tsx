@@ -48,7 +48,14 @@ function App() {
     setAuctions(mockAuctions);
   }
 
-    seedAuctionsToFirebase();
+  seedAuctionsToFirebase();
+  
+  return () => {
+    if ((window as any).__unsubscribeFirebase) {
+      (window as any).__unsubscribeFirebase();
+    }
+  };
+}, []);
     
   if (!savedProducts || JSON.parse(savedProducts).length === 0) {
     setProducts(mockProducts);
