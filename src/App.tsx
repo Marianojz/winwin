@@ -22,14 +22,6 @@ import CompletarPerfil from './pages/CompletarPerfil';
 function App() {
   const { setAuctions, setProducts, setUser, theme } = useStore();
 
-  useEffect(() => {
-    console.log('🔍 App.tsx - useEffect ejecutándose');
-    
-    
-
-    // Apply theme
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [setAuctions, setProducts, setUser, theme]);
 
   return (
     <Router>
