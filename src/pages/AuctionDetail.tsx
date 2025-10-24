@@ -269,7 +269,8 @@ const AuctionDetail = () => {
             </div>
 
             {/* SOLO mostrar controles de oferta si la subasta está ACTIVA */}
-            {isActive ? (
+                        {/* SOLO mostrar controles de oferta si la subasta está ACTIVA - VERIFICACIÓN MÚLTIPLE */}
+            {(auction.status === 'active' && auction.endTime && new Date(auction.endTime) > new Date()) ? (
               <>
                 <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', marginBottom: '1.5rem' }}>
                   <h3 style={{ marginBottom: '1rem' }}>Realizar Oferta</h3>
@@ -322,13 +323,12 @@ const AuctionDetail = () => {
                 <AlertCircle size={48} color="var(--error)" style={{ marginBottom: '1rem' }} />
                 <h3 style={{ color: 'var(--error)', marginBottom: '0.5rem' }}>Subasta Finalizada</h3>
                 <p style={{ color: 'var(--text-secondary)' }}>Esta subasta ya no acepta ofertas.</p>
-                {isRecentlyEnded && (
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-                    Esta página se ocultará en {formatTime(timeRemaining)}
-                  </p>
-                )}
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                  Estado: {auction.status} | Tiempo final: {auction.endTime ? new Date(auction.endTime).toLocaleString() : 'No definido'}
+                </p>
               </div>
             )}
+        
 
             {lastThreeBids.length > 0 && (
               <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem' }}>
