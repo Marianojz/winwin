@@ -12,9 +12,34 @@ interface AuctionCardProps {
 const AuctionCard = ({ auction }: AuctionCardProps) => {
   const lastThreeBids = auction.bids.slice(-3).reverse();
 
+  // Función para determinar si la subasta debe mostrarse después de finalizada
+  const shouldShowAfterEnd = () => {
+    if (auction.status !== 'ended' && auction.status !== 'sold') {
+      return false;
+    }
+    
+    if (!auction.endTime) return false;
+    
+    const endTime = new Date(auction.endTime).getTime();
+    const now = new Date().getTime();
+    const thirtyMinutes = 30 * 60 * 1000; // 30 minutos en milisegundos
+    
+    return (now - endTime) <= thirtyMinutes;
+  };
+
+  // Determinar el estado de visualización
+  const isActive = auction.status === 'active';
+  const isRecentlyEnded = shouldShowAfterEnd();
+  const isHidden = (auction.status === 'ended' || auction.status === 'sold') && !isRecentlyEnded;
+
+  // Si la subasta está oculta, no renderizar nada
+  if (isHidden) {
+    return null;
+  }
+
   return (
     <Link 
-      to={`/subastas/${auction.id}`} 
+      to={isActive ? `/subastas/${auction.id}` : '#'} 
       className={`auction-card ${auction.featured ? 'featured-auction' : ''} ${auction.isFlash ? 'flash-auction' : ''}`}
       style={{
         ...(auction.featured && {
@@ -23,7 +48,16 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
         }),
         ...(auction.isFlash && {
           background: 'linear-gradient(135deg, var(--bg-secondary) 0%, rgba(255, 107, 0, 0.1) 100%)',
+        }),
+        ...(!isActive && {
+          opacity: 0.8,
+          filter: 'grayscale(0.3)',
         })
+      }}
+      onClick={(e) => {
+        if (!isActive) {
+          e.preventDefault();
+        }
       }}
     >
       <div className="auction-card-image">
@@ -38,8 +72,8 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
           gap: '0.5rem',
           zIndex: 10
         }}>
-          {/* Mostrar si está finalizada */}
-          {auction.status === 'ended' && (
+          {/* Mostrar si está finalizada recientemente */}
+          {isRecentlyEnded && (
             <div style={{
               background: '#666',
               color: '#fff',
@@ -55,7 +89,7 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
             </div>
           )}
           
-          {auction.status === 'sold' && (
+          {auction.status === 'sold' && isRecentlyEnded && (
             <div style={{
               background: '#28a745',
               color: '#fff',
@@ -71,7 +105,7 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
             </div>
           )}
 
-          {auction.featured && auction.status === 'active' && (
+          {auction.featured && isActive && (
             <div style={{
               background: 'linear-gradient(135deg, #FFD700, #FFA500)',
               color: '#000',
@@ -89,7 +123,7 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
             </div>
           )}
           
-          {auction.isFlash && auction.status === 'active' && (
+          {auction.isFlash && isActive && (
             <div style={{
               background: 'linear-gradient(135deg, #FF4444, #FF6B00)',
               color: '#fff',
@@ -107,7 +141,7 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
             </div>
           )}
           
-          {auction.status === 'active' && !auction.featured && !auction.isFlash && (
+          {isActive && !auction.featured && !auction.isFlash && (
             <div className="auction-card-badge badge-success">
               <Gavel size={14} />
               Activa
@@ -115,7 +149,7 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
           )}
         </div>
 
-        {auction.buyNowPrice && (
+        {auction.buyNowPrice && isActive && (
           <div className="auction-card-buynow">
             <DollarSign size={16} />
             Compra Directa
@@ -132,7 +166,7 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
             <span className="price-label">Oferta Actual</span>
             <span className="price-value">{formatCurrency(auction.currentPrice)}</span>
           </div>
-          {auction.buyNowPrice && (
+          {auction.buyNowPrice && isActive && (
             <div className="price-buynow">
               <span className="price-label">Compra Ya</span>
               <span className="price-value">{formatCurrency(auction.buyNowPrice)}</span>
@@ -140,9 +174,23 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
           )}
         </div>
 
-        <div className="auction-card-countdown">
-          <Countdown endTime={auction.endTime} />
-        </div>
+        {isActive ? (
+          <div className="auction-card-countdown">
+            <Countdown endTime={auction.endTime} />
+          </div>
+        ) : isRecentlyEnded && (
+          <div className="auction-card-countdown" style={{ color: '#666', textAlign: 'center' }}>
+            <div style={{ 
+              fontSize: '0.875rem', 
+              fontWeight: 600,
+              padding: '0.5rem',
+              background: '#f5f5f5',
+              borderRadius: '0.5rem'
+            }}>
+              ⏰ Subasta finalizada recientemente
+            </div>
+          </div>
+        )}
 
         {lastThreeBids.length > 0 && (
           <div className="auction-card-bids">
@@ -161,23 +209,23 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
           </div>
         )}
 
-        {auction.status === 'active' ? (
-  <button className="btn btn-primary auction-card-btn">
-    Ver Detalles y Ofertar
-  </button>
-) : (
-  <button 
-    className="btn btn-secondary auction-card-btn" 
-    style={{ 
-      background: '#666', 
-      cursor: 'not-allowed',
-      opacity: 0.7 
-    }}
-    disabled
-  >
-    Subasta Finalizada
-  </button>
-)}
+        {isActive ? (
+          <button className="btn btn-primary auction-card-btn">
+            Ver Detalles y Ofertar
+          </button>
+        ) : (
+          <button 
+            className="btn btn-secondary auction-card-btn" 
+            style={{ 
+              background: '#666', 
+              cursor: 'not-allowed',
+              opacity: 0.7 
+            }}
+            disabled
+          >
+            {isRecentlyEnded ? 'Subasta Finalizada' : 'No Disponible'}
+          </button>
+        )}
       </div>
     </Link>
   );
