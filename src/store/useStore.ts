@@ -171,26 +171,47 @@ export const useStore = create<AppState>((set, get) => ({
     safeLocalStorageSet('auctions', auctions);
     set({ auctions });
   },
-  addBid: (auctionId, amount, userId, username) => {
-    const auctions = get().auctions.map(auction => {
-      if (auction.id === auctionId) {
-        const newBid = {
-          id: Date.now().toString(),
-          auctionId,
-          userId,
-          username,
-          amount,
-          createdAt: new Date()
-        };
-        return {
-          ...auction,
+  addBid: async (auctionId, amount, userId, username) => {
+    const newBid = {
+      id: Date.now().toString(),
+      auctionId,
+      userId,
+      username,
+      amount,
+      createdAt: new Date()
+    };
+
+    try {
+      // Actualizar en Firebase - esto sincroniza automáticamente a todos
+      const auctionRef = doc(db, 'auctions', auctionId);
+      const auctionSnap = await getDoc(auctionRef);
+      
+      if (auctionSnap.exists()) {
+        await updateDoc(auctionRef, {
           currentPrice: amount,
-          bids: [...auction.bids, newBid]
-        };
+          bids: arrayUnion(newBid)
+        });
+        
+        console.log('✅ Oferta sincronizada en Firebase');
+      } else {
+        console.error('❌ Subasta no existe en Firebase');
       }
-      return auction;
-    });
-    get().setAuctions(auctions);
+    } catch (error) {
+      console.error('❌ Error sincronizando oferta:', error);
+      
+      // Fallback: actualizar solo localmente si Firebase falla
+      const auctions = get().auctions.map(auction => {
+        if (auction.id === auctionId) {
+          return {
+            ...auction,
+            currentPrice: amount,
+            bids: [...auction.bids, newBid]
+          };
+        }
+        return auction;
+      });
+      get().setAuctions(auctions);
+    }
   },
 
   // Products
