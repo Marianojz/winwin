@@ -439,51 +439,7 @@ const AdminPanel = () => {
               </div>
             </div>
 
-            {/* Lista de Usuarios Mock */}
-            <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem', marginBottom: '1rem' }}>
-              <h4 style={{ marginBottom: '1rem' }}>Usuarios Recientes</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {[
-                  { id: 1, name: 'Juan Pérez', email: 'juan@email.com', role: 'Usuario', status: 'Activo', joined: '15/10/2025' },
-                  { id: 2, name: 'María García', email: 'maria@email.com', role: 'Usuario', status: 'Activo', joined: '14/10/2025' },
-                  { id: 3, name: 'Carlos López', email: 'carlos@email.com', role: 'Usuario', status: 'Inactivo', joined: '13/10/2025' },
-                  { id: 4, name: 'Admin User', email: 'admin@subastaargenta.com', role: 'Admin', status: 'Activo', joined: '01/01/2025' }
-                ].map(user => (
-                  <div key={user.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1fr 1fr auto', gap: '1rem', padding: '1rem', background: 'var(--bg-secondary)', borderRadius: '0.5rem', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{user.name}</div>
-                      <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{user.email}</div>
-                    </div>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                      Registrado: {user.joined}
-                    </div>
-                    <span className={user.role === 'Admin' ? 'badge badge-warning' : 'badge badge-success'}>
-                      {user.role}
-                    </span>
-                    <span className={user.status === 'Activo' ? 'badge badge-success' : 'badge badge-error'}>
-                      {user.status}
-                    </span>
-                    <button 
-                      className="btn btn-outline" 
-                      style={{ padding: '0.5rem 0.75rem', fontSize: '0.875rem' }}
-                      onClick={() => alert(`Ver detalles de ${user.name}`)}
-                    >
-                      <Eye size={16} />
-                      Ver
-                    </button>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button className="btn btn-outline" style={{ padding: '0.5rem' }}>
-                        <Edit size={16} />
-                      </button>
-                      {user.role !== 'Admin' && (
-                        <button style={{ padding: '0.5rem', background: 'var(--error)', color: 'white', borderRadius: '0.5rem' }}>
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+
             </div>
 
             <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
