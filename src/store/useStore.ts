@@ -1,14 +1,4 @@
 import { create } from 'zustand';
-import { 
-  doc, 
-  updateDoc, 
-  arrayUnion, 
-  onSnapshot, 
-  collection,
-  setDoc,
-  getDoc 
-} from 'firebase/firestore';
-import { db } from '../config/firebase';
 import { User, Auction, Product, CartItem, Notification, Theme, Bot, Order, OrderStatus } from '../types';
 
 interface AppState {
@@ -55,9 +45,6 @@ interface AppState {
   orders: Order[];
   addOrder: (order: Order) => void;
   updateOrderStatus: (orderId: string, status: OrderStatus, updates?: Partial<Order>) => void;
-
-  // Firebase sync
-  initFirebaseSync: () => void;
 }
 
 // Función auxiliar para guardar en localStorage de forma segura
@@ -107,36 +94,6 @@ const safeLocalStorageSet = (key: string, value: any) => {
   }
 };
 
-// Función auxiliar para sincronizar subastas con Firebase
-const syncAuctionsWithFirebase = (set: any) => {
-  const auctionsRef = collection(db, 'auctions');
-  
-  // Escuchar cambios en tiempo real
-  const unsubscribe = onSnapshot(auctionsRef, (snapshot) => {
-    const auctionsFromFirebase: Auction[] = [];
-    
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-      auctionsFromFirebase.push({
-        id: doc.id,
-        ...data,
-        endTime: data.endTime?.toDate() || new Date(data.endTime),
-        bids: data.bids?.map((b: any) => ({
-          ...b,
-          createdAt: b.createdAt?.toDate() || new Date(b.createdAt)
-        })) || []
-      } as Auction);
-    });
-
-    // Actualizar estado local con datos de Firebase
-    set({ auctions: auctionsFromFirebase });
-  }, (error) => {
-    console.error('Error sincronizando subastas:', error);
-  });
-
-  return unsubscribe;
-};
-
 export const useStore = create<AppState>((set, get) => ({
   // Theme
   theme: (localStorage.getItem('theme') as Theme) || 'light',
@@ -145,8 +102,6 @@ export const useStore = create<AppState>((set, get) => ({
     localStorage.setItem('theme', newTheme);
     set({ theme: newTheme });
   },
-
-  
 
   // User
   user: null,
@@ -166,18 +121,6 @@ export const useStore = create<AppState>((set, get) => ({
           ...b,
           createdAt: new Date(b.createdAt)
         })) || []
-
-        // Inicializar sincronización con Firebase
-  initFirebaseSync: () => {
-    const unsubscribe = syncAuctionsWithFirebase(set);
-    
-    // Guardar función de desuscripción
-    if (typeof window !== 'undefined') {
-      (window as any).__unsubscribeFirebase = unsubscribe;
-    }
-    
-    console.log('🔥 Firebase sincronización iniciada');
-  }
       }));
     } catch (error) {
       console.error('Error cargando subastas:', error);
@@ -188,47 +131,26 @@ export const useStore = create<AppState>((set, get) => ({
     safeLocalStorageSet('auctions', auctions);
     set({ auctions });
   },
-  addBid: async (auctionId, amount, userId, username) => {
-    const newBid = {
-      id: Date.now().toString(),
-      auctionId,
-      userId,
-      username,
-      amount,
-      createdAt: new Date()
-    };
-
-    try {
-      // Actualizar en Firebase - esto sincroniza automáticamente a todos
-      const auctionRef = doc(db, 'auctions', auctionId);
-      const auctionSnap = await getDoc(auctionRef);
-      
-      if (auctionSnap.exists()) {
-        await updateDoc(auctionRef, {
+  addBid: (auctionId, amount, userId, username) => {
+    const auctions = get().auctions.map(auction => {
+      if (auction.id === auctionId) {
+        const newBid = {
+          id: Date.now().toString(),
+          auctionId,
+          userId,
+          username,
+          amount,
+          createdAt: new Date()
+        };
+        return {
+          ...auction,
           currentPrice: amount,
-          bids: arrayUnion(newBid)
-        });
-        
-        console.log('✅ Oferta sincronizada en Firebase');
-      } else {
-        console.error('❌ Subasta no existe en Firebase');
+          bids: [...auction.bids, newBid]
+        };
       }
-    } catch (error) {
-      console.error('❌ Error sincronizando oferta:', error);
-      
-      // Fallback: actualizar solo localmente si Firebase falla
-      const auctions = get().auctions.map(auction => {
-        if (auction.id === auctionId) {
-          return {
-            ...auction,
-            currentPrice: amount,
-            bids: [...auction.bids, newBid]
-          };
-        }
-        return auction;
-      });
-      get().setAuctions(auctions);
-    }
+      return auction;
+    });
+    get().setAuctions(auctions);
   },
 
   // Products
