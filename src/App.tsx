@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { useStore } from './store/useStore';
 import Terminos from './pages/Terminos';
 import Preguntas from './pages/Preguntas';
 import { useEffect } from 'react';
