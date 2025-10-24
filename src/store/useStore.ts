@@ -55,6 +55,9 @@ interface AppState {
   orders: Order[];
   addOrder: (order: Order) => void;
   updateOrderStatus: (orderId: string, status: OrderStatus, updates?: Partial<Order>) => void;
+
+  // Firebase sync
+  initFirebaseSync: () => void;
 }
 
 // Función auxiliar para guardar en localStorage de forma segura
