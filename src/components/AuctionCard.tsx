@@ -17,37 +17,6 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
       to={`/subastas/${auction.id}`} 
       className={`auction-card ${auction.featured ? 'featured-auction' : ''} ${auction.isFlash ? 'flash-auction' : ''}`}
       style={{
-        {/* Mostrar si está finalizada */}
-        {auction.status === 'ended' && (
-          <div style={{
-            background: '#666',
-            color: '#fff',
-            padding: '0.5rem 0.75rem',
-            borderRadius: '0.5rem',
-            fontSize: '0.75rem',
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.25rem'
-          }}>
-            ⏰ FINALIZADA
-          </div>
-        )}
-        {auction.status === 'sold' && (
-          <div style={{
-            background: '#28a745',
-            color: '#fff',
-            padding: '0.5rem 0.75rem',
-            borderRadius: '0.5rem',
-            fontSize: '0.75rem',
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.25rem'
-          }}>
-            ✅ VENDIDA
-          </div>
-        )}
         ...(auction.featured && {
           border: '3px solid var(--primary)',
           boxShadow: '0 8px 24px rgba(255, 107, 0, 0.3)',
@@ -59,17 +28,50 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
     >
       <div className="auction-card-image">
         <img src={auction.images[0]} alt={auction.title} loading="lazy" />
-        
-        <div style={{ 
-          position: 'absolute', 
-          top: '0.75rem', 
-          left: '0.75rem', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '0.5rem', 
-          zIndex: 10 
+
+        <div style={{
+          position: 'absolute',
+          top: '0.75rem',
+          left: '0.75rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.5rem',
+          zIndex: 10
         }}>
-          {auction.featured && (
+          {/* Mostrar si está finalizada */}
+          {auction.status === 'ended' && (
+            <div style={{
+              background: '#666',
+              color: '#fff',
+              padding: '0.5rem 0.75rem',
+              borderRadius: '0.5rem',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem'
+            }}>
+              ⏰ FINALIZADA
+            </div>
+          )}
+          
+          {auction.status === 'sold' && (
+            <div style={{
+              background: '#28a745',
+              color: '#fff',
+              padding: '0.5rem 0.75rem',
+              borderRadius: '0.5rem',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem'
+            }}>
+              ✅ VENDIDA
+            </div>
+          )}
+
+          {auction.featured && auction.status === 'active' && (
             <div style={{
               background: 'linear-gradient(135deg, #FFD700, #FFA500)',
               color: '#000',
@@ -86,7 +88,8 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
               ⭐ DESTACADA
             </div>
           )}
-          {auction.isFlash && (
+          
+          {auction.isFlash && auction.status === 'active' && (
             <div style={{
               background: 'linear-gradient(135deg, #FF4444, #FF6B00)',
               color: '#fff',
@@ -103,6 +106,7 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
               ⚡ RELÁMPAGO
             </div>
           )}
+          
           {auction.status === 'active' && !auction.featured && !auction.isFlash && (
             <div className="auction-card-badge badge-success">
               <Gavel size={14} />
