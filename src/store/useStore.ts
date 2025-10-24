@@ -143,6 +143,8 @@ export const useStore = create<AppState>((set, get) => ({
     set({ theme: newTheme });
   },
 
+  
+
   // User
   user: null,
   setUser: (user) => set({ user, isAuthenticated: !!user }),
@@ -161,6 +163,18 @@ export const useStore = create<AppState>((set, get) => ({
           ...b,
           createdAt: new Date(b.createdAt)
         })) || []
+
+        // Inicializar sincronización con Firebase
+  initFirebaseSync: () => {
+    const unsubscribe = syncAuctionsWithFirebase(set);
+    
+    // Guardar función de desuscripción
+    if (typeof window !== 'undefined') {
+      (window as any).__unsubscribeFirebase = unsubscribe;
+    }
+    
+    console.log('🔥 Firebase sincronización iniciada');
+  }
       }));
     } catch (error) {
       console.error('Error cargando subastas:', error);
