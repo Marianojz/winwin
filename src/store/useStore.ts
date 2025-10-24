@@ -1,4 +1,14 @@
 import { create } from 'zustand';
+import { 
+  doc, 
+  updateDoc, 
+  arrayUnion, 
+  onSnapshot, 
+  collection,
+  setDoc,
+  getDoc 
+} from 'firebase/firestore';
+import { db } from '../config/firebase';
 import { User, Auction, Product, CartItem, Notification, Theme, Bot, Order, OrderStatus } from '../types';
 
 interface AppState {
