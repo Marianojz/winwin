@@ -3,8 +3,6 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { useStore } from './store/useStore';
 import Terminos from './pages/Terminos';
 import Preguntas from './pages/Preguntas';
-import { useEffect } from 'react';
-import { useStore } from './store/useStore';
 import { mockAuctions, mockProducts } from './utils/mockData';
 import Navbar from './components/Navbar';
 import ScrollToTop from './components/ScrollToTop';
@@ -21,63 +19,40 @@ import Notificaciones from './pages/Notificaciones';
 import Perfil from './pages/Perfil';
 import AdminPanelPro from './pages/AdminPanelPro';
 import CompletarPerfil from './pages/CompletarPerfil';
-import { seedAuctionsToFirebase } from './utils/seedFirebase';
 
 function App() {
   const { setAuctions, setProducts, setUser, theme } = useStore();
-  const { theme, initFirebaseSync } = useStore();
 
-  // Inicializar sincronización de Firebase al montar la app
   useEffect(() => {
-    initFirebaseSync();
+    console.log('🔍 App.tsx - useEffect ejecutándose');
     
-    // Limpiar al desmontar
-    return () => {
-      if ((window as any).__unsubscribeFirebase) {
-        (window as any).__unsubscribeFirebase();
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-  console.log('🔍 App.tsx - useEffect ejecutándose');
-  
-  // Initialize mock data only if empty
-  const savedAuctions = localStorage.getItem('auctions');
-  const savedProducts = localStorage.getItem('products');
-  
-  if (!savedAuctions || JSON.parse(savedAuctions).length === 0) {
-    setAuctions(mockAuctions);
-  }
-
-  seedAuctionsToFirebase();
-  
-  return () => {
-    if ((window as any).__unsubscribeFirebase) {
-      (window as any).__unsubscribeFirebase();
+    // Initialize mock data only if empty
+    const savedAuctions = localStorage.getItem('auctions');
+    const savedProducts = localStorage.getItem('products');
+    
+    if (!savedAuctions || JSON.parse(savedAuctions).length === 0) {
+      setAuctions(mockAuctions);
     }
-  };
-}, []);
     
-  if (!savedProducts || JSON.parse(savedProducts).length === 0) {
-    setProducts(mockProducts);
-  }
-  
-  // Auto-login for demo purposes
-  const savedUser = localStorage.getItem('user');
-  console.log('🔍 Usuario guardado en localStorage:', savedUser);
-  
-  if (savedUser) {
-    const parsedUser = JSON.parse(savedUser);
-    console.log('🔍 Usuario parseado:', parsedUser);
-    setUser(parsedUser);
-  } else {
-    console.log('✅ No hay usuario en localStorage');
-  }
+    if (!savedProducts || JSON.parse(savedProducts).length === 0) {
+      setProducts(mockProducts);
+    }
+    
+    // Auto-login for demo purposes
+    const savedUser = localStorage.getItem('user');
+    console.log('🔍 Usuario guardado en localStorage:', savedUser);
+    
+    if (savedUser) {
+      const parsedUser = JSON.parse(savedUser);
+      console.log('🔍 Usuario parseado:', parsedUser);
+      setUser(parsedUser);
+    } else {
+      console.log('✅ No hay usuario en localStorage');
+    }
 
-  // Apply theme
-  document.documentElement.setAttribute('data-theme', theme);
-}, []);
+    // Apply theme
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [setAuctions, setProducts, setUser, theme]);
 
   return (
     <Router>
@@ -98,7 +73,7 @@ function App() {
             <Route path="/notificaciones" element={<Notificaciones />} />
             <Route path="/perfil" element={<Perfil />} />
             <Route path="/terminos" element={<Terminos />} />
-<Route path="/preguntas" element={<Preguntas />} />
+            <Route path="/preguntas" element={<Preguntas />} />
             <Route path="/admin" element={<AdminPanelPro />} />
             <Route path="/completar-perfil" element={<CompletarPerfil />} />
           </Routes>
