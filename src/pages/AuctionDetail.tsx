@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Gavel, User, Clock, ShoppingCart, AlertCircle, TrendingUp, ChevronLeft } from 'lucide-react';
+import { Gavel, DollarSign, User, Clock, ShoppingCart, AlertCircle, TrendingUp, ChevronLeft } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { formatCurrency, formatTimeAgo } from '../utils/helpers';
 import Countdown from '../components/Countdown';
@@ -42,8 +42,10 @@ const AuctionDetail = () => {
       navigate('/login');
       return;
     }
-    }
-      navigate('/login');
+
+    // VALIDACIÓN: Verificar que la subasta esté activa
+    if (auction.status !== 'active') {
+      alert('Esta subasta ya finalizó. No se pueden realizar más ofertas.');
       return;
     }
 
@@ -65,33 +67,32 @@ const AuctionDetail = () => {
     }
 
     addBid(auction.id, amount, user!.id, user!.username);
-    addNotification({
-      userId: user!.id,
-      type: 'auction_outbid',
-      title: 'Oferta realizada',
-      message: `Ofertaste ${formatCurrency(amount)} en "${auction.title}"`,
-      read: false
-    });
+    
+    // Verificar si es la oferta ganadora
+    const isWinningBid = auction.buyNowPrice && amount >= auction.buyNowPrice;
+
+    if (isWinningBid) {
+      addNotification({
+        userId: user!.id,
+        type: 'auction_won',
+        title: '¡Ganaste la subasta!',
+        message: `Ganaste "${auction.title}" por ${formatCurrency(amount)}. Tenés 48hs para pagar.`,
+        read: false,
+        link: '/notificaciones'
+      });
+      alert(`🎉 ¡GANASTE LA SUBASTA!\n\nProducto: ${auction.title}\nMonto final: ${formatCurrency(amount)}\n\nTenés 48 horas para completar el pago.\nRevisá tus notificaciones para ver el ticket de pago.`);
+    } else {
+      addNotification({
+        userId: user!.id,
+        type: 'auction_outbid',
+        title: 'Oferta realizada',
+        message: `Ofertaste ${formatCurrency(amount)} en "${auction.title}"`,
+        read: false
+      });
+      alert(`✅ Oferta realizada con éxito!\n\nMonto: ${formatCurrency(amount)}\n\nSos el mejor postor actual.`);
+    }
 
     setShowBidError('');
-
-// Verificar si es la oferta ganadora (cuando se cierra la subasta)
-const isWinningBid = amount >= (auction.buyNowPrice || Infinity);
-
-if (isWinningBid && auction.buyNowPrice) {
-  // Si alcanza el precio de compra directa, finalizar subasta
-  addNotification({
-    userId: user!.id,
-    type: 'auction_won',
-    title: '¡ Ganaste la subasta!',
-    message: `Ganaste "${auction.title}" por ${formatCurrency(amount)}. Tenés 48hs para pagar.`,
-    read: false,
-    link: '/notificaciones'
-  });
-  alert(`🎉 ¡GANASTE LA SUBASTA!\n\nProducto: ${auction.title}\nMonto final: ${formatCurrency(amount)}\n\nTenés 48 horas para completar el pago.\nRevisá tus notificaciones para ver el ticket de pago.`);
-} else {
-  alert(`✅ Oferta realizada con éxito!\n\nMonto: ${formatCurrency(amount)}\n\nSos el mejor postor actual.`);
-}
   };
 
   const handleBuyNow = () => {
@@ -100,14 +101,11 @@ if (isWinningBid && auction.buyNowPrice) {
       return;
     }
 
-    // ESTA VALIDACIÓN DEBE ESTAR AQUÍ ⬇️
+    // VALIDACIÓN: Verificar que la subasta esté activa
     if (auction.status !== 'active') {
       alert('Esta subasta ya finalizó. No se puede realizar la compra directa.');
       return;
     }
-
-    if (auction.buyNowPrice) {
-      // ... resto del código
 
     if (auction.buyNowPrice) {
       const confirm = window.confirm(
@@ -115,7 +113,6 @@ if (isWinningBid && auction.buyNowPrice) {
       );
       
       if (confirm) {
-        // Crear notificación de compra ganada
         addNotification({
           userId: user!.id,
           type: 'auction_won',
@@ -125,7 +122,6 @@ if (isWinningBid && auction.buyNowPrice) {
           link: '/notificaciones'
         });
         
-        // Simular link de pago de MercadoPago
         const mercadopagoLink = `https://www.mercadopago.com.ar/checkout/v1/payment?preference_id=MOCK-${auction.id}-${Date.now()}`;
         
         alert(`🎉 ¡COMPRA EXITOSA!\n\nProducto: ${auction.title}\nMonto: ${formatCurrency(auction.buyNowPrice)}\n\nTenés 48 horas para completar el pago.\n\n📧 Revisá tus notificaciones para ver el ticket de pago.\n\n🔗 Link de pago: ${mercadopagoLink}`);
@@ -137,6 +133,8 @@ if (isWinningBid && auction.buyNowPrice) {
     const current = parseInt(bidAmount) || auction.currentPrice;
     setBidAmount((current + amount).toString());
   };
+
+  const lastThreeBids = auction.bids.slice(-3).reverse();
 
   return (
     <div style={{ minHeight: 'calc(100vh - 80px)', padding: '2rem 0' }}>
@@ -176,12 +174,12 @@ if (isWinningBid && auction.buyNowPrice) {
                   onClick={() => setSelectedImage(idx)}
                   style={{
                     background: 'var(--bg-secondary)',
-                    border: selectedImage === idx ? '3px solid var(--primary)' : 'none',
-                    borderRadius: '0.75rem',
+                    border: selectedImage === idx ? '3px solid var(--primary)' : '3px solid transparent',
+                    borderRadius: '0.5rem',
                     overflow: 'hidden',
-                    aspectRatio: '1',
                     cursor: 'pointer',
-                    padding: 0
+                    padding: 0,
+                    aspectRatio: '1'
                   }}
                 >
                   <img src={img} alt={`${auction.title} ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -191,130 +189,101 @@ if (isWinningBid && auction.buyNowPrice) {
           </div>
 
           <div>
-            <h1 style={{ marginBottom: '1rem' }}>{auction.title}</h1>
+            <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>{auction.title}</h1>
             
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
-              {auction.status === 'active' ? (
-                <span className="badge badge-success">
-                  <Gavel size={14} />
-                  Subasta Activa
-                </span>
-              ) : (
-                <span className="badge badge-error">Finalizada</span>
-              )}
-            </div>
-
-            <div style={{ marginBottom: '2rem' }}>
-              <Countdown endTime={auction.endTime} />
-            </div>
-
-            <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', marginBottom: '2rem' }}>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                  Oferta Actual
-                </div>
-                <div style={{ fontSize: '2.5rem', fontWeight: 700, color: 'var(--primary)', fontFamily: 'Poppins' }}>
-                  {formatCurrency(auction.currentPrice)}
-                </div>
+            <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Oferta Actual</div>
+                <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--primary)' }}>{formatCurrency(auction.currentPrice)}</div>
               </div>
 
               {auction.buyNowPrice && (
-                <>
-                  <div style={{ height: '1px', background: 'var(--border)', marginBottom: '1.5rem' }} />
-                  <div>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                      Precio de Compra Directa
-                    </div>
-                    <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--warning)', fontFamily: 'Poppins' }}>
-                      {formatCurrency(auction.buyNowPrice)}
-                    </div>
-                  </div>
-                </>
+                <div style={{ marginBottom: '1rem' }}>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Precio de Compra Directa</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--success)' }}>{formatCurrency(auction.buyNowPrice)}</div>
+                </div>
               )}
+
+              <div style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
+                <Clock size={20} style={{ marginBottom: '0.5rem' }} />
+                <Countdown endTime={auction.endTime} />
+              </div>
             </div>
 
-            {auction.status === 'active' && (
-              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', marginBottom: '2rem' }}>
-                <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <TrendingUp size={24} />
-                  Realizar Oferta
-                </h3>
-
-                {showBidError && (
-                  <div style={{ background: 'var(--error)', color: 'white', padding: '0.75rem', borderRadius: '0.5rem', marginBottom: '1rem', fontSize: '0.9375rem' }}>
-                    {showBidError}
+            {/* Solo mostrar controles si la subasta está activa */}
+            {auction.status === 'active' ? (
+              <>
+                <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', marginBottom: '1.5rem' }}>
+                  <h3 style={{ marginBottom: '1rem' }}>Realizar Oferta</h3>
+                  
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                    <input
+                      type="number"
+                      value={bidAmount}
+                      onChange={(e) => setBidAmount(e.target.value)}
+                      placeholder="Ingresa tu oferta"
+                      style={{
+                        flex: 1,
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '2px solid var(--border)',
+                        background: 'var(--bg-tertiary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '1rem'
+                      }}
+                    />
                   </div>
-                )}
 
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                    Monto de la Oferta
-                  </label>
-                  <input 
-                    type="number"
-                    value={bidAmount}
-                    onChange={(e) => setBidAmount(e.target.value)}
-                    placeholder="Ingresa tu oferta"
-                    style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1.125rem', fontWeight: 600 }}
-                  />
-                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                    Las ofertas deben ser múltiplos de $500
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                    <button onClick={() => incrementBid(500)} className="btn btn-secondary" style={{ flex: 1 }}>+$500</button>
+                    <button onClick={() => incrementBid(1000)} className="btn btn-secondary" style={{ flex: 1 }}>+$1.000</button>
+                    <button onClick={() => incrementBid(5000)} className="btn btn-secondary" style={{ flex: 1 }}>+$5.000</button>
                   </div>
+
+                  {showBidError && (
+                    <div style={{ color: 'var(--error)', marginBottom: '1rem', fontSize: '0.875rem' }}>
+                      {showBidError}
+                    </div>
+                  )}
+
+                  <button onClick={handleBid} className="btn btn-primary" style={{ width: '100%', marginBottom: '0.75rem' }}>
+                    <Gavel size={20} />
+                    Realizar Oferta
+                  </button>
+
+                  {auction.buyNowPrice && (
+                    <button onClick={handleBuyNow} className="btn btn-success" style={{ width: '100%' }}>
+                      <ShoppingCart size={20} />
+                      Comprar Ahora por {formatCurrency(auction.buyNowPrice)}
+                    </button>
+                  )}
                 </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                  <button onClick={() => incrementBid(500)} className="btn btn-outline" style={{ padding: '0.625rem' }}>
-                    +$500
-                  </button>
-                  <button onClick={() => incrementBid(1000)} className="btn btn-outline" style={{ padding: '0.625rem' }}>
-                    +$1,000
-                  </button>
-                  <button onClick={() => incrementBid(5000)} className="btn btn-outline" style={{ padding: '0.625rem' }}>
-                    +$5,000
-                  </button>
-                </div>
-
-                <button onClick={handleBid} className="btn btn-primary" style={{ width: '100%', padding: '1rem', fontSize: '1.125rem' }}>
-                  <Gavel size={20} />
-                  Ofertar {bidAmount && formatCurrency(parseInt(bidAmount))}
-                </button>
-
-                {auction.buyNowPrice && (
-                  <button onClick={handleBuyNow} className="btn btn-secondary" style={{ width: '100%', marginTop: '0.75rem', padding: '1rem', fontSize: '1.125rem' }}>
-                    <ShoppingCart size={20} />
-                    Comprar Ahora por {formatCurrency(auction.buyNowPrice)}
-                  </button>
-                )}
+              </>
+            ) : (
+              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', marginBottom: '1.5rem', textAlign: 'center' }}>
+                <AlertCircle size={48} color="var(--error)" style={{ marginBottom: '1rem' }} />
+                <h3 style={{ color: 'var(--error)', marginBottom: '0.5rem' }}>Subasta Finalizada</h3>
+                <p style={{ color: 'var(--text-secondary)' }}>Esta subasta ya no acepta ofertas.</p>
               </div>
             )}
 
-            {auction.bids.length > 0 && (
+            {lastThreeBids.length > 0 && (
               <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem' }}>
                 <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <User size={24} />
-                  Historial de Ofertas ({auction.bids.length})
+                  <TrendingUp size={20} />
+                  Últimas Ofertas
                 </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '300px', overflowY: 'auto' }}>
-                  {[...auction.bids].reverse().map((bid) => (
-                    <div 
-                      key={bid.id}
-                      style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        alignItems: 'center',
-                        padding: '0.875rem',
-                        background: 'var(--bg-tertiary)',
-                        borderRadius: '0.5rem'
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{bid.username}</div>
-                        <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                          <Clock size={12} style={{ display: 'inline', marginRight: '0.25rem' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {lastThreeBids.map((bid) => (
+                    <div key={bid.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <User size={16} />
+                        <span>{bid.username}</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                           {formatTimeAgo(bid.createdAt)}
-                        </div>
+                        </span>
                       </div>
-                      <div style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--primary)' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--primary)' }}>
                         {formatCurrency(bid.amount)}
                       </div>
                     </div>
