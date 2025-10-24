@@ -161,9 +161,23 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
           </div>
         )}
 
-        <button className="btn btn-primary auction-card-btn">
-          Ver Detalles y Ofertar
-        </button>
+        {auction.status === 'active' ? (
+  <button className="btn btn-primary auction-card-btn">
+    Ver Detalles y Ofertar
+  </button>
+) : (
+  <button 
+    className="btn btn-secondary auction-card-btn" 
+    style={{ 
+      background: '#666', 
+      cursor: 'not-allowed',
+      opacity: 0.7 
+    }}
+    disabled
+  >
+    Subasta Finalizada
+  </button>
+)}
       </div>
     </Link>
   );
