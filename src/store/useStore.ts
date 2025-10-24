@@ -104,6 +104,36 @@ const safeLocalStorageSet = (key: string, value: any) => {
   }
 };
 
+// Función auxiliar para sincronizar subastas con Firebase
+const syncAuctionsWithFirebase = (set: any) => {
+  const auctionsRef = collection(db, 'auctions');
+  
+  // Escuchar cambios en tiempo real
+  const unsubscribe = onSnapshot(auctionsRef, (snapshot) => {
+    const auctionsFromFirebase: Auction[] = [];
+    
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      auctionsFromFirebase.push({
+        id: doc.id,
+        ...data,
+        endTime: data.endTime?.toDate() || new Date(data.endTime),
+        bids: data.bids?.map((b: any) => ({
+          ...b,
+          createdAt: b.createdAt?.toDate() || new Date(b.createdAt)
+        })) || []
+      } as Auction);
+    });
+
+    // Actualizar estado local con datos de Firebase
+    set({ auctions: auctionsFromFirebase });
+  }, (error) => {
+    console.error('Error sincronizando subastas:', error);
+  });
+
+  return unsubscribe;
+};
+
 export const useStore = create<AppState>((set, get) => ({
   // Theme
   theme: (localStorage.getItem('theme') as Theme) || 'light',
