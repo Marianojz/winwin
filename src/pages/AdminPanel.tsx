@@ -439,7 +439,12 @@ const AdminPanel = () => {
               </div>
             </div>
 
-
+{/* Los usuarios reales se cargan desde Firebase en AdminPanelPro.tsx */}
+<div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem', marginBottom: '1rem', textAlign: 'center' }}>
+  <p style={{ color: 'var(--text-secondary)' }}>
+    Los usuarios reales se gestionan en el Panel de Administración Pro
+  </p>
+</div>
             </div>
 
             <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
