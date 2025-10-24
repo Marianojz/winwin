@@ -73,23 +73,12 @@ npm run dev
 
 ## 🎯 Uso
 
-### Credenciales de Prueba
+### Primeros Pasos
 
-**Usuario Regular:**
-- Email: cualquier email válido
-- Contraseña: mínimo 6 caracteres
-
-**Administrador:**
-- Email: `admin@subastaargenta.com`
-- Contraseña: cualquier contraseña (mínimo 6 caracteres)
-
-### Navegación Principal
-
-- **Inicio**: Vista general con subastas destacadas
-- **Subastas**: Todas las subastas activas con filtros
-- **Tienda**: Catálogo completo de productos
-- **Panel Admin**: Solo para administradores (gestión completa)
-
+1. **Registrate**: Crea tu cuenta con email y contraseña
+2. **Verifica tu email**: Revisa tu casilla de correo
+3. **Completa tu perfil**: Agrega tu DNI y dirección en el mapa
+4. **¡Empieza a comprar!**: Explora subastas y productos
 ### Funcionalidades Clave
 
 #### Subastas
