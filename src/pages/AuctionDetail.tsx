@@ -123,20 +123,10 @@ if (isWinningBid && auction.buyNowPrice) {
           link: '/notificaciones'
         });
         
-        // Cambiar estado de subasta a 'sold'
-        const updatedAuctions = auctions.map(a => 
-          a.id === auction.id 
-            ? { ...a, status: 'sold' as const, winnerId: user!.id }
-            : a
-        );
-        
         // Simular link de pago de MercadoPago
         const mercadopagoLink = `https://www.mercadopago.com.ar/checkout/v1/payment?preference_id=MOCK-${auction.id}-${Date.now()}`;
         
         alert(`🎉 ¡COMPRA EXITOSA!\n\nProducto: ${auction.title}\nMonto: ${formatCurrency(auction.buyNowPrice)}\n\nTenés 48 horas para completar el pago.\n\n📧 Revisá tus notificaciones para ver el ticket de pago.\n\n🔗 Link de pago: ${mercadopagoLink}`);
-        
-        // Opcional: abrir MercadoPago en nueva pestaña
-        // window.open(mercadopagoLink, '_blank');
       }
     }
   };
