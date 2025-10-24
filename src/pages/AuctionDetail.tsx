@@ -14,15 +14,27 @@ const AuctionDetail = () => {
   const [bidAmount, setBidAmount] = useState('');
   const [selectedImage, setSelectedImage] = useState(0);
   const [showBidError, setShowBidError] = useState('');
+  const [isRecentlyEnded, setIsRecentlyEnded] = useState(false);
 
   useEffect(() => {
     if (auction) {
       const nextBid = auction.currentPrice + 500;
       setBidAmount(nextBid.toString());
+
+      // Verificar si la subasta finalizó recientemente (menos de 30 minutos)
+      if (auction.status === 'ended' || auction.status === 'sold') {
+        if (auction.endTime) {
+          const endTime = new Date(auction.endTime).getTime();
+          const now = new Date().getTime();
+          const thirtyMinutes = 30 * 60 * 1000;
+          setIsRecentlyEnded((now - endTime) <= thirtyMinutes);
+        }
+      }
     }
   }, [auction]);
 
-  if (!auction) {
+  // Si la subasta no existe O si finalizó hace más de 30 minutos
+  if (!auction || ((auction.status === 'ended' || auction.status === 'sold') && !isRecentlyEnded)) {
     return (
       <div style={{ minHeight: 'calc(100vh - 80px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
         <div style={{ textAlign: 'center' }}>
@@ -197,17 +209,27 @@ const AuctionDetail = () => {
                 <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--primary)' }}>{formatCurrency(auction.currentPrice)}</div>
               </div>
 
-              {auction.buyNowPrice && (
+              {auction.buyNowPrice && auction.status === 'active' && (
                 <div style={{ marginBottom: '1rem' }}>
                   <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Precio de Compra Directa</div>
                   <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--success)' }}>{formatCurrency(auction.buyNowPrice)}</div>
                 </div>
               )}
 
-              <div style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
-                <Clock size={20} style={{ marginBottom: '0.5rem' }} />
-                <Countdown endTime={auction.endTime} />
-              </div>
+              {auction.status === 'active' ? (
+                <div style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
+                  <Clock size={20} style={{ marginBottom: '0.5rem' }} />
+                  <Countdown endTime={auction.endTime} />
+                </div>
+              ) : (
+                <div style={{ padding: '1rem', background: '#666', color: 'white', borderRadius: '0.75rem', textAlign: 'center' }}>
+                  <Clock size={20} style={{ marginBottom: '0.5rem' }} />
+                  <div>⏰ Subasta Finalizada Recientemente</div>
+                  <div style={{ fontSize: '0.875rem', opacity: 0.8, marginTop: '0.25rem' }}>
+                    Disponible por 30 minutos después de finalizar
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Solo mostrar controles si la subasta está activa */}
