@@ -100,11 +100,14 @@ if (isWinningBid && auction.buyNowPrice) {
       return;
     }
 
-    // Verificar que la subasta esté activa
+    // ESTA VALIDACIÓN DEBE ESTAR AQUÍ ⬇️
     if (auction.status !== 'active') {
       alert('Esta subasta ya finalizó. No se puede realizar la compra directa.');
       return;
     }
+
+    if (auction.buyNowPrice) {
+      // ... resto del código
 
     if (auction.buyNowPrice) {
       const confirm = window.confirm(
