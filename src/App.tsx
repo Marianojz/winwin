@@ -26,17 +26,6 @@ function App() {
     console.log('🔍 App.tsx - useEffect ejecutándose');
     
     
-    // Auto-login for demo purposes
-    const savedUser = localStorage.getItem('user');
-    console.log('🔍 Usuario guardado en localStorage:', savedUser);
-    
-    if (savedUser) {
-      const parsedUser = JSON.parse(savedUser);
-      console.log('🔍 Usuario parseado:', parsedUser);
-      setUser(parsedUser);
-    } else {
-      console.log('✅ No hay usuario en localStorage');
-    }
 
     // Apply theme
     document.documentElement.setAttribute('data-theme', theme);
