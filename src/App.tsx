@@ -22,6 +22,19 @@ import CompletarPerfil from './pages/CompletarPerfil';
 
 function App() {
   const { setAuctions, setProducts, setUser, theme } = useStore();
+  const { theme, initFirebaseSync } = useStore();
+
+  // Inicializar sincronización de Firebase al montar la app
+  useEffect(() => {
+    initFirebaseSync();
+    
+    // Limpiar al desmontar
+    return () => {
+      if ((window as any).__unsubscribeFirebase) {
+        (window as any).__unsubscribeFirebase();
+      }
+    };
+  }, []);
 
   useEffect(() => {
   console.log('🔍 App.tsx - useEffect ejecutándose');
