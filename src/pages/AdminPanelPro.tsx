@@ -1130,21 +1130,21 @@ const AdminPanel = () => {
                     }
 
                     // Crear la subasta
-                    const newAuction = {
-                      id: Date.now().toString(),
-                      title: auctionForm.title.trim(),
-                      description: auctionForm.description.trim(),
-                      images: auctionForm.images.length > 0 ? auctionForm.images : ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800'],
-                      startPrice: auctionForm.startPrice,
-                      currentPrice: auctionForm.currentPrice,
-                      buyNowPrice: auctionForm.buyNowPrice || undefined,
-                      categoryId: auctionForm.categoryId,
-                      status: 'active',
-                      bids: [],
-                      endTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-                      createdAt: new Date().toISOString(),
-                      updatedAt: new Date().toISOString()
-                    };
+                    const newAuction: Auction = {
+  id: Date.now().toString(),
+  title: auctionForm.title,
+  description: auctionForm.description,
+  images: auctionForm.images,
+  startPrice: auctionForm.startPrice,
+  currentPrice: auctionForm.startPrice,
+  buyNowPrice: auctionForm.buyNowPrice || undefined,
+  categoryId: auctionForm.categoryId,
+  status: 'active',
+  bids: [],
+  createdAt: new Date(),
+  endTime: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 horas desde ahora
+  sellerId: user?.id || 'admin'
+};
 
                     setAuctions([...auctions, newAuction]);
                     
