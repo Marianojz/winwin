@@ -848,10 +848,10 @@ useEffect(() => {
                   Activas: <strong style={{ color: 'var(--success)' }}>{activeAuctions}</strong> | 
                   Finalizadas: <strong style={{ color: 'var(--text-secondary)' }}>{endedAuctions}</strong>
                 </span>
-                <button className="btn btn-primary" onClick={() => setActiveTab('create-auction')}>
-                  <Plus size={18} />
-                  Nueva Subasta
-                </button>
+                <button className="btn btn-primary" onClick={() => setActiveTab('create-product')}>
+  <Plus size={18} />
+  Nuevo Producto
+</button>
               </div>
             </div>
 
