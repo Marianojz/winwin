@@ -1097,15 +1097,15 @@ const AdminPanel = () => {
               </div>
 
               {/* Imágenes */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                  Imágenes del Producto
-                </label>
-                <ImageUploader 
-  images={productForm.images}
-  onImagesChange={(images: string[]) => setProductForm({...productForm, images})}
-/>
-              </div>
+<div>
+  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+    Imágenes del Producto
+  </label>
+  <ImageUploader 
+    images={productForm.images}
+    onChange={(images: string[]) => setProductForm({...productForm, images})}
+  />
+</div>
 
               {/* Botones */}
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
