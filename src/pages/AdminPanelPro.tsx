@@ -92,7 +92,6 @@ const AdminPanel = () => {
     }
   };
 
-  // useEffect para cargar usuarios al montar el componente
   useEffect(() => {
     if (activeTab === 'users') {
       loadUsers();
