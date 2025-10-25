@@ -21,8 +21,8 @@ const AdminPanelPro = () => {
   
   const [activeTab, setActiveTab] = useState('dashboard');
   const [realUsers, setRealUsers] = useState<any[]>([]);
-const [selectedUser, setSelectedUser] = useState<any>(null);
-const [loadingUsers, setLoadingUsers] = useState(true);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [loadingUsers, setLoadingUsers] = useState(true);
   
   // Estados para productos
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -37,23 +37,23 @@ const [loadingUsers, setLoadingUsers] = useState(true);
   // Estados para subastas
   const [editingAuction, setEditingAuction] = useState<Auction | null>(null);
   const [auctionForm, setAuctionForm] = useState({
-  title: '',
-  description: '',
-  startPrice: 0,
-  currentPrice: 0,
-  buyNowPrice: 0,
-  categoryId: '1',
-  images: [] as string[],
-  durationDays: 0,
-  durationHours: 0,
-  durationMinutes: 30,
-  condition: 'new' as 'new' | 'like-new' | 'excellent' | 'good' | 'fair',
-  featured: false,
-  allowExtension: true,
-  scheduled: false,
-  scheduledDate: '',
-  scheduledTime: ''
-});
+    title: '',
+    description: '',
+    startPrice: 0,
+    currentPrice: 0,
+    buyNowPrice: 0,
+    categoryId: '1',
+    images: [] as string[],
+    durationDays: 0,
+    durationHours: 0,
+    durationMinutes: 30,
+    condition: 'new' as 'new' | 'like-new' | 'excellent' | 'good' | 'fair',
+    featured: false,
+    allowExtension: true,
+    scheduled: false,
+    scheduledDate: '',
+    scheduledTime: ''
+  });
 
   // Estados para bots
   const [botForm, setBotForm] = useState({
@@ -74,30 +74,30 @@ const [loadingUsers, setLoadingUsers] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // Cargar usuarios reales de Firebase
-const loadUsers = async () => {
-  setLoadingUsers(true);
-  try {
-    const usersQuery = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
-    const usersSnapshot = await getDocs(usersQuery);
-    const usersData = usersSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    setRealUsers(usersData);
-    console.log('✅ Usuarios cargados:', usersData.length);
-  } catch (error) {
-    console.error('❌ Error al cargar usuarios:', error);
-  } finally {
-    setLoadingUsers(false);
-  }
-};
+  const loadUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const usersQuery = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+      const usersSnapshot = await getDocs(usersQuery);
+      const usersData = usersSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setRealUsers(usersData);
+      console.log('✅ Usuarios cargados:', usersData.length);
+    } catch (error) {
+      console.error('❌ Error al cargar usuarios:', error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
 
-// useEffect para cargar usuarios al montar el componente
-useEffect(() => {
-  if (activeTab === 'users') {
-    loadUsers();
-  }
-}, [activeTab]);
+  // useEffect para cargar usuarios al montar el componente
+  useEffect(() => {
+    if (activeTab === 'users') {
+      loadUsers();
+    }
+  }, [activeTab]);
 
   // Protección de acceso
   if (!user?.isAdmin) {
@@ -122,7 +122,7 @@ useEffect(() => {
   const totalRevenue = orders
     .filter(o => o.status === 'delivered')
     .reduce((sum, o) => sum + o.amount, 0);
-  const activeUsers = 150; // Mock
+  const activeUsers = realUsers.length || 150;
   const totalOrders = orders.length;
   const activeAuctions = auctions.filter(a => a.status === 'active').length;
   const endedAuctions = auctions.filter(a => a.status === 'ended').length;
@@ -183,23 +183,23 @@ useEffect(() => {
   const handleEditAuction = (auction: Auction) => {
     setEditingAuction(auction);
     setAuctionForm({
-  title: '',
-  description: '',
-  startPrice: 0,
-  currentPrice: 0,
-  buyNowPrice: 0,
-  categoryId: '1',
-  images: [],
-  durationDays: 0,
-  durationHours: 0,
-  durationMinutes: 30,
-  condition: 'new',
-  featured: false,
-  allowExtension: true,
-  scheduled: false,
-  scheduledDate: '',
-  scheduledTime: ''
-});
+      title: auction.title,
+      description: auction.description,
+      startPrice: auction.startPrice,
+      currentPrice: auction.currentPrice,
+      buyNowPrice: auction.buyNowPrice || 0,
+      categoryId: auction.categoryId,
+      images: auction.images || [],
+      durationDays: 0,
+      durationHours: 0,
+      durationMinutes: 30,
+      condition: auction.condition || 'new',
+      featured: auction.featured || false,
+      allowExtension: true,
+      scheduled: false,
+      scheduledDate: '',
+      scheduledTime: ''
+    });
     setActiveTab('edit-auction');
   };
 
@@ -256,122 +256,48 @@ useEffect(() => {
     alert('✅ Bot creado correctamente');
   };
 
-  // Función de Reset
-  const handleResetData = () => {
-    if (window.confirm('⚠️ ADVERTENCIA: Esto reiniciará todos los datos a los valores por defecto.\n\n¿Estás seguro de continuar?')) {
-      if (window.confirm('🔴 ÚLTIMA CONFIRMACIÓN\n\nSe perderán todos los cambios realizados.\n\n¿Confirmas el reset?')) {
-        window.location.reload();
-      }
-    }
-  };
+  // Tabs de navegación
+  const tabs = [
+    { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 size={18} /> },
+    { id: 'users', label: 'Usuarios', icon: <Users size={18} /> },
+    { id: 'orders', label: 'Pedidos', icon: <ShoppingBag size={18} /> },
+    { id: 'auctions', label: 'Subastas', icon: <Gavel size={18} /> },
+    { id: 'create-auction', label: 'Crear Subasta', icon: <Plus size={18} /> },
+    { id: 'products', label: 'Productos', icon: <Package size={18} /> },
+    { id: 'bots', label: 'Bots', icon: <Bot size={18} /> }
+  ];
 
-  // Funciones para Pedidos
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === 'all' || order.status === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
-
-  const getStatusColor = (status: OrderStatus) => {
-    const colors = {
-      pending_payment: 'var(--warning)',
-      payment_confirmed: 'var(--info)',
-      preparing: 'var(--primary)',
-      in_transit: 'var(--secondary)',
-      delivered: 'var(--success)',
-      cancelled: 'var(--error)',
-      expired: 'var(--error)'
-    };
-    return colors[status] || 'var(--text-secondary)';
-  };
-
-  const getStatusText = (status: OrderStatus) => {
-    const texts = {
-      pending_payment: 'Pendiente de Pago',
-      payment_confirmed: 'Pago Confirmado',
-      preparing: 'Preparando Envío',
-      in_transit: 'En Tránsito',
-      delivered: 'Entregado',
-      cancelled: 'Cancelado',
-      expired: 'Expirado'
-    };
-    return texts[status] || status;
-  };
-
-  const getTimeRemaining = (expiresAt?: Date) => {
-    if (!expiresAt) return null;
-    const now = Date.now();
-    const expires = new Date(expiresAt).getTime();
-    const diff = expires - now;
-    
-    if (diff <= 0) return 'Expirado';
-    
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
-    return `${hours}h ${minutes}m`;
-  };
-
-  const handleStatusChange = (orderId: string, newStatus: OrderStatus) => {
-    if (window.confirm(`¿Confirmar cambio de estado a "${getStatusText(newStatus)}"?`)) {
-      const updates: Partial<Order> = {};
-      
-      if (newStatus === 'in_transit' && !selectedOrder?.trackingNumber) {
-        const tracking = prompt('Ingrese el número de seguimiento:');
-        if (tracking) {
-          updates.trackingNumber = tracking;
-        }
-      }
-      
-      updateOrderStatus(orderId, newStatus, updates);
-      alert('✅ Estado actualizado correctamente');
-      setSelectedOrder(null);
-    }
-  };
   return (
     <div style={{ minHeight: 'calc(100vh - 80px)', padding: '2rem 0', background: 'var(--bg-primary)' }}>
-      <div className="container-fluid" style={{ maxWidth: '1400px' }}>
-        
+      <div className="container">
         {/* Header */}
-        <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <h1 style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <Activity size={36} color="var(--primary)" />
-              Panel de Administración
-            </h1>
-            <p style={{ color: 'var(--text-secondary)' }}>Gestiona toda la plataforma desde un solo lugar</p>
-          </div>
-          <button 
-            onClick={handleResetData}
-            className="btn btn-outline"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderColor: 'var(--error)', color: 'var(--error)' }}
-          >
-            <RefreshCw size={18} />
-            Reset Datos
-          </button>
+        <div style={{ marginBottom: '2rem' }}>
+          <h1 style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <BarChart3 size={36} />
+            Panel de Administración Pro
+          </h1>
+          <p style={{ color: 'var(--text-secondary)' }}>
+            Gestión completa de la plataforma
+          </p>
         </div>
 
-        {/* Tabs Navigation */}
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', borderBottom: '2px solid var(--border)', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-          {[
-            { id: 'dashboard', label: 'Dashboard', icon: <TrendingUp size={18} /> },
-            { id: 'orders', label: 'Pedidos', icon: <ShoppingBag size={18} /> },
-            { id: 'users', label: 'Usuarios', icon: <Users size={18} /> },
-            { id: 'auctions', label: 'Subastas', icon: <Gavel size={18} /> },
-            { id: 'create-auction', label: 'Crear Subasta', icon: <Plus size={18} /> },
-            { id: 'products', label: 'Productos', icon: <Package size={18} /> },
-            { id: 'inventory', label: 'Inventario', icon: <BarChart3 size={18} /> },
-            { id: 'bots', label: 'Bots', icon: <Bot size={18} /> },
-            { id: 'reports', label: 'Reportes', icon: <FileText size={18} /> }
-          ].map(tab => (
+        {/* Tabs de navegación */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '0.5rem', 
+          overflowX: 'auto', 
+          marginBottom: '2rem',
+          padding: '0.5rem',
+          background: 'var(--bg-secondary)',
+          borderRadius: '0.75rem'
+        }}>
+          {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               style={{
-                padding: '0.875rem 1.5rem',
-                background: activeTab === tab.id ? 'var(--primary)' : 'var(--bg-secondary)',
+                padding: '0.75rem 1.5rem',
+                background: activeTab === tab.id ? 'var(--primary)' : 'transparent',
                 color: activeTab === tab.id ? 'white' : 'var(--text-primary)',
                 border: 'none',
                 borderRadius: '0.5rem',
@@ -393,62 +319,9 @@ useEffect(() => {
         {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
           <div>
-            {/* KPIs */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '2px solid var(--success)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                  <DollarSign size={28} color="var(--success)" />
-                  <span style={{ fontSize: '0.75rem', color: 'var(--success)', background: 'rgba(34, 197, 94, 0.1)', padding: '0.25rem 0.5rem', borderRadius: '0.25rem' }}>
-                    +12%
-                  </span>
-                </div>
-                <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--success)', marginBottom: '0.25rem' }}>
-                  {formatCurrency(totalRevenue)}
-                </div>
-                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Ingresos Totales</div>
-              </div>
-
-              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '2px solid var(--warning)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                  <Clock size={28} color="var(--warning)" />
-                  {expiringSoon > 0 && (
-                    <span style={{ fontSize: '0.75rem', color: 'var(--error)', background: 'rgba(239, 68, 68, 0.1)', padding: '0.25rem 0.5rem', borderRadius: '0.25rem' }}>
-                      ¡Urgente!
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--warning)', marginBottom: '0.25rem' }}>
-                  {pendingPayments}
-                </div>
-                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                  Pagos Pendientes {expiringSoon > 0 && `(${expiringSoon} por expirar)`}
-                </div>
-              </div>
-
-              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '2px solid var(--secondary)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                  <Truck size={28} color="var(--secondary)" />
-                </div>
-                <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--secondary)', marginBottom: '0.25rem' }}>
-                  {inTransit}
-                </div>
-                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>En Tránsito</div>
-              </div>
-
-              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '2px solid var(--primary)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                  <CheckCircle size={28} color="var(--primary)" />
-                </div>
-                <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.25rem' }}>
-                  {delivered}
-                </div>
-                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Entregados</div>
-              </div>
-            </div>
-
-            {/* Alertas Importantes */}
-            {(expiringSoon > 0 || pendingPayments > 5) && (
-              <div style={{ background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(251, 146, 60, 0.1))', padding: '1.5rem', borderRadius: '1rem', marginBottom: '2rem', border: '2px solid var(--error)' }}>
+            {/* Alertas importantes */}
+            {expiringSoon > 0 && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '2px solid var(--error)', padding: '1.5rem', borderRadius: '1rem', marginBottom: '2rem' }}>
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--error)' }}>
                   <AlertTriangle size={24} />
                   Alertas Importantes
@@ -467,15 +340,43 @@ useEffect(() => {
                       </button>
                     </div>
                   )}
-                  {pendingPayments > 5 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Clock size={18} color="var(--warning)" />
-                      <span>{pendingPayments} pagos pendientes requieren atención</span>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
+
+            {/* KPIs */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '2px solid var(--success)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                  <DollarSign size={28} color="var(--success)" />
+                  <span style={{ fontSize: '0.75rem', color: 'var(--success)', background: 'rgba(34, 197, 94, 0.1)', padding: '0.25rem 0.5rem', borderRadius: '0.25rem' }}>
+                    +12%
+                  </span>
+                </div>
+                <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--success)', marginBottom: '0.25rem' }}>
+                  {formatCurrency(totalRevenue)}
+                </div>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Ingresos Totales</div>
+              </div>
+
+              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '2px solid var(--primary)' }}>
+                <Users size={28} color="var(--primary)" style={{ marginBottom: '1rem' }} />
+                <div style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '0.25rem' }}>{activeUsers}</div>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Usuarios Activos</div>
+              </div>
+
+              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '2px solid var(--warning)' }}>
+                <Gavel size={28} color="var(--warning)" style={{ marginBottom: '1rem' }} />
+                <div style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '0.25rem' }}>{activeAuctions}</div>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Subastas Activas</div>
+              </div>
+
+              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '2px solid var(--secondary)' }}>
+                <Package size={28} color="var(--secondary)" style={{ marginBottom: '1rem' }} />
+                <div style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '0.25rem' }}>{products.length}</div>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Productos en Tienda</div>
+              </div>
+            </div>
 
             {/* Resumen Rápido */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
@@ -542,7 +443,7 @@ useEffect(() => {
               <h3 style={{ marginBottom: '1rem' }}>Acciones Rápidas</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <button 
-                  onClick={() => setActiveTab('auctions')}
+                  onClick={() => setActiveTab('create-auction')}
                   className="btn btn-primary" 
                   style={{ width: '100%', justifyContent: 'flex-start', padding: '0.75rem' }}
                 >
@@ -550,7 +451,7 @@ useEffect(() => {
                   Nueva Subasta
                 </button>
                 <button 
-                  onClick={() => setActiveTab('products')}
+                  onClick={() => setActiveTab('create-product')}
                   className="btn btn-primary" 
                   style={{ width: '100%', justifyContent: 'flex-start', padding: '0.75rem' }}
                 >
@@ -570,427 +471,111 @@ useEffect(() => {
           </div>
         )}
 
+        {/* USERS TAB */}
+        {activeTab === 'users' && (
+          <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Users size={28} />
+                Usuarios Registrados
+              </h3>
+              <button onClick={loadUsers} className="btn btn-outline">
+                <RefreshCw size={18} />
+                Actualizar
+              </button>
+            </div>
+
+            {loadingUsers ? (
+              <div style={{ textAlign: 'center', padding: '3rem' }}>
+                <Activity size={48} color="var(--primary)" style={{ animation: 'spin 1s linear infinite' }} />
+                <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>Cargando usuarios...</p>
+              </div>
+            ) : realUsers.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem' }}>
+                <Users size={64} color="var(--text-secondary)" />
+                <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>No hay usuarios registrados aún</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {realUsers.map(u => (
+                  <div 
+                    key={u.id} 
+                    style={{ 
+                      padding: '1.5rem', 
+                      background: 'var(--bg-tertiary)', 
+                      borderRadius: '0.75rem',
+                      border: '1px solid var(--border)',
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto',
+                      gap: '1rem',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+                        <img 
+                          src={u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.username || 'U')}&size=48&background=FF6B00&color=fff&bold=true`}
+                          alt={u.username}
+                          style={{ width: '48px', height: '48px', borderRadius: '50%' }}
+                        />
+                        <div>
+                          <h4 style={{ margin: 0 }}>{u.username || 'Usuario'}</h4>
+                          <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{u.email}</p>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                        <span>DNI: {u.dni || 'No especificado'}</span>
+                        <span>•</span>
+                        <span>Registrado: {new Date(u.createdAt).toLocaleDateString('es-AR')}</span>
+                        <span>•</span>
+                        <span className={u.role === 'admin' ? 'badge badge-warning' : 'badge badge-success'}>
+                          {u.role === 'admin' ? 'Admin' : 'Usuario'}
+                        </span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setSelectedUser(u)}
+                      className="btn btn-outline"
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      <Eye size={16} />
+                      Ver Detalles
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Modal de detalles de usuario */}
+        {selectedUser && (
+          <UserDetailsModal 
+            user={selectedUser}
+            onClose={() => setSelectedUser(null)}
+            onUpdate={loadUsers}
+          />
+        )}
+
         {/* ORDERS TAB */}
         {activeTab === 'orders' && (
-          <div>
-            {/* Filtros y Búsqueda */}
-            <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', marginBottom: '2rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.875rem' }}>
-                    <Search size={16} style={{ display: 'inline', marginRight: '0.25rem' }} />
-                    Buscar
-                  </label>
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="ID, producto o cliente..."
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.875rem' }}>
-                    <Filter size={16} style={{ display: 'inline', marginRight: '0.25rem' }} />
-                    Filtrar por Estado
-                  </label>
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value as OrderStatus | 'all')}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                  >
-                    <option value="all">Todos los Estados</option>
-                    <option value="pending_payment">Pendiente de Pago</option>
-                    <option value="payment_confirmed">Pago Confirmado</option>
-                    <option value="preparing">Preparando</option>
-                    <option value="in_transit">En Tránsito</option>
-                    <option value="delivered">Entregado</option>
-                    <option value="cancelled">Cancelado</option>
-                    <option value="expired">Expirado</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Lista de Órdenes */}
-            <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem' }}>
-              <h3 style={{ marginBottom: '1.5rem' }}>
-                Pedidos ({filteredOrders.length})
-              </h3>
-              
-              {filteredOrders.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-                  <ShoppingBag size={64} style={{ margin: '0 auto 1rem', opacity: 0.3 }} />
-                  <p>No se encontraron pedidos</p>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {filteredOrders.map(order => (
-                    <div 
-                      key={order.id} 
-                      style={{ 
-                        background: 'var(--bg-tertiary)', 
-                        padding: '1.5rem', 
-                        borderRadius: '0.75rem',
-                        border: order.status === 'pending_payment' && order.expiresAt && 
-                               (new Date(order.expiresAt).getTime() - Date.now()) < 24 * 60 * 60 * 1000 
-                               ? '2px solid var(--error)' : 'none'
-                      }}
-                    >
-                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', gap: '1.5rem', alignItems: 'center' }}>
-                        {/* Información del Pedido */}
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                            <img 
-                              src={order.productImage} 
-                              alt={order.productName}
-                              style={{ width: '50px', height: '50px', borderRadius: '0.5rem', objectFit: 'cover' }}
-                            />
-                            <div>
-                              <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
-                                {order.productName}
-                              </div>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                ID: {order.id}
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                            <div>
-                              <Users size={14} style={{ display: 'inline', marginRight: '0.25rem' }} />
-                              {order.userName}
-                            </div>
-                            <div>
-                              <MapPin size={14} style={{ display: 'inline', marginRight: '0.25rem' }} />
-                              {order.address.locality}, {order.address.province}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Tipo y Monto */}
-                        <div>
-                          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
-                            {order.productType === 'auction' ? '🔨 Subasta' : '🛒 Tienda'}
-                          </div>
-                          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)' }}>
-                            {formatCurrency(order.amount)}
-                          </div>
-                        </div>
-
-                        {/* Estado */}
-                        <div>
-                          <div style={{ 
-                            padding: '0.5rem 1rem', 
-                            background: getStatusColor(order.status) + '20', 
-                            color: getStatusColor(order.status),
-                            borderRadius: '0.5rem',
-                            fontSize: '0.875rem',
-                            fontWeight: 600,
-                            textAlign: 'center'
-                          }}>
-                            {getStatusText(order.status)}
-                          </div>
-                          {order.trackingNumber && (
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem', textAlign: 'center' }}>
-                              📦 {order.trackingNumber}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Tiempo restante para pagos pendientes */}
-                        {order.status === 'pending_payment' && order.expiresAt && (
-                          <div style={{ textAlign: 'center' }}>
-                            <Timer size={20} color={
-                              (new Date(order.expiresAt).getTime() - Date.now()) < 24 * 60 * 60 * 1000 
-                              ? 'var(--error)' : 'var(--warning)'
-                            } />
-                            <div style={{ 
-                              fontSize: '0.875rem', 
-                              fontWeight: 600,
-                              color: (new Date(order.expiresAt).getTime() - Date.now()) < 24 * 60 * 60 * 1000 
-                                ? 'var(--error)' : 'var(--warning)'
-                            }}>
-                              {getTimeRemaining(order.expiresAt)}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Acciones */}
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button
-                            onClick={() => setSelectedOrder(order)}
-                            className="btn btn-outline"
-                            style={{ padding: '0.5rem' }}
-                            title="Ver detalles"
-                          >
-                            <Eye size={18} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-       {/* USERS TAB */}
-{activeTab === 'users' && (
-  <div>
-    <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)', marginBottom: '2rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <Users size={28} />
-          Gestión de Usuarios
-        </h3>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <span style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>
-            Total: <strong style={{ color: 'var(--primary)' }}>{realUsers.length}</strong> usuarios
-          </span>
-        </div>
-      </div>
-
-      <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem', marginBottom: '1.5rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-          <div style={{ textAlign: 'center', padding: '1rem' }}>
-            <Award size={24} color="var(--primary)" style={{ marginBottom: '0.5rem' }} />
-            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--primary)' }}>
-              {realUsers.filter(u => u.role === 'admin').length}
-            </div>
-            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Administradores</div>
-          </div>
-          <div style={{ textAlign: 'center', padding: '1rem' }}>
-            <Users size={24} color="var(--success)" style={{ marginBottom: '0.5rem' }} />
-            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--success)' }}>
-              {realUsers.filter(u => u.active).length}
-            </div>
-            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Usuarios Activos</div>
-          </div>
-          <div style={{ textAlign: 'center', padding: '1rem' }}>
-            <Clock size={24} color="var(--warning)" style={{ marginBottom: '0.5rem' }} />
-            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--warning)' }}>
-              {realUsers.length}
-            </div>
-            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Total Registrados</div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ overflowX: 'auto' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {loadingUsers ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-              Cargando usuarios...
-            </div>
-          ) : realUsers.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-              No hay usuarios registrados
-            </div>
-          ) : (
-            realUsers.map((realUser) => (
-              <div key={realUser.id} style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: '200px' }}>
-                  <div style={{ fontWeight: 600, marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <img 
-                      src={realUser.avatar} 
-                      alt={realUser.username} 
-                      style={{ 
-                        width: '30px', 
-                        height: '30px', 
-                        borderRadius: '50%',
-                        border: '2px solid var(--primary)'
-                      }} 
-                    />
-                    {realUser.username}
-                  </div>
-                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{realUser.email}</div>
-                </div>
-                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                  DNI: {realUser.dni || 'Sin DNI'}
-                </div>
-                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                  {realUser.locality || 'Sin localidad'}, {realUser.province || 'Sin provincia'}
-                </div>
-                <span className={realUser.role === 'admin' ? 'badge badge-warning' : 'badge badge-success'}>
-                  {realUser.role === 'admin' ? 'Admin' : 'Usuario'}
-                </span>
-                <span className={realUser.active ? 'badge badge-success' : 'badge badge-error'}>
-                  {realUser.active ? 'Activo' : 'Suspendido'}
-                </span>
-                <button 
-                  className="btn btn-outline" 
-                  style={{ padding: '0.5rem 0.75rem', fontSize: '0.875rem' }}
-                  onClick={() => setSelectedUser(realUser)}
-                >
-                  <Eye size={16} />
-                  Ver
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  </div>
-)}
-
-        {/* AUCTIONS TAB */}
-        {activeTab === 'auctions' && (
-          <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <Gavel size={28} />
-                Gestión de Subastas
-              </h3>
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>
-                  Activas: <strong style={{ color: 'var(--success)' }}>{activeAuctions}</strong> | 
-                  Finalizadas: <strong style={{ color: 'var(--text-secondary)' }}>{endedAuctions}</strong>
-                </span>
-                <button className="btn btn-primary" onClick={() => setActiveTab('create-product')}>
-  <Plus size={18} />
-  Nuevo Producto
-</button>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {auctions.map(auction => (
-                <div key={auction.id} style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
-                    <div style={{ flex: 1, minWidth: '250px' }}>
-                      <h4 style={{ marginBottom: '0.5rem' }}>{auction.title}</h4>
-                      <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                        {auction.bids.length} ofertas • Finaliza: {new Date(auction.endTime).toLocaleDateString('es-AR')}
-                      </div>
-                      <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
-                        <div>
-                          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Precio Inicial</div>
-                          <div style={{ fontSize: '1.125rem', fontWeight: 600 }}>{formatCurrency(auction.startPrice)}</div>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Precio Actual</div>
-                          <div style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--primary)' }}>{formatCurrency(auction.currentPrice)}</div>
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
-                      <span style={{ 
-                        padding: '0.5rem 1rem', 
-                        background: auction.status === 'active' ? 'var(--success)' : 'var(--error)',
-                        color: 'white',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem',
-                        fontWeight: 600
-                      }}>
-                        {auction.status === 'active' ? 'Activa' : 'Finalizada'}
-                      </span>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button 
-                          onClick={() => handleEditAuction(auction)}
-                          className="btn btn-outline" 
-                          style={{ padding: '0.5rem 0.75rem' }}
-                        >
-                          <Edit size={16} />
-                          Editar
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteAuction(auction.id)}
-                          style={{ padding: '0.5rem', background: 'var(--error)', color: 'white', borderRadius: '0.5rem', border: 'none', cursor: 'pointer' }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* EDIT AUCTION TAB */}
-        {activeTab === 'edit-auction' && editingAuction && (
           <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
             <h3 style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <Edit size={28} />
-              Editar Subasta: {editingAuction.title}
+              <ShoppingBag size={28} />
+              Gestión de Pedidos
             </h3>
-            
-            <div style={{ display: 'grid', gap: '1.5rem' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Título</label>
-                <input 
-                  type="text" 
-                  value={auctionForm.title}
-                  onChange={(e) => setAuctionForm({...auctionForm, title: e.target.value})}
-                  style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Descripción</label>
-                <textarea 
-                  value={auctionForm.description}
-                  onChange={(e) => setAuctionForm({...auctionForm, description: e.target.value})}
-                  rows={4}
-                  style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem', resize: 'vertical' }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Precio Inicial</label>
-                  <input 
-                    type="number" 
-                    value={auctionForm.startPrice}
-                    onChange={(e) => setAuctionForm({...auctionForm, startPrice: Number(e.target.value)})}
-                    style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Precio Actual</label>
-                  <input 
-                    type="number" 
-                    value={auctionForm.currentPrice}
-                    onChange={(e) => setAuctionForm({...auctionForm, currentPrice: Number(e.target.value)})}
-                    style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Compra Directa (Opcional)</label>
-                  <input 
-                    type="number" 
-                    value={auctionForm.buyNowPrice}
-                    onChange={(e) => setAuctionForm({...auctionForm, buyNowPrice: Number(e.target.value)})}
-                    placeholder="0 = sin compra directa"
-                    style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                <button 
-                  onClick={handleSaveAuction}
-                  className="btn btn-primary" 
-                  style={{ flex: 1, padding: '1rem', fontSize: '1.0625rem' }}
-                >
-                  💾 Guardar Cambios
-                </button>
-                <button 
-                  onClick={() => { setActiveTab('auctions'); setEditingAuction(null); }}
-                  className="btn btn-outline" 
-                  style={{ padding: '1rem', minWidth: '120px' }}
-                >
-                  Cancelar
-                </button>
-              </div>
+            <div style={{ textAlign: 'center', padding: '3rem' }}>
+              <ShoppingBag size={64} color="var(--text-secondary)" />
+              <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>
+                Sistema de gestión de pedidos - En desarrollo
+              </p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                Total de pedidos: {orders.length}
+              </p>
             </div>
           </div>
         )}
+
         {/* CREATE PRODUCT TAB */}
         {activeTab === 'create-product' && (
           <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
@@ -1195,807 +780,9 @@ useEffect(() => {
             </div>
           </div>
         )}
-        
-        {/* CREATE PRODUCT TAB */}
-{activeTab === 'create-product' && (
-  <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
-    <h3 style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-      <Plus size={28} />
-      Crear Nuevo Producto para la Tienda
-    </h3>
-    
-    <div style={{ display: 'grid', gap: '1.5rem' }}>
-      {/* Nombre del Producto */}
-      <div>
-        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-          Nombre del Producto *
-        </label>
-        <input 
-          type="text" 
-          placeholder="Ej: Auriculares Bluetooth Sony WH-1000XM5"
-          value={productForm.name}
-          onChange={(e) => setProductForm({...productForm, name: e.target.value})}
-          style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-        />
-        <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-          Mínimo 5 caracteres - Sé descriptivo y claro
-        </div>
+
+        {/* PRODUCTS TAB - continuará en siguiente mensaje... */}
       </div>
-
-      {/* Descripción */}
-      <div>
-        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-          Descripción Detallada *
-        </label>
-        <textarea 
-          placeholder="Describe el producto: características, especificaciones, qué incluye, etc."
-          value={productForm.description}
-          onChange={(e) => setProductForm({...productForm, description: e.target.value})}
-          rows={5}
-          style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem', resize: 'vertical' }}
-        />
-        <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-          Mínimo 20 caracteres - Incluye toda la información relevante
-        </div>
-      </div>
-
-      {/* Precio y Stock */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-            Precio * (en pesos)
-          </label>
-          <input 
-            type="number" 
-            placeholder="15000"
-            value={productForm.price || ''}
-            onChange={(e) => setProductForm({...productForm, price: Number(e.target.value)})}
-            style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-            min="0"
-          />
-        </div>
-
-        <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-            Stock Disponible *
-          </label>
-          <input 
-            type="number" 
-            placeholder="10"
-            value={productForm.stock || ''}
-            onChange={(e) => setProductForm({...productForm, stock: Number(e.target.value)})}
-            style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-            min="0"
-          />
-        </div>
-      </div>
-
-      {/* Categoría */}
-      <div>
-        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-          Categoría *
-        </label>
-        <select 
-          value={productForm.categoryId}
-          onChange={(e) => setProductForm({...productForm, categoryId: e.target.value})}
-          style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-        >
-          <option value="1">📱 Electrónica</option>
-          <option value="2">👕 Moda</option>
-          <option value="3">🏠 Hogar</option>
-          <option value="4">⚽ Deportes</option>
-          <option value="5">🧸 Juguetes</option>
-          <option value="6">📚 Libros</option>
-        </select>
-      </div>
-
-      {/* Cuadro Informativo */}
-      <div style={{ 
-        background: '#E3F2FD', 
-        color: '#0D47A1',
-        padding: '1.25rem', 
-        borderRadius: '0.75rem',
-        border: '2px solid #2196F3'
-      }}>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'start' }}>
-          <div style={{ fontSize: '1.5rem' }}>ℹ️</div>
-          <div>
-            <h4 style={{ marginBottom: '0.5rem', fontSize: '1rem', fontWeight: 700 }}>
-              Importante - Productos de la Tienda
-            </h4>
-            <ul style={{ margin: 0, paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.375rem', fontSize: '0.875rem' }}>
-              <li>Los productos se venden al precio fijo indicado</li>
-              <li>El stock se descuenta automáticamente al confirmar la compra</li>
-              <li>Podés editar precio y stock en cualquier momento</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      {/* Botones */}
-      <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-        <button 
-          onClick={() => {
-            // Validaciones
-            if (!productForm.name.trim()) {
-              alert('⚠️ Por favor ingresa un nombre para el producto');
-              return;
-            }
-            if (productForm.name.trim().length < 5) {
-              alert('⚠️ El nombre debe tener al menos 5 caracteres');
-              return;
-            }
-            if (!productForm.description.trim()) {
-              alert('⚠️ Por favor ingresa una descripción');
-              return;
-            }
-            if (productForm.description.trim().length < 20) {
-              alert('⚠️ La descripción debe tener al menos 20 caracteres');
-              return;
-            }
-            if (productForm.price <= 0) {
-              alert('⚠️ El precio debe ser mayor a $0');
-              return;
-            }
-            if (productForm.stock < 0) {
-              alert('⚠️ El stock no puede ser negativo');
-              return;
-            }
-
-            // Crear el producto
-            const newProduct = {
-              id: Date.now().toString(),
-              name: productForm.name.trim(),
-              description: productForm.description.trim(),
-              images: ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800'], // Placeholder
-              price: productForm.price,
-              stock: productForm.stock,
-              categoryId: productForm.categoryId,
-              ratings: [],
-              averageRating: 0
-            };
-
-            setProducts([...products, newProduct]);
-            
-            // Resetear formulario
-            setProductForm({
-              name: '',
-              description: '',
-              price: 0,
-              stock: 0,
-              categoryId: '1'
-            });
-
-            alert('✅ ¡Producto creado exitosamente!\n\n📌 El producto ya está visible en la Tienda.');
-            setActiveTab('products');
-          }}
-          className="btn btn-primary" 
-          style={{ flex: 1, padding: '1.125rem', fontSize: '1.0625rem', fontWeight: 600 }}
-        >
-          ✨ Crear Producto
-        </button>
-        <button 
-          onClick={() => {
-            if (productForm.name || productForm.description || productForm.price > 0) {
-              if (window.confirm('¿Descartar los cambios y volver?')) {
-                setProductForm({
-                  name: '',
-                  description: '',
-                  price: 0,
-                  stock: 0,
-                  categoryId: '1'
-                });
-                setActiveTab('products');
-              }
-            } else {
-              setActiveTab('products');
-            }
-          }}
-          className="btn btn-outline" 
-          style={{ padding: '1.125rem', minWidth: '140px', fontSize: '1rem' }}
-        >
-          Cancelar
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-          <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
-            <h3 style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <Plus size={28} />
-              Crear Nueva Subasta
-            </h3>
-            
-            <div style={{ display: 'grid', gap: '1.5rem' }}>
-              {/* Título */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                  Título de la Subasta *
-                </label>
-                <input 
-                  type="text" 
-                  placeholder="Ej: iPhone 15 Pro Max 256GB Nuevo en Caja"
-                  value={auctionForm.title}
-                  onChange={(e) => setAuctionForm({...auctionForm, title: e.target.value})}
-                  style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                />
-                <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                  Mínimo 10 caracteres - Sé descriptivo y claro
-                </div>
-              </div>
-
-              {/* Descripción */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                  Descripción Detallada *
-                </label>
-                <textarea 
-                  placeholder="Describe el producto en detalle: características, estado, accesorios incluidos, etc."
-                  value={auctionForm.description}
-                  onChange={(e) => setAuctionForm({...auctionForm, description: e.target.value})}
-                  rows={5}
-                  style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem', resize: 'vertical' }}
-                />
-                <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                  Mínimo 20 caracteres - Incluye toda la información relevante
-                </div>
-              </div>
-
-              {/* Carga de Imágenes */}
-              <ImageUploader 
-                images={auctionForm.images}
-                onChange={(images) => setAuctionForm({...auctionForm, images})}
-                maxImages={3}
-                maxSizeMB={5}
-              />
-
-              {/* Precios */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                    Precio Inicial * (en pesos)
-                  </label>
-                  <input 
-                    type="number" 
-                    placeholder="10000"
-                    value={auctionForm.startPrice || ''}
-                    onChange={(e) => {
-                      const value = e.target.value === '' ? 0 : Number(e.target.value);
-                      setAuctionForm({
-                        ...auctionForm, 
-                        startPrice: value,
-                        currentPrice: value
-                      });
-                    }}
-                    style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                    min="0"
-                  />
-                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                    Precio con el que inicia la subasta
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                    Precio Compra Directa (opcional)
-                  </label>
-                  <input 
-                    type="number" 
-                    placeholder="Dejar vacío si no aplica"
-                    value={auctionForm.buyNowPrice || ''}
-                    onChange={(e) => {
-                      const value = e.target.value === '' ? 0 : Number(e.target.value);
-                      setAuctionForm({...auctionForm, buyNowPrice: value});
-                    }}
-                    style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                    min="0"
-                  />
-                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                    Dejar en 0 o vacío para desactivar
-                  </div>
-                </div>
-              </div>
-
-              {/* Duración de la Subasta */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 600 }}>
-                  Duración de la Subasta *
-                </label>
-                
-                <div style={{ 
-                  display: 'flex', 
-                  gap: '0.5rem', 
-                  marginBottom: '1rem',
-                  flexWrap: 'wrap'
-                }}>
-                  <button
-                    type="button"
-                    onClick={() => setAuctionForm({
-                      ...auctionForm, 
-                      durationDays: 0, 
-                      durationHours: 0, 
-                      durationMinutes: 15
-                    })}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      background: 'var(--bg-tertiary)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '0.5rem',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem'
-                    }}
-                  >
-                    ⚡ 15 min (Relámpago)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAuctionForm({
-                      ...auctionForm, 
-                      durationDays: 0, 
-                      durationHours: 0, 
-                      durationMinutes: 30
-                    })}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      background: 'var(--bg-tertiary)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '0.5rem',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem'
-                    }}
-                  >
-                    ⚡ 30 min
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAuctionForm({
-                      ...auctionForm, 
-                      durationDays: 0, 
-                      durationHours: 1, 
-                      durationMinutes: 0
-                    })}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      background: 'var(--bg-tertiary)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '0.5rem',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem'
-                    }}
-                  >
-                    🕐 1 hora
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAuctionForm({
-                      ...auctionForm, 
-                      durationDays: 1, 
-                      durationHours: 0, 
-                      durationMinutes: 0
-                    })}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      background: 'var(--bg-tertiary)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '0.5rem',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem'
-                    }}
-                  >
-                    📅 1 día
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAuctionForm({
-                      ...auctionForm, 
-                      durationDays: 7, 
-                      durationHours: 0, 
-                      durationMinutes: 0
-                    })}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      background: 'var(--bg-tertiary)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '0.5rem',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem'
-                    }}
-                  >
-                    📅 7 días
-                  </button>
-                </div>
-
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
-                  gap: '1rem',
-                  background: 'var(--bg-tertiary)',
-                  padding: '1.25rem',
-                  borderRadius: '0.75rem'
-                }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
-                      Días
-                    </label>
-                    <input 
-                      type="number" 
-                      placeholder="0"
-                      value={auctionForm.durationDays}
-                      onChange={(e) => setAuctionForm({...auctionForm, durationDays: Number(e.target.value)})}
-                      style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                      min="0"
-                      max="30"
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
-                      Horas
-                    </label>
-                    <input 
-                      type="number" 
-                      placeholder="0"
-                      value={auctionForm.durationHours}
-                      onChange={(e) => setAuctionForm({...auctionForm, durationHours: Number(e.target.value)})}
-                      style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                      min="0"
-                      max="23"
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
-                      Minutos
-                    </label>
-                    <input 
-                      type="number" 
-                      placeholder="0"
-                      value={auctionForm.durationMinutes}
-                      onChange={(e) => setAuctionForm({...auctionForm, durationMinutes: Number(e.target.value)})}
-                      style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                      min="0"
-                      max="59"
-                    />
-                  </div>
-                </div>
-                <div style={{ 
-                  fontSize: '0.875rem', 
-                  color: 'var(--primary)', 
-                  marginTop: '0.75rem',
-                  fontWeight: 600 
-                }}>
-                  ⏱️ Duración total: {
-                    (() => {
-                      const days = auctionForm.durationDays;
-                      const hours = auctionForm.durationHours;
-                      const minutes = auctionForm.durationMinutes;
-                      const parts = [];
-                      if (days > 0) parts.push(`${days} día${days > 1 ? 's' : ''}`);
-                      if (hours > 0) parts.push(`${hours} hora${hours > 1 ? 's' : ''}`);
-                      if (minutes > 0) parts.push(`${minutes} minuto${minutes > 1 ? 's' : ''}`);
-                      return parts.length > 0 ? parts.join(', ') : '⚠️ Debes definir una duración';
-                    })()
-                  }
-                </div>
-              </div>
-
-              {/* Programar Subasta */}
-              <div style={{ 
-                background: 'var(--bg-tertiary)', 
-                padding: '1.25rem', 
-                borderRadius: '0.75rem'
-              }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', marginBottom: '1rem' }}>
-                  <input 
-                    type="checkbox"
-                    checked={auctionForm.scheduled}
-                    onChange={(e) => setAuctionForm({...auctionForm, scheduled: e.target.checked})}
-                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                  />
-                  <span style={{ fontWeight: 600 }}>📅 Programar inicio de subasta</span>
-                </label>
-                
-                {auctionForm.scheduled && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
-                        Fecha de inicio
-                      </label>
-                      <input 
-                        type="date" 
-                        value={auctionForm.scheduledDate}
-                        onChange={(e) => setAuctionForm({...auctionForm, scheduledDate: e.target.value})}
-                        style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                        min={new Date().toISOString().split('T')[0]}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
-                        Hora de inicio
-                      </label>
-                      <input 
-                        type="time" 
-                        value={auctionForm.scheduledTime}
-                        onChange={(e) => setAuctionForm({...auctionForm, scheduledTime: e.target.value})}
-                        style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                      />
-                    </div>
-                  </div>
-                )}
-                <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.75rem' }}>
-                  {auctionForm.scheduled 
-                    ? 'La subasta se activará automáticamente en la fecha y hora seleccionadas' 
-                    : 'Si no programas, la subasta se activará inmediatamente al crearla'}
-                </div>
-              </div>
-
-              {/* Categoría */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                  Categoría *
-                </label>
-                <select 
-                  value={auctionForm.categoryId}
-                  onChange={(e) => setAuctionForm({...auctionForm, categoryId: e.target.value})}
-                  style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                >
-                  <option value="1">📱 Electrónica</option>
-                  <option value="2">👕 Moda</option>
-                  <option value="3">🏠 Hogar</option>
-                  <option value="4">⚽ Deportes</option>
-                  <option value="5">🧸 Juguetes</option>
-                  <option value="6">📚 Libros</option>
-                </select>
-              </div>
-
-              {/* Estado del Producto */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                  Estado del Producto *
-                </label>
-                <select 
-                  value={auctionForm.condition}
-                  onChange={(e) => setAuctionForm({...auctionForm, condition: e.target.value as any})}
-                  style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                >
-                  <option value="new">🆕 Nuevo (sin usar)</option>
-                  <option value="like-new">✨ Como Nuevo (usado 1-2 veces)</option>
-                  <option value="excellent">⭐ Excelente (usado, impecable)</option>
-                  <option value="good">👍 Muy Bueno (señales leves de uso)</option>
-                  <option value="fair">👌 Bueno (usado, funcional)</option>
-                </select>
-              </div>
-
-              {/* Opciones adicionales */}
-              <div style={{ 
-                background: 'var(--bg-tertiary)', 
-                padding: '1.25rem', 
-                borderRadius: '0.75rem'
-              }}>
-                <h4 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Opciones Adicionales</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
-                    <input 
-                      type="checkbox"
-                      checked={auctionForm.featured}
-                      onChange={(e) => setAuctionForm({...auctionForm, featured: e.target.checked})}
-                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                    />
-                    <span>⭐ Marcar como Destacada (aparecerá primero en la lista)</span>
-                  </label>
-                  
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
-                    <input 
-                      type="checkbox"
-                      checked={auctionForm.allowExtension}
-                      onChange={(e) => setAuctionForm({...auctionForm, allowExtension: e.target.checked})}
-                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                    />
-                    <span>🕐 Permitir extensión automática (si hay ofertas en los últimos 5 min)</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Cuadro de Importante */}
-              <div style={{ 
-                background: '#FFA500', 
-                color: '#000',
-                padding: '1.25rem', 
-                borderRadius: '0.75rem',
-                display: 'flex',
-                gap: '1rem',
-                alignItems: 'start',
-                border: '2px solid #FF8C00'
-              }}>
-                <div style={{ fontSize: '1.5rem' }}>⚠️</div>
-                <div>
-                  <h4 style={{ marginBottom: '0.5rem', fontSize: '1rem', fontWeight: 700 }}>
-                    Importante - Reglas de la Subasta
-                  </h4>
-                  <ul style={{ margin: 0, paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.375rem', fontSize: '0.875rem' }}>
-                    <li>Las ofertas deben ser múltiplos de $500</li>
-                    <li>El ganador tiene 48 horas para completar el pago</li>
-                    <li>Las imágenes deben ser claras y representativas del producto</li>
-                    <li>La descripción debe ser honesta y detallada</li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* Botones */}
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                <button 
-                  onClick={() => {
-                    if (!auctionForm.title.trim()) {
-                      alert('⚠️ Por favor ingresa un título para la subasta');
-                      return;
-                    }
-                    if (auctionForm.title.trim().length < 10) {
-                      alert('⚠️ El título debe tener al menos 10 caracteres');
-                      return;
-                    }
-                    if (!auctionForm.description.trim()) {
-                      alert('⚠️ Por favor ingresa una descripción');
-                      return;
-                    }
-                    if (auctionForm.description.trim().length < 20) {
-                      alert('⚠️ La descripción debe tener al menos 20 caracteres');
-                      return;
-                    }
-                    if (auctionForm.startPrice <= 0) {
-                      alert('⚠️ El precio inicial debe ser mayor a $0');
-                      return;
-                    }
-                    if (auctionForm.buyNowPrice > 0 && auctionForm.buyNowPrice <= auctionForm.startPrice) {
-                      alert('⚠️ El precio de compra directa debe ser mayor al precio inicial');
-                      return;
-                    }
-
-                    const days = auctionForm.durationDays || 0;
-                    const hours = auctionForm.durationHours || 0;
-                    const minutes = auctionForm.durationMinutes || 0;
-                    const totalMinutes = (days * 24 * 60) + (hours * 60) + minutes;
-
-                    if (totalMinutes < 5) {
-                      alert('⚠️ La duración mínima de la subasta es 5 minutos');
-                      return;
-                    }
-
-                    if (auctionForm.scheduled) {
-                      if (!auctionForm.scheduledDate || !auctionForm.scheduledTime) {
-                        alert('⚠️ Debes seleccionar fecha y hora para la subasta programada');
-                        return;
-                      }
-                      const scheduledDateTime = new Date(`${auctionForm.scheduledDate}T${auctionForm.scheduledTime}`);
-                      if (scheduledDateTime <= new Date()) {
-                        alert('⚠️ La fecha programada debe ser en el futuro');
-                        return;
-                      }
-                    }
-
-                    let images = auctionForm.images || [];
-                    if (images.length === 0) {
-                      images = [
-                        'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800',
-                        'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800'
-                      ];
-                    }
-
-                    let startTime: Date;
-                    let endTime: Date;
-                    let status: 'active' | 'ended' | 'sold' = 'active';
-
-                    if (auctionForm.scheduled) {
-                      startTime = new Date(`${auctionForm.scheduledDate}T${auctionForm.scheduledTime}`);
-                      endTime = new Date(startTime.getTime() + totalMinutes * 60 * 1000);
-                      status = 'active';
-                    } else {
-                      startTime = new Date();
-                      endTime = new Date(Date.now() + totalMinutes * 60 * 1000);
-                      status = 'active';
-                    }
-
-                    const isFlash = totalMinutes < 120;
-
-                    const newAuction = {
-                      id: Date.now().toString(),
-                      title: auctionForm.title.trim(),
-                      description: auctionForm.description.trim(),
-                      images: images,
-                      startPrice: auctionForm.startPrice,
-                      currentPrice: auctionForm.startPrice,
-                      buyNowPrice: auctionForm.buyNowPrice > 0 ? auctionForm.buyNowPrice : undefined,
-                      endTime: endTime,
-                      status: status,
-                      categoryId: auctionForm.categoryId,
-                      bids: [],
-                      winnerId: undefined,
-                      featured: auctionForm.featured,
-                      isFlash: isFlash,
-                      condition: auctionForm.condition
-                    };
-
-                    setAuctions([...auctions, newAuction]);
-                    
-                    setAuctionForm({
-                      title: '',
-                      description: '',
-                      startPrice: 0,
-                      currentPrice: 0,
-                      buyNowPrice: 0,
-                      categoryId: '1',
-                      images: [],
-                      durationDays: 0,
-                      durationHours: 0,
-                      durationMinutes: 30,
-                      condition: 'new',
-                      featured: false,
-                      allowExtension: true,
-                      scheduled: false,
-                      scheduledDate: '',
-                      scheduledTime: ''
-                    });
-
-                    const imageInput = document.getElementById('auction-images') as HTMLInputElement;
-                    if (imageInput) imageInput.value = '';
-
-                    const successMessage = auctionForm.scheduled
-                      ? `✅ ¡Subasta programada exitosamente!\n\n📅 Se activará el ${new Date(`${auctionForm.scheduledDate}T${auctionForm.scheduledTime}`).toLocaleString('es-AR')}\n⏱️ Durará ${
-                          (() => {
-                            const parts = [];
-                            if (auctionForm.durationDays > 0) parts.push(`${auctionForm.durationDays} día${auctionForm.durationDays > 1 ? 's' : ''}`);
-                            if (auctionForm.durationHours > 0) parts.push(`${auctionForm.durationHours} hora${auctionForm.durationHours > 1 ? 's' : ''}`);
-                            if (auctionForm.durationMinutes > 0) parts.push(`${auctionForm.durationMinutes} minuto${auctionForm.durationMinutes > 1 ? 's' : ''}`);
-                            return parts.join(', ');
-                          })()
-                        }`
-                      : '✅ ¡Subasta creada exitosamente!\n\n📌 La subasta está ahora activa y visible para todos los usuarios.';
-                    
-                    alert(successMessage);
-                    setActiveTab('auctions');
-                  }}
-                  className="btn btn-primary" 
-                  style={{ flex: 1, padding: '1.125rem', fontSize: '1.0625rem', fontWeight: 600 }}
-                >
-                  ✨ Crear Subasta
-                </button>
-                <button 
-                  onClick={() => {
-                    if (auctionForm.title || auctionForm.description || auctionForm.startPrice > 0) {
-                      if (window.confirm('¿Descartar los cambios y volver?')) {
-                        setAuctionForm({
-                          title: '',
-                          description: '',
-                          startPrice: 0,
-                          currentPrice: 0,
-                          buyNowPrice: 0,
-                          categoryId: '1',
-                          images: [],
-                          durationDays: 0,
-                          durationHours: 0,
-                          durationMinutes: 30,
-                          condition: 'new',
-                          featured: false,
-                          allowExtension: true,
-                          scheduled: false,
-                          scheduledDate: '',
-                          scheduledTime: ''
-                        });
-                        const imageInput = document.getElementById('auction-images') as HTMLInputElement;
-                        if (imageInput) imageInput.value = '';
-                        setActiveTab('auctions');
-                      }
-                    } else {
-                      setActiveTab('auctions');
-                    }
-                  }}
-                  className="btn btn-outline" 
-                  style={{ padding: '1.125rem', minWidth: '140px', fontSize: '1rem' }}
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        
         {/* PRODUCTS TAB */}
         {activeTab === 'products' && (
           <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
@@ -2009,9 +796,9 @@ useEffect(() => {
                   Total: <strong style={{ color: 'var(--primary)' }}>{products.length}</strong> productos
                 </span>
                 <button className="btn btn-primary" onClick={() => setActiveTab('create-product')}>
-  <Plus size={18} />
-  Nuevo Producto
-</button>
+                  <Plus size={18} />
+                  Nuevo Producto
+                </button>
               </div>
             </div>
 
@@ -2107,18 +894,37 @@ useEffect(() => {
                     style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
                   />
                 </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Categoría</label>
+                  <select 
+                    value={productForm.categoryId}
+                    onChange={(e) => setProductForm({...productForm, categoryId: e.target.value})}
+                    style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                  >
+                    <option value="1">📱 Electrónica</option>
+                    <option value="2">👕 Moda</option>
+                    <option value="3">🏠 Hogar</option>
+                    <option value="4">⚽ Deportes</option>
+                    <option value="5">🧸 Juguetes</option>
+                    <option value="6">📚 Libros</option>
+                  </select>
+                </div>
               </div>
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button 
                   onClick={handleSaveProduct}
                   className="btn btn-primary" 
-                  style={{ flex: 1, padding: '1rem', fontSize: '1.0625rem' }}
+                  style={{ flex: 1, padding: '1rem' }}
                 >
-                  💾 Guardar Cambios
+                  Guardar Cambios
                 </button>
                 <button 
-                  onClick={() => { setActiveTab('products'); setEditingProduct(null); }}
+                  onClick={() => {
+                    setEditingProduct(null);
+                    setActiveTab('products');
+                  }}
                   className="btn btn-outline" 
                   style={{ padding: '1rem', minWidth: '120px' }}
                 >
@@ -2128,557 +934,210 @@ useEffect(() => {
             </div>
           </div>
         )}
-{/* INVENTORY TAB */}
-        {activeTab === 'inventory' && (
-          <div>
-            <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)', marginBottom: '2rem' }}>
-              <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <BarChart3 size={28} />
-                Control de Inventario
+
+        {/* AUCTIONS TAB */}
+        {activeTab === 'auctions' && (
+          <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Gavel size={28} />
+                Gestión de Subastas
               </h3>
-
-              <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
-                <button 
-                  onClick={() => setInventoryFilter('all')}
-                  className={inventoryFilter === 'all' ? 'btn btn-primary' : 'btn btn-outline'}
-                  style={{ padding: '0.75rem 1.25rem' }}
-                >
-                  Todos ({products.length})
-                </button>
-                <button 
-                  onClick={() => setInventoryFilter('low')}
-                  className={inventoryFilter === 'low' ? 'btn btn-primary' : 'btn btn-outline'}
-                  style={{ padding: '0.75rem 1.25rem' }}
-                >
-                  Stock Bajo ({lowStockProducts.length})
-                </button>
-                <button 
-                  onClick={() => setInventoryFilter('out')}
-                  className={inventoryFilter === 'out' ? 'btn btn-primary' : 'btn btn-outline'}
-                  style={{ padding: '0.75rem 1.25rem' }}
-                >
-                  Sin Stock ({outOfStockProducts.length})
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>
+                  Activas: <strong style={{ color: 'var(--success)' }}>{activeAuctions}</strong> • 
+                  Finalizadas: <strong>{endedAuctions}</strong>
+                </span>
+                <button className="btn btn-primary" onClick={() => setActiveTab('create-auction')}>
+                  <Plus size={18} />
+                  Nueva Subasta
                 </button>
               </div>
+            </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-                <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center' }}>
-                  <Package size={24} color="var(--primary)" style={{ marginBottom: '0.5rem' }} />
-                  <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--primary)' }}>
-                    {products.length}
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Total Productos</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {auctions.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem' }}>
+                  <Gavel size={64} color="var(--text-secondary)" />
+                  <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>No hay subastas creadas aún</p>
                 </div>
-                <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center' }}>
-                  <DollarSign size={24} color="var(--success)" style={{ marginBottom: '0.5rem' }} />
-                  <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--success)' }}>
-                    {formatCurrency(totalInventoryValue)}
+              ) : (
+                auctions.map(auction => (
+                  <div 
+                    key={auction.id} 
+                    style={{ 
+                      padding: '1.5rem', 
+                      background: 'var(--bg-tertiary)', 
+                      borderRadius: '0.75rem',
+                      border: '1px solid var(--border)',
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto',
+                      gap: '1rem',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <div>
+                      <h4 style={{ margin: '0 0 0.5rem 0' }}>{auction.title}</h4>
+                      <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                        {auction.bids.length} ofertas • Finaliza: {new Date(auction.endTime).toLocaleDateString('es-AR')}
+                      </div>
+                      <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+                        <div>
+                          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Precio Inicial</div>
+                          <div style={{ fontSize: '1.125rem', fontWeight: 600 }}>{formatCurrency(auction.startPrice)}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Precio Actual</div>
+                          <div style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--primary)' }}>{formatCurrency(auction.currentPrice)}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
+                      <span style={{ 
+                        padding: '0.5rem 1rem', 
+                        background: auction.status === 'active' ? 'var(--success)' : 'var(--error)',
+                        color: 'white',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        fontWeight: 600
+                      }}>
+                        {auction.status === 'active' ? 'Activa' : 'Finalizada'}
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button 
+                          onClick={() => handleEditAuction(auction)}
+                          className="btn btn-outline"
+                          style={{ padding: '0.5rem 1rem' }}
+                        >
+                          <Edit size={16} />
+                          Editar
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteAuction(auction.id)}
+                          style={{ padding: '0.5rem 1rem', background: 'var(--error)', color: 'white', borderRadius: '0.5rem', border: 'none', cursor: 'pointer' }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Valor Total</div>
-                </div>
-                <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center' }}>
-                  <AlertCircle size={24} color="var(--warning)" style={{ marginBottom: '0.5rem' }} />
-                  <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--warning)' }}>
-                    {lowStockProducts.length}
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Stock Bajo</div>
-                </div>
-                <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center' }}>
-                  <AlertCircle size={24} color="var(--error)" style={{ marginBottom: '0.5rem' }} />
-                  <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--error)' }}>
-                    {outOfStockProducts.length}
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Sin Stock</div>
-                </div>
-              </div>
-
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: 'var(--bg-tertiary)', borderBottom: '2px solid var(--border)' }}>
-                      <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600 }}>Producto</th>
-                      <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 600 }}>Stock</th>
-                      <th style={{ padding: '1rem', textAlign: 'right', fontWeight: 600 }}>Precio Unit.</th>
-                      <th style={{ padding: '1rem', textAlign: 'right', fontWeight: 600 }}>Valor Total</th>
-                      <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 600 }}>Estado</th>
-                      <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 600 }}>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {products
-                      .filter(p => {
-                        if (inventoryFilter === 'low') return p.stock < 5 && p.stock > 0;
-                        if (inventoryFilter === 'out') return p.stock === 0;
-                        return true;
-                      })
-                      .map(product => (
-                        <tr key={product.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: '1rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                              <img 
-                                src={product.images[0]} 
-                                alt={product.name}
-                                style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '0.5rem' }}
-                              />
-                              <div>
-                                <div style={{ fontWeight: 600 }}>{product.name}</div>
-                                <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>ID: {product.id}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'center', fontWeight: 600, fontSize: '1.125rem' }}>
-                            {product.stock}
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 600 }}>
-                            {formatCurrency(product.price)}
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 700, color: 'var(--primary)' }}>
-                            {formatCurrency(product.price * product.stock)}
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'center' }}>
-                            {product.stock === 0 ? (
-                              <span className="badge badge-error">Sin Stock</span>
-                            ) : product.stock < 5 ? (
-                              <span className="badge badge-warning">Bajo</span>
-                            ) : (
-                              <span className="badge badge-success">OK</span>
-                            )}
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'center' }}>
-                            <button 
-                              onClick={() => handleEditProduct(product)}
-                              className="btn btn-outline"
-                              style={{ padding: '0.5rem 0.75rem' }}
-                            >
-                              <Edit size={16} />
-                              Editar
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
+                ))
+              )}
             </div>
           </div>
         )}
 
         {/* BOTS TAB */}
         {activeTab === 'bots' && (
-          <div>
-            <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', marginBottom: '2rem', boxShadow: '0 2px 8px var(--shadow)' }}>
-              <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <Plus size={24} />
-                Crear Nuevo Bot
-              </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Nombre del Bot</label>
+          <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
+            <h3 style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <Bot size={28} />
+              Gestión de Bots
+            </h3>
+            
+            {/* Formulario para crear bot */}
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem', marginBottom: '2rem' }}>
+              <h4 style={{ marginBottom: '1rem' }}>Crear Nuevo Bot</h4>
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                <input 
+                  type="text"
+                  placeholder="Nombre del bot"
+                  value={botForm.name}
+                  onChange={(e) => setBotForm({...botForm, name: e.target.value})}
+                  style={{ padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
                   <input 
-                    type="text" 
-                    placeholder="Bot 1" 
-                    value={botForm.name}
-                    onChange={(e) => setBotForm({...botForm, name: e.target.value})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Saldo Disponible</label>
-                  <input 
-                    type="number" 
+                    type="number"
+                    placeholder="Saldo inicial"
                     value={botForm.balance}
                     onChange={(e) => setBotForm({...botForm, balance: Number(e.target.value)})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
+                    style={{ padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
                   />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Intervalo Mín (min)</label>
                   <input 
-                    type="number" 
+                    type="number"
+                    placeholder="Intervalo mín (seg)"
                     value={botForm.intervalMin}
                     onChange={(e) => setBotForm({...botForm, intervalMin: Number(e.target.value)})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
+                    style={{ padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
                   />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Intervalo Máx (min)</label>
                   <input 
-                    type="number" 
+                    type="number"
+                    placeholder="Intervalo máx (seg)"
                     value={botForm.intervalMax}
                     onChange={(e) => setBotForm({...botForm, intervalMax: Number(e.target.value)})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
+                    style={{ padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
                   />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Oferta Máxima</label>
                   <input 
-                    type="number" 
+                    type="number"
+                    placeholder="Oferta máxima"
                     value={botForm.maxBidAmount}
                     onChange={(e) => setBotForm({...botForm, maxBidAmount: Number(e.target.value)})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
+                    style={{ padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
                   />
                 </div>
-                <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                  <button onClick={handleAddBot} className="btn btn-primary" style={{ width: '100%' }}>
-                    <Plus size={18} />
-                    Crear Bot
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
-              <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <Bot size={24} />
-                Bots Activos ({bots.length})
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {bots.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-                    <Bot size={64} color="var(--text-tertiary)" style={{ marginBottom: '1rem' }} />
-                    <p>No hay bots configurados. Crea tu primer bot arriba.</p>
-                  </div>
-                ) : (
-                  bots.map(bot => (
-                    <div key={bot.id} style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                      <div style={{ flex: 1, minWidth: '250px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
-                          <Bot size={24} color="var(--primary)" />
-                          <h4 style={{ margin: 0 }}>{bot.name}</h4>
-                          <span className={bot.isActive ? 'badge badge-success' : 'badge badge-error'}>
-                            {bot.isActive ? 'Activo' : 'Inactivo'}
-                          </span>
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                          <div>Saldo: <strong>{formatCurrency(bot.balance)}</strong></div>
-                          <div>Intervalo: <strong>{bot.intervalMin}-{bot.intervalMax}min</strong></div>
-                          <div>Oferta Máx: <strong>{formatCurrency(bot.maxBidAmount)}</strong></div>
-                          <div>Subastas: <strong>{bot.targetAuctions.length || 'Todas'}</strong></div>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button 
-                          onClick={() => updateBot(bot.id, { isActive: !bot.isActive })}
-                          className="btn btn-outline"
-                          style={{ padding: '0.625rem 1rem' }}
-                        >
-                          {bot.isActive ? 'Pausar' : 'Activar'}
-                        </button>
-                        <button 
-                          onClick={() => {
-                            if (window.confirm(`¿Eliminar el bot "${bot.name}"?`)) {
-                              deleteBot(bot.id);
-                            }
-                          }}
-                          style={{ padding: '0.625rem', background: 'var(--error)', color: 'white', borderRadius: '0.5rem', border: 'none', cursor: 'pointer' }}
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* REPORTS TAB */}
-        {activeTab === 'reports' && (
-          <div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-              <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem' }}>
-                <h3 style={{ marginBottom: '1.5rem' }}>Resumen de Ventas</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
-                    <span>Total Vendido</span>
-                    <strong style={{ color: 'var(--primary)' }}>{formatCurrency(totalRevenue)}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
-                    <span>Pedidos Completados</span>
-                    <strong>{delivered}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
-                    <span>En Proceso</span>
-                    <strong>{inTransit + orders.filter(o => o.status === 'preparing').length}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Ticket Promedio</span>
-                    <strong style={{ color: 'var(--success)' }}>
-                      {delivered > 0 ? formatCurrency(totalRevenue / delivered) : '$0'}
-                    </strong>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem' }}>
-                <h3 style={{ marginBottom: '1.5rem' }}>Estado de Pedidos</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {[
-                    { status: 'pending_payment' as OrderStatus, label: 'Pendiente de Pago' },
-                    { status: 'payment_confirmed' as OrderStatus, label: 'Pago Confirmado' },
-                    { status: 'preparing' as OrderStatus, label: 'Preparando' },
-                    { status: 'in_transit' as OrderStatus, label: 'En Tránsito' },
-                    { status: 'delivered' as OrderStatus, label: 'Entregado' }
-                  ].map(({ status, label }) => {
-                    const count = orders.filter(o => o.status === status).length;
-                    const percentage = orders.length > 0 ? (count / orders.length) * 100 : 0;
-
-                  {/* Modal de Detalles de Usuario */}
-      {selectedUser && (
-        <UserDetailsModal 
-          user={selectedUser}
-          onClose={() => setSelectedUser(null)}
-          onUpdate={() => {
-            loadUsers();
-            setSelectedUser(null);
-          }}
-        />
-      )}
-                    
-                    return (
-                      <div key={status}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                          <span style={{ fontSize: '0.875rem' }}>{label}</span>
-                          <strong>{count}</strong>
-                        </div>
-                        <div style={{ width: '100%', height: '8px', background: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden' }}>
-                          <div style={{ 
-                            width: `${percentage}%`, 
-                            height: '100%', 
-                            background: getStatusColor(status),
-                            transition: 'width 0.3s'
-                          }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <h3>Exportar Reportes</h3>
-                <button className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Download size={18} />
-                  Descargar Excel
+                <button 
+                  onClick={handleAddBot}
+                  className="btn btn-primary"
+                  style={{ padding: '0.875rem' }}
+                >
+                  <Plus size={18} />
+                  Crear Bot
                 </button>
               </div>
-              <p style={{ color: 'var(--text-secondary)' }}>
-                Exporta todos los datos de pedidos, productos y subastas en formato Excel para análisis detallado.
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Modal de Detalle de Orden */}
-      {selectedOrder && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '2rem'
-          }}
-          onClick={() => setSelectedOrder(null)}
-        >
-          <div 
-            style={{
-              background: 'var(--bg-secondary)',
-              borderRadius: '1rem',
-              padding: '2rem',
-              maxWidth: '600px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2>Detalle del Pedido</h2>
-              <button 
-                onClick={() => setSelectedOrder(null)}
-                style={{ 
-                  background: 'none', 
-                  border: 'none', 
-                  fontSize: '1.5rem', 
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                ×
-              </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <img 
-                src={selectedOrder.productImage} 
-                alt={selectedOrder.productName}
-                style={{ width: '100%', height: '250px', objectFit: 'cover', borderRadius: '0.75rem' }}
-              />
-
-              <div>
-                <h3 style={{ marginBottom: '0.5rem' }}>{selectedOrder.productName}</h3>
-                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                  {selectedOrder.productType === 'auction' ? '🔨 Subasta' : '🛒 Tienda'} • ID: {selectedOrder.id}
+            {/* Lista de bots */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {bots.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                  No hay bots creados
                 </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>
-                  {formatCurrency(selectedOrder.amount)}
-                </div>
-              </div>
-
-              <div style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
-                <h4 style={{ marginBottom: '0.75rem' }}>Cliente</h4>
-                <div style={{ fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <div>
-                    <Users size={16} style={{ display: 'inline', marginRight: '0.5rem' }} />
-                    {selectedOrder.userName}
-                  </div>
-                  <div>
-                    <MapPin size={16} style={{ display: 'inline', marginRight: '0.5rem' }} />
-                    {selectedOrder.address.street}, {selectedOrder.address.locality}, {selectedOrder.address.province}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
-                <h4 style={{ marginBottom: '0.75rem' }}>Estado Actual</h4>
-                <div style={{ 
-                  padding: '1rem', 
-                  background: getStatusColor(selectedOrder.status) + '20', 
-                  color: getStatusColor(selectedOrder.status),
-                  borderRadius: '0.5rem',
-                  fontWeight: 600,
-                  textAlign: 'center',
-                  fontSize: '1.125rem'
-                }}>
-                  {getStatusText(selectedOrder.status)}
-                </div>
-
-                {selectedOrder.status === 'pending_payment' && selectedOrder.expiresAt && (
-                  <div style={{ marginTop: '1rem', textAlign: 'center' }}>
-                    <Clock size={20} style={{ display: 'inline', marginRight: '0.5rem' }} />
-                    <strong>Expira en: {getTimeRemaining(selectedOrder.expiresAt)}</strong>
-                  </div>
-                )}
-
-                {selectedOrder.trackingNumber && (
-                  <div style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.875rem' }}>
-                    <Truck size={16} style={{ display: 'inline', marginRight: '0.5rem' }} />
-                    Tracking: <strong>{selectedOrder.trackingNumber}</strong>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <h4 style={{ marginBottom: '0.75rem' }}>Cambiar Estado</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                  {selectedOrder.status === 'pending_payment' && (
-                    <button 
-                      onClick={() => handleStatusChange(selectedOrder.id, 'payment_confirmed')}
-                      className="btn"
-                      style={{ background: 'var(--success)', color: 'white', padding: '0.75rem' }}
-                    >
-                      <CheckCircle size={16} />
-                      Confirmar Pago
-                    </button>
-                  )}
-                  {selectedOrder.status === 'payment_confirmed' && (
-                    <button 
-                      onClick={() => handleStatusChange(selectedOrder.id, 'preparing')}
-                      className="btn btn-primary"
-                      style={{ padding: '0.75rem' }}
-                    >
-                      Preparar Envío
-                    </button>
-                  )}
-                  {selectedOrder.status === 'preparing' && (
-                    <button 
-                      onClick={() => handleStatusChange(selectedOrder.id, 'in_transit')}
-                      className="btn"
-                      style={{ background: 'var(--secondary)', color: 'white', padding: '0.75rem' }}
-                    >
-                      <Truck size={16} />
-                      En Tránsito
-                    </button>
-                  )}
-                  {selectedOrder.status === 'in_transit' && (
-                    <button 
-                      onClick={() => handleStatusChange(selectedOrder.id, 'delivered')}
-                      className="btn"
-                      style={{ background: 'var(--success)', color: 'white', padding: '0.75rem' }}
-                    >
-                      <CheckCircle size={16} />
-                      Entregado
-                    </button>
-                  )}
-                  {['pending_payment', 'payment_confirmed', 'preparing'].includes(selectedOrder.status) && (
-                    <button 
-                      onClick={() => handleStatusChange(selectedOrder.id, 'cancelled')}
-                      className="btn"
-                      style={{ background: 'var(--error)', color: 'white', padding: '0.75rem' }}
-                    >
-                      <XCircle size={16} />
-                      Cancelar
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {(selectedOrder.paidAt || selectedOrder.shippedAt || selectedOrder.deliveredAt) && (
-                <div style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
-                  <h4 style={{ marginBottom: '0.75rem' }}>Historial</h4>
-                  <div style={{ fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              ) : (
+                bots.map(bot => (
+                  <div 
+                    key={bot.id}
+                    style={{
+                      padding: '1.5rem',
+                      background: 'var(--bg-tertiary)',
+                      borderRadius: '0.75rem',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '1rem'
+                    }}
+                  >
                     <div>
-                      <Calendar size={16} style={{ display: 'inline', marginRight: '0.5rem' }} />
-                      Creado: {new Date(selectedOrder.createdAt).toLocaleString('es-AR')}
+                      <h4 style={{ margin: '0 0 0.5rem 0' }}>{bot.name}</h4>
+                      <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                        <span>Saldo: {formatCurrency(bot.balance)}</span>
+                        <span>Intervalo: {bot.intervalMin}-{bot.intervalMax}s</span>
+                        <span>Oferta máx: {formatCurrency(bot.maxBidAmount)}</span>
+                      </div>
                     </div>
-                    {selectedOrder.paidAt && (
-                      <div>
-                        <CheckCircle size={16} style={{ display: 'inline', marginRight: '0.5rem', color: 'var(--success)' }} />
-                        Pagado: {new Date(selectedOrder.paidAt).toLocaleString('es-AR')}
-                      </div>
-                    )}
-                    {selectedOrder.shippedAt && (
-                      <div>
-                        <Truck size={16} style={{ display: 'inline', marginRight: '0.5rem', color: 'var(--secondary)' }} />
-                        Enviado: {new Date(selectedOrder.shippedAt).toLocaleString('es-AR')}
-                      </div>
-                    )}
-                    {selectedOrder.deliveredAt && (
-                      <div>
-                        <CheckCircle size={16} style={{ display: 'inline', marginRight: '0.5rem', color: 'var(--primary)' }} />
-                        Entregado: {new Date(selectedOrder.deliveredAt).toLocaleString('es-AR')}
-                      </div>
-                    )}
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button 
+                        onClick={() => updateBot(bot.id, { isActive: !bot.isActive })}
+                        className={`btn ${bot.isActive ? 'btn-success' : 'btn-outline'}`}
+                        style={{ padding: '0.5rem 1rem' }}
+                      >
+                        {bot.isActive ? 'Activo' : 'Inactivo'}
+                      </button>
+                      <button 
+                        onClick={() => deleteBot(bot.id)}
+                        style={{ padding: '0.5rem 1rem', background: 'var(--error)', color: 'white', borderRadius: '0.5rem', border: 'none', cursor: 'pointer' }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ))
               )}
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Modal de Detalles de Usuario */}
-      {selectedUser && (
-        <UserDetailsModal 
-          user={selectedUser}
-          onClose={() => setSelectedUser(null)}
-          onUpdate={() => {
-            loadUsers();
-            setSelectedUser(null);
-          }}
-        />
-      )}
+      </div>
     </div>
   );
 };
