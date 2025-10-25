@@ -992,8 +992,210 @@ useEffect(() => {
           </div>
         )}
 
-        {/* CREATE AUCTION TAB */}
-        {activeTab === 'create-auction' && (
+        {/* CREATE PRODUCT TAB */}
+{activeTab === 'create-product' && (
+  <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
+    <h3 style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <Plus size={28} />
+      Crear Nuevo Producto para la Tienda
+    </h3>
+    
+    <div style={{ display: 'grid', gap: '1.5rem' }}>
+      {/* Nombre del Producto */}
+      <div>
+        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+          Nombre del Producto *
+        </label>
+        <input 
+          type="text" 
+          placeholder="Ej: Auriculares Bluetooth Sony WH-1000XM5"
+          value={productForm.name}
+          onChange={(e) => setProductForm({...productForm, name: e.target.value})}
+          style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+        />
+        <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+          Mínimo 5 caracteres - Sé descriptivo y claro
+        </div>
+      </div>
+
+      {/* Descripción */}
+      <div>
+        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+          Descripción Detallada *
+        </label>
+        <textarea 
+          placeholder="Describe el producto: características, especificaciones, qué incluye, etc."
+          value={productForm.description}
+          onChange={(e) => setProductForm({...productForm, description: e.target.value})}
+          rows={5}
+          style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem', resize: 'vertical' }}
+        />
+        <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+          Mínimo 20 caracteres - Incluye toda la información relevante
+        </div>
+      </div>
+
+      {/* Precio y Stock */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+            Precio * (en pesos)
+          </label>
+          <input 
+            type="number" 
+            placeholder="15000"
+            value={productForm.price || ''}
+            onChange={(e) => setProductForm({...productForm, price: Number(e.target.value)})}
+            style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+            min="0"
+          />
+        </div>
+
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+            Stock Disponible *
+          </label>
+          <input 
+            type="number" 
+            placeholder="10"
+            value={productForm.stock || ''}
+            onChange={(e) => setProductForm({...productForm, stock: Number(e.target.value)})}
+            style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+            min="0"
+          />
+        </div>
+      </div>
+
+      {/* Categoría */}
+      <div>
+        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+          Categoría *
+        </label>
+        <select 
+          value={productForm.categoryId}
+          onChange={(e) => setProductForm({...productForm, categoryId: e.target.value})}
+          style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+        >
+          <option value="1">📱 Electrónica</option>
+          <option value="2">👕 Moda</option>
+          <option value="3">🏠 Hogar</option>
+          <option value="4">⚽ Deportes</option>
+          <option value="5">🧸 Juguetes</option>
+          <option value="6">📚 Libros</option>
+        </select>
+      </div>
+
+      {/* Cuadro Informativo */}
+      <div style={{ 
+        background: '#E3F2FD', 
+        color: '#0D47A1',
+        padding: '1.25rem', 
+        borderRadius: '0.75rem',
+        border: '2px solid #2196F3'
+      }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'start' }}>
+          <div style={{ fontSize: '1.5rem' }}>ℹ️</div>
+          <div>
+            <h4 style={{ marginBottom: '0.5rem', fontSize: '1rem', fontWeight: 700 }}>
+              Importante - Productos de la Tienda
+            </h4>
+            <ul style={{ margin: 0, paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.375rem', fontSize: '0.875rem' }}>
+              <li>Los productos se venden al precio fijo indicado</li>
+              <li>El stock se descuenta automáticamente al confirmar la compra</li>
+              <li>Podés editar precio y stock en cualquier momento</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {/* Botones */}
+      <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+        <button 
+          onClick={() => {
+            // Validaciones
+            if (!productForm.name.trim()) {
+              alert('⚠️ Por favor ingresa un nombre para el producto');
+              return;
+            }
+            if (productForm.name.trim().length < 5) {
+              alert('⚠️ El nombre debe tener al menos 5 caracteres');
+              return;
+            }
+            if (!productForm.description.trim()) {
+              alert('⚠️ Por favor ingresa una descripción');
+              return;
+            }
+            if (productForm.description.trim().length < 20) {
+              alert('⚠️ La descripción debe tener al menos 20 caracteres');
+              return;
+            }
+            if (productForm.price <= 0) {
+              alert('⚠️ El precio debe ser mayor a $0');
+              return;
+            }
+            if (productForm.stock < 0) {
+              alert('⚠️ El stock no puede ser negativo');
+              return;
+            }
+
+            // Crear el producto
+            const newProduct = {
+              id: Date.now().toString(),
+              name: productForm.name.trim(),
+              description: productForm.description.trim(),
+              images: ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800'], // Placeholder
+              price: productForm.price,
+              stock: productForm.stock,
+              categoryId: productForm.categoryId,
+              ratings: [],
+              averageRating: 0
+            };
+
+            setProducts([...products, newProduct]);
+            
+            // Resetear formulario
+            setProductForm({
+              name: '',
+              description: '',
+              price: 0,
+              stock: 0,
+              categoryId: '1'
+            });
+
+            alert('✅ ¡Producto creado exitosamente!\n\n📌 El producto ya está visible en la Tienda.');
+            setActiveTab('products');
+          }}
+          className="btn btn-primary" 
+          style={{ flex: 1, padding: '1.125rem', fontSize: '1.0625rem', fontWeight: 600 }}
+        >
+          ✨ Crear Producto
+        </button>
+        <button 
+          onClick={() => {
+            if (productForm.name || productForm.description || productForm.price > 0) {
+              if (window.confirm('¿Descartar los cambios y volver?')) {
+                setProductForm({
+                  name: '',
+                  description: '',
+                  price: 0,
+                  stock: 0,
+                  categoryId: '1'
+                });
+                setActiveTab('products');
+              }
+            } else {
+              setActiveTab('products');
+            }
+          }}
+          className="btn btn-outline" 
+          style={{ padding: '1.125rem', minWidth: '140px', fontSize: '1rem' }}
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+)}
           <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
             <h3 style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <Plus size={28} />
