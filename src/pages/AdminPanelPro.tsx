@@ -132,8 +132,6 @@ const AdminPanel = () => {
   const conversionRate = totalOrders > 0 ? ((totalOrders / activeUsers) * 100).toFixed(1) : 0;
 
   const pendingPayments = orders.filter(o => o.status === 'pending_payment').length;
-  const inTransit = orders.filter(o => o.status === 'in_transit').length;
-  const delivered = orders.filter(o => o.status === 'delivered').length;
   const expiringSoon = orders.filter(o => {
     if (o.status === 'pending_payment' && o.expiresAt) {
       const hoursLeft = (new Date(o.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60);
