@@ -781,67 +781,116 @@ const AdminPanelPro = () => {
           </div>
         )}
 
-        {/* PRODUCTS TAB - continuará en siguiente mensaje... */}
-      </div>
         {/* PRODUCTS TAB */}
         {activeTab === 'products' && (
           <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <Package size={28} />
-                Gestión de Productos
+                Productos de la Tienda
               </h3>
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>
-                  Total: <strong style={{ color: 'var(--primary)' }}>{products.length}</strong> productos
-                </span>
-                <button className="btn btn-primary" onClick={() => setActiveTab('create-product')}>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <select 
+                  value={inventoryFilter}
+                  onChange={(e) => setInventoryFilter(e.target.value)}
+                  style={{ padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
+                >
+                  <option value="all">Todos los productos</option>
+                  <option value="low-stock">Stock bajo (menos de 5)</option>
+                  <option value="out-of-stock">Sin stock</option>
+                  <option value="in-stock">Con stock</option>
+                </select>
+                <button 
+                  onClick={() => setActiveTab('create-product')}
+                  className="btn btn-primary"
+                >
                   <Plus size={18} />
                   Nuevo Producto
                 </button>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1.5rem' }}>
-              {products.map(product => (
-                <div key={product.id} style={{ background: 'var(--bg-tertiary)', borderRadius: '0.75rem', overflow: 'hidden' }}>
-                  <img 
-                    src={product.images[0]} 
-                    alt={product.name}
-                    style={{ width: '100%', height: '180px', objectFit: 'cover' }}
-                  />
-                  <div style={{ padding: '1rem' }}>
-                    <h4 style={{ marginBottom: '0.5rem', fontSize: '1rem' }}>{product.name}</h4>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.5rem' }}>
-                      {formatCurrency(product.price)}
+            {products.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem' }}>
+                <Package size={64} color="var(--text-secondary)" />
+                <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>No hay productos en la tienda</p>
+                <button 
+                  onClick={() => setActiveTab('create-product')}
+                  className="btn btn-primary"
+                  style={{ marginTop: '1rem' }}
+                >
+                  <Plus size={18} />
+                  Crear Primer Producto
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                {products
+                  .filter(product => {
+                    switch (inventoryFilter) {
+                      case 'low-stock': return product.stock < 5 && product.stock > 0;
+                      case 'out-of-stock': return product.stock === 0;
+                      case 'in-stock': return product.stock > 0;
+                      default: return true;
+                    }
+                  })
+                  .map(product => (
+                    <div 
+                      key={product.id} 
+                      style={{ 
+                        padding: '1.5rem', 
+                        background: 'var(--bg-tertiary)', 
+                        borderRadius: '0.75rem',
+                        border: '1px solid var(--border)',
+                        display: 'grid',
+                        gridTemplateColumns: 'auto 1fr auto',
+                        gap: '1.5rem',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <img 
+                        src={product.images[0]} 
+                        alt={product.name}
+                        style={{ width: '80px', height: '80px', borderRadius: '0.5rem', objectFit: 'cover' }}
+                      />
+                      <div style={{ minWidth: 0 }}>
+                        <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '1.125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {product.name}
+                        </h4>
+                        <p style={{ margin: '0 0 0.75rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {product.description}
+                        </p>
+                        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.875rem' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--success)' }}>{formatCurrency(product.price)}</span>
+                          <span style={{ color: product.stock > 5 ? 'var(--success)' : product.stock > 0 ? 'var(--warning)' : 'var(--error)' }}>
+                            Stock: {product.stock}
+                          </span>
+                          <span style={{ color: 'var(--text-secondary)' }}>
+                            Categoría: {['Electrónica', 'Moda', 'Hogar', 'Deportes', 'Juguetes', 'Libros'][parseInt(product.categoryId) - 1]}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button 
+                          onClick={() => handleEditProduct(product)}
+                          className="btn btn-outline"
+                          style={{ padding: '0.5rem' }}
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteProduct(product.id)}
+                          className="btn btn-outline"
+                          style={{ padding: '0.5rem', color: 'var(--error)' }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
-                    <div style={{ 
-                      fontSize: '0.875rem', 
-                      color: product.stock < 5 ? 'var(--error)' : 'var(--success)',
-                      marginBottom: '1rem'
-                    }}>
-                      Stock: {product.stock} unidades
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button 
-                        onClick={() => handleEditProduct(product)}
-                        className="btn btn-outline" 
-                        style={{ flex: 1, padding: '0.5rem', fontSize: '0.875rem' }}
-                      >
-                        <Edit size={16} />
-                        Editar
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteProduct(product.id)}
-                        style={{ padding: '0.5rem', background: 'var(--error)', color: 'white', borderRadius: '0.5rem', border: 'none', cursor: 'pointer' }}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  ))
+                }
+              </div>
+            )}
           </div>
         )}
 
@@ -855,7 +904,9 @@ const AdminPanelPro = () => {
             
             <div style={{ display: 'grid', gap: '1.5rem' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Nombre</label>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                  Nombre del Producto *
+                </label>
                 <input 
                   type="text" 
                   value={productForm.name}
@@ -865,68 +916,300 @@ const AdminPanelPro = () => {
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Descripción</label>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                  Descripción *
+                </label>
                 <textarea 
                   value={productForm.description}
                   onChange={(e) => setProductForm({...productForm, description: e.target.value})}
-                  rows={4}
+                  rows={5}
                   style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem', resize: 'vertical' }}
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Precio</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                    Precio *
+                  </label>
                   <input 
                     type="number" 
-                    value={productForm.price}
+                    value={productForm.price || ''}
                     onChange={(e) => setProductForm({...productForm, price: Number(e.target.value)})}
                     style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                    min="0"
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Stock</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                    Stock Disponible *
+                  </label>
                   <input 
                     type="number" 
-                    value={productForm.stock}
+                    value={productForm.stock || ''}
                     onChange={(e) => setProductForm({...productForm, stock: Number(e.target.value)})}
                     style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                    min="0"
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Categoría</label>
-                  <select 
-                    value={productForm.categoryId}
-                    onChange={(e) => setProductForm({...productForm, categoryId: e.target.value})}
-                    style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                  >
-                    <option value="1">📱 Electrónica</option>
-                    <option value="2">👕 Moda</option>
-                    <option value="3">🏠 Hogar</option>
-                    <option value="4">⚽ Deportes</option>
-                    <option value="5">🧸 Juguetes</option>
-                    <option value="6">📚 Libros</option>
-                  </select>
-                </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                  Categoría *
+                </label>
+                <select 
+                  value={productForm.categoryId}
+                  onChange={(e) => setProductForm({...productForm, categoryId: e.target.value})}
+                  style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                >
+                  <option value="1">📱 Electrónica</option>
+                  <option value="2">👕 Moda</option>
+                  <option value="3">🏠 Hogar</option>
+                  <option value="4">⚽ Deportes</option>
+                  <option value="5">🧸 Juguetes</option>
+                  <option value="6">📚 Libros</option>
+                </select>
               </div>
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button 
                   onClick={handleSaveProduct}
                   className="btn btn-primary" 
-                  style={{ flex: 1, padding: '1rem' }}
+                  style={{ flex: 1, padding: '1.125rem', fontSize: '1.0625rem', fontWeight: 600 }}
                 >
-                  Guardar Cambios
+                  💾 Guardar Cambios
                 </button>
                 <button 
                   onClick={() => {
-                    setEditingProduct(null);
-                    setActiveTab('products');
+                    if (window.confirm('¿Descartar los cambios?')) {
+                      setEditingProduct(null);
+                      setActiveTab('products');
+                    }
                   }}
                   className="btn btn-outline" 
-                  style={{ padding: '1rem', minWidth: '120px' }}
+                  style={{ padding: '1.125rem', minWidth: '140px', fontSize: '1rem' }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CREATE AUCTION TAB */}
+        {activeTab === 'create-auction' && (
+          <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
+            <h3 style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <Plus size={28} />
+              Crear Nueva Subasta
+            </h3>
+            
+            <div style={{ display: 'grid', gap: '1.5rem' }}>
+              {/* Título */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                  Título de la Subasta *
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="Ej: iPhone 15 Pro Max 256GB Nuevo Sellado"
+                  value={auctionForm.title}
+                  onChange={(e) => setAuctionForm({...auctionForm, title: e.target.value})}
+                  style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                />
+              </div>
+
+              {/* Descripción */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                  Descripción Detallada *
+                </label>
+                <textarea 
+                  placeholder="Describe el artículo: estado, características, qué incluye, etc."
+                  value={auctionForm.description}
+                  onChange={(e) => setAuctionForm({...auctionForm, description: e.target.value})}
+                  rows={5}
+                  style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem', resize: 'vertical' }}
+                />
+              </div>
+
+              {/* Precios */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                    Precio Inicial *
+                  </label>
+                  <input 
+                    type="number" 
+                    placeholder="1000"
+                    value={auctionForm.startPrice || ''}
+                    onChange={(e) => setAuctionForm({...auctionForm, startPrice: Number(e.target.value)})}
+                    style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                    min="0"
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                    Precio Actual *
+                  </label>
+                  <input 
+                    type="number" 
+                    placeholder="1000"
+                    value={auctionForm.currentPrice || ''}
+                    onChange={(e) => setAuctionForm({...auctionForm, currentPrice: Number(e.target.value)})}
+                    style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                    min="0"
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                    Precio Compra Ya (opcional)
+                  </label>
+                  <input 
+                    type="number" 
+                    placeholder="15000"
+                    value={auctionForm.buyNowPrice || ''}
+                    onChange={(e) => setAuctionForm({...auctionForm, buyNowPrice: Number(e.target.value)})}
+                    style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                    min="0"
+                  />
+                </div>
+              </div>
+
+              {/* Categoría */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                  Categoría *
+                </label>
+                <select 
+                  value={auctionForm.categoryId}
+                  onChange={(e) => setAuctionForm({...auctionForm, categoryId: e.target.value})}
+                  style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                >
+                  <option value="1">📱 Electrónica</option>
+                  <option value="2">👕 Moda</option>
+                  <option value="3">🏠 Hogar</option>
+                  <option value="4">⚽ Deportes</option>
+                  <option value="5">🧸 Juguetes</option>
+                  <option value="6">📚 Libros</option>
+                </select>
+              </div>
+
+              {/* Imágenes */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                  Imágenes del Producto
+                </label>
+                <ImageUploader 
+                  images={auctionForm.images}
+                  onImagesChange={(images) => setAuctionForm({...auctionForm, images})}
+                  maxImages={8}
+                />
+              </div>
+
+              {/* Botones */}
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button 
+                  onClick={() => {
+                    // Validaciones básicas
+                    if (!auctionForm.title.trim()) {
+                      alert('⚠️ Por favor ingresa un título para la subasta');
+                      return;
+                    }
+                    if (!auctionForm.description.trim()) {
+                      alert('⚠️ Por favor ingresa una descripción');
+                      return;
+                    }
+                    if (auctionForm.startPrice <= 0) {
+                      alert('⚠️ El precio inicial debe ser mayor a $0');
+                      return;
+                    }
+                    if (auctionForm.currentPrice < auctionForm.startPrice) {
+                      alert('⚠️ El precio actual no puede ser menor al precio inicial');
+                      return;
+                    }
+
+                    // Crear la subasta
+                    const newAuction = {
+                      id: Date.now().toString(),
+                      title: auctionForm.title.trim(),
+                      description: auctionForm.description.trim(),
+                      images: auctionForm.images.length > 0 ? auctionForm.images : ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800'],
+                      startPrice: auctionForm.startPrice,
+                      currentPrice: auctionForm.currentPrice,
+                      buyNowPrice: auctionForm.buyNowPrice || undefined,
+                      categoryId: auctionForm.categoryId,
+                      status: 'active',
+                      bids: [],
+                      endTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString()
+                    };
+
+                    setAuctions([...auctions, newAuction]);
+                    
+                    // Resetear formulario
+                    setAuctionForm({
+                      title: '',
+                      description: '',
+                      startPrice: 0,
+                      currentPrice: 0,
+                      buyNowPrice: 0,
+                      categoryId: '1',
+                      images: [],
+                      durationDays: 0,
+                      durationHours: 0,
+                      durationMinutes: 30,
+                      condition: 'new',
+                      featured: false,
+                      allowExtension: true,
+                      scheduled: false,
+                      scheduledDate: '',
+                      scheduledTime: ''
+                    });
+
+                    alert('✅ ¡Subasta creada exitosamente!\n\n📌 La subasta ya está activa y visible para los usuarios.');
+                    setActiveTab('auctions');
+                  }}
+                  className="btn btn-primary" 
+                  style={{ flex: 1, padding: '1.125rem', fontSize: '1.0625rem', fontWeight: 600 }}
+                >
+                  🎯 Crear Subasta
+                </button>
+                <button 
+                  onClick={() => {
+                    if (auctionForm.title || auctionForm.description || auctionForm.startPrice > 0) {
+                      if (window.confirm('¿Descartar los cambios y volver?')) {
+                        setAuctionForm({
+                          title: '',
+                          description: '',
+                          startPrice: 0,
+                          currentPrice: 0,
+                          buyNowPrice: 0,
+                          categoryId: '1',
+                          images: [],
+                          durationDays: 0,
+                          durationHours: 0,
+                          durationMinutes: 30,
+                          condition: 'new',
+                          featured: false,
+                          allowExtension: true,
+                          scheduled: false,
+                          scheduledDate: '',
+                          scheduledTime: ''
+                        });
+                        setActiveTab('auctions');
+                      }
+                    } else {
+                      setActiveTab('auctions');
+                    }
+                  }}
+                  className="btn btn-outline" 
+                  style={{ padding: '1.125rem', minWidth: '140px', fontSize: '1rem' }}
                 >
                   Cancelar
                 </button>
@@ -938,31 +1221,36 @@ const AdminPanelPro = () => {
         {/* AUCTIONS TAB */}
         {activeTab === 'auctions' && (
           <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <Gavel size={28} />
                 Gestión de Subastas
               </h3>
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>
-                  Activas: <strong style={{ color: 'var(--success)' }}>{activeAuctions}</strong> • 
-                  Finalizadas: <strong>{endedAuctions}</strong>
-                </span>
-                <button className="btn btn-primary" onClick={() => setActiveTab('create-auction')}>
-                  <Plus size={18} />
-                  Nueva Subasta
-                </button>
-              </div>
+              <button 
+                onClick={() => setActiveTab('create-auction')}
+                className="btn btn-primary"
+              >
+                <Plus size={18} />
+                Nueva Subasta
+              </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {auctions.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem' }}>
-                  <Gavel size={64} color="var(--text-secondary)" />
-                  <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>No hay subastas creadas aún</p>
-                </div>
-              ) : (
-                auctions.map(auction => (
+            {auctions.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem' }}>
+                <Gavel size={64} color="var(--text-secondary)" />
+                <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>No hay subastas creadas</p>
+                <button 
+                  onClick={() => setActiveTab('create-auction')}
+                  className="btn btn-primary"
+                  style={{ marginTop: '1rem' }}
+                >
+                  <Plus size={18} />
+                  Crear Primera Subasta
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                {auctions.map(auction => (
                   <div 
                     key={auction.id} 
                     style={{ 
@@ -971,58 +1259,174 @@ const AdminPanelPro = () => {
                       borderRadius: '0.75rem',
                       border: '1px solid var(--border)',
                       display: 'grid',
-                      gridTemplateColumns: '1fr auto',
-                      gap: '1rem',
+                      gridTemplateColumns: 'auto 1fr auto',
+                      gap: '1.5rem',
                       alignItems: 'center'
                     }}
                   >
-                    <div>
-                      <h4 style={{ margin: '0 0 0.5rem 0' }}>{auction.title}</h4>
-                      <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                        {auction.bids.length} ofertas • Finaliza: {new Date(auction.endTime).toLocaleDateString('es-AR')}
-                      </div>
-                      <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
-                        <div>
-                          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Precio Inicial</div>
-                          <div style={{ fontSize: '1.125rem', fontWeight: 600 }}>{formatCurrency(auction.startPrice)}</div>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Precio Actual</div>
-                          <div style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--primary)' }}>{formatCurrency(auction.currentPrice)}</div>
-                        </div>
+                    <img 
+                      src={auction.images[0]} 
+                      alt={auction.title}
+                      style={{ width: '80px', height: '80px', borderRadius: '0.5rem', objectFit: 'cover' }}
+                    />
+                    <div style={{ minWidth: 0 }}>
+                      <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '1.125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {auction.title}
+                      </h4>
+                      <p style={{ margin: '0 0 0.75rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {auction.description}
+                      </p>
+                      <div style={{ display: 'flex', gap: '1rem', fontSize: '0.875rem' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--success)' }}>
+                          {formatCurrency(auction.currentPrice)}
+                        </span>
+                        <span style={{ color: 'var(--text-secondary)' }}>
+                          Ofertas: {auction.bids.length}
+                        </span>
+                        <span className={`badge badge-${auction.status === 'active' ? 'success' : auction.status === 'ended' ? 'secondary' : 'warning'}`}>
+                          {auction.status === 'active' ? 'Activa' : auction.status === 'ended' ? 'Finalizada' : 'Programada'}
+                        </span>
+                        <span style={{ color: 'var(--text-secondary)' }}>
+                          Finaliza: {new Date(auction.endTime).toLocaleDateString('es-AR')}
+                        </span>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
-                      <span style={{ 
-                        padding: '0.5rem 1rem', 
-                        background: auction.status === 'active' ? 'var(--success)' : 'var(--error)',
-                        color: 'white',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem',
-                        fontWeight: 600
-                      }}>
-                        {auction.status === 'active' ? 'Activa' : 'Finalizada'}
-                      </span>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button 
-                          onClick={() => handleEditAuction(auction)}
-                          className="btn btn-outline"
-                          style={{ padding: '0.5rem 1rem' }}
-                        >
-                          <Edit size={16} />
-                          Editar
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteAuction(auction.id)}
-                          style={{ padding: '0.5rem 1rem', background: 'var(--error)', color: 'white', borderRadius: '0.5rem', border: 'none', cursor: 'pointer' }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button 
+                        onClick={() => handleEditAuction(auction)}
+                        className="btn btn-outline"
+                        style={{ padding: '0.5rem' }}
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteAuction(auction.id)}
+                        className="btn btn-outline"
+                        style={{ padding: '0.5rem', color: 'var(--error)' }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </div>
-                ))
-              )}
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* EDIT AUCTION TAB */}
+        {activeTab === 'edit-auction' && editingAuction && (
+          <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
+            <h3 style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <Edit size={28} />
+              Editar Subasta: {editingAuction.title}
+            </h3>
+            
+            <div style={{ display: 'grid', gap: '1.5rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                  Título de la Subasta *
+                </label>
+                <input 
+                  type="text" 
+                  value={auctionForm.title}
+                  onChange={(e) => setAuctionForm({...auctionForm, title: e.target.value})}
+                  style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                  Descripción *
+                </label>
+                <textarea 
+                  value={auctionForm.description}
+                  onChange={(e) => setAuctionForm({...auctionForm, description: e.target.value})}
+                  rows={5}
+                  style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem', resize: 'vertical' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                    Precio Inicial *
+                  </label>
+                  <input 
+                    type="number" 
+                    value={auctionForm.startPrice || ''}
+                    onChange={(e) => setAuctionForm({...auctionForm, startPrice: Number(e.target.value)})}
+                    style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                    min="0"
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                    Precio Actual *
+                  </label>
+                  <input 
+                    type="number" 
+                    value={auctionForm.currentPrice || ''}
+                    onChange={(e) => setAuctionForm({...auctionForm, currentPrice: Number(e.target.value)})}
+                    style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                    min="0"
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                    Precio Compra Ya (opcional)
+                  </label>
+                  <input 
+                    type="number" 
+                    value={auctionForm.buyNowPrice || ''}
+                    onChange={(e) => setAuctionForm({...auctionForm, buyNowPrice: Number(e.target.value)})}
+                    style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                    min="0"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                  Categoría *
+                </label>
+                <select 
+                  value={auctionForm.categoryId}
+                  onChange={(e) => setAuctionForm({...auctionForm, categoryId: e.target.value})}
+                  style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                >
+                  <option value="1">📱 Electrónica</option>
+                  <option value="2">👕 Moda</option>
+                  <option value="3">🏠 Hogar</option>
+                  <option value="4">⚽ Deportes</option>
+                  <option value="5">🧸 Juguetes</option>
+                  <option value="6">📚 Libros</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button 
+                  onClick={handleSaveAuction}
+                  className="btn btn-primary" 
+                  style={{ flex: 1, padding: '1.125rem', fontSize: '1.0625rem', fontWeight: 600 }}
+                >
+                  💾 Guardar Cambios
+                </button>
+                <button 
+                  onClick={() => {
+                    if (window.confirm('¿Descartar los cambios?')) {
+                      setEditingAuction(null);
+                      setActiveTab('auctions');
+                    }
+                  }}
+                  className="btn btn-outline" 
+                  style={{ padding: '1.125rem', minWidth: '140px', fontSize: '1rem' }}
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1030,113 +1434,149 @@ const AdminPanelPro = () => {
         {/* BOTS TAB */}
         {activeTab === 'bots' && (
           <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
-            <h3 style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <Bot size={28} />
-              Gestión de Bots
-            </h3>
-            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Bot size={28} />
+                Gestión de Bots de Subastas
+              </h3>
+              <button 
+                onClick={handleAddBot}
+                className="btn btn-primary"
+              >
+                <Plus size={18} />
+                Nuevo Bot
+              </button>
+            </div>
+
             {/* Formulario para crear bot */}
             <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem', marginBottom: '2rem' }}>
               <h4 style={{ marginBottom: '1rem' }}>Crear Nuevo Bot</h4>
-              <div style={{ display: 'grid', gap: '1rem' }}>
-                <input 
-                  type="text"
-                  placeholder="Nombre del bot"
-                  value={botForm.name}
-                  onChange={(e) => setBotForm({...botForm, name: e.target.value})}
-                  style={{ padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                />
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 600 }}>
+                    Nombre del Bot
+                  </label>
                   <input 
-                    type="number"
-                    placeholder="Saldo inicial"
-                    value={botForm.balance}
-                    onChange={(e) => setBotForm({...botForm, balance: Number(e.target.value)})}
-                    style={{ padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                  />
-                  <input 
-                    type="number"
-                    placeholder="Intervalo mín (seg)"
-                    value={botForm.intervalMin}
-                    onChange={(e) => setBotForm({...botForm, intervalMin: Number(e.target.value)})}
-                    style={{ padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                  />
-                  <input 
-                    type="number"
-                    placeholder="Intervalo máx (seg)"
-                    value={botForm.intervalMax}
-                    onChange={(e) => setBotForm({...botForm, intervalMax: Number(e.target.value)})}
-                    style={{ padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
-                  />
-                  <input 
-                    type="number"
-                    placeholder="Oferta máxima"
-                    value={botForm.maxBidAmount}
-                    onChange={(e) => setBotForm({...botForm, maxBidAmount: Number(e.target.value)})}
-                    style={{ padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
+                    type="text" 
+                    placeholder="Bot Argentina"
+                    value={botForm.name}
+                    onChange={(e) => setBotForm({...botForm, name: e.target.value})}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
                   />
                 </div>
-                <button 
-                  onClick={handleAddBot}
-                  className="btn btn-primary"
-                  style={{ padding: '0.875rem' }}
-                >
-                  <Plus size={18} />
-                  Crear Bot
-                </button>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 600 }}>
+                    Balance Inicial
+                  </label>
+                  <input 
+                    type="number" 
+                    value={botForm.balance}
+                    onChange={(e) => setBotForm({...botForm, balance: Number(e.target.value)})}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
+                    min="0"
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 600 }}>
+                    Oferta Máxima
+                  </label>
+                  <input 
+                    type="number" 
+                    value={botForm.maxBidAmount}
+                    onChange={(e) => setBotForm({...botForm, maxBidAmount: Number(e.target.value)})}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
+                    min="0"
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 600 }}>
+                    Intervalo Mínimo (seg)
+                  </label>
+                  <input 
+                    type="number" 
+                    value={botForm.intervalMin}
+                    onChange={(e) => setBotForm({...botForm, intervalMin: Number(e.target.value)})}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
+                    min="1"
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 600 }}>
+                    Intervalo Máximo (seg)
+                  </label>
+                  <input 
+                    type="number" 
+                    value={botForm.intervalMax}
+                    onChange={(e) => setBotForm({...botForm, intervalMax: Number(e.target.value)})}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
+                    min="1"
+                  />
+                </div>
               </div>
             </div>
 
             {/* Lista de bots */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {bots.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
-                  No hay bots creados
-                </div>
-              ) : (
-                bots.map(bot => (
+            {bots.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem' }}>
+                <Bot size={64} color="var(--text-secondary)" />
+                <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>No hay bots configurados</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                {bots.map(bot => (
                   <div 
-                    key={bot.id}
-                    style={{
-                      padding: '1.5rem',
-                      background: 'var(--bg-tertiary)',
+                    key={bot.id} 
+                    style={{ 
+                      padding: '1.5rem', 
+                      background: 'var(--bg-tertiary)', 
                       borderRadius: '0.75rem',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: '1rem'
+                      border: '1px solid var(--border)',
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto auto',
+                      gap: '1.5rem',
+                      alignItems: 'center'
                     }}
                   >
                     <div>
-                      <h4 style={{ margin: '0 0 0.5rem 0' }}>{bot.name}</h4>
-                      <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                        <span>Saldo: {formatCurrency(bot.balance)}</span>
+                      <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '1.125rem' }}>
+                        {bot.name}
+                        <span className={`badge ${bot.isActive ? 'badge-success' : 'badge-secondary'}`} style={{ marginLeft: '0.75rem' }}>
+                          {bot.isActive ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </h4>
+                      <div style={{ display: 'flex', gap: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                        <span>Balance: {formatCurrency(bot.balance)}</span>
+                        <span>•</span>
                         <span>Intervalo: {bot.intervalMin}-{bot.intervalMax}s</span>
-                        <span>Oferta máx: {formatCurrency(bot.maxBidAmount)}</span>
+                        <span>•</span>
+                        <span>Oferta Máx: {formatCurrency(bot.maxBidAmount)}</span>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button 
-                        onClick={() => updateBot(bot.id, { isActive: !bot.isActive })}
-                        className={`btn ${bot.isActive ? 'btn-success' : 'btn-outline'}`}
-                        style={{ padding: '0.5rem 1rem' }}
-                      >
-                        {bot.isActive ? 'Activo' : 'Inactivo'}
-                      </button>
-                      <button 
-                        onClick={() => deleteBot(bot.id)}
-                        style={{ padding: '0.5rem 1rem', background: 'var(--error)', color: 'white', borderRadius: '0.5rem', border: 'none', cursor: 'pointer' }}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
+                    <button 
+                      onClick={() => updateBot(bot.id, { isActive: !bot.isActive })}
+                      className={`btn ${bot.isActive ? 'btn-warning' : 'btn-success'}`}
+                    >
+                      {bot.isActive ? '⏸️ Pausar' : '▶️ Activar'}
+                    </button>
+                    <button 
+                      onClick={() => {
+                        if (window.confirm(`¿Eliminar el bot "${bot.name}"?`)) {
+                          deleteBot(bot.id);
+                        }
+                      }}
+                      className="btn btn-outline"
+                      style={{ color: 'var(--error)' }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
-
       </div>
     </div>
   );
