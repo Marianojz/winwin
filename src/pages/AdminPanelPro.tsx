@@ -1804,10 +1804,10 @@ useEffect(() => {
                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>
                   Total: <strong style={{ color: 'var(--primary)' }}>{products.length}</strong> productos
                 </span>
-                <button className="btn btn-primary" onClick={() => alert('Función de crear producto en desarrollo')}>
-                  <Plus size={18} />
-                  Nuevo Producto
-                </button>
+                <button className="btn btn-primary" onClick={() => setActiveTab('create-product')}>
+  <Plus size={18} />
+  Nuevo Producto
+</button>
               </div>
             </div>
 
