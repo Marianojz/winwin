@@ -103,18 +103,31 @@ export interface Bot {
 
 export type Theme = 'light' | 'dark';
 
-// ========== SISTEMA DE PEDIDOS (NUEVO) ==========
+// ========== SISTEMA DE PEDIDOS (ACTUALIZADO) ==========
 
 export type OrderStatus = 
   | 'pending_payment'      // Esperando pago (48hs para subastas)
+  | 'payment_expired'      // Expiró el plazo de pago
   | 'payment_confirmed'    // Pago confirmado
+  | 'processing'           // Procesando pedido (AGREGADO)
   | 'preparing'            // Preparando envío
+  | 'shipped'              // Enviado (AGREGADO)
   | 'in_transit'           // En camino
   | 'delivered'            // Entregado
   | 'cancelled'            // Cancelado
-  | 'expired';             // Expiró el plazo de pago
+  | 'expired';             // Expiró el plazo de pago (alternativo)
 
 export type ProductType = 'store' | 'auction';
+
+export type DeliveryMethod = 'shipping' | 'pickup' | 'email';
+
+export interface ShippingAddress {
+  street: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  country?: string;
+}
 
 export interface Order {
   id: string;
@@ -124,17 +137,20 @@ export interface Order {
   productName: string;
   productImage: string;
   productType: ProductType;
+  type: ProductType;              // Alias para compatibilidad
   amount: number;
   status: OrderStatus;
   paymentMethod?: string;
+  deliveryMethod: DeliveryMethod;  // AGREGADO
   createdAt: Date;
   paidAt?: Date;
   shippedAt?: Date;
   deliveredAt?: Date;
-  expiresAt?: Date;        // Para subastas: fecha límite de pago (48hs)
+  expiresAt?: Date;               // Para subastas: fecha límite de pago (48hs)
   trackingNumber?: string;
   notes?: string;
   address: Address;
+  shippingAddress?: ShippingAddress; // AGREGADO para compatibilidad con AdminPanel
 }
 
 export interface Report {
