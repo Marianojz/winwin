@@ -69,8 +69,8 @@ const AdminPanel = () => {
   const lowStockProducts = products.filter(p => p.stock < 5 && p.stock > 0);
   const outOfStockProducts = products.filter(p => p.stock === 0);
   const totalInventoryValue = products.reduce((sum, p) => sum + (p.price * p.stock), 0);
-  const avgBidsPerAuction = auctions.length > 0 ? (totalBids / auctions.length).toFixed(1) : 0;
-  const conversionRate = totalOrders > 0 ? ((totalOrders / activeUsers) * 100).toFixed(1) : 0;
+  const avgBidsPerAuction = auctions.length > 0 ? (totalBids / auctions.length).toFixed(1) : '0';
+  const conversionRate = totalOrders > 0 ? ((totalOrders / activeUsers) * 100).toFixed(1) : '0';
 
   // Funciones para Productos
   const handleEditProduct = (product: Product) => {
@@ -439,12 +439,11 @@ const AdminPanel = () => {
               </div>
             </div>
 
-{/* Los usuarios reales se cargan desde Firebase en AdminPanelPro.tsx */}
-<div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem', marginBottom: '1rem', textAlign: 'center' }}>
-  <p style={{ color: 'var(--text-secondary)' }}>
-    Los usuarios reales se gestionan en el Panel de Administración Pro
-  </p>
-</div>
+            {/* Los usuarios reales se cargan desde Firebase en AdminPanelPro.tsx */}
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem', marginBottom: '1rem', textAlign: 'center' }}>
+              <p style={{ color: 'var(--text-secondary)' }}>
+                Los usuarios reales se gestionan en el Panel de Administración Pro
+              </p>
             </div>
 
             <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
