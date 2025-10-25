@@ -13,7 +13,7 @@ import { formatCurrency } from '../utils/helpers';
 import { Product, Auction, Order, OrderStatus } from '../types';
 import ImageUploader from '../components/ImageUploader';
 
-const AdminPanelPro = () => {
+const AdminPanel = () => {
   const { 
     user, auctions, products, bots, orders,
     addBot, updateBot, deleteBot, setProducts, setAuctions, updateOrderStatus 
@@ -274,7 +274,7 @@ const AdminPanelPro = () => {
         <div style={{ marginBottom: '2rem' }}>
           <h1 style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <BarChart3 size={36} />
-            Panel de Administración Pro
+            Panel de Administración
           </h1>
           <p style={{ color: 'var(--text-secondary)' }}>
             Gestión completa de la plataforma
@@ -1582,4 +1582,4 @@ const AdminPanelPro = () => {
   );
 };
 
-export default AdminPanelPro;
+export default AdminPanel;
