@@ -25,7 +25,7 @@ interface UserData {
 interface UserDetailsModalProps {
   user: UserData;
   onClose: () => void;
-  onUpdate: () => void;
+  onUpdate?: () => void;  // ← AHORA ES OPCIONAL
 }
 
 const UserDetailsModal = ({ user, onClose, onUpdate }: UserDetailsModalProps) => {
