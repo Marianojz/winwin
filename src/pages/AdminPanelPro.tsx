@@ -1102,10 +1102,9 @@ const AdminPanel = () => {
                   Imágenes del Producto
                 </label>
                 <ImageUploader 
-                  images={auctionForm.images}
-                  onImagesChange={(images) => setAuctionForm({...auctionForm, images})}
-                  maxImages={8}
-                />
+  images={productForm.images}
+  onImagesChange={(images: string[]) => setProductForm({...productForm, images})}
+/>
               </div>
 
               {/* Botones */}
