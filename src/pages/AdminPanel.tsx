@@ -409,6 +409,14 @@ const AdminPanel = () => {
     setEditingAuction(null);
     setActiveTab('auctions');
   };
+  const handleDeleteAuction = (auctionId: string) => {
+    const auction = auctions.find(a => a.id === auctionId);
+    if (window.confirm(`¿Estás seguro de eliminar "${auction?.title}"?\n\nSe perderán todas las ofertas asociadas.`)) {
+      const updatedAuctions = auctions.filter(a => a.id !== auctionId);
+      setAuctions(updatedAuctions);
+      alert('🗑️ Subasta eliminada correctamente');
+    }
+  };
 
   // Funciones para Bots
   const handleAddBot = () => {
@@ -2535,6 +2543,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
