@@ -18,7 +18,159 @@ const AdminPanel = () => {
     user, auctions, products, bots, orders,
     addBot, updateBot, deleteBot, setProducts, setAuctions, updateOrderStatus 
   } = useStore();
+  // ============================================
+  // FUNCIONES PARA CREAR SUBASTA
+  // ============================================
   
+  // Función para validar el formulario de subasta
+  const validateAuctionForm = (form: any): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+
+    // Validar título
+    if (!form.title || form.title.trim().length < 5) {
+      errors.push('El título debe tener al menos 5 caracteres');
+    }
+    if (form.title && form.title.length > 100) {
+      errors.push('El título no puede superar los 100 caracteres');
+    }
+
+    // Validar descripción
+    if (!form.description || form.description.trim().length < 20) {
+      errors.push('La descripción debe tener al menos 20 caracteres');
+    }
+    if (form.description && form.description.length > 2000) {
+      errors.push('La descripción no puede superar los 2000 caracteres');
+    }
+
+    // Validar precio inicial
+    if (!form.startPrice || form.startPrice <= 0) {
+      errors.push('El precio inicial debe ser mayor a $0');
+    }
+    if (form.startPrice && form.startPrice < 100) {
+      errors.push('El precio inicial mínimo es $100');
+    }
+
+    // Validar precio de Compra Ya (si está activado)
+    if (form.buyNowPrice && form.buyNowPrice > 0) {
+      if (form.buyNowPrice <= form.startPrice) {
+        errors.push('El precio de "Compra Ya" debe ser mayor al precio inicial');
+      }
+    }
+
+    // Validar imágenes
+    if (!form.images || form.images.length === 0) {
+      errors.push('Debes agregar al menos 1 imagen');
+    }
+    if (form.images && form.images.length > 3) {
+      errors.push('Máximo 3 imágenes permitidas');
+    }
+
+    // Validar duración
+    const totalMinutes = (form.durationDays * 24 * 60) + (form.durationHours * 60) + form.durationMinutes;
+    if (totalMinutes < 5) {
+      errors.push('La duración mínima es de 5 minutos');
+    }
+    if (totalMinutes > 10080) { // 7 días
+      errors.push('La duración máxima es de 7 días');
+    }
+
+    // Validar fecha programada (si está activada)
+    if (form.scheduled) {
+      if (!form.scheduledDate || !form.scheduledTime) {
+        errors.push('Debes seleccionar fecha y hora para programar la subasta');
+      } else {
+        const scheduledDateTime = new Date(`${form.scheduledDate}T${form.scheduledTime}`);
+        if (scheduledDateTime <= new Date()) {
+          errors.push('La fecha programada debe ser futura');
+        }
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  };
+
+  // Función para crear subasta en Firebase
+  const handleCreateAuction = async () => {
+    // Validar formulario
+    const validation = validateAuctionForm(auctionForm);
+    if (!validation.valid) {
+      alert(`Errores en el formulario:\n\n${validation.errors.join('\n')}`);
+      return;
+    }
+
+    try {
+      // Calcular fecha de finalización
+      const now = new Date();
+      let startTime = now;
+
+      // Si está programada, usar la fecha programada
+      if (auctionForm.scheduled && auctionForm.scheduledDate && auctionForm.scheduledTime) {
+        startTime = new Date(`${auctionForm.scheduledDate}T${auctionForm.scheduledTime}`);
+      }
+
+      // Calcular end time basado en duración
+      const totalMinutes = (auctionForm.durationDays * 24 * 60) + (auctionForm.durationHours * 60) + auctionForm.durationMinutes;
+      const endTime = new Date(startTime.getTime() + totalMinutes * 60000);
+
+      // Crear objeto de subasta
+      const newAuction = {
+        title: auctionForm.title.trim(),
+        description: auctionForm.description.trim(),
+        images: auctionForm.images,
+        startPrice: Number(auctionForm.startPrice),
+        currentPrice: Number(auctionForm.startPrice),
+        buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
+        endTime: endTime,
+        status: auctionForm.scheduled ? 'scheduled' as any : 'active',
+        categoryId: auctionForm.categoryId,
+        bids: [],
+        featured: auctionForm.featured || false,
+        isFlash: totalMinutes <= 60, // Si dura 1 hora o menos, es flash
+        condition: auctionForm.condition || 'new',
+        id: `auction_${Date.now()}` // ID temporal
+      };
+
+      // Actualizar estado local
+      setAuctions([...auctions, newAuction]);
+
+      // Mensaje de éxito
+      const successMessage = auctionForm.scheduled 
+        ? `✅ Subasta programada correctamente para ${startTime.toLocaleDateString()} ${startTime.toLocaleTimeString()}`
+        : '✅ Subasta creada correctamente';
+      
+      alert(successMessage);
+
+      // Resetear formulario
+      setAuctionForm({
+        title: '',
+        description: '',
+        startPrice: 1000,
+        currentPrice: 0,
+        buyNowPrice: 0,
+        categoryId: '1',
+        images: [] as string[],
+        durationDays: 0,
+        durationHours: 0,
+        durationMinutes: 30,
+        condition: 'new' as 'new' | 'like-new' | 'excellent' | 'good' | 'fair',
+        featured: false,
+        allowExtension: true,
+        scheduled: false,
+        scheduledDate: '',
+        scheduledTime: ''
+      });
+
+      // Volver a la lista de subastas
+      setActiveTab('auctions');
+
+    } catch (error: any) {
+      console.error('❌ Error creando subasta:', error);
+      alert(`❌ Error al crear subasta: ${error.message}`);
+    }
+  };
   const [activeTab, setActiveTab] = useState('dashboard');
   const [realUsers, setRealUsers] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -1614,4 +1766,5 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
