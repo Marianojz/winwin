@@ -179,12 +179,16 @@ const AdminPanel = () => {
   // Estados para productos
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productForm, setProductForm] = useState({
-    name: '',
-    description: '',
-    price: 0,
-    stock: 0,
-    categoryId: '1'
-  });
+  name: '',
+  description: '',
+  price: 0,
+  stock: 0,
+  categoryId: '1',
+  images: [] as string[],
+  badges: [] as string[],
+  active: true,
+  featured: false
+});
 
   // Estados para subastas
   const [editingAuction, setEditingAuction] = useState<Auction | null>(null);
@@ -2543,6 +2547,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
