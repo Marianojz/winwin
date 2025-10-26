@@ -52,7 +52,7 @@ const UserDetailsModal = ({ user, onClose, onUpdate }: UserDetailsModalProps) =>
       });
       alert('✅ Usuario actualizado correctamente');
       setIsEditing(false);
-      onUpdate();
+      onUpdate?.();
     } catch (error) {
       console.error('Error al actualizar usuario:', error);
       alert('❌ Error al actualizar usuario');
@@ -75,7 +75,7 @@ const UserDetailsModal = ({ user, onClose, onUpdate }: UserDetailsModalProps) =>
           active: newStatus
         });
         alert(newStatus ? '✅ Usuario activado' : '⚠️ Usuario suspendido');
-        onUpdate();
+        onUpdate?.();
       } catch (error) {
         console.error('Error al cambiar estado:', error);
         alert('❌ Error al cambiar estado del usuario');
@@ -100,7 +100,7 @@ const UserDetailsModal = ({ user, onClose, onUpdate }: UserDetailsModalProps) =>
           isAdmin: newRole === 'admin'
         });
         alert('✅ Rol actualizado correctamente');
-        onUpdate();
+        onUpdate?.();
       } catch (error) {
         console.error('Error al cambiar rol:', error);
         alert('❌ Error al cambiar rol');
@@ -134,7 +134,7 @@ const UserDetailsModal = ({ user, onClose, onUpdate }: UserDetailsModalProps) =>
         try {
           await deleteDoc(doc(db, 'users', user.id));
           alert('🗑️ Usuario eliminado correctamente');
-          onUpdate();
+          onUpdate?.();
           onClose();
         } catch (error) {
           console.error('Error al eliminar usuario:', error);
