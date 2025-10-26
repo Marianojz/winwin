@@ -312,6 +312,22 @@ const AdminPanel = () => {
   });
   setActiveTab('edit-product');
 };
+  const handleCreateProduct = () => {
+  // Resetear formulario
+  setProductForm({
+    name: '',
+    description: '',
+    price: 0,
+    stock: 0,
+    categoryId: '1',
+    images: [] as string[],
+    badges: [] as string[],
+    active: true,
+    featured: false
+  });
+  setEditingProduct(null);
+  setActiveTab('create-product');
+};
 
   const handleSaveProduct = () => {
     if (editingProduct) {
@@ -2551,6 +2567,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
