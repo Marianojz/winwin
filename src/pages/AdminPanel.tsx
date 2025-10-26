@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { 
   Eye, Edit, Trash2, Users, Award, Clock, AlertCircle, Activity, RefreshCw,
-  Gavel, Package, Bot, TrendingUp, DollarSign, Plus, CheckCircle, XCircle, 
-  Truck, FileText, Download, Search, Filter, Calendar, ShoppingBag, Timer, 
+  Gavel, Package, Bot, DollarSign, Plus, XCircle, 
+  Search, Filter, ShoppingBag, Timer, 
   AlertTriangle, MapPin, BarChart3
 } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
@@ -1607,5 +1607,6 @@ const AdminPanel = () => {
     </div>
   );
 };
+
 
 export default AdminPanel;
