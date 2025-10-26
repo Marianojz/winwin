@@ -298,16 +298,20 @@ const AdminPanel = () => {
 
   // Funciones para Productos
   const handleEditProduct = (product: Product) => {
-    setEditingProduct(product);
-    setProductForm({
-      name: product.name,
-      description: product.description,
-      price: product.price,
-      stock: product.stock,
-      categoryId: product.categoryId
-    });
-    setActiveTab('edit-product');
-  };
+  setEditingProduct(product);
+  setProductForm({
+    name: product.name,
+    description: product.description,
+    price: product.price,
+    stock: product.stock,
+    categoryId: product.categoryId,
+    images: product.images || [],
+    badges: product.badges || [],
+    active: product.active !== undefined ? product.active : true,
+    featured: product.featured || false
+  });
+  setActiveTab('edit-product');
+};
 
   const handleSaveProduct = () => {
     if (editingProduct) {
@@ -2547,6 +2551,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
