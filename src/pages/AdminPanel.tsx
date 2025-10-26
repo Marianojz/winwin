@@ -328,6 +328,48 @@ const AdminPanel = () => {
   setEditingProduct(null);
   setActiveTab('create-product');
 };
+  const validateProductForm = (): { valid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  // Validar nombre
+  if (!productForm.name || productForm.name.trim().length < 5) {
+    errors.push('El nombre debe tener al menos 5 caracteres');
+  }
+  if (productForm.name && productForm.name.length > 100) {
+    errors.push('El nombre no puede superar los 100 caracteres');
+  }
+
+  // Validar descripción
+  if (!productForm.description || productForm.description.trim().length < 20) {
+    errors.push('La descripción debe tener al menos 20 caracteres');
+  }
+  if (productForm.description && productForm.description.length > 2000) {
+    errors.push('La descripción no puede superar los 2000 caracteres');
+  }
+
+  // Validar precio
+  if (!productForm.price || productForm.price < 100) {
+    errors.push('El precio mínimo es $100');
+  }
+
+  // Validar stock
+  if (productForm.stock < 0) {
+    errors.push('El stock no puede ser negativo');
+  }
+
+  // Validar imágenes
+  if (productForm.images.length === 0) {
+    errors.push('Debes agregar al menos 1 imagen del producto');
+  }
+  if (productForm.images.length > 5) {
+    errors.push('Máximo 5 imágenes por producto');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+};
 
   const handleSaveProduct = () => {
     if (editingProduct) {
@@ -2567,6 +2609,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
