@@ -328,9 +328,19 @@ const AdminPanel = () => {
     }
   };
 
-  // Funciones para Subastas
   const handleEditAuction = (auction: Auction) => {
     setEditingAuction(auction);
+    
+    // Calcular duración restante desde el endTime
+    const now = new Date();
+    const endTime = new Date(auction.endTime);
+    const remainingMs = endTime.getTime() - now.getTime();
+    const remainingMinutes = Math.floor(remainingMs / (1000 * 60));
+    
+    const durationDays = Math.floor(remainingMinutes / (24 * 60));
+    const durationHours = Math.floor((remainingMinutes % (24 * 60)) / 60);
+    const durationMinutes = remainingMinutes % 60;
+    
     setAuctionForm({
       title: auction.title,
       description: auction.description,
@@ -339,9 +349,9 @@ const AdminPanel = () => {
       buyNowPrice: auction.buyNowPrice || 0,
       categoryId: auction.categoryId,
       images: auction.images || [],
-      durationDays: 0,
-      durationHours: 0,
-      durationMinutes: 30,
+      durationDays: durationDays > 0 ? durationDays : 0,
+      durationHours: durationHours > 0 ? durationHours : 0,
+      durationMinutes: durationMinutes > 0 ? durationMinutes : 30,
       condition: auction.condition || 'new',
       featured: auction.featured || false,
       allowExtension: true,
@@ -2227,6 +2237,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
