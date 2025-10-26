@@ -274,16 +274,20 @@ const AdminPanel = () => {
   });
 
   const getStatusBadge = (status: OrderStatus) => {
-    const badges = {
-      pending_payment: { className: 'badge-warning', text: '⏳ Pago Pendiente' },
-      payment_expired: { className: 'badge-error', text: '❌ Expirado' },
-      processing: { className: 'badge-info', text: '🔄 Procesando' },
-      shipped: { className: 'badge-primary', text: '📦 Enviado' },
-      delivered: { className: 'badge-success', text: '✅ Entregado' },
-      cancelled: { className: 'badge-secondary', text: '🚫 Cancelado' }
-    };
-    return badges[status];
+  const badges = {
+    pending_payment: { className: 'badge-warning', text: '⏳ Pago Pendiente' },
+    payment_expired: { className: 'badge-error', text: '❌ Expirado' },
+    payment_confirmed: { className: 'badge-success', text: '✅ Pago Confirmado' },
+    processing: { className: 'badge-info', text: '🔄 Procesando' },
+    preparing: { className: 'badge-info', text: '📦 Preparando' },
+    shipped: { className: 'badge-primary', text: '🚢 Enviado' },
+    in_transit: { className: 'badge-primary', text: '🚚 En Tránsito' },
+    delivered: { className: 'badge-success', text: '✅ Entregado' },
+    cancelled: { className: 'badge-secondary', text: '🚫 Cancelado' },
+    expired: { className: 'badge-error', text: '⌛ Expirado' }
   };
+  return badges[status] || { className: 'badge-secondary', text: '❓ Desconocido' };
+};
 
   const getDeliveryMethodBadge = (method: string) => {
     const badges = {
@@ -1610,3 +1614,4 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
