@@ -363,36 +363,51 @@ const AdminPanel = () => {
   };
 
   const handleSaveAuction = () => {
-    if (editingAuction) {
-      const updatedAuctions = auctions.map(a => 
-        a.id === editingAuction.id 
-          ? { 
-              ...a, 
-              title: auctionForm.title,
-              description: auctionForm.description,
-              startPrice: auctionForm.startPrice,
-              currentPrice: auctionForm.currentPrice,
-              buyNowPrice: auctionForm.buyNowPrice || undefined,
-              categoryId: auctionForm.categoryId,
-              images: auctionForm.images,
-              condition: auctionForm.condition
-            }
-          : a
-      );
-      setAuctions(updatedAuctions);
-      alert('✅ Subasta actualizada correctamente');
-      setEditingAuction(null);
-      setActiveTab('auctions');
-    }
-  };
+    if (!editingAuction) return;
 
-  const handleDeleteAuction = (auctionId: string) => {
-    const auction = auctions.find(a => a.id === auctionId);
-    if (window.confirm(`¿Estás seguro de eliminar "${auction?.title}"?\n\nSe perderán todas las ofertas asociadas.`)) {
-      const updatedAuctions = auctions.filter(a => a.id !== auctionId);
-      setAuctions(updatedAuctions);
-      alert('🗑️ Subasta eliminada correctamente');
+    // Validar formulario (reutilizamos la misma validación de crear)
+    const validation = validateAuctionForm(auctionForm);
+    if (!validation.valid) {
+      alert(`Errores en el formulario:\n\n${validation.errors.join('\n')}`);
+      return;
     }
+
+    // Advertencia si se modifica precio inicial y ya hay ofertas
+    if (editingAuction.bids.length > 0 && auctionForm.startPrice !== editingAuction.startPrice) {
+      if (!window.confirm('⚠️ ADVERTENCIA: Esta subasta ya tiene ofertas.\n\n¿Estás seguro de cambiar el precio inicial?\n\nEsto puede afectar la validez de las ofertas existentes.')) {
+        return;
+      }
+    }
+
+    // Calcular nueva fecha de finalización basada en duración
+    const totalMinutes = (auctionForm.durationDays * 24 * 60) + (auctionForm.durationHours * 60) + auctionForm.durationMinutes;
+    const now = new Date();
+    const newEndTime = new Date(now.getTime() + totalMinutes * 60000);
+
+    // Actualizar subasta
+    const updatedAuctions = auctions.map(a => 
+      a.id === editingAuction.id 
+        ? { 
+            ...a, 
+            title: auctionForm.title.trim(),
+            description: auctionForm.description.trim(),
+            startPrice: Number(auctionForm.startPrice),
+            currentPrice: Math.max(Number(auctionForm.currentPrice), Number(auctionForm.startPrice)),
+            buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
+            categoryId: auctionForm.categoryId,
+            images: auctionForm.images,
+            condition: auctionForm.condition,
+            featured: auctionForm.featured,
+            endTime: newEndTime,
+            isFlash: totalMinutes <= 60
+          }
+        : a
+    );
+    
+    setAuctions(updatedAuctions);
+    alert('✅ Subasta actualizada correctamente');
+    setEditingAuction(null);
+    setActiveTab('auctions');
   };
 
   // Funciones para Bots
@@ -2237,6 +2252,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
