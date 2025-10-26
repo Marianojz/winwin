@@ -1,6 +1,4 @@
-import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { useStore } from './store/useStore';
 import Terminos from './pages/Terminos';
 import Preguntas from './pages/Preguntas';
 import Navbar from './components/Navbar';
@@ -16,13 +14,10 @@ import Cleanup from './pages/Cleanup';
 import Carrito from './pages/Carrito';
 import Notificaciones from './pages/Notificaciones';
 import Perfil from './pages/Perfil';
-import AdminPanelPro from './pages/AdminPanelPro';
+import AdminPanel from './pages/AdminPanel';
 import CompletarPerfil from './pages/CompletarPerfil';
 
 function App() {
-  const { setAuctions, setProducts, setUser, theme } = useStore();
-
-
   return (
     <Router>
       <div className="app">
@@ -43,7 +38,7 @@ function App() {
             <Route path="/perfil" element={<Perfil />} />
             <Route path="/terminos" element={<Terminos />} />
             <Route path="/preguntas" element={<Preguntas />} />
-            <Route path="/admin" element={<AdminPanelPro />} />
+            <Route path="/admin" element={<AdminPanel />} />
             <Route path="/completar-perfil" element={<CompletarPerfil />} />
           </Routes>
         </main>
