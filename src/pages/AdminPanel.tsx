@@ -371,19 +371,73 @@ const AdminPanel = () => {
   };
 };
 
-  const handleSaveProduct = () => {
+  const handleSaveProduct = async () => {
+  // Validar formulario
+  const validation = validateProductForm();
+  if (!validation.valid) {
+    alert(`❌ Errores en el formulario:\n\n${validation.errors.join('\n')}`);
+    return;
+  }
+
+  try {
     if (editingProduct) {
-      const updatedProducts = products.map(p => 
-        p.id === editingProduct.id 
-          ? { ...p, ...productForm }
-          : p
+      // EDITAR PRODUCTO EXISTENTE
+      const updatedProduct = {
+        ...editingProduct,
+        ...productForm,
+        updatedAt: new Date().toISOString()
+      };
+
+      const updatedProducts = products.map(p =>
+        p.id === editingProduct.id ? updatedProduct : p
       );
       setProducts(updatedProducts);
+
+      // TODO: Guardar en Firebase cuando esté configurado
+      // await updateDoc(doc(db, 'products', editingProduct.id), updatedProduct);
+
       alert('✅ Producto actualizado correctamente');
       setEditingProduct(null);
       setActiveTab('products');
+
+    } else {
+      // CREAR PRODUCTO NUEVO
+      const newProduct = {
+        ...productForm,
+        id: `product_${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        ratings: [],
+        averageRating: 0
+      };
+
+      setProducts([...products, newProduct as Product]);
+
+      // TODO: Guardar en Firebase cuando esté configurado
+      // await addDoc(collection(db, 'products'), newProduct);
+
+      alert('✅ Producto creado correctamente');
+      
+      // Resetear formulario
+      setProductForm({
+        name: '',
+        description: '',
+        price: 0,
+        stock: 0,
+        categoryId: '1',
+        images: [] as string[],
+        badges: [] as string[],
+        active: true,
+        featured: false
+      });
+
+      setActiveTab('products');
     }
-  };
+  } catch (error: any) {
+    console.error('❌ Error guardando producto:', error);
+    alert(`❌ Error al guardar producto: ${error.message}`);
+  }
+};
 
   const handleDeleteProduct = (productId: string) => {
     const product = products.find(p => p.id === productId);
@@ -2609,6 +2663,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
