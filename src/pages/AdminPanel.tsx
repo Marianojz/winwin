@@ -8,7 +8,7 @@ import { db } from '../config/firebase';
 import UserDetailsModal from '../components/UserDetailsModal';
 import StatsCard from '../components/StatsCard';
 import { useStore } from '../store/useStore';
-import { formatCurrency } from '../utils/helpers';
+import { formatCurrency, formatTimeAgo } from '../utils/helpers';
 import { Product, Auction, Order, OrderStatus } from '../types';
 import ImageUploader from '../components/ImageUploader';
 
