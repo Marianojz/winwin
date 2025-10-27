@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { 
-  Eye, Edit, Trash2, Users, Award, Clock, AlertCircle, Activity, RefreshCw,
+  Eye, Edit, Trash2, Users, Clock, AlertCircle, Activity, RefreshCw,
   Gavel, Package, Bot, DollarSign, Plus, XCircle,
   TrendingUp, ShoppingCart, Bell, AlertTriangle,
   Search, Filter, ShoppingBag, MapPin, BarChart3
