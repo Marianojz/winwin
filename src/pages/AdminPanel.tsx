@@ -1319,6 +1319,286 @@ const AdminPanel = () => {
   </div>
 )}
 
+        {/* CREATE PRODUCT TAB */}
+{activeTab === 'create-product' && (
+  <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
+    <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <Plus size={24} color="var(--success)" />
+      Crear Nuevo Producto
+    </h3>
+
+    <div style={{ display: 'grid', gap: '2rem' }}>
+      
+      {/* SECCIÓN 1: INFORMACIÓN BÁSICA */}
+      <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
+        <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem' }}>
+          📝 Información Básica
+        </h4>
+
+        <div style={{ display: 'grid', gap: '1.5rem' }}>
+          {/* Nombre del producto */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+              Nombre del Producto *
+            </label>
+            <input 
+              type="text" 
+              value={productForm.name}
+              onChange={(e) => setProductForm({...productForm, name: e.target.value})}
+              placeholder="Ej: iPhone 15 Pro Max 256GB"
+              maxLength={100}
+              style={{ 
+                width: '100%', 
+                padding: '0.875rem', 
+                borderRadius: '0.5rem',
+                fontSize: '1rem',
+                border: '2px solid var(--border)'
+              }}
+            />
+            <small style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
+              {productForm.name.length}/100 caracteres
+            </small>
+          </div>
+
+          {/* Descripción */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+              Descripción Detallada *
+            </label>
+            <textarea 
+              value={productForm.description}
+              onChange={(e) => setProductForm({...productForm, description: e.target.value})}
+              placeholder="Describe tu producto en detalle: características, especificaciones, estado, etc."
+              maxLength={2000}
+              style={{ 
+                width: '100%', 
+                padding: '0.875rem', 
+                borderRadius: '0.5rem', 
+                minHeight: '150px',
+                fontSize: '1rem',
+                border: '2px solid var(--border)',
+                resize: 'vertical'
+              }}
+            />
+            <small style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
+              {productForm.description.length}/2000 caracteres
+            </small>
+          </div>
+
+          {/* Categoría */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+              Categoría *
+            </label>
+            <select 
+              value={productForm.categoryId}
+              onChange={(e) => setProductForm({...productForm, categoryId: e.target.value})}
+              style={{ 
+                width: '100%', 
+                padding: '0.875rem', 
+                borderRadius: '0.5rem',
+                fontSize: '1rem',
+                border: '2px solid var(--border)'
+              }}
+            >
+              <option value="1">📱 Electrónica</option>
+              <option value="2">👕 Moda</option>
+              <option value="3">🏠 Hogar</option>
+              <option value="4">🎮 Juegos</option>
+              <option value="5">📚 Libros</option>
+              <option value="6">🎨 Arte</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* SECCIÓN 2: IMÁGENES */}
+      <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
+        <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem' }}>
+          📸 Imágenes del Producto (Máximo 5)
+        </h4>
+        <ImageUploader
+          images={productForm.images}
+          onImagesChange={(images) => setProductForm({...productForm, images})}
+          maxImages={5}
+        />
+      </div>
+
+      {/* SECCIÓN 3: PRECIOS Y STOCK */}
+      <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
+        <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem' }}>
+          💰 Precio y Stock
+        </h4>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          {/* Precio */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+              Precio de Venta *
+            </label>
+            <div style={{ position: 'relative' }}>
+              <span style={{ 
+                position: 'absolute', 
+                left: '1rem', 
+                top: '50%', 
+                transform: 'translateY(-50%)',
+                fontWeight: 600,
+                color: 'var(--text-secondary)'
+              }}>
+                $
+              </span>
+              <input 
+                type="number" 
+                value={productForm.price || ''}
+                onChange={(e) => setProductForm({...productForm, price: Number(e.target.value)})}
+                placeholder="0"
+                min="100"
+                step="100"
+                style={{ 
+                  width: '100%', 
+                  padding: '0.875rem 0.875rem 0.875rem 2rem', 
+                  borderRadius: '0.5rem',
+                  fontSize: '1.125rem',
+                  fontWeight: 600,
+                  border: '2px solid var(--border)'
+                }}
+              />
+            </div>
+            <small style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
+              Mínimo: $100
+            </small>
+          </div>
+
+          {/* Stock */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+              Stock Disponible *
+            </label>
+            <input 
+              type="number" 
+              value={productForm.stock || ''}
+              onChange={(e) => setProductForm({...productForm, stock: Number(e.target.value)})}
+              placeholder="0"
+              min="0"
+              style={{ 
+                width: '100%', 
+                padding: '0.875rem', 
+                borderRadius: '0.5rem',
+                fontSize: '1.125rem',
+                fontWeight: 600,
+                border: '2px solid var(--border)'
+              }}
+            />
+            <small style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
+              Cantidad de unidades disponibles
+            </small>
+          </div>
+        </div>
+      </div>
+
+      {/* SECCIÓN 4: BADGES Y OPCIONES */}
+      <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
+        <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem' }}>
+          ⭐ Badges y Opciones Especiales
+        </h4>
+
+        <div style={{ display: 'grid', gap: '1.5rem' }}>
+          {/* Badges predefinidos */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '1rem', fontWeight: 600 }}>
+              Badges del Producto (opcional)
+            </label>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {['Nuevo', 'Oferta', '50% OFF', 'Destacado', 'Envío Gratis', 'Hot Sale'].map((badge) => (
+                <button
+                  key={badge}
+                  type="button"
+                  onClick={() => {
+                    const badges = productForm.badges.includes(badge)
+                      ? productForm.badges.filter(b => b !== badge)
+                      : [...productForm.badges, badge];
+                    setProductForm({...productForm, badges});
+                  }}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    borderRadius: '2rem',
+                    border: '2px solid',
+                    borderColor: productForm.badges.includes(badge) ? 'var(--primary)' : 'var(--border)',
+                    background: productForm.badges.includes(badge) ? 'var(--primary)' : 'transparent',
+                    color: productForm.badges.includes(badge) ? 'white' : 'var(--text-primary)',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {badge}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Opciones de visibilidad */}
+          <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={productForm.active}
+                onChange={(e) => setProductForm({...productForm, active: e.target.checked})}
+                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+              />
+              <span style={{ fontWeight: 600 }}>Producto Activo (visible en la tienda)</span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={productForm.featured}
+                onChange={(e) => setProductForm({...productForm, featured: e.target.checked})}
+                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+              />
+              <span style={{ fontWeight: 600 }}>Producto Destacado (aparece primero)</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* BOTONES DE ACCIÓN */}
+      <div style={{ display: 'flex', gap: '1rem', paddingTop: '1rem' }}>
+        <button 
+          onClick={handleSaveProduct}
+          className="btn btn-primary" 
+          style={{ flex: 1, padding: '1rem', fontSize: '1.0625rem', fontWeight: 600 }}
+        >
+          <Plus size={20} />
+          Crear Producto
+        </button>
+        <button 
+          onClick={() => {
+            if (window.confirm('¿Descartar cambios y volver?')) {
+              setProductForm({
+                name: '',
+                description: '',
+                price: 0,
+                stock: 0,
+                categoryId: '1',
+                images: [] as string[],
+                badges: [] as string[],
+                active: true,
+                featured: false
+              });
+              setActiveTab('products');
+            }
+          }}
+          className="btn btn-outline"
+          style={{ padding: '1rem', minWidth: '150px' }}
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+)}
         {/* EDIT PRODUCT TAB */}
 {activeTab === 'edit-product' && editingProduct && (
   <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
@@ -3126,6 +3406,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
