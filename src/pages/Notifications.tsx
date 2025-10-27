@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Bell, Check, Trash2, AlertCircle, Gavel, ShoppingCart, Clock, CheckCircle } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { formatCurrency, formatTimeAgo } from '../utils/helpers';
+import { formatTimeAgo } from '../utils/helpers';
 import { useNavigate } from 'react-router-dom';
 
 const Notifications = () => {
