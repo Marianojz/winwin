@@ -655,9 +655,15 @@ const AdminPanel = () => {
             const Icon = tab.icon;
             return (
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
+  key={tab.id}
+  onClick={() => {
+    if (tab.id === 'create-product') {
+      handleCreateProduct();
+    } else {
+      setActiveTab(tab.id);
+    }
+  }}
+  style={{
                   padding: '0.875rem 1.5rem',
                   background: activeTab === tab.id ? 'var(--primary)' : 'transparent',
                   color: activeTab === tab.id ? 'white' : 'var(--text-primary)',
@@ -3406,6 +3412,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
