@@ -374,7 +374,6 @@ const AuctionDetail = () => {
                     </div>
                   )}
                 </div>
-              )}
             </div>
 
             {/* SOLO mostrar controles de oferta si la subasta está ACTIVA */}
