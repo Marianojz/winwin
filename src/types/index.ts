@@ -56,6 +56,11 @@ export interface Product {
   categoryId: string;
   ratings: Rating[];
   averageRating: number;
+  badges?: string[];
+  active?: boolean;
+  featured?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Rating {
