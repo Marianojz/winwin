@@ -230,6 +230,7 @@ const AdminPanel = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<OrderStatus | 'all'>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  
   // ============================================
   // FUNCIONES PARA ESTADÍSTICAS DEL DASHBOARD
   // ============================================
@@ -3631,6 +3632,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
