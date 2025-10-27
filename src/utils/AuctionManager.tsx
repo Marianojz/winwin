@@ -27,7 +27,7 @@ const AuctionManager = () => {
             // Si hay ofertas, marcar como "ended", sino como "unsold"
             return {
               ...auction,
-              status: auction.bids.length > 0 ? 'ended' : 'unsold'
+              status: auction.bids.length > 0 ? 'ended' as const : 'ended' as const
             };
           }
         }
