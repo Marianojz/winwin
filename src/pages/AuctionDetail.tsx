@@ -374,7 +374,6 @@ const AuctionDetail = () => {
             </div>
 
             {/* SOLO mostrar controles de oferta si la subasta está ACTIVA */}
-                        {/* SOLO mostrar controles de oferta si la subasta está ACTIVA - VERIFICACIÓN MÚLTIPLE */}
             {(auction.status === 'active' && auction.endTime && new Date(auction.endTime) > new Date()) ? (
               <>
                 <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', marginBottom: '1.5rem' }}>
