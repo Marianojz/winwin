@@ -9,6 +9,7 @@ import {
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import UserDetailsModal from '../components/UserDetailsModal';
+import StatsCard from '../components/StatsCard';
 import { useStore } from '../store/useStore';
 import { formatCurrency } from '../utils/helpers';
 import { Product, Auction, Order, OrderStatus } from '../types';
@@ -3517,6 +3518,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
