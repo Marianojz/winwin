@@ -15,6 +15,7 @@ import Carrito from './pages/Carrito';
 import Notificaciones from './pages/Notificaciones';
 import Perfil from './pages/Perfil';
 import AdminPanel from './pages/AdminPanel';
+import Notifications from './pages/Notifications';
 import CompletarPerfil from './pages/CompletarPerfil';
 
 function App() {
