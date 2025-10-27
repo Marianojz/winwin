@@ -263,6 +263,104 @@ const AuctionDetail = () => {
                   <Clock size={20} style={{ marginBottom: '0.5rem' }} />
                   <Countdown endTime={auction.endTime} />
                 </div>
+      {/* RECUADRO EXPLICATIVO - MEJORA 2 */}
+{isActive && (
+  <div style={{ 
+    marginTop: '1.5rem',
+    padding: '1.5rem', 
+    background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
+    border: '3px solid #FF6B00',
+    borderRadius: '1rem',
+    boxShadow: '0 4px 12px rgba(255, 107, 0, 0.15)'
+  }}>
+    <h4 style={{ 
+      fontSize: '1.25rem', 
+      fontWeight: 700, 
+      color: '#CC5500',
+      marginBottom: '1rem',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem'
+    }}>
+      📖 ¿Cómo funciona esta subasta?
+    </h4>
+    
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      gap: '1rem',
+      fontSize: '1.125rem',
+      lineHeight: '1.6',
+      color: '#333'
+    }}>
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'flex-start', 
+        gap: '0.75rem',
+        padding: '0.75rem',
+        background: 'white',
+        borderRadius: '0.5rem'
+      }}>
+        <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>1️⃣</span>
+        <span><strong>El precio actual es:</strong> {formatCurrency(auction.currentPrice)}. Este es el monto mínimo que debe superar tu oferta.</span>
+      </div>
+      
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'flex-start', 
+        gap: '0.75rem',
+        padding: '0.75rem',
+        background: 'white',
+        borderRadius: '0.5rem'
+      }}>
+        <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>2️⃣</span>
+        <span><strong>Para ofertar:</strong> Tu oferta debe ser de a $500 en $500. Por ejemplo: $11.500, $12.000, $12.500, etc.</span>
+      </div>
+      
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'flex-start', 
+        gap: '0.75rem',
+        padding: '0.75rem',
+        background: 'white',
+        borderRadius: '0.5rem'
+      }}>
+        <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>3️⃣</span>
+        <span><strong>Tiempo límite:</strong> Cuando termine el reloj de cuenta regresiva, gana quien haya ofertado más dinero.</span>
+      </div>
+      
+      {auction.buyNowPrice && (
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'flex-start', 
+          gap: '0.75rem',
+          padding: '0.75rem',
+          background: '#c8e6c9',
+          borderRadius: '0.5rem',
+          border: '2px solid #4caf50'
+        }}>
+          <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>⚡</span>
+          <span><strong>Compra Ya:</strong> O podés comprar directo por {formatCurrency(auction.buyNowPrice)} y ganás inmediatamente sin esperar.</span>
+        </div>
+      )}
+      
+      <div style={{ 
+        marginTop: '0.5rem',
+        padding: '1rem',
+        background: '#e3f2fd',
+        borderRadius: '0.5rem',
+        border: '2px solid #2196f3'
+      }}>
+        <div style={{ fontWeight: 700, color: '#1565c0', marginBottom: '0.5rem', fontSize: '1.125rem' }}>
+          ⚠️ Importante:
+        </div>
+        <div style={{ color: '#1565c0' }}>
+          Si ganás, tenés <strong>48 horas</strong> para pagar. Si no pagás en ese tiempo, perdés la subasta y el producto vuelve a estar disponible.
+        </div>
+      </div>
+    </div>
+  </div>
+)}
               ) : (
                 <div style={{ padding: '1rem', background: '#666', color: 'white', borderRadius: '0.75rem', textAlign: 'center' }}>
                   <Clock size={20} style={{ marginBottom: '0.5rem' }} />
