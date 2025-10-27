@@ -239,9 +239,17 @@ const AuctionDetail = () => {
             
             <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', marginBottom: '1.5rem' }}>
               <div style={{ marginBottom: '1rem' }}>
-                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Oferta Actual</div>
-                <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--primary)' }}>{formatCurrency(auction.currentPrice)}</div>
-              </div>
+  <div style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: 600 }}>💰 Precio Actual de la Subasta</div>
+  <div style={{ 
+    fontSize: '3.5rem', 
+    fontWeight: 800, 
+    color: 'var(--primary)',
+    textShadow: '0 2px 4px rgba(255, 107, 0, 0.2)',
+    letterSpacing: '-1px'
+  }}>
+    {formatCurrency(auction.currentPrice)}
+  </div>
+</div>
 
               {auction.buyNowPrice && isActive && (
                 <div style={{ marginBottom: '1rem' }}>
