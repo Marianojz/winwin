@@ -649,7 +649,8 @@ const AdminPanel = () => {
             { id: 'orders', label: 'Pedidos', icon: ShoppingBag },
             { id: 'inventory', label: 'Inventario', icon: Package },
             { id: 'bots', label: 'Bots', icon: Bot },
-            { id: 'create-auction', label: 'Crear Subasta', icon: Plus }
+            { id: 'create-auction', label: 'Crear Subasta', icon: Plus },
+            { id: 'create-product', label: 'Crear Producto', icon: Plus },
           ].map(tab => {
             const Icon = tab.icon;
             return (
@@ -2663,6 +2664,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
