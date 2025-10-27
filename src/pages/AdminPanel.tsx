@@ -794,138 +794,251 @@ const AdminPanel = () => {
         {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
           <div style={{ display: 'grid', gap: '1.5rem' }}>
-            {/* Stats Cards Row 1 */}
+            {/* Stats Cards - Primera Fila */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
-              <div style={{ padding: '1.75rem', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '1.25rem', color: 'white', boxShadow: '0 8px 24px rgba(102, 126, 234, 0.25)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                  <Users size={36} style={{ opacity: 0.9 }} />
-                  <div style={{ background: 'rgba(255,255,255,0.2)', padding: '0.5rem 0.875rem', borderRadius: '0.5rem', fontSize: '0.8125rem', fontWeight: 600 }}>
-                    +12%
-                  </div>
-                </div>
-                <div style={{ fontSize: '2.25rem', fontWeight: 700, marginBottom: '0.25rem' }}>{activeUsers}</div>
-                <div style={{ opacity: 0.9, fontSize: '0.9375rem' }}>Usuarios Activos</div>
-              </div>
-
-              <div style={{ padding: '1.75rem', background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', borderRadius: '1.25rem', color: 'white', boxShadow: '0 8px 24px rgba(240, 147, 251, 0.25)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                  <DollarSign size={36} style={{ opacity: 0.9 }} />
-                  <div style={{ background: 'rgba(255,255,255,0.2)', padding: '0.5rem 0.875rem', borderRadius: '0.5rem', fontSize: '0.8125rem', fontWeight: 600 }}>
-                    +{conversionRate}%
-                  </div>
-                </div>
-                <div style={{ fontSize: '2.25rem', fontWeight: 700, marginBottom: '0.25rem' }}>{formatCurrency(totalRevenue)}</div>
-                <div style={{ opacity: 0.9, fontSize: '0.9375rem' }}>Ingresos Totales</div>
-              </div>
-
-              <div style={{ padding: '1.75rem', background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', borderRadius: '1.25rem', color: 'white', boxShadow: '0 8px 24px rgba(79, 172, 254, 0.25)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                  <ShoppingBag size={36} style={{ opacity: 0.9 }} />
-                  <div style={{ background: 'rgba(255,255,255,0.2)', padding: '0.5rem 0.875rem', borderRadius: '0.5rem', fontSize: '0.8125rem', fontWeight: 600 }}>
-                    HOY
-                  </div>
-                </div>
-                <div style={{ fontSize: '2.25rem', fontWeight: 700, marginBottom: '0.25rem' }}>{totalOrders}</div>
-                <div style={{ opacity: 0.9, fontSize: '0.9375rem' }}>Pedidos Totales</div>
-              </div>
-
-              <div style={{ padding: '1.75rem', background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', borderRadius: '1.25rem', color: 'white', boxShadow: '0 8px 24px rgba(250, 112, 154, 0.25)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                  <Gavel size={36} style={{ opacity: 0.9 }} />
-                  <div style={{ background: 'rgba(255,255,255,0.2)', padding: '0.5rem 0.875rem', borderRadius: '0.5rem', fontSize: '0.8125rem', fontWeight: 600 }}>
-                    ACTIVAS
-                  </div>
-                </div>
-                <div style={{ fontSize: '2.25rem', fontWeight: 700, marginBottom: '0.25rem' }}>{activeAuctions}</div>
-                <div style={{ opacity: 0.9, fontSize: '0.9375rem' }}>Subastas</div>
-              </div>
-            </div>
-{/* Stats Cards Row 2 */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
-              <div style={{ padding: '1.75rem', background: 'var(--bg-secondary)', borderRadius: '1.25rem', border: '1px solid var(--border)', boxShadow: '0 2px 8px var(--shadow)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                  <div style={{ padding: '0.75rem', background: 'var(--primary-light)', borderRadius: '0.75rem' }}>
-                    <Award size={24} color="var(--primary)" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '1.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>{avgBidsPerAuction}</div>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Promedio Ofertas</div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ padding: '1.75rem', background: 'var(--bg-secondary)', borderRadius: '1.25rem', border: '1px solid var(--border)', boxShadow: '0 2px 8px var(--shadow)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                  <div style={{ padding: '0.75rem', background: 'var(--success-light)', borderRadius: '0.75rem' }}>
-                    <Package size={24} color="var(--success)" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '1.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>{products.length}</div>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Productos Totales</div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ padding: '1.75rem', background: 'var(--bg-secondary)', borderRadius: '1.25rem', border: '1px solid var(--border)', boxShadow: '0 2px 8px var(--shadow)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                  <div style={{ padding: '0.75rem', background: 'var(--warning-light)', borderRadius: '0.75rem' }}>
-                    <AlertTriangle size={24} color="var(--warning)" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '1.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>{lowStockProducts.length}</div>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Stock Bajo</div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ padding: '1.75rem', background: 'var(--bg-secondary)', borderRadius: '1.25rem', border: '1px solid var(--border)', boxShadow: '0 2px 8px var(--shadow)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                  <div style={{ padding: '0.75rem', background: 'var(--info-light)', borderRadius: '0.75rem' }}>
-                    <Bot size={24} color="var(--info)" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '1.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>{bots.filter(b => b.isActive).length}</div>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Bots Activos</div>
-                  </div>
-                </div>
-              </div>
+              <StatsCard
+                title="Usuarios Registrados"
+                value={stats.users.total}
+                icon={Users}
+                color="var(--primary)"
+                subtitle={`${stats.users.active} activos`}
+              />
+              
+              <StatsCard
+                title="Ingresos del Mes"
+                value={formatCurrency(stats.revenue.month)}
+                icon={DollarSign}
+                color="#f093fb"
+                subtitle={`Total: ${formatCurrency(stats.revenue.total)}`}
+              />
+              
+              <StatsCard
+                title="Pedidos Totales"
+                value={stats.orders.total}
+                icon={ShoppingCart}
+                color="#4facfe"
+                subtitle={`${stats.orders.pendingPayment} pendientes de pago`}
+              />
+              
+              <StatsCard
+                title="Subastas Activas"
+                value={stats.auctions.active}
+                icon={Gavel}
+                color="#fa709a"
+                subtitle={`${stats.auctions.ended} finalizadas`}
+              />
             </div>
 
-            {/* Alertas y Notificaciones */}
-            {(pendingPayments > 0 || expiringSoon > 0 || lowStockProducts.length > 0 || outOfStockProducts.length > 0) && (
-              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid var(--border)' }}>
-                <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <AlertCircle size={20} color="var(--warning)" />
+            {/* Stats Cards - Segunda Fila */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
+              <StatsCard
+                title="Total de Ofertas"
+                value={stats.auctions.totalBids}
+                icon={TrendingUp}
+                color="var(--success)"
+                subtitle="En todas las subastas"
+              />
+              
+              <StatsCard
+                title="Productos Activos"
+                value={stats.products.active}
+                icon={Package}
+                color="var(--info)"
+                subtitle={`${stats.products.total} totales`}
+              />
+              
+              <StatsCard
+                title="Stock Bajo"
+                value={stats.products.lowStock}
+                icon={AlertTriangle}
+                color="var(--warning)"
+                subtitle={`${stats.products.outOfStock} sin stock`}
+              />
+              
+              <StatsCard
+                title="Bots Activos"
+                value={stats.bots.active}
+                icon={Bot}
+                color="#667eea"
+                subtitle={`${stats.bots.total} totales`}
+              />
+            </div>
+
+            {/* Alertas Importantes */}
+            {(stats.orders.pendingPayment > 0 || getAuctionsEndingSoon().length > 0 || stats.products.lowStock > 0 || stats.products.outOfStock > 0) && (
+              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid var(--border)', boxShadow: '0 2px 8px var(--shadow)' }}>
+                <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <Bell size={24} color="var(--warning)" />
                   Alertas y Notificaciones
                 </h3>
-                <div style={{ display: 'grid', gap: '0.75rem' }}>
-                  {pendingPayments > 0 && (
-                    <div style={{ padding: '1rem', background: 'var(--warning-light)', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <Clock size={20} color="var(--warning)" />
-                      <span><strong>{pendingPayments}</strong> pedidos pendientes de pago</span>
+                <div style={{ display: 'grid', gap: '0.875rem' }}>
+                  {stats.orders.pendingPayment > 0 && (
+                    <div style={{ padding: '1rem', background: 'var(--warning-light)', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', border: '1px solid var(--warning)' }}>
+                      <Clock size={22} color="var(--warning)" />
+                      <div>
+                        <strong>{stats.orders.pendingPayment}</strong> pedidos pendientes de pago
+                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                          Requieren atención urgente
+                        </div>
+                      </div>
                     </div>
                   )}
-                  {expiringSoon > 0 && (
-                    <div style={{ padding: '1rem', background: 'var(--error-light)', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <Timer size={20} color="var(--error)" />
-                      <span><strong>{expiringSoon}</strong> pedidos expiran en menos de 24 horas</span>
+                  
+                  {getAuctionsEndingSoon().length > 0 && (
+                    <div style={{ padding: '1rem', background: 'var(--info-light)', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', border: '1px solid var(--info)' }}>
+                      <AlertCircle size={22} color="var(--info)" />
+                      <div>
+                        <strong>{getAuctionsEndingSoon().length}</strong> subastas finalizan en las próximas 24hs
+                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                          {getAuctionsEndingSoon().map(a => a.title).join(', ')}
+                        </div>
+                      </div>
                     </div>
                   )}
-                  {lowStockProducts.length > 0 && (
-                    <div style={{ padding: '1rem', background: 'var(--warning-light)', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <Package size={20} color="var(--warning)" />
-                      <span><strong>{lowStockProducts.length}</strong> productos con stock bajo (menos de 5 unidades)</span>
+                  
+                  {stats.products.lowStock > 0 && (
+                    <div style={{ padding: '1rem', background: 'var(--warning-light)', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', border: '1px solid var(--warning)' }}>
+                      <AlertTriangle size={22} color="var(--warning)" />
+                      <div>
+                        <strong>{stats.products.lowStock}</strong> productos con stock bajo
+                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                          Menos de 5 unidades disponibles
+                        </div>
+                      </div>
                     </div>
                   )}
-                  {outOfStockProducts.length > 0 && (
-                    <div style={{ padding: '1rem', background: 'var(--error-light)', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <XCircle size={20} color="var(--error)" />
-                      <span><strong>{outOfStockProducts.length}</strong> productos sin stock</span>
+                  
+                  {stats.products.outOfStock > 0 && (
+                    <div style={{ padding: '1rem', background: 'var(--error-light)', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', border: '1px solid var(--error)' }}>
+                      <XCircle size={22} color="var(--error)" />
+                      <div>
+                        <strong>{stats.products.outOfStock}</strong> productos sin stock
+                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                          Requieren reposición urgente
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
             )}
+
+            {/* Resumen por Categorías */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+              {/* Resumen de Subastas */}
+              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid var(--border)', boxShadow: '0 2px 8px var(--shadow)' }}>
+                <h4 style={{ fontSize: '1.125rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Gavel size={20} color="var(--primary)" />
+                  Estado de Subastas
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Activas</span>
+                    <strong style={{ color: 'var(--success)' }}>{stats.auctions.active}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Finalizadas</span>
+                    <strong>{stats.auctions.ended}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Total Ofertas</span>
+                    <strong style={{ color: 'var(--primary)' }}>{stats.auctions.totalBids}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Resumen de Pedidos */}
+              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid var(--border)', boxShadow: '0 2px 8px var(--shadow)' }}>
+                <h4 style={{ fontSize: '1.125rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <ShoppingCart size={20} color="var(--info)" />
+                  Estado de Pedidos
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Pendientes Pago</span>
+                    <strong style={{ color: 'var(--warning)' }}>{stats.orders.pendingPayment}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Procesando</span>
+                    <strong style={{ color: 'var(--info)' }}>{stats.orders.processing}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>En Tránsito</span>
+                    <strong style={{ color: 'var(--primary)' }}>{stats.orders.inTransit}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Entregados</span>
+                    <strong style={{ color: 'var(--success)' }}>{stats.orders.delivered}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Resumen de Inventario */}
+              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid var(--border)', boxShadow: '0 2px 8px var(--shadow)' }}>
+                <h4 style={{ fontSize: '1.125rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Package size={20} color="var(--success)" />
+                  Inventario
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Total Productos</span>
+                    <strong style={{ color: 'var(--success)' }}>{stats.products.total}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Activos</span>
+                    <strong>{stats.products.active}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Stock Bajo</span>
+                    <strong style={{ color: 'var(--warning)' }}>{stats.products.lowStock}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Sin Stock</span>
+                    <strong style={{ color: 'var(--error)' }}>{stats.products.outOfStock}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Actividad Reciente */}
+            <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid var(--border)', boxShadow: '0 2px 8px var(--shadow)' }}>
+              <h4 style={{ fontSize: '1.125rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Activity size={20} color="var(--primary)" />
+                Actividad Reciente
+              </h4>
+              {getRecentActivity().length === 0 ? (
+                <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
+                  No hay actividad reciente
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {getRecentActivity().map((activity, index) => (
+                    <div key={index} style={{ 
+                      padding: '1rem', 
+                      background: 'var(--bg-tertiary)', 
+                      borderRadius: '0.5rem',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        {activity.type === 'order' ? (
+                          <ShoppingCart size={18} color="var(--info)" />
+                        ) : (
+                          <TrendingUp size={18} color="var(--success)" />
+                        )}
+                        <span style={{ fontSize: '0.9375rem' }}>{activity.message}</span>
+                      </div>
+                      <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                        {formatTimeAgo(activity.time)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
             {/* Actividad Reciente */}
             <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', border: '1px solid var(--border)' }}>
@@ -3518,6 +3631,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
