@@ -263,7 +263,10 @@ const AuctionDetail = () => {
                   <Clock size={20} style={{ marginBottom: '0.5rem' }} />
                   <Countdown endTime={auction.endTime} />
                 </div>
-      {/* RECUADRO EXPLICATIVO - MEJORA 2 */}
+              )
+              : null}
+
+              {/* RECUADRO EXPLICATIVO - MEJORA 2 */}
 {isActive && (
   <div style={{ 
     marginTop: '1.5rem',
