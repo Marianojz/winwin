@@ -31,19 +31,8 @@ interface AppState {
   // Notifications
   notifications: Notification[];
   addNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => void;
-  markNotificationAsRead: (notificationId: string) => {
-    set((state) => ({
-      notifications: state.notifications.map(n =>
-        n.id === notificationId ? { ...n, read: true } : n
-      ),
-    }));
-  },
-
-  deleteNotification: (notificationId: string) => {
-    set((state) => ({
-      notifications: state.notifications.filter(n => n.id !== notificationId),
-    }));
-  },
+  markNotificationAsRead: (notificationId: string) => void;
+  deleteNotification: (notificationId: string) => void;
   markAsRead: (notificationId: string) => void;
   unreadCount: number;
 
@@ -232,6 +221,25 @@ export const useStore = create<AppState>((set, get) => ({
       notifications: [newNotification, ...state.notifications],
       unreadCount: state.unreadCount + 1
     }));
+  },
+  markNotificationAsRead: (notificationId) => {
+    set(state => ({
+      notifications: state.notifications.map(n =>
+        n.id === notificationId ? { ...n, read: true } : n
+      ),
+      unreadCount: Math.max(0, state.unreadCount - 1)
+    }));
+  },
+  deleteNotification: (notificationId) => {
+    set(state => {
+      const notificationToDelete = state.notifications.find(n => n.id === notificationId);
+      const wasUnread = notificationToDelete && !notificationToDelete.read;
+      
+      return {
+        notifications: state.notifications.filter(n => n.id !== notificationId),
+        unreadCount: wasUnread ? Math.max(0, state.unreadCount - 1) : state.unreadCount
+      };
+    });
   },
   markAsRead: (notificationId) => {
     set(state => ({
