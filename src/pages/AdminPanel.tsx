@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { 
   Eye, Edit, Trash2, Users, Award, Clock, AlertCircle, Activity, RefreshCw,
-  Gavel, Package, Bot, DollarSign, Plus, XCircle, 
+  Gavel, Package, Bot, DollarSign, Plus, XCircle,
+  TrendingUp, ShoppingCart, Bell, AlertTriangle, CheckCircle, TrendingDown, 
   Search, Filter, ShoppingBag, Timer, 
   AlertTriangle, MapPin, BarChart3
 } from 'lucide-react';
@@ -3516,6 +3517,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
