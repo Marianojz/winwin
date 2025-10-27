@@ -228,6 +228,110 @@ const AdminPanel = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<OrderStatus | 'all'>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  // ============================================
+  // FUNCIONES PARA ESTADÍSTICAS DEL DASHBOARD
+  // ============================================
+  
+  const getDashboardStats = () => {
+    // Usuarios
+    const totalUsers = realUsers.length;
+    const activeUsers = realUsers.filter(u => u.active !== false).length;
+    
+    // Subastas
+    const activeAuctions = auctions.filter(a => a.status === 'active').length;
+    const endedAuctions = auctions.filter(a => a.status === 'ended').length;
+    const totalBids = auctions.reduce((sum, a) => sum + (a.bids?.length || 0), 0);
+    
+    // Productos
+    const totalProducts = products.length;
+    const activeProducts = products.filter(p => p.active !== false).length;
+    const lowStockProducts = products.filter(p => p.stock > 0 && p.stock < 5).length;
+    const outOfStockProducts = products.filter(p => p.stock === 0).length;
+    
+    // Pedidos
+    const totalOrders = orders.length;
+    const pendingPayment = orders.filter(o => o.status === 'pending_payment').length;
+    const processing = orders.filter(o => o.status === 'processing').length;
+    const inTransit = orders.filter(o => o.status === 'in_transit').length;
+    const delivered = orders.filter(o => o.status === 'delivered').length;
+    
+    // Ingresos
+    const totalRevenue = orders
+      .filter(o => ['payment_confirmed', 'processing', 'in_transit', 'delivered'].includes(o.status))
+      .reduce((sum, o) => sum + o.amount, 0);
+    
+    const monthRevenue = orders
+      .filter(o => {
+        const orderDate = new Date(o.createdAt);
+        const now = new Date();
+        return orderDate.getMonth() === now.getMonth() && 
+               orderDate.getFullYear() === now.getFullYear() &&
+               ['payment_confirmed', 'processing', 'in_transit', 'delivered'].includes(o.status);
+      })
+      .reduce((sum, o) => sum + o.amount, 0);
+    
+    // Bots
+    const activeBots = bots.filter(b => b.isActive).length;
+    const totalBotsBalance = bots.reduce((sum, b) => sum + b.balance, 0);
+    
+    return {
+      users: { total: totalUsers, active: activeUsers },
+      auctions: { active: activeAuctions, ended: endedAuctions, totalBids },
+      products: { total: totalProducts, active: activeProducts, lowStock: lowStockProducts, outOfStock: outOfStockProducts },
+      orders: { total: totalOrders, pendingPayment, processing, inTransit, delivered },
+      revenue: { total: totalRevenue, month: monthRevenue },
+      bots: { active: activeBots, total: bots.length, totalBalance: totalBotsBalance }
+    };
+  };
+  
+  const getRecentActivity = () => {
+    const activities = [];
+    
+    // Últimas 5 órdenes
+    const recentOrders = [...orders]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5);
+    
+    recentOrders.forEach(order => {
+      activities.push({
+        type: 'order',
+        message: `${order.userName} realizó un pedido de ${formatCurrency(order.amount)}`,
+        time: order.createdAt,
+        status: order.status
+      });
+    });
+    
+    // Últimas 5 pujas
+    const recentBids = auctions
+      .flatMap(a => a.bids?.map(b => ({ ...b, auctionTitle: a.title })) || [])
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5);
+    
+    recentBids.forEach(bid => {
+      activities.push({
+        type: 'bid',
+        message: `${bid.username} pujó ${formatCurrency(bid.amount)} en "${bid.auctionTitle}"`,
+        time: bid.createdAt,
+        status: 'bid'
+      });
+    });
+    
+    return activities
+      .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+      .slice(0, 10);
+  };
+  
+  const getAuctionsEndingSoon = () => {
+    const now = new Date();
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    
+    return auctions.filter(a => {
+      const endTime = new Date(a.endTime);
+      return a.status === 'active' && endTime > now && endTime <= tomorrow;
+    });
+  };
+
+  const stats = getDashboardStats();
 
   // Cargar usuarios reales de Firebase
   const loadUsers = async () => {
@@ -3412,6 +3516,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
