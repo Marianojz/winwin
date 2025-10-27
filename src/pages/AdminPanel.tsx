@@ -335,6 +335,11 @@ const AdminPanel = () => {
 
   const stats = getDashboardStats();
 
+  // Variables calculadas para filtros del inventario
+  const lowStockProducts = products.filter(p => p.stock > 0 && p.stock < 5);
+  const outOfStockProducts = products.filter(p => p.stock === 0);
+  const totalInventoryValue = products.reduce((sum, p) => sum + (p.price * p.stock), 0);
+
   // Cargar usuarios reales de Firebase
   const loadUsers = async () => {
     setLoadingUsers(true);
