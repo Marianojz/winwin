@@ -31,6 +31,19 @@ interface AppState {
   // Notifications
   notifications: Notification[];
   addNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => void;
+  markNotificationAsRead: (notificationId: string) => {
+    set((state) => ({
+      notifications: state.notifications.map(n =>
+        n.id === notificationId ? { ...n, read: true } : n
+      ),
+    }));
+  },
+
+  deleteNotification: (notificationId: string) => {
+    set((state) => ({
+      notifications: state.notifications.filter(n => n.id !== notificationId),
+    }));
+  },
   markAsRead: (notificationId: string) => void;
   unreadCount: number;
 
