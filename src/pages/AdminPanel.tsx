@@ -378,29 +378,6 @@ const AdminPanel = () => {
     );
   }
 
-  // Estadísticas calculadas
-  const totalBids = auctions.reduce((sum, a) => sum + a.bids.length, 0);
-  const totalRevenue = orders
-    .filter(o => o.status === 'delivered')
-    .reduce((sum, o) => sum + o.amount, 0);
-  const activeUsers = realUsers.length || 150;
-  const totalOrders = orders.length;
-  const activeAuctions = auctions.filter(a => a.status === 'active').length;
-  const endedAuctions = auctions.filter(a => a.status === 'ended').length;
-  const lowStockProducts = products.filter(p => p.stock < 5 && p.stock > 0);
-  const outOfStockProducts = products.filter(p => p.stock === 0);
-  const totalInventoryValue = products.reduce((sum, p) => sum + (p.price * p.stock), 0);
-  const avgBidsPerAuction = auctions.length > 0 ? (totalBids / auctions.length).toFixed(1) : 0;
-  const conversionRate = totalOrders > 0 ? ((totalOrders / activeUsers) * 100).toFixed(1) : 0;
-
-  const pendingPayments = orders.filter(o => o.status === 'pending_payment').length;
-  const expiringSoon = orders.filter(o => {
-    if (o.status === 'pending_payment' && o.expiresAt) {
-      const hoursLeft = (new Date(o.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60);
-      return hoursLeft < 24 && hoursLeft > 0;
-    }
-    return false;
-  }).length;
 
   // Funciones para Productos
   const handleEditProduct = (product: Product) => {
