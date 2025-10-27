@@ -1419,7 +1419,7 @@ const AdminPanel = () => {
         </h4>
         <ImageUploader
           images={productForm.images}
-          onImagesChange={(images) => setProductForm({...productForm, images})}
+          onChange={(images) => setProductForm({...productForm, images})}
           maxImages={5}
         />
       </div>
@@ -1697,7 +1697,7 @@ const AdminPanel = () => {
         </h4>
         <ImageUploader
           images={productForm.images}
-          onImagesChange={(images) => setProductForm({...productForm, images})}
+          onChange={(images) => setProductForm({...productForm, images})}
           maxImages={5}
         />
       </div>
@@ -3406,6 +3406,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
