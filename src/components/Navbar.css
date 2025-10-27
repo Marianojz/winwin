@@ -290,7 +290,21 @@
   }
 
   /* Menú principal: convertir a dropdown en móvil */
-  .navbar-menu {
+  /* IMPORTANTE: Mantener acciones visibles en móvil */
+  .navbar-actions {
+    display: flex !important;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  
+  /* Botón de login visible y compacto en móvil */
+  .navbar-actions .btn-primary {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    display: flex !important;
+  }
+   .navbar-menu {
     position: fixed;
     bottom: 0;
     left: 0;
