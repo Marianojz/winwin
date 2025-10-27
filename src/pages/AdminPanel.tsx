@@ -287,7 +287,7 @@ const AdminPanel = () => {
   };
   
   const getRecentActivity = () => {
-    const activities = [];
+    const activities: any[] = [];
     
     // Últimas 5 órdenes
     const recentOrders = [...orders]
