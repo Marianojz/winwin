@@ -1696,10 +1696,10 @@ const AdminPanel = () => {
           📸 Imágenes del Producto (Máximo 5)
         </h4>
         <ImageUploader
-  images={productForm.images}
-  onChange={(images: string[]) => setProductForm({...productForm, images})}
-  maxImages={5}
-/>
+          images={productForm.images}
+          onImagesChange={(images) => setProductForm({...productForm, images})}
+          maxImages={5}
+        />
       </div>
 
       {/* SECCIÓN 3: PRECIOS Y STOCK */}
@@ -3406,6 +3406,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
