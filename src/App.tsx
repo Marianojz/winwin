@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Terminos from './pages/Terminos';
 import Preguntas from './pages/Preguntas';
 import Navbar from './components/Navbar';
+import AuctionManager from './utils/AuctionManager';
 import ScrollToTop from './components/ScrollToTop';
 import Home from './pages/Home';
 import Subastas from './pages/Subastas';
@@ -23,6 +24,7 @@ function App() {
     <Router>
       <div className="app">
         <Navbar />
+        <AuctionManager />
         <ScrollToTop />
         <main className="main-content">
           <Routes>
