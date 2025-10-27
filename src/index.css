@@ -50,6 +50,12 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
   overflow-x: hidden;
 }
+/* Espacio para el menú fijo inferior en móvil */
+@media (max-width: 768px) {
+  body {
+    padding-bottom: 70px;
+  }
+}
 
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Poppins', sans-serif;
