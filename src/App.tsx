@@ -40,6 +40,7 @@ function App() {
             <Route path="/terminos" element={<Terminos />} />
             <Route path="/preguntas" element={<Preguntas />} />
             <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/notificaciones" element={<Notifications />} />
             <Route path="/completar-perfil" element={<CompletarPerfil />} />
           </Routes>
         </main>
