@@ -1320,83 +1320,265 @@ const AdminPanel = () => {
 )}
 
         {/* EDIT PRODUCT TAB */}
-        {activeTab === 'edit-product' && editingProduct && (
-          <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
-            <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <Edit size={24} />
-              Editando: {editingProduct.name}
-            </h3>
-            <div style={{ display: 'grid', gap: '1.5rem' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Nombre del Producto</label>
-                <input 
-                  type="text" 
-                  value={productForm.name}
-                  onChange={(e) => setProductForm({...productForm, name: e.target.value})}
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Descripción</label>
-                <textarea 
-                  value={productForm.description}
-                  onChange={(e) => setProductForm({...productForm, description: e.target.value})}
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', minHeight: '100px' }}
-                />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Precio</label>
-                  <input 
-                    type="number" 
-                    value={productForm.price}
-                    onChange={(e) => setProductForm({...productForm, price: Number(e.target.value)})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Stock</label>
-                  <input 
-                    type="number" 
-                    value={productForm.stock}
-                    onChange={(e) => setProductForm({...productForm, stock: Number(e.target.value)})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Categoría</label>
-                  <select 
-                    value={productForm.categoryId}
-                    onChange={(e) => setProductForm({...productForm, categoryId: e.target.value})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
-                  >
-                    <option value="1">📱 Electrónica</option>
-                    <option value="2">👕 Moda</option>
-                    <option value="3">🏠 Hogar</option>
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <button 
-                  onClick={handleSaveProduct}
-                  className="btn btn-primary" 
-                  style={{ flex: 1 }}
-                >
-                  Guardar Cambios
-                </button>
-                <button 
-                  onClick={() => {
-                    setEditingProduct(null);
-                    setActiveTab('products');
-                  }}
-                  className="btn btn-outline"
-                >
-                  Cancelar
-                </button>
-              </div>
+{activeTab === 'edit-product' && editingProduct && (
+  <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
+    <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <Edit size={24} color="var(--warning)" />
+      Editando: {editingProduct.name}
+    </h3>
+
+    <div style={{ display: 'grid', gap: '2rem' }}>
+      
+      {/* SECCIÓN 1: INFORMACIÓN BÁSICA */}
+      <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
+        <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem' }}>
+          📝 Información Básica
+        </h4>
+
+        <div style={{ display: 'grid', gap: '1.5rem' }}>
+          {/* Nombre */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+              Nombre del Producto *
+            </label>
+            <input 
+              type="text" 
+              value={productForm.name}
+              onChange={(e) => setProductForm({...productForm, name: e.target.value})}
+              maxLength={100}
+              style={{ 
+                width: '100%', 
+                padding: '0.875rem', 
+                borderRadius: '0.5rem',
+                fontSize: '1rem',
+                border: '2px solid var(--border)'
+              }}
+            />
+            <small style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
+              {productForm.name.length}/100 caracteres
+            </small>
+          </div>
+
+          {/* Descripción */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+              Descripción *
+            </label>
+            <textarea 
+              value={productForm.description}
+              onChange={(e) => setProductForm({...productForm, description: e.target.value})}
+              maxLength={2000}
+              style={{ 
+                width: '100%', 
+                padding: '0.875rem', 
+                borderRadius: '0.5rem', 
+                minHeight: '150px',
+                fontSize: '1rem',
+                border: '2px solid var(--border)',
+                resize: 'vertical'
+              }}
+            />
+            <small style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
+              {productForm.description.length}/2000 caracteres
+            </small>
+          </div>
+
+          {/* Categoría */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+              Categoría *
+            </label>
+            <select 
+              value={productForm.categoryId}
+              onChange={(e) => setProductForm({...productForm, categoryId: e.target.value})}
+              style={{ 
+                width: '100%', 
+                padding: '0.875rem', 
+                borderRadius: '0.5rem',
+                fontSize: '1rem',
+                border: '2px solid var(--border)'
+              }}
+            >
+              <option value="1">📱 Electrónica</option>
+              <option value="2">👕 Moda</option>
+              <option value="3">🏠 Hogar</option>
+              <option value="4">🎮 Juegos</option>
+              <option value="5">📚 Libros</option>
+              <option value="6">🎨 Arte</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* SECCIÓN 2: IMÁGENES */}
+      <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
+        <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem' }}>
+          📸 Imágenes del Producto (Máximo 5)
+        </h4>
+        <ImageUploader
+          images={productForm.images}
+          onImagesChange={(images) => setProductForm({...productForm, images})}
+          maxImages={5}
+        />
+      </div>
+
+      {/* SECCIÓN 3: PRECIOS Y STOCK */}
+      <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
+        <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem' }}>
+          💰 Precio y Stock
+        </h4>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          {/* Precio */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+              Precio de Venta *
+            </label>
+            <div style={{ position: 'relative' }}>
+              <span style={{ 
+                position: 'absolute', 
+                left: '1rem', 
+                top: '50%', 
+                transform: 'translateY(-50%)',
+                fontWeight: 600,
+                color: 'var(--text-secondary)'
+              }}>
+                $
+              </span>
+              <input 
+                type="number" 
+                value={productForm.price || ''}
+                onChange={(e) => setProductForm({...productForm, price: Number(e.target.value)})}
+                min="100"
+                step="100"
+                style={{ 
+                  width: '100%', 
+                  padding: '0.875rem 0.875rem 0.875rem 2rem', 
+                  borderRadius: '0.5rem',
+                  fontSize: '1.125rem',
+                  fontWeight: 600,
+                  border: '2px solid var(--border)'
+                }}
+              />
             </div>
           </div>
-        )}
+
+          {/* Stock */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+              Stock Disponible *
+            </label>
+            <input 
+              type="number" 
+              value={productForm.stock || ''}
+              onChange={(e) => setProductForm({...productForm, stock: Number(e.target.value)})}
+              min="0"
+              style={{ 
+                width: '100%', 
+                padding: '0.875rem', 
+                borderRadius: '0.5rem',
+                fontSize: '1.125rem',
+                fontWeight: 600,
+                border: '2px solid var(--border)'
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* SECCIÓN 4: BADGES Y OPCIONES */}
+      <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
+        <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem' }}>
+          ⭐ Badges y Opciones Especiales
+        </h4>
+
+        <div style={{ display: 'grid', gap: '1.5rem' }}>
+          {/* Badges */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '1rem', fontWeight: 600 }}>
+              Badges del Producto
+            </label>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {['Nuevo', 'Oferta', '50% OFF', 'Destacado', 'Envío Gratis', 'Hot Sale'].map((badge) => (
+                <button
+                  key={badge}
+                  type="button"
+                  onClick={() => {
+                    const badges = productForm.badges.includes(badge)
+                      ? productForm.badges.filter(b => b !== badge)
+                      : [...productForm.badges, badge];
+                    setProductForm({...productForm, badges});
+                  }}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    borderRadius: '2rem',
+                    border: '2px solid',
+                    borderColor: productForm.badges.includes(badge) ? 'var(--primary)' : 'var(--border)',
+                    background: productForm.badges.includes(badge) ? 'var(--primary)' : 'transparent',
+                    color: productForm.badges.includes(badge) ? 'white' : 'var(--text-primary)',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {badge}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Opciones */}
+          <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={productForm.active}
+                onChange={(e) => setProductForm({...productForm, active: e.target.checked})}
+                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+              />
+              <span style={{ fontWeight: 600 }}>Producto Activo</span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={productForm.featured}
+                onChange={(e) => setProductForm({...productForm, featured: e.target.checked})}
+                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+              />
+              <span style={{ fontWeight: 600 }}>Producto Destacado</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* BOTONES DE ACCIÓN */}
+      <div style={{ display: 'flex', gap: '1rem', paddingTop: '1rem' }}>
+        <button 
+          onClick={handleSaveProduct}
+          className="btn btn-primary" 
+          style={{ flex: 1, padding: '1rem', fontSize: '1.0625rem', fontWeight: 600 }}
+        >
+          <Edit size={20} />
+          Guardar Cambios
+        </button>
+        <button 
+          onClick={() => {
+            if (window.confirm('¿Descartar cambios?')) {
+              setEditingProduct(null);
+              setActiveTab('products');
+            }
+          }}
+          className="btn btn-outline"
+          style={{ padding: '1rem', minWidth: '150px' }}
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
         {/* AUCTIONS TAB */}
         {activeTab === 'auctions' && (
@@ -2944,6 +3126,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
