@@ -1039,72 +1039,6 @@ const AdminPanel = () => {
             </div>
           </div>
         )}
-
-            {/* Actividad Reciente */}
-            <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', border: '1px solid var(--border)' }}>
-              <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <Activity size={24} />
-                Resumen de Actividad
-              </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-                <div>
-                  <h4 style={{ fontSize: '1rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}>Subastas</h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
-                      <span>Activas</span>
-                      <strong style={{ color: 'var(--success)' }}>{activeAuctions}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
-                      <span>Finalizadas</span>
-                      <strong>{endedAuctions}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
-                      <span>Total Ofertas</span>
-                      <strong style={{ color: 'var(--primary)' }}>{totalBids}</strong>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 style={{ fontSize: '1rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}>Inventario</h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
-                      <span>Valor Total</span>
-                      <strong style={{ color: 'var(--success)' }}>{formatCurrency(totalInventoryValue)}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
-                      <span>Stock Bajo</span>
-                      <strong style={{ color: 'var(--warning)' }}>{lowStockProducts.length}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
-                      <span>Sin Stock</span>
-                      <strong style={{ color: 'var(--error)' }}>{outOfStockProducts.length}</strong>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 style={{ fontSize: '1rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}>Pedidos</h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
-                      <span>Pendientes</span>
-                      <strong style={{ color: 'var(--warning)' }}>{orderStats.pending}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
-                      <span>En Proceso</span>
-                      <strong style={{ color: 'var(--info)' }}>{orderStats.processing}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
-                      <span>Entregados</span>
-                      <strong style={{ color: 'var(--success)' }}>{orderStats.delivered}</strong>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* USERS TAB */}
         {activeTab === 'users' && (
           <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
@@ -3631,6 +3565,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
