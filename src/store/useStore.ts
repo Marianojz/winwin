@@ -209,6 +209,9 @@ export const useStore = create<AppState>((set, get) => ({
   cartTotal: 0,
 
   // Notifications
+    notifications: [],
+  unreadCount: 0,
+  
   // Función para cargar notificaciones del usuario actual
   loadUserNotifications: () => {
     const user = get().user;
@@ -240,7 +243,7 @@ export const useStore = create<AppState>((set, get) => ({
       console.error('Error cargando notificaciones:', error);
       set({ notifications: [], unreadCount: 0 });
     }
-  }
+  },
     
   notifications: [],
   addNotification: (notification) => {
