@@ -134,7 +134,32 @@ export const useStore = create<AppState>((set, get) => ({
     safeLocalStorageSet('auctions', auctions);
     set({ auctions });
   },
-  addBid: (auctionId, amount, userId, username) => {
+  addBid: async (auctionId, amount, userId, username) => {
+  try {
+    const bid = {
+      id: Date.now().toString(),
+      auctionId,
+      userId,
+      username,
+      amount,
+      createdAt: new Date().toISOString()
+    };
+
+    // Guardar en Firebase Realtime Database
+    const bidRef = push(ref(realtimeDb, `auctions/${auctionId}/bids`));
+    await set(bidRef, bid);
+
+    // Actualizar precio actual en Firebase
+    await update(ref(realtimeDb, `auctions/${auctionId}`), {
+      currentPrice: amount,
+      lastBidAt: new Date().toISOString()
+    });
+
+    console.log('✅ Oferta guardada en Firebase');
+    
+  } catch (error) {
+    console.error('❌ Error guardando oferta en Firebase:', error);
+    // Fallback a localStorage si Firebase falla
     const auctions = get().auctions.map(auction => {
       if (auction.id === auctionId) {
         const newBid = {
@@ -154,7 +179,8 @@ export const useStore = create<AppState>((set, get) => ({
       return auction;
     });
     get().setAuctions(auctions);
-  },
+  }
+},
 
   // Products
   products: (() => {
