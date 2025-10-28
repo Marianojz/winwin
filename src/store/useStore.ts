@@ -147,7 +147,7 @@ export const useStore = create<AppState>((set, get) => ({
       createdAt: new Date().toISOString()
     };
 
-    // ✅ VERSIÓN CORREGIDA - Opción simple
+    // ✅ VERSIÓN CORREGIDA - Con set importado
     const bidRef = ref(realtimeDb, `auctions/${auctionId}/bids/${bid.id}`);
     await set(bidRef, bid);
 
@@ -162,7 +162,8 @@ export const useStore = create<AppState>((set, get) => ({
   } catch (error) {
     console.error('❌ Error guardando oferta en Firebase:', error);
     // Fallback a localStorage si Firebase falla
-    const auctions = get().auctions.map(auction => {
+    const state = get();
+    const auctions = state.auctions.map(auction => {
       if (auction.id === auctionId) {
         const newBid = {
           id: Date.now().toString(),
@@ -180,7 +181,7 @@ export const useStore = create<AppState>((set, get) => ({
       }
       return auction;
     });
-    get().setAuctions(auctions);
+    state.setAuctions(auctions);
   }
 },
 
