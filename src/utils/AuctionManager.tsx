@@ -1,3 +1,4 @@
+import { soundManager } from '../utils/sounds';
 import { useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import { Order } from '../types';
