@@ -5,8 +5,19 @@ import { useStore } from '../store/useStore';
 import { formatCurrency } from '../utils/helpers';
 import { Order } from '../types';
 
-const Carrito = () => {
-  const { cart, updateQuantity, removeFromCart, clearCart, cartTotal } = useStore();
+const { 
+  cart, 
+  user, 
+  isAuthenticated,
+  products,
+  removeFromCart, 
+  updateQuantity, 
+  clearCart, 
+  cartTotal,
+  addOrder,
+  addNotification,
+  setProducts
+} = useStore();
 
   const handleCheckout = () => {
     if (cart.length === 0) {
