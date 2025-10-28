@@ -1,6 +1,9 @@
-import { ShoppingCart, Trash2, Plus, Minus, CreditCard } from 'lucide-react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Trash2, ShoppingCart, CreditCard, AlertCircle } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { formatCurrency } from '../utils/helpers';
+import { Order } from '../types';
 
 const Carrito = () => {
   const { cart, updateQuantity, removeFromCart, clearCart, cartTotal } = useStore();
