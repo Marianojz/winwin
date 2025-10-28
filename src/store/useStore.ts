@@ -147,8 +147,8 @@ export const useStore = create<AppState>((set, get) => ({
       createdAt: new Date().toISOString()
     };
 
-    // Guardar en Firebase Realtime Database
-    const bidRef = push(ref(realtimeDb, `auctions/${auctionId}/bids`));
+    // ✅ VERSIÓN CORREGIDA - Opción simple
+    const bidRef = ref(realtimeDb, `auctions/${auctionId}/bids/${bid.id}`);
     await set(bidRef, bid);
 
     // Actualizar precio actual en Firebase
