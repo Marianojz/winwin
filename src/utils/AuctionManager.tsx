@@ -54,7 +54,7 @@ const AuctionManager = () => {
               });
 
               // Reproducir sonido (si implementamos después)
-              playNotificationSound('outbid');
+              soundManager.playOutbid();
               
               // Actualizar el registro para no notificar múltiples veces
               previousBidsRef.current.delete(key);
