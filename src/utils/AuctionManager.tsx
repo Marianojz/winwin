@@ -128,7 +128,7 @@ const AuctionManager = () => {
               });
 
               // Reproducir sonido de victoria
-              playNotificationSound('won');
+              soundManager.playWon();
 
               // Notificar al admin
               addNotification({
