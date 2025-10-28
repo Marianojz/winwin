@@ -26,6 +26,7 @@ function App() {
       <div className="app">
         <Navbar />
         <AuctionManager />
+        <OrderManager />
         <ScrollToTop />
         <main className="main-content">
           <Routes>
