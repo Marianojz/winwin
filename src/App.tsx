@@ -22,6 +22,7 @@ import Notifications from './pages/Notifications';
 import CompletarPerfil from './pages/CompletarPerfil';
 
 function App() {
+  useSyncFirebase();
   return (
     <Router>
       <div className="app">
