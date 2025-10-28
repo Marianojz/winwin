@@ -11,7 +11,6 @@ const OrderManager = () => {
   useEffect(() => {
     const checkExpiredOrders = () => {
       const now = new Date();
-      let hasChanges = false;
 
       orders.forEach(order => {
         // Solo revisar órdenes pendientes de pago
@@ -21,7 +20,6 @@ const OrderManager = () => {
           // Si expiró el plazo de pago
           if (expiresAt <= now) {
             console.log(`⌛ Orden ${order.id} expiró - Devolviendo al stock`);
-            hasChanges = true;
 
             // Cambiar estado de la orden
             updateOrderStatus(order.id, 'payment_expired');
