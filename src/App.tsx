@@ -3,6 +3,7 @@ import Terminos from './pages/Terminos';
 import Preguntas from './pages/Preguntas';
 import Navbar from './components/Navbar';
 import AuctionManager from './utils/AuctionManager';
+import OrderManager from './utils/OrderManager';
 import ScrollToTop from './components/ScrollToTop';
 import Home from './pages/Home';
 import Subastas from './pages/Subastas';
