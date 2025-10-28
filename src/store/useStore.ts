@@ -30,11 +30,12 @@ interface AppState {
 
   // Notifications
   notifications: Notification[];
+  unreadCount: number;
+  loadUserNotifications: () => void;
   addNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => void;
   markNotificationAsRead: (notificationId: string) => void;
   deleteNotification: (notificationId: string) => void;
   markAsRead: (notificationId: string) => void;
-  unreadCount: number;
 
   // Bots (Admin only)
   bots: Bot[];
@@ -209,7 +210,7 @@ export const useStore = create<AppState>((set, get) => ({
   cartTotal: 0,
 
   // Notifications
-    notifications: [],
+  notifications: [],
   unreadCount: 0,
   
   // Función para cargar notificaciones del usuario actual
@@ -244,8 +245,7 @@ export const useStore = create<AppState>((set, get) => ({
       set({ notifications: [], unreadCount: 0 });
     }
   },
-    
-  notifications: [],
+  
   addNotification: (notification) => {
     const newNotification = {
       ...notification,
@@ -285,7 +285,6 @@ export const useStore = create<AppState>((set, get) => ({
       unreadCount: Math.max(0, state.unreadCount - 1)
     }));
   },
-  unreadCount: 0,
 
   // Bots
   bots: JSON.parse(localStorage.getItem('bots') || '[]'),
