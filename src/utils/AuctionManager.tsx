@@ -1,15 +1,14 @@
 import { useEffect } from 'react';
 import { useStore } from '../store/useStore';
+import { Order } from '../types';
 
 /**
- * Componente que actualiza el estado de las subastas automáticamente
- * Se ejecuta cada 60 segundos y verifica si alguna subasta finalizó
+ * Gestor de subastas que actualiza estados y crea órdenes automáticamente
  */
 const AuctionManager = () => {
-  const { auctions, setAuctions } = useStore();
+  const { auctions, setAuctions, addNotification, addOrder } = useStore();
 
   useEffect(() => {
-    // Función que actualiza el estado de las subastas
     const updateAuctionStatuses = () => {
       const now = new Date();
       let hasChanges = false;
@@ -24,10 +23,66 @@ const AuctionManager = () => {
             console.log(`🔄 Subasta "${auction.title}" finalizó automáticamente`);
             hasChanges = true;
             
-            // Si hay ofertas, marcar como "ended", sino como "unsold"
+            // Verificar si hay ganador (última oferta)
+            if (auction.bids.length > 0) {
+              const winningBid = auction.bids[auction.bids.length - 1];
+              const winnerId = winningBid.userId;
+              const winnerName = winningBid.username;
+              const finalPrice = winningBid.amount;
+
+              // Crear orden de pago para el ganador
+              const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 horas
+              
+              const order: Order = {
+                id: `ORD-${Date.now()}`,
+                userId: winnerId,
+                userName: winnerName,
+                productId: auction.id,
+                productName: auction.title,
+                productImage: auction.images[0] || '',
+                productType: 'auction',
+                type: 'auction',
+                amount: finalPrice,
+                status: 'pending_payment',
+                deliveryMethod: 'shipping',
+                createdAt: now,
+                expiresAt: expiresAt,
+                address: { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } }
+              };
+
+              addOrder(order);
+              console.log(`📝 Orden creada para ${winnerName}: ${finalPrice}`);
+
+              // Notificar al ganador
+              addNotification({
+                userId: winnerId,
+                type: 'auction_won',
+                title: '🎉 ¡Ganaste la subasta!',
+                message: `Ganaste "${auction.title}" por $${finalPrice.toLocaleString()}. Tenés 48hs para pagar.`,
+                read: false,
+                link: '/notificaciones'
+              });
+
+              // Notificar al admin
+              addNotification({
+                userId: 'admin',
+                type: 'auction_won',
+                title: '🎯 Subasta Finalizada',
+                message: `${winnerName} ganó "${auction.title}" por $${finalPrice.toLocaleString()}. Esperando pago.`,
+                read: false
+              });
+
+              return {
+                ...auction,
+                status: 'ended' as const,
+                winnerId: winnerId
+              };
+            }
+            
+            // Si no hay ofertas, marcar como finalizada sin ganador
             return {
               ...auction,
-              status: auction.bids.length > 0 ? 'ended' as const : 'ended' as const
+              status: 'ended' as const
             };
           }
         }
@@ -49,9 +104,9 @@ const AuctionManager = () => {
 
     // Limpiar el intervalo al desmontar el componente
     return () => clearInterval(interval);
-  }, [auctions, setAuctions]);
+  }, [auctions, setAuctions, addNotification, addOrder]);
 
-  return null; // Este componente no renderiza nada visual
+  return null;
 };
 
 export default AuctionManager;
