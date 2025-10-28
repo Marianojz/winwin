@@ -1,23 +1,26 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trash2, ShoppingCart, CreditCard, AlertCircle } from 'lucide-react';
+import { Trash2, ShoppingCart, CreditCard, AlertCircle, Minus, Plus } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { formatCurrency } from '../utils/helpers';
 import { Order } from '../types';
 
-const { 
-  cart, 
-  user, 
-  isAuthenticated,
-  products,
-  removeFromCart, 
-  updateQuantity, 
-  clearCart, 
-  cartTotal,
-  addOrder,
-  addNotification,
-  setProducts
-} = useStore();
+const Carrito = () => {
+  const navigate = useNavigate();
+  
+  const { 
+    cart, 
+    user, 
+    isAuthenticated,
+    products,
+    removeFromCart, 
+    updateQuantity, 
+    clearCart, 
+    cartTotal,
+    addOrder,
+    addNotification,
+    setProducts
+  } = useStore();
 
   const handleCheckout = () => {
     if (cart.length === 0) {
