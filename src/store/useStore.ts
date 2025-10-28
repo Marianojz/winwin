@@ -209,6 +209,39 @@ export const useStore = create<AppState>((set, get) => ({
   cartTotal: 0,
 
   // Notifications
+  // Función para cargar notificaciones del usuario actual
+  loadUserNotifications: () => {
+    const user = get().user;
+    if (!user) {
+      set({ notifications: [], unreadCount: 0 });
+      return;
+    }
+
+    try {
+      const storageKey = `notifications_${user.id}`;
+      const saved = localStorage.getItem(storageKey);
+      
+      if (!saved) {
+        set({ notifications: [], unreadCount: 0 });
+        return;
+      }
+      
+      const parsed = JSON.parse(saved);
+      const notifications = parsed.map((n: any) => ({
+        ...n,
+        createdAt: new Date(n.createdAt)
+      }));
+      
+      const unreadCount = notifications.filter((n: any) => !n.read).length;
+      
+      set({ notifications, unreadCount });
+      console.log(`✅ Cargadas ${notifications.length} notificaciones para ${user.username}`);
+    } catch (error) {
+      console.error('Error cargando notificaciones:', error);
+      set({ notifications: [], unreadCount: 0 });
+    }
+  }
+    
   notifications: [],
   addNotification: (notification) => {
     const newNotification = {
