@@ -6,8 +6,77 @@ const Carrito = () => {
   const { cart, updateQuantity, removeFromCart, clearCart, cartTotal } = useStore();
 
   const handleCheckout = () => {
-    alert('Redirigiendo a MercadoPago...');
+    if (cart.length === 0) {
+      alert('El carrito está vacío');
+      return;
+    }
+
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    // Verificar stock disponible
+    const stockIssues = cart.filter(item => item.quantity > item.product.stock);
+    if (stockIssues.length > 0) {
+      alert(`Stock insuficiente para:\n${stockIssues.map(item => `- ${item.product.name} (disponibles: ${item.product.stock})`).join('\n')}`);
+      return;
+    }
+
+    // Crear órdenes para cada producto
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 horas para pagar
+
+    cart.forEach(item => {
+      const order: Order = {
+        id: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        userId: user.id,
+        userName: user.username,
+        productId: item.product.id,
+        productName: item.product.name,
+        productImage: item.product.images[0] || '',
+        productType: 'store',
+        type: 'store',
+        amount: item.product.price * item.quantity,
+        status: 'pending_payment',
+        deliveryMethod: 'shipping',
+        createdAt: now,
+        expiresAt: expiresAt,
+        address: user.address || { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } }
+      };
+
+      addOrder(order);
+
+      // Reducir stock temporalmente (se devolverá si no paga)
+      const updatedProducts = products.map(p =>
+        p.id === item.product.id
+          ? { ...p, stock: p.stock - item.quantity }
+          : p
+      );
+      setProducts(updatedProducts);
+    });
+
+    // Notificación para el usuario
+    addNotification({
+      userId: user.id,
+      type: 'purchase',
+      title: '🛍️ Compra Iniciada',
+      message: `Compraste ${cart.length} producto(s) por ${formatCurrency(cartTotal)}. Tenés 48hs para pagar.`,
+      read: false
+    });
+
+    // Notificación para el admin
+    addNotification({
+      userId: 'admin',
+      type: 'purchase',
+      title: '🛍️ Nueva Compra',
+      message: `${user.username} inició una compra por ${formatCurrency(cartTotal)}. Esperando pago.`,
+      read: false
+    });
+
     clearCart();
+    alert('¡Compra iniciada! Te enviamos el link de pago por email. Tenés 48hs para completar el pago.');
+    navigate('/notificaciones');
   };
 
   if (cart.length === 0) {
