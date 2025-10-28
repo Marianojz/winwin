@@ -146,14 +146,11 @@ export const useStore = create<AppState>((set, get) => ({
       createdAt: new Date().toISOString()
     };
 
-    // ✅ VERSIÓN CORREGIDA - Con set importado
-    const bidRef = ref(realtimeDb, `auctions/${auctionId}/bids/${bid.id}`);
-    await set(bidRef, bid);
-
-    // Actualizar precio actual en Firebase
+    // ✅ VERSIÓN SIMPLE - Solo usar update
     await update(ref(realtimeDb, `auctions/${auctionId}`), {
       currentPrice: amount,
-      lastBidAt: new Date().toISOString()
+      lastBidAt: new Date().toISOString(),
+      [`bids/${bid.id}`]: bid  // Esto agrega el bid directamente
     });
 
     console.log('✅ Oferta guardada en Firebase');
