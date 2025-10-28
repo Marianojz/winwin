@@ -92,7 +92,6 @@ const {
     alert('¡Compra iniciada! Te enviamos el link de pago por email. Tenés 48hs para completar el pago.');
     navigate('/notificaciones');
   };
-
   if (cart.length === 0) {
     return (
       <div style={{ minHeight: 'calc(100vh - 80px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
