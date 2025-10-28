@@ -108,6 +108,8 @@ const AuctionDetail = () => {
     }
 
     addBid(auction.id, amount, user!.id, user!.username);
+    soundManager.playBid();
+
     
     // Verificar si es la oferta ganadora
     const isWinningBid = auction.buyNowPrice && amount >= auction.buyNowPrice;
