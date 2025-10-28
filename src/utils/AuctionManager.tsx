@@ -1,14 +1,77 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import { Order } from '../types';
 
 /**
- * Gestor de subastas que actualiza estados y crea órdenes automáticamente
+ * Gestor de subastas que actualiza estados, crea órdenes y detecta ofertas superadas
  */
 const AuctionManager = () => {
-  const { auctions, setAuctions, addNotification, addOrder } = useStore();
+  const { auctions, setAuctions, addNotification, addOrder, user } = useStore();
+  const previousBidsRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
+    // Inicializar el mapa de ofertas anteriores
+    auctions.forEach(auction => {
+      const key = `${auction.id}_${user?.id || 'anonymous'}`;
+      if (auction.bids.length > 0 && user) {
+        // Guardar la última oferta del usuario actual por subasta
+        const userLastBid = auction.bids
+          .filter(bid => bid.userId === user.id)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+        
+        if (userLastBid) {
+          previousBidsRef.current.set(key, userLastBid.amount);
+        }
+      }
+    });
+  }, [auctions, user]);
+
+  useEffect(() => {
+    const checkForOutbids = () => {
+      if (!user) return;
+
+      auctions.forEach(auction => {
+        if (auction.status === 'active' && auction.bids.length > 0) {
+          const key = `${auction.id}_${user.id}`;
+          const userLastBidAmount = previousBidsRef.current.get(key);
+          const currentWinningBid = auction.bids[auction.bids.length - 1];
+          
+          // Si el usuario tenía una oferta y ahora no es la ganadora
+          if (userLastBidAmount && currentWinningBid.userId !== user.id) {
+            // Verificar si superaron su oferta
+            if (currentWinningBid.amount > userLastBidAmount) {
+              console.log(`🚨 Usuario ${user.username} fue superado en subasta ${auction.title}`);
+              
+              // Notificar al usuario
+              addNotification({
+                userId: user.id,
+                type: 'auction_outbid',
+                title: '💔 Superaron tu oferta',
+                message: `Alguien ofertó $${currentWinningBid.amount.toLocaleString()} en "${auction.title}". ¡Podés mejorar tu oferta!`,
+                read: false,
+                link: `/subastas/${auction.id}`
+              });
+
+              // Reproducir sonido (si implementamos después)
+              playNotificationSound('outbid');
+              
+              // Actualizar el registro para no notificar múltiples veces
+              previousBidsRef.current.delete(key);
+            }
+          }
+
+          // Actualizar el registro de ofertas actuales del usuario
+          const userCurrentBid = auction.bids
+            .filter(bid => bid.userId === user.id)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+          
+          if (userCurrentBid) {
+            previousBidsRef.current.set(key, userCurrentBid.amount);
+          }
+        }
+      });
+    };
+
     const updateAuctionStatuses = () => {
       const now = new Date();
       let needsUpdate = false;
@@ -63,6 +126,9 @@ const AuctionManager = () => {
                 link: '/notificaciones'
               });
 
+              // Reproducir sonido de victoria
+              playNotificationSound('won');
+
               // Notificar al admin
               addNotification({
                 userId: 'admin',
@@ -96,15 +162,25 @@ const AuctionManager = () => {
       }
     };
 
-    // Ejecutar inmediatamente al cargar
+    // Función para sonidos (placeholder para implementación futura)
+    const playNotificationSound = (type: 'outbid' | 'won') => {
+      // Por ahora solo log, implementaremos sonidos después
+      console.log(`🔊 Reproduciendo sonido para: ${type}`);
+      // Aquí irá la implementación de sonidos
+    };
+
+    // Ejecutar chequeos
+    checkForOutbids();
     updateAuctionStatuses();
 
-    // Ejecutar cada 60 segundos (1 minuto)
-    const interval = setInterval(updateAuctionStatuses, 60000);
+    // Ejecutar cada 30 segundos para chequeos más frecuentes
+    const interval = setInterval(() => {
+      checkForOutbids();
+      updateAuctionStatuses();
+    }, 30000);
 
-    // Limpiar el intervalo al desmontar el componente
     return () => clearInterval(interval);
-  }, [auctions, setAuctions, addNotification, addOrder]);
+  }, [auctions, setAuctions, addNotification, addOrder, user]);
 
   return null;
 };
