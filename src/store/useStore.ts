@@ -1,5 +1,4 @@
-import { ref, update, set } from 'firebase/database';
-import { realtimeDb } from '../config/firebase';
+import { ref, update } from 'firebase/database';
 import { create } from 'zustand';
 import { User, Auction, Product, CartItem, Notification, Theme, Bot, Order, OrderStatus } from '../types';
 
