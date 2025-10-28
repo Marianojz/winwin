@@ -1,7 +1,7 @@
-import { soundManager } from '../utils/sounds';
 import { useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import { Order } from '../types';
+import { soundManager } from '../utils/sounds';
 
 /**
  * Gestor de subastas que actualiza estados, crea órdenes y detecta ofertas superadas
@@ -53,7 +53,7 @@ const AuctionManager = () => {
                 link: `/subastas/${auction.id}`
               });
 
-              // Reproducir sonido (si implementamos después)
+              // Reproducir sonido
               soundManager.playOutbid();
               
               // Actualizar el registro para no notificar múltiples veces
@@ -161,13 +161,6 @@ const AuctionManager = () => {
         console.log('✅ Actualizando estado de subastas...');
         setAuctions(updatedAuctions);
       }
-    };
-
-    // Función para sonidos (placeholder para implementación futura)
-    const playNotificationSound = (type: 'outbid' | 'won') => {
-      // Por ahora solo log, implementaremos sonidos después
-      console.log(`🔊 Reproduciendo sonido para: ${type}`);
-      // Aquí irá la implementación de sonidos
     };
 
     // Ejecutar chequeos
