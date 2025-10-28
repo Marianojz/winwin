@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { ref, onValue, set, push, update, remove } from 'firebase/database';
-import { realtimeDb } from '../firebase';
-import { Auction, Product, Order, Notification } from '../types';
+import { ref, onValue, set, push, update } from 'firebase/database';
+import { realtimeDb } from '../firebase'; // Ajusta la ruta si es necesario
+import { Auction } from '../types';
 
 // Hook para subastas en tiempo real
 export const useAuctionsRealtime = () => {
