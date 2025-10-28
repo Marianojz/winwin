@@ -1,3 +1,4 @@
+import { useSyncFirebase } from './hooks/useSyncFirebase';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Terminos from './pages/Terminos';
 import Preguntas from './pages/Preguntas';
