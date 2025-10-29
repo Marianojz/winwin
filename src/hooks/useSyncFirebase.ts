@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { ref, onValue } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
 import { useStore } from '../store/useStore';
+import { Bid } from '../types';
 
 const useSyncFirebase = () => {
   const { setAuctions, setProducts } = useStore();
@@ -19,7 +20,18 @@ const useSyncFirebase = () => {
         const auctionsArray = Object.keys(data).map(key => {
           const auctionData = data[key];
           
-          // ✅ CORRECCIÓN: Manejar datos que pueden faltar o ser undefined
+          // Convertir bids de unknown[] a Bid[]
+          const bids: Bid[] = auctionData?.bids ? Object.values(auctionData.bids).map((bid: any) => ({
+            id: bid.id || '',
+            auctionId: bid.auctionId || '',
+            userId: bid.userId || '',
+            username: bid.username || '',
+            amount: bid.amount || 0,
+            createdAt: new Date(bid.createdAt || new Date()),
+            isBot: bid.isBot || false
+          })) : [];
+          
+          // ✅ CORRECCIÓN: Estructura tipada correctamente
           return {
             id: key,
             title: auctionData?.title || 'Sin título',
@@ -31,7 +43,7 @@ const useSyncFirebase = () => {
             endTime: new Date(auctionData?.endTime || new Date()),
             status: auctionData?.status || 'active',
             categoryId: auctionData?.categoryId || 'general',
-            bids: auctionData?.bids ? Object.values(auctionData.bids) : [],
+            bids: bids, // ← Ahora es Bid[] correctamente tipado
             winnerId: auctionData?.winnerId,
             featured: auctionData?.featured || false,
             isFlash: auctionData?.isFlash || false,
