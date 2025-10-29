@@ -131,8 +131,8 @@ const AdminPanel = () => {
         featured: auctionForm.featured || false,
         isFlash: totalMinutes <= 60, // Si dura 1 hora o menos, es flash
         condition: auctionForm.condition || 'new',
-        id: `auction_${Date.now()}` // ID temporal
-        createdBy: user?.id || 'admin',
+        id: `auction_${Date.now()}`, // ID temporal
+        createdBy: user?.id || 'admin' // AGREGAR ESTA LÍNEA SIN COMA
       };
 
       // Actualizar estado local
@@ -3548,6 +3548,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
