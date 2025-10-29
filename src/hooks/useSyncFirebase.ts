@@ -51,3 +51,38 @@ export const useSyncFirebase = () => {
 
   return null;
 };
+export const useSyncFirebase = () => {
+  const { setAuctions, setProducts } = useStore();
+
+  useEffect(() => {
+    console.log('🔄 INICIANDO SINCRONIZACIÓN FIREBASE...');
+
+    // Sincronizar subastas
+    const auctionsRef = ref(realtimeDb, 'auctions');
+    const unsubscribeAuctions = onValue(auctionsRef, (snapshot) => {
+      const data = snapshot.val();
+      console.log('📡 Firebase - Datos recibidos:', data);
+      
+      if (data) {
+        const auctionsArray = Object.keys(data).map(key => ({
+          id: key,
+          ...data[key],
+          endTime: new Date(data[key].endTime),
+          bids: data[key].bids ? Object.values(data[key].bids) : []
+        }));
+        console.log('✅ Firebase - Subastas sincronizadas:', auctionsArray.length);
+        setAuctions(auctionsArray);
+      } else {
+        console.log('📭 Firebase - No hay subastas');
+        setAuctions([]);
+      }
+    });
+
+    return () => {
+      console.log('🔴 Cerrando sincronización Firebase');
+      unsubscribeAuctions();
+    };
+  }, [setAuctions, setProducts]);
+
+  return null;
+};
