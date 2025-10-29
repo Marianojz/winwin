@@ -79,36 +79,44 @@ const AuctionDetail = () => {
   const isActive = auction.status === 'active';
 
   const handleBid = () => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
+  if (!isAuthenticated) {
+    navigate('/login');
+    return;
+  }
 
-    // VALIDACIÓN: Verificar que la subasta esté activa
-    if (!isActive) {
-      alert('Esta subasta ya finalizó. No se pueden realizar más ofertas.');
-      return;
-    }
+  // VALIDACIÓN: Verificar que la subasta esté activa
+  if (!isActive) {
+    alert('Esta subasta ya finalizó. No se pueden realizar más ofertas.');
+    return;
+  }
 
-    const amount = parseInt(bidAmount);
-    
-    if (isNaN(amount)) {
-      setShowBidError('Ingresa un monto válido');
-      return;
-    }
+  const amount = parseInt(bidAmount);
+  
+  if (isNaN(amount)) {
+    setShowBidError('Ingresa un monto válido');
+    return;
+  }
 
-    if (amount % 500 !== 0) {
-      setShowBidError('La oferta debe ser múltiplo de $500');
-      return;
-    }
+  if (amount % 500 !== 0) {
+    setShowBidError('La oferta debe ser múltiplo de $500');
+    return;
+  }
 
-    if (amount <= auction.currentPrice) {
-      setShowBidError(`La oferta debe ser mayor a ${formatCurrency(auction.currentPrice)}`);
-      return;
-    }
+  // ✅ CORRECCIÓN CRÍTICA: Validar que sea mayor al precio actual
+  if (amount <= auction.currentPrice) {
+    setShowBidError(`La oferta debe ser mayor a ${formatCurrency(auction.currentPrice)}`);
+    return;
+  }
 
-    addBid(auction.id, amount, user!.id, user!.username);
-    soundManager.playBid();
+  // ✅ CORRECCIÓN: Validar que no sea tu propia oferta la ganadora
+  const lastBid = auction.bids[auction.bids.length - 1];
+  if (lastBid && lastBid.userId === user!.id) {
+    setShowBidError('Ya sos el mejor postor. Esperá a que alguien supere tu oferta.');
+    return;
+  }
+
+  addBid(auction.id, amount, user!.id, user!.username);
+  soundManager.playBid();
 
     
     // Verificar si es la oferta ganadora
