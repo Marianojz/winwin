@@ -28,6 +28,29 @@ const AuctionManager = () => {
   }, [auctions, user]);
 
   useEffect(() => {
+    // ✅ NUEVO: LIMPIAR SUBASTAS CORRUPTAS
+    const cleanCorruptedAuctions = () => {
+      const corruptedAuctions = auctions.filter(auction => 
+        !auction.title || auction.title === 'Sin título' || auction.title.trim() === ''
+      );
+      
+      if (corruptedAuctions.length > 0) {
+        console.log(`🗑️ Eliminando ${corruptedAuctions.length} subastas corruptas:`);
+        corruptedAuctions.forEach(auction => {
+          console.log(`   - "${auction.title}" (ID: ${auction.id})`);
+        });
+        
+        // Filtrar solo subastas válidas
+        const validAuctions = auctions.filter(auction => 
+          auction.title && auction.title !== 'Sin título' && auction.title.trim() !== ''
+        );
+        
+        setAuctions(validAuctions);
+        return true; // Hubo limpieza
+      }
+      return false; // No hubo limpieza
+    };
+
     const checkForOutbids = () => {
       if (!user) return;
 
@@ -172,7 +195,16 @@ const AuctionManager = () => {
       }
     };
 
-    // Ejecutar chequeos
+    // ✅ PRIMERO: Limpiar subastas corruptas
+    const hadCleanup = cleanCorruptedAuctions();
+    
+    // Si hubo limpieza, salir y esperar próximo ciclo
+    if (hadCleanup) {
+      console.log('🔄 Limpieza completada, esperando próximo ciclo...');
+      return;
+    }
+
+    // Ejecutar chequeos normales
     checkForOutbids();
     updateAuctionStatuses();
 
