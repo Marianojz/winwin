@@ -307,7 +307,7 @@ const AuctionDetail = () => {
     </div>
   </div>
 )}
-              ) : (
+              )} : (
                 <div style={{ padding: '1rem', background: '#666', color: 'white', borderRadius: '0.75rem', textAlign: 'center' }}>
                   <Clock size={20} style={{ marginBottom: '0.5rem' }} />
                   <div>⏰ Subasta Finalizada</div>
