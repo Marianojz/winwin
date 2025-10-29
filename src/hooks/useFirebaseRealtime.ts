@@ -17,8 +17,8 @@ export const useAuctionsRealtime = () => {
           id: key,
           ...data[key],
           endTime: new Date(data[key].endTime),
-          bids: data[key].bids ? Object.values(data[key].bids) : []
-          createdBy: data[key].createdBy || 'unknown',
+          bids: data[key].bids ? Object.values(data[key].bids) : [],
+          createdBy: data[key].createdBy || 'unknown' // AGREGAR ESTA LÍNEA SIN COMA
         }));
         setAuctions(auctionsArray);
       } else {
