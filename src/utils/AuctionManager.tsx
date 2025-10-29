@@ -74,27 +74,27 @@ const AuctionManager = () => {
     };
 
     const updateAuctionStatuses = () => {
-  const now = new Date();
-  let needsUpdate = false;
+      const now = new Date();
+      let needsUpdate = false;
 
-  console.log('🕐 Chequeando subastas - Hora actual:', now.toISOString());
+      console.log('🕐 Chequeando subastas - Hora actual:', now.toISOString());
 
-  const updatedAuctions = auctions.map(auction => {
-    // Solo revisar subastas activas
-    if (auction.status === 'active') {
-      const endTime = new Date(auction.endTime);
-      
-      console.log(`📊 Subasta "${auction.title}":`, {
-        endTime: endTime.toISOString(),
-        now: now.toISOString(),
-        shouldEnd: endTime <= now,
-        timeRemaining: endTime.getTime() - now.getTime()
-      });
-      
-      // Si el tiempo de finalización ya pasó
-      if (endTime <= now) {
-        console.log(`🔄 Subasta "${auction.title}" finalizó automáticamente`);
-        needsUpdate = true;;
+      const updatedAuctions = auctions.map(auction => {
+        // Solo revisar subastas activas
+        if (auction.status === 'active') {
+          const endTime = new Date(auction.endTime);
+          
+          console.log(`📊 Subasta "${auction.title}":`, {
+            endTime: endTime.toISOString(),
+            now: now.toISOString(),
+            shouldEnd: endTime <= now,
+            timeRemaining: endTime.getTime() - now.getTime()
+          });
+          
+          // Si el tiempo de finalización ya pasó
+          if (endTime <= now) {
+            console.log(`🔄 Subasta "${auction.title}" finalizó automáticamente`);
+            needsUpdate = true;
             
             // Verificar si hay ganador (última oferta)
             if (auction.bids.length > 0) {
