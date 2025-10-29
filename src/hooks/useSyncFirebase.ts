@@ -47,7 +47,8 @@ const useSyncFirebase = () => {
             winnerId: auctionData?.winnerId,
             featured: auctionData?.featured || false,
             isFlash: auctionData?.isFlash || false,
-            condition: auctionData?.condition || 'good'
+            condition: auctionData?.condition || 'good',
+            createdBy: auctionData?.createdBy || 'unknown' // <- AGREGAR ESTA LÍNEA
           };
         });
         
