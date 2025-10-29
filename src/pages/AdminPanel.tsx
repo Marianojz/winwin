@@ -137,6 +137,13 @@ const AdminPanel = () => {
 
       // Actualizar estado local
       setAuctions([...auctions, newAuction]);
+            // Guardar en Firebase
+      try {
+        await update(ref(realtimeDb, `auctions/${newAuction.id}`), newAuction);
+        console.log('✅ Subasta guardada en Firebase');
+      } catch (error) {
+        console.error('❌ Error guardando en Firebase:', error);
+      }
 
       // Mensaje de éxito
       const successMessage = auctionForm.scheduled 
@@ -3548,6 +3555,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
