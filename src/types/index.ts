@@ -20,6 +20,7 @@ export interface User {
 
 export interface Auction {
   id: string;
+  createdBy: string;
   title: string;
   description: string;
   images: string[];
