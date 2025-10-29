@@ -138,7 +138,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
   addBid: async (auctionId, amount, userId, username) => {
   try {
-        console.log('🔥 Intentando guardar oferta en Firebase...');
+    console.log('🔥 Intentando guardar oferta en Firebase...');
     
     const bid = {
       id: Date.now().toString(),
@@ -149,18 +149,22 @@ export const useStore = create<AppState>((set, get) => ({
       createdAt: new Date().toISOString()
     };
 
-    // ✅ VERSIÓN SIMPLE - Solo usar update
+    // AGREGÁ ESTE LOG PARA VER LA URL
+    console.log('🔗 URL de Firebase:', `auctions/${auctionId}`);
+    
     await update(ref(realtimeDb, `auctions/${auctionId}`), {
       currentPrice: amount,
       lastBidAt: new Date().toISOString(),
-      [`bids/${bid.id}`]: bid  // Esto agrega el bid directamente
+      [`bids/${bid.id}`]: bid
     });
 
     console.log('✅ OFERTA GUARDADA EN FIREBASE EXITOSAMENTE');
     
   } catch (error) {
-    console.error('❌ ERROR CRÍTICO guardando oferta en Firebase:', error);
-    // Fallback a localStorage si Firebase falla
+    console.error('❌ ERROR CRÍTICO Firebase:', error);
+    console.error('❌ VERIFICAR: 1) Realtime Database activado 2) Reglas en test mode');
+    
+    // Fallback a localStorage
     const state = get();
     const auctions = state.auctions.map(auction => {
       if (auction.id === auctionId) {
