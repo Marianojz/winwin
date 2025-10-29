@@ -138,6 +138,8 @@ export const useStore = create<AppState>((set, get) => ({
   },
   addBid: async (auctionId, amount, userId, username) => {
   try {
+        console.log('🔥 Intentando guardar oferta en Firebase...');
+    
     const bid = {
       id: Date.now().toString(),
       auctionId,
@@ -154,10 +156,10 @@ export const useStore = create<AppState>((set, get) => ({
       [`bids/${bid.id}`]: bid  // Esto agrega el bid directamente
     });
 
-    console.log('✅ Oferta guardada en Firebase');
+    console.log('✅ OFERTA GUARDADA EN FIREBASE EXITOSAMENTE');
     
   } catch (error) {
-    console.error('❌ Error guardando oferta en Firebase:', error);
+    console.error('❌ ERROR CRÍTICO guardando oferta en Firebase:', error);
     // Fallback a localStorage si Firebase falla
     const state = get();
     const auctions = state.auctions.map(auction => {
