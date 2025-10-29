@@ -136,9 +136,19 @@ export const useStore = create<AppState>((set, get) => ({
     safeLocalStorageSet('auctions', auctions);
     set({ auctions });
   },
-  addBid: async (auctionId, amount, userId, username) => {
+    addBid: async (auctionId, amount, userId, username) => {
   try {
     console.log('🔥 Intentando guardar oferta en Firebase...');
+    
+    // VERIFICAR QUE EL USUARIO NO SEA EL CREADOR DE LA SUBASTA
+    const state = get();
+    const auction = state.auctions.find(a => a.id === auctionId);
+    
+    if (auction && auction.createdBy === userId) {
+      console.error('❌ ERROR: No puedes hacer ofertas en tu propia subasta');
+      alert('No puedes hacer ofertas en tu propia subasta');
+      return; // Detener la función aquí
+    }
     
     const bid = {
       id: Date.now().toString(),
