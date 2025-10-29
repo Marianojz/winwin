@@ -137,15 +137,18 @@ const AdminPanel = () => {
         createdBy: user?.id || 'admin' // AGREGAR ESTA LÍNEA SIN COMA
       };
 
-      // Actualizar estado local
-      setAuctions([...auctions, newAuction]);
-            // Guardar en Firebase
+      // Guardar en Firebase
       try {
+        console.log('🔥 Guardando subasta en Firebase...');
         await update(ref(realtimeDb, `auctions/${newAuction.id}`), newAuction);
-        console.log('✅ Subasta guardada en Firebase');
+        console.log('✅ Subasta guardada en Firebase correctamente');
       } catch (error) {
         console.error('❌ Error guardando en Firebase:', error);
+        alert('Error guardando en Firebase: ' + error.message);
       }
+
+      // Actualizar estado local
+      setAuctions([...auctions, newAuction]);
 
       // Mensaje de éxito
       const successMessage = auctionForm.scheduled 
@@ -3557,6 +3560,7 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
 
 
 
