@@ -37,7 +37,7 @@ const useSyncFirebase = () => {
             title: auctionData?.title || 'Sin título',
             description: auctionData?.description || '',
             images: auctionData?.images || [],
-            startPrice: auctionData?.startPrice || 0,
+            startingPrice: auctionData?.startingPrice || 0,
             currentPrice: auctionData?.currentPrice || 0,
             buyNowPrice: auctionData?.buyNowPrice,
             endTime: new Date(auctionData?.endTime || new Date()),
