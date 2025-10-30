@@ -24,19 +24,19 @@ export interface Auction {
   title: string;
   description: string;
   images: string[];
-  startingPrice: number;  // ← Asegúrate que sea startingPrice
+  startingPrice: number;  // ← DEBE ser startingPrice
   currentPrice: number;
   buyNowPrice?: number;
-  startTime: Date;        // ← Requerido
+  startTime: Date;
   endTime: Date;
-  status: 'active' | 'ended' | 'sold' | 'cancelled' | 'scheduled'; // ← Agregar 'scheduled'
+  status: 'active' | 'ended' | 'sold' | 'cancelled' | 'scheduled';
   categoryId: string;
   bids: Bid[];
   winnerId?: string;
   featured?: boolean;
   isFlash?: boolean;
   condition?: 'new' | 'like-new' | 'excellent' | 'good' | 'fair';
-  createdAt?: Date;       // ← Recomendado
+  createdAt?: Date;
 }
 
 export interface Bid {
