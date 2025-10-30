@@ -590,7 +590,7 @@ const newAuction: Auction = {
     setAuctionForm({
       title: auction.title,
       description: auction.description,
-      startPrice: (auction as any).startPrice ?? (auction as any).startPrice,
+      startPrice: auction.startingPrice,
       currentPrice: auction.currentPrice,
       buyNowPrice: auction.buyNowPrice || 0,
       categoryId: auction.categoryId,
