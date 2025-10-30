@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import { Order } from '../types';
 import { soundManager } from '../utils/sounds';
+import { launchConfettiFromTop } from '../utils/celebrations';
 
 /**
  * Gestor de subastas que actualiza estados, crea órdenes y detecta ofertas superadas
@@ -161,6 +162,10 @@ const AuctionManager = () => {
 
               // Reproducir sonido de victoria
               soundManager.playWon();
+              // Efecto visual: papel picado para el usuario ganador
+              if (user && user.id === winnerId) {
+                launchConfettiFromTop(3500);
+              }
 
               // Notificar al admin
               addNotification({

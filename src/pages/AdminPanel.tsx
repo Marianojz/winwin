@@ -46,16 +46,16 @@ const AdminPanel = () => {
     }
 
     // Validar precio inicial
-    if (!form.startPrice || form.startPrice <= 0) {
+    if (!form.startingPrice || form.startingPrice <= 0) {
       errors.push('El precio inicial debe ser mayor a $0');
     }
-    if (form.startPrice && form.startPrice < 100) {
+    if (form.startingPrice && form.startingPrice < 100) {
       errors.push('El precio inicial mínimo es $100');
     }
 
     // Validar precio de Compra Ya (si está activado)
     if (form.buyNowPrice && form.buyNowPrice > 0) {
-      if (form.buyNowPrice <= form.startPrice) {
+      if (form.buyNowPrice <= form.startingPrice) {
         errors.push('El precio de "Compra Ya" debe ser mayor al precio inicial');
       }
     }
@@ -104,6 +104,10 @@ const AdminPanel = () => {
       return;
     }
 
+    if (!user || !user.id) {
+      alert('Debes estar autenticado para crear subastas.');
+      return;
+    }
     try {
       // Calcular fecha de finalización
       const now = new Date();
@@ -118,39 +122,53 @@ const AdminPanel = () => {
       const totalMinutes = (auctionForm.durationDays * 24 * 60) + (auctionForm.durationHours * 60) + auctionForm.durationMinutes;
       const endTime = new Date(startTime.getTime() + totalMinutes * 60000);
 
+      // Sanitizar precio inicial, quitar ceros a izquierda
+      let sanitizedStartingPrice = String(auctionForm.startingPrice || '').replace(/^0+/, '');
+      if (!sanitizedStartingPrice || isNaN(Number(sanitizedStartingPrice)) || Number(sanitizedStartingPrice) < 100) {
+        alert('El precio inicial debe ser un número mayor o igual a $100 (sin ceros a la izquierda).');
+        return;
+      }
+      sanitizedStartingPrice = Number(sanitizedStartingPrice);
+
+      // Verificar formato de otros campos claves
+      if (!auctionForm.title || !auctionForm.description || !auctionForm.images?.length) {
+        alert('Todos los campos requeridos deben estar completos y válidos.');
+        return;
+      }
+
       // Crear objeto de subasta
       const newAuction = {
         title: auctionForm.title.trim(),
         description: auctionForm.description.trim(),
         images: auctionForm.images,
-        startPrice: Number(auctionForm.startPrice),
-        currentPrice: Number(auctionForm.startPrice),
+        startingPrice: sanitizedStartingPrice,
+        currentPrice: sanitizedStartingPrice,
         buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
-        endTime: endTime,
+        endTime: +endTime,
         status: auctionForm.scheduled ? 'scheduled' as any : 'active',
         categoryId: auctionForm.categoryId,
         bids: [],
         featured: auctionForm.featured || false,
         isFlash: totalMinutes <= 60, // Si dura 1 hora o menos, es flash
         condition: auctionForm.condition || 'new',
-        id: `auction_${Date.now()}`, // ID temporal
-        createdBy: user?.id || 'admin' // AGREGAR ESTA LÍNEA SIN COMA
+        id: `auction_${Date.now()}`,
+        createdBy: user.id
       };
 
       // Guardar en Firebase
-try {
-  console.log('🔥 Guardando subasta en Firebase...');
-  await update(ref(realtimeDb, `auctions/${newAuction.id}`), newAuction);
-  console.log('✅ Subasta guardada en Firebase correctamente');
-} catch (error) {
-  console.error('❌ Error guardando en Firebase:', error);
-  
-  if (error instanceof Error) {
-    alert('Error guardando en Firebase: ' + error.message);
-  } else {
-    alert('Error guardando en Firebase: Error desconocido');
-  }
-}
+      try {
+        console.log('🔥 Guardando subasta en Firebase...');
+        await update(ref(realtimeDb, `auctions/${newAuction.id}`), newAuction);
+        console.log('✅ Subasta guardada en Firebase correctamente');
+      } catch (error) {
+        console.error('❌ Error guardando en Firebase:', error);
+        
+        if (error instanceof Error) {
+          alert('Error guardando en Firebase: ' + error.message);
+        } else {
+          alert('Error guardando en Firebase: Error desconocido');
+        }
+      }
 
       // Actualizar estado local
       setAuctions([...auctions, newAuction]);
@@ -166,8 +184,8 @@ try {
       setAuctionForm({
         title: '',
         description: '',
-        startPrice: 1000,
-        currentPrice: 0,
+        startingPrice: 1000,
+        currentPrice: 1000,
         buyNowPrice: 0,
         categoryId: '1',
         images: [] as string[],
@@ -214,7 +232,7 @@ try {
   const [auctionForm, setAuctionForm] = useState({
     title: '',
     description: '',
-    startPrice: 0,
+    startingPrice: 0,
     currentPrice: 0,
     buyNowPrice: 0,
     categoryId: '1',
@@ -570,7 +588,7 @@ try {
     setAuctionForm({
       title: auction.title,
       description: auction.description,
-      startPrice: auction.startPrice,
+      startingPrice: auction.startingPrice,
       currentPrice: auction.currentPrice,
       buyNowPrice: auction.buyNowPrice || 0,
       categoryId: auction.categoryId,
@@ -599,7 +617,7 @@ try {
     }
 
     // Advertencia si se modifica precio inicial y ya hay ofertas
-    if (editingAuction.bids.length > 0 && auctionForm.startPrice !== editingAuction.startPrice) {
+    if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAuction.startingPrice) {
       if (!window.confirm('⚠️ ADVERTENCIA: Esta subasta ya tiene ofertas.\n\n¿Estás seguro de cambiar el precio inicial?\n\nEsto puede afectar la validez de las ofertas existentes.')) {
         return;
       }
@@ -617,8 +635,8 @@ try {
             ...a, 
             title: auctionForm.title.trim(),
             description: auctionForm.description.trim(),
-            startPrice: Number(auctionForm.startPrice),
-            currentPrice: Math.max(Number(auctionForm.currentPrice), Number(auctionForm.startPrice)),
+            startingPrice: Number(auctionForm.startingPrice),
+            currentPrice: Math.max(Number(auctionForm.currentPrice), Number(auctionForm.startingPrice)),
             buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
             categoryId: auctionForm.categoryId,
             images: auctionForm.images,
@@ -2267,8 +2285,8 @@ try {
                     <input 
                       type="number" 
                       placeholder="1000"
-                      value={auctionForm.startPrice}
-                      onChange={(e) => setAuctionForm({...auctionForm, startPrice: Number(e.target.value)})}
+                      value={auctionForm.startingPrice}
+                      onChange={(e) => setAuctionForm({...auctionForm, startingPrice: Number(e.target.value)})}
                       min="100"
                       step="500"
                       style={{ 
@@ -2279,7 +2297,7 @@ try {
                         border: '2px solid var(--border)'
                       }}
                     />
-                    {editingAuction.bids.length > 0 && auctionForm.startPrice !== editingAuction.startPrice && (
+                    {editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAuction.startingPrice && (
                       <div style={{ fontSize: '0.8125rem', color: 'var(--warning)', marginTop: '0.5rem', fontWeight: 600 }}>
                         ⚠️ Modificando precio inicial
                       </div>
@@ -2295,7 +2313,7 @@ try {
                       type="number" 
                       value={auctionForm.currentPrice}
                       onChange={(e) => setAuctionForm({...auctionForm, currentPrice: Number(e.target.value)})}
-                      min={auctionForm.startPrice}
+                      min={auctionForm.startingPrice}
                       step="500"
                       style={{ 
                         width: '100%', 
@@ -2560,7 +2578,7 @@ try {
                     placeholder="ID de pedido, usuario..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem }}
                   />
                 </div>
                 <div>
@@ -2571,7 +2589,7 @@ try {
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value as OrderStatus | 'all')}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem }}
                   >
                     <option value="all">Todos los estados</option>
                     <option value="pending_payment">⏳ Pago Pendiente</option>
@@ -2974,7 +2992,7 @@ try {
                     placeholder="Bot Argentina"
                     value={botForm.name}
                     onChange={(e) => setBotForm({...botForm, name: e.target.value})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem }}
                   />
                 </div>
                 <div>
@@ -2985,7 +3003,7 @@ try {
                     type="number" 
                     value={botForm.balance}
                     onChange={(e) => setBotForm({...botForm, balance: Number(e.target.value)})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem }}
                     min="0"
                   />
                 </div>
@@ -2997,7 +3015,7 @@ try {
                     type="number" 
                     value={botForm.maxBidAmount}
                     onChange={(e) => setBotForm({...botForm, maxBidAmount: Number(e.target.value)})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem }}
                     min="0"
                   />
                 </div>
@@ -3011,7 +3029,7 @@ try {
                     type="number" 
                     value={botForm.intervalMin}
                     onChange={(e) => setBotForm({...botForm, intervalMin: Number(e.target.value)})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem }}
                     min="1"
                   />
                 </div>
@@ -3023,7 +3041,7 @@ try {
                     type="number" 
                     value={botForm.intervalMax}
                     onChange={(e) => setBotForm({...botForm, intervalMax: Number(e.target.value)})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem }}
                     min="1"
                   />
                 </div>
@@ -3237,8 +3255,8 @@ try {
                     <input 
                       type="number" 
                       placeholder="1000"
-                      value={auctionForm.startPrice}
-                      onChange={(e) => setAuctionForm({...auctionForm, startPrice: Number(e.target.value)})}
+                      value={auctionForm.startingPrice}
+                      onChange={(e) => setAuctionForm({...auctionForm, startingPrice: Number(e.target.value)})}
                       min="100"
                       step="500"
                       style={{ 
@@ -3523,8 +3541,8 @@ try {
                       setAuctionForm({
                         title: '',
                         description: '',
-                        startPrice: 1000,
-                        currentPrice: 0,
+                        startingPrice: 1000,
+                        currentPrice: 1000,
                         buyNowPrice: 0,
                         categoryId: '1',
                         images: [] as string[],

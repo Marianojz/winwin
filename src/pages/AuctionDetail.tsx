@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Gavel, User, Clock, ShoppingCart, AlertCircle, TrendingUp, ChevronLeft } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { formatCurrency, formatTimeAgo } from '../utils/helpers';
+import { launchConfettiFromTop } from '../utils/celebrations';
 import Countdown from '../components/Countdown';
 
 const AuctionDetail = () => {
@@ -78,6 +79,13 @@ const AuctionDetail = () => {
 
   const isActive = auction.status === 'active';
 
+  // Agregar hooks/cálculos auxiliares para saber tiempo restante (en segundos)
+  const now = Date.now();
+  const auctionEndTimestamp = new Date(auction.endTime).getTime();
+  const secondsToFinish = Math.max(0, Math.floor((auctionEndTimestamp - now) / 1000));
+  const lessThanOneMinute = isActive && secondsToFinish <= 60;
+  const lessThanTenSeconds = isActive && secondsToFinish <= 10;
+
   const handleBid = () => {
   if (!isAuthenticated) {
     navigate('/login');
@@ -131,6 +139,7 @@ const AuctionDetail = () => {
         read: false,
         link: '/notificaciones'
       });
+      launchConfettiFromTop(3500);
       alert(`🎉 ¡GANASTE LA SUBASTA!\n\nProducto: ${auction.title}\nMonto final: ${formatCurrency(amount)}\n\nTenés 48 horas para completar el pago.\nRevisá tus notificaciones para ver el ticket de pago.`);
     } else {
       addNotification({
@@ -172,6 +181,7 @@ const AuctionDetail = () => {
           read: false,
           link: '/notificaciones'
         });
+        launchConfettiFromTop(3500);
         
         const mercadopagoLink = `https://www.mercadopago.com.ar/checkout/v1/payment?preference_id=MOCK-${auction.id}-${Date.now()}`;
         
@@ -269,14 +279,6 @@ const AuctionDetail = () => {
                 </div>
               )}
 
-              {isActive ? (
-                <div style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
-                  <Clock size={20} style={{ marginBottom: '0.5rem' }} />
-                  <Countdown endTime={auction.endTime} />
-                </div>
-              )
-              : null}
-
               {/* RECUADRO EXPLICATIVO - MEJORA 2 */}
 {isActive && (
   <div style={{ 
@@ -307,15 +309,75 @@ const AuctionDetail = () => {
     </div>
   </div>
 )}
-                <div style={{ padding: '1rem', background: '#666', color: 'white', borderRadius: '0.75rem', textAlign: 'center' }}>
-                  <Clock size={20} style={{ marginBottom: '0.5rem' }} />
-                  <div>⏰ Subasta Finalizada</div>
-                  {isRecentlyEnded && (
-                    <div style={{ fontSize: '0.875rem', opacity: 0.8, marginTop: '0.25rem' }}>
-                      Se ocultará en: {formatTime(timeRemaining)}
-                    </div>
-                  )}
-                </div>
+                {/* Mejorar panel de estado según ACTIVA o FINALIZADA */}
+{isActive ? (
+  <div
+    style={{
+      padding: '1.5rem 1rem',
+      background: lessThanOneMinute ? '#ffa726' : 'var(--bg-tertiary)',
+      borderRadius: '0.75rem',
+      boxShadow: lessThanOneMinute
+        ? '0 0 25px 3px #FFA50080, 0 0 8px #ff5722' : '0 2px 8px #0001',
+      border: lessThanOneMinute ? '2px solid #e65100' : '2px solid var(--primary)',
+      color: lessThanOneMinute ? '#fff' : 'var(--text-primary)',
+      marginBottom: '1.25rem',
+      position: 'relative',
+      textAlign: 'center',
+      transition: 'all .33s cubic-bezier(.6,-0.01,0,1.01)'
+    }}
+  >
+    <div
+      style={{
+        marginBottom: '0.5rem',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: '0.5rem',
+        animation: lessThanTenSeconds ? 'shake 0.5s infinite alternate' : undefined
+      }}
+    >
+      <Clock size={28} style={{ color: lessThanOneMinute ? '#fff7a7' : 'var(--primary)', transition: 'color .33s' }} />
+      <span
+        style={{
+          fontWeight: 'bold',
+          fontSize: lessThanOneMinute ? '2.2rem' : '1.6rem',
+          color: lessThanOneMinute ? '#fff' : 'var(--primary)',
+          letterSpacing: '1.5px',
+          transition: 'color .3s',
+          animation: lessThanOneMinute ? 'blinker 1s steps(2) infinite' : undefined
+        }}
+      >
+        <Countdown endTime={auction.endTime} />
+      </span>
+    </div>
+    <div style={{fontSize: '1.05rem', fontWeight: 500}}>{lessThanOneMinute ? '¡Poco tiempo! ¡No te quedes afuera!' : 'Subasta Activa'}</div>
+    <style>
+      {`
+        @keyframes blinker { 50% { opacity: 0.5; }}
+        @keyframes shake {
+          0% { transform: translateX(0); }
+          40% { transform: translateX(-3px); }
+          60% { transform: translateX(3px); }
+          100% { transform: translateX(0); }
+        }
+      `}
+    </style>
+  </div>
+) : (
+  <div style={{
+    padding: '1.5rem 1rem', background: '#666', color: '#fff', borderRadius: '0.75rem', marginBottom: '1.25rem', textAlign: 'center', border: '2px solid #444', boxShadow: '0 1px 6px #0002',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12
+  }}>
+    <AlertCircle size={40} color="#ffe37a" style={{ marginBottom: '0.5rem' }} />
+    <div style={{fontWeight: 700,fontSize: '1.25rem'}}>Subasta Finalizada</div>
+    <div style={{fontSize: '1rem', opacity: 0.88}}>No se pueden aceptar más ofertas en este artículo.</div>
+    {isRecentlyEnded && (
+      <div style={{ fontSize: '0.875rem', opacity: 0.8, marginTop: '0.25rem' }}>
+        Se ocultará en: {formatTime(timeRemaining)}
+      </div>
+    )}
+  </div>
+)}
             </div>
 
             {/* SOLO mostrar controles de oferta si la subasta está ACTIVA */}
@@ -429,7 +491,7 @@ const AuctionDetail = () => {
               </li>
               <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
                 <span style={{ color: 'var(--primary)', fontWeight: 700 }}>✓</span>
-                <span>Precio de inicio: {formatCurrency(auction.startPrice)}</span>
+                <span>Precio de inicio: {formatCurrency(auction.startingPrice ?? auction.currentPrice)}</span>
               </li>
             </ul>
           </div>
