@@ -230,25 +230,25 @@ const newAuction: Auction = {
 });
 
   // Estados para subastas
-  const [editingAuction, setEditingAuction] = useState<Auction | null>(null);
-  const [auctionForm, setAuctionForm] = useState({
-    title: '',
-    description: '',
-    startPrice: 0,
-    currentPrice: 0,
-    buyNowPrice: 0,
-    categoryId: '1',
-    images: [] as string[],
-    durationDays: 0,
-    durationHours: 0,
-    durationMinutes: 30,
-    condition: 'new' as 'new' | 'like-new' | 'excellent' | 'good' | 'fair',
-    featured: false,
-    allowExtension: true,
-    scheduled: false,
-    scheduledDate: '',
-    scheduledTime: ''
-  });
+const [editingAuction, setEditingAuction] = useState<Auction | null>(null);
+const [auctionForm, setAuctionForm] = useState({
+  title: '',
+  description: '',
+  startingPrice: 0,  // ← CAMBIADO de startPrice a startingPrice
+  currentPrice: 0,
+  buyNowPrice: 0,
+  categoryId: '1',
+  images: [] as string[],
+  durationDays: 0,
+  durationHours: 0,
+  durationMinutes: 30,
+  condition: 'new' as 'new' | 'like-new' | 'excellent' | 'good' | 'fair',
+  featured: false,
+  allowExtension: true,
+  scheduled: false,
+  scheduledDate: '',
+  scheduledTime: ''
+});
 
   // Estados para bots
   const [botForm, setBotForm] = useState({
