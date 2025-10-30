@@ -123,12 +123,12 @@ if (form.buyNowPrice && form.buyNowPrice > 0) {
       const endTime = new Date(startTime.getTime() + totalMinutes * 60000);
 
       // Sanitizar precio inicial, quitar ceros a izquierda
-      const sanitizedstartPriceStr = String(auctionForm.startPrice ?? '').replace(/^0+/, '');
-      if (!sanitizedstartPriceStr || isNaN(Number(sanitizedstartPriceStr)) || Number(sanitizedstartPriceStr) < 100) {
-        alert('El precio inicial debe ser un número mayor o igual a $100 (sin ceros a la izquierda).');
-        return;
-      }
-      const sanitizedstartPrice = Number(sanitizedstartPriceStr);
+const sanitizedstartPriceStr = String(auctionForm.startingPrice ?? '').replace(/^0+/, '');  // ← CAMBIADO
+if (!sanitizedstartPriceStr || isNaN(Number(sanitizedstartPriceStr)) || Number(sanitizedstartPriceStr) < 100) {
+  alert('El precio inicial debe ser un número mayor o igual a $100 (sin ceros a la izquierda).');
+  return;
+}
+const sanitizedstartPrice = Number(sanitizedstartPriceStr);
 
       // Verificar formato de otros campos claves
       if (!auctionForm.title || !auctionForm.description || !auctionForm.images?.length) {
