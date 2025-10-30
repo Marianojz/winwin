@@ -46,16 +46,16 @@ const AdminPanel = () => {
     }
 
     // Validar precio inicial
-    if (!form.startingPrice || form.startingPrice <= 0) {
+    if (!form.startPrice || form.startPrice <= 0) {
       errors.push('El precio inicial debe ser mayor a $0');
     }
-    if (form.startingPrice && form.startingPrice < 100) {
+    if (form.startPrice && form.startPrice < 100) {
       errors.push('El precio inicial mínimo es $100');
     }
 
     // Validar precio de Compra Ya (si está activado)
     if (form.buyNowPrice && form.buyNowPrice > 0) {
-      if (form.buyNowPrice <= form.startingPrice) {
+      if (form.buyNowPrice <= form.startPrice) {
         errors.push('El precio de "Compra Ya" debe ser mayor al precio inicial');
       }
     }
@@ -123,12 +123,12 @@ const AdminPanel = () => {
       const endTime = new Date(startTime.getTime() + totalMinutes * 60000);
 
       // Sanitizar precio inicial, quitar ceros a izquierda
-      const sanitizedStartingPriceStr = String(auctionForm.startingPrice ?? '').replace(/^0+/, '');
-      if (!sanitizedStartingPriceStr || isNaN(Number(sanitizedStartingPriceStr)) || Number(sanitizedStartingPriceStr) < 100) {
+      const sanitizedstartPriceStr = String(auctionForm.startPrice ?? '').replace(/^0+/, '');
+      if (!sanitizedstartPriceStr || isNaN(Number(sanitizedstartPriceStr)) || Number(sanitizedstartPriceStr) < 100) {
         alert('El precio inicial debe ser un número mayor o igual a $100 (sin ceros a la izquierda).');
         return;
       }
-      const sanitizedStartingPrice = Number(sanitizedStartingPriceStr);
+      const sanitizedstartPrice = Number(sanitizedstartPriceStr);
 
       // Verificar formato de otros campos claves
       if (!auctionForm.title || !auctionForm.description || !auctionForm.images?.length) {
@@ -141,8 +141,8 @@ const AdminPanel = () => {
         title: auctionForm.title.trim(),
         description: auctionForm.description.trim(),
         images: auctionForm.images,
-        startingPrice: sanitizedStartingPrice,
-        currentPrice: sanitizedStartingPrice,
+        startPrice: sanitizedstartPrice,
+        currentPrice: sanitizedstartPrice,
         buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
         endTime: endTime,
         status: auctionForm.scheduled ? 'scheduled' as any : 'active',
@@ -184,7 +184,7 @@ const AdminPanel = () => {
       setAuctionForm({
         title: '',
         description: '',
-        startingPrice: 1000,
+        startPrice: 1000,
         currentPrice: 1000,
         buyNowPrice: 0,
         categoryId: '1',
@@ -232,7 +232,7 @@ const AdminPanel = () => {
   const [auctionForm, setAuctionForm] = useState({
     title: '',
     description: '',
-    startingPrice: 0,
+    startPrice: 0,
     currentPrice: 0,
     buyNowPrice: 0,
     categoryId: '1',
@@ -588,7 +588,7 @@ const AdminPanel = () => {
     setAuctionForm({
       title: auction.title,
       description: auction.description,
-      startingPrice: (auction as any).startingPrice ?? (auction as any).startPrice,
+      startPrice: (auction as any).startPrice ?? (auction as any).startPrice,
       currentPrice: auction.currentPrice,
       buyNowPrice: auction.buyNowPrice || 0,
       categoryId: auction.categoryId,
@@ -617,7 +617,7 @@ const AdminPanel = () => {
     }
 
     // Advertencia si se modifica precio inicial y ya hay ofertas
-    if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== ((editingAuction as any).startingPrice ?? (editingAuction as any).startPrice)) {
+    if (editingAuction.bids.length > 0 && auctionForm.startPrice !== ((editingAuction as any).startPrice ?? (editingAuction as any).startPrice)) {
       if (!window.confirm('⚠️ ADVERTENCIA: Esta subasta ya tiene ofertas.\n\n¿Estás seguro de cambiar el precio inicial?\n\nEsto puede afectar la validez de las ofertas existentes.')) {
         return;
       }
@@ -635,8 +635,8 @@ const AdminPanel = () => {
             ...a, 
             title: auctionForm.title.trim(),
             description: auctionForm.description.trim(),
-            startingPrice: Number(auctionForm.startingPrice),
-            currentPrice: Math.max(Number(auctionForm.currentPrice), Number(auctionForm.startingPrice)),
+            startPrice: Number(auctionForm.startPrice),
+            currentPrice: Math.max(Number(auctionForm.currentPrice), Number(auctionForm.startPrice)),
             buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
             categoryId: auctionForm.categoryId,
             images: auctionForm.images,
@@ -2285,8 +2285,8 @@ const AdminPanel = () => {
                     <input 
                       type="number" 
                       placeholder="1000"
-                      value={auctionForm.startingPrice}
-                      onChange={(e) => setAuctionForm({...auctionForm, startingPrice: Number(e.target.value)})}
+                      value={auctionForm.startPrice}
+                      onChange={(e) => setAuctionForm({...auctionForm, startPrice: Number(e.target.value)})}
                       min="100"
                       step="500"
                       style={{ 
@@ -2297,7 +2297,7 @@ const AdminPanel = () => {
                         border: '2px solid var(--border)'
                       }}
                     />
-                    {editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAuction.startingPrice && (
+                    {editingAuction.bids.length > 0 && auctionForm.startPrice !== editingAuction.startPrice && (
                       <div style={{ fontSize: '0.8125rem', color: 'var(--warning)', marginTop: '0.5rem', fontWeight: 600 }}>
                         ⚠️ Modificando precio inicial
                       </div>
@@ -2313,7 +2313,7 @@ const AdminPanel = () => {
                       type="number" 
                       value={auctionForm.currentPrice}
                       onChange={(e) => setAuctionForm({...auctionForm, currentPrice: Number(e.target.value)})}
-                      min={auctionForm.startingPrice}
+                      min={auctionForm.startPrice}
                       step="500"
                       style={{ 
                         width: '100%', 
@@ -3255,8 +3255,8 @@ const AdminPanel = () => {
                     <input 
                       type="number" 
                       placeholder="1000"
-                      value={auctionForm.startingPrice}
-                      onChange={(e) => setAuctionForm({...auctionForm, startingPrice: Number(e.target.value)})}
+                      value={auctionForm.startPrice}
+                      onChange={(e) => setAuctionForm({...auctionForm, startPrice: Number(e.target.value)})}
                       min="100"
                       step="500"
                       style={{ 
@@ -3541,7 +3541,7 @@ const AdminPanel = () => {
                       setAuctionForm({
                         title: '',
                         description: '',
-                        startingPrice: 1000,
+                        startPrice: 1000,
                         currentPrice: 1000,
                         buyNowPrice: 0,
                         categoryId: '1',
