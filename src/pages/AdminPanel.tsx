@@ -46,16 +46,16 @@ const AdminPanel = () => {
     }
 
     // Validar precio inicial
-    if (!form.startPrice || form.startPrice <= 0) {
+    if (!form.startingPrice || form.startingPrice <= 0) {
       errors.push('El precio inicial debe ser mayor a $0');
     }
-    if (form.startPrice && form.startPrice < 100) {
+    if (form.startingPrice && form.startingPrice < 100) {
       errors.push('El precio inicial mínimo es $100');
     }
 
     // Validar precio de Compra Ya (si está activado)
     if (form.buyNowPrice && form.buyNowPrice > 0) {
-      if (form.buyNowPrice <= form.startPrice) {
+      if (form.buyNowPrice <= form.startingPrice) {
         errors.push('El precio de "Compra Ya" debe ser mayor al precio inicial');
       }
     }
@@ -637,8 +637,8 @@ const newAuction: Auction = {
             ...a, 
             title: auctionForm.title.trim(),
             description: auctionForm.description.trim(),
-            startPrice: Number(auctionForm.startPrice),
-            currentPrice: Math.max(Number(auctionForm.currentPrice), Number(auctionForm.startPrice)),
+            startPrice: Number(auctionForm.startingPrice),
+            currentPrice: Math.max(Number(auctionForm.currentPrice), Number(auctionForm.startingPrice)),
             buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
             categoryId: auctionForm.categoryId,
             images: auctionForm.images,
@@ -2287,8 +2287,8 @@ const newAuction: Auction = {
                     <input 
                       type="number" 
                       placeholder="1000"
-                      value={auctionForm.startPrice}
-                      onChange={(e) => setAuctionForm({...auctionForm, startPrice: Number(e.target.value)})}
+                      value={auctionForm.startingPrice}
+                      onChange={(e) => setAuctionForm({...auctionForm, startingPrice: Number(e.target.value)})}
                       min="100"
                       step="500"
                       style={{ 
@@ -2299,7 +2299,7 @@ const newAuction: Auction = {
                         border: '2px solid var(--border)'
                       }}
                     />
-                    {editingAuction.bids.length > 0 && auctionForm.startPrice !== editingAuction.startPrice && (
+                    {editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAuction.startingPrice && (
                       <div style={{ fontSize: '0.8125rem', color: 'var(--warning)', marginTop: '0.5rem', fontWeight: 600 }}>
                         ⚠️ Modificando precio inicial
                       </div>
@@ -2315,7 +2315,7 @@ const newAuction: Auction = {
                       type="number" 
                       value={auctionForm.currentPrice}
                       onChange={(e) => setAuctionForm({...auctionForm, currentPrice: Number(e.target.value)})}
-                      min={auctionForm.startPrice}
+                      min={auctionForm.startingPrice}
                       step="500"
                       style={{ 
                         width: '100%', 
@@ -3257,8 +3257,8 @@ const newAuction: Auction = {
                     <input 
                       type="number" 
                       placeholder="1000"
-                      value={auctionForm.startPrice}
-                      onChange={(e) => setAuctionForm({...auctionForm, startPrice: Number(e.target.value)})}
+                      value={auctionForm.startingPrice}
+                      onChange={(e) => setAuctionForm({...auctionForm, startingPrice: Number(e.target.value)})}
                       min="100"
                       step="500"
                       style={{ 
@@ -3543,7 +3543,7 @@ const newAuction: Auction = {
                       setAuctionForm({
                         title: '',
                         description: '',
-                        startPrice: 1000,
+                        startingPrice: 1000,
                         currentPrice: 1000,
                         buyNowPrice: 0,
                         categoryId: '1',
