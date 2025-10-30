@@ -46,19 +46,19 @@ const AdminPanel = () => {
     }
 
     // Validar precio inicial
-    if (!form.startingPrice || form.startingPrice <= 0) {
-      errors.push('El precio inicial debe ser mayor a $0');
-    }
-    if (form.startingPrice && form.startingPrice < 100) {
-      errors.push('El precio inicial mínimo es $100');
-    }
+if (!form.startingPrice || form.startingPrice <= 0) {  // ← CAMBIADO
+  errors.push('El precio inicial debe ser mayor a $0');
+}
+if (form.startingPrice && form.startingPrice < 100) {  // ← CAMBIADO
+  errors.push('El precio inicial mínimo es $100');
+}
 
-    // Validar precio de Compra Ya (si está activado)
-    if (form.buyNowPrice && form.buyNowPrice > 0) {
-      if (form.buyNowPrice <= form.startingPrice) {
-        errors.push('El precio de "Compra Ya" debe ser mayor al precio inicial');
-      }
-    }
+// Validar precio de Compra Ya (si está activado)
+if (form.buyNowPrice && form.buyNowPrice > 0) {
+  if (form.buyNowPrice <= form.startingPrice) {  // ← CAMBIADO
+    errors.push('El precio de "Compra Ya" debe ser mayor al precio inicial');
+  }
+}
 
     // Validar imágenes
     if (!form.images || form.images.length === 0) {
