@@ -123,12 +123,12 @@ const AdminPanel = () => {
       const endTime = new Date(startTime.getTime() + totalMinutes * 60000);
 
       // Sanitizar precio inicial, quitar ceros a izquierda
-      let sanitizedStartingPrice = String(auctionForm.startingPrice || '').replace(/^0+/, '');
-      if (!sanitizedStartingPrice || isNaN(Number(sanitizedStartingPrice)) || Number(sanitizedStartingPrice) < 100) {
+      const sanitizedStartingPriceStr = String(auctionForm.startingPrice ?? '').replace(/^0+/, '');
+      if (!sanitizedStartingPriceStr || isNaN(Number(sanitizedStartingPriceStr)) || Number(sanitizedStartingPriceStr) < 100) {
         alert('El precio inicial debe ser un número mayor o igual a $100 (sin ceros a la izquierda).');
         return;
       }
-      sanitizedStartingPrice = Number(sanitizedStartingPrice);
+      const sanitizedStartingPrice = Number(sanitizedStartingPriceStr);
 
       // Verificar formato de otros campos claves
       if (!auctionForm.title || !auctionForm.description || !auctionForm.images?.length) {
@@ -144,7 +144,7 @@ const AdminPanel = () => {
         startingPrice: sanitizedStartingPrice,
         currentPrice: sanitizedStartingPrice,
         buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
-        endTime: +endTime,
+        endTime: endTime,
         status: auctionForm.scheduled ? 'scheduled' as any : 'active',
         categoryId: auctionForm.categoryId,
         bids: [],
@@ -588,7 +588,7 @@ const AdminPanel = () => {
     setAuctionForm({
       title: auction.title,
       description: auction.description,
-      startingPrice: auction.startingPrice,
+      startingPrice: (auction as any).startingPrice ?? (auction as any).startPrice,
       currentPrice: auction.currentPrice,
       buyNowPrice: auction.buyNowPrice || 0,
       categoryId: auction.categoryId,
@@ -617,7 +617,7 @@ const AdminPanel = () => {
     }
 
     // Advertencia si se modifica precio inicial y ya hay ofertas
-    if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAuction.startingPrice) {
+    if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== ((editingAuction as any).startingPrice ?? (editingAuction as any).startPrice)) {
       if (!window.confirm('⚠️ ADVERTENCIA: Esta subasta ya tiene ofertas.\n\n¿Estás seguro de cambiar el precio inicial?\n\nEsto puede afectar la validez de las ofertas existentes.')) {
         return;
       }

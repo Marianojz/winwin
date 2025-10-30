@@ -24,7 +24,10 @@ export interface Auction {
   title: string;
   description: string;
   images: string[];
+  // Compatibilidad: algunas partes antiguas usan startPrice.
+  // Las reglas de Firebase requieren startingPrice. Soportamos ambos.
   startPrice: number;
+  startingPrice?: number;
   currentPrice: number;
   buyNowPrice?: number;
   endTime: Date;
