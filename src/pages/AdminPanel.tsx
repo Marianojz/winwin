@@ -137,23 +137,25 @@ const AdminPanel = () => {
       }
 
       // Crear objeto de subasta
-      const newAuction = {
-        title: auctionForm.title.trim(),
-        description: auctionForm.description.trim(),
-        images: auctionForm.images,
-        startPrice: sanitizedstartPrice,
-        currentPrice: sanitizedstartPrice,
-        buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
-        endTime: endTime,
-        status: auctionForm.scheduled ? 'scheduled' as any : 'active',
-        categoryId: auctionForm.categoryId,
-        bids: [],
-        featured: auctionForm.featured || false,
-        isFlash: totalMinutes <= 60, // Si dura 1 hora o menos, es flash
-        condition: auctionForm.condition || 'new',
-        id: `auction_${Date.now()}`,
-        createdBy: user.id
-      };
+const newAuction: Auction = {
+  id: `auction_${Date.now()}`,
+  title: auctionForm.title.trim(),
+  description: auctionForm.description.trim(),
+  images: auctionForm.images,
+  startingPrice: sanitizedstartPrice,  // ← CAMBIAR a startingPrice
+  currentPrice: sanitizedstartPrice,
+  buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
+  startTime: new Date(),  // ← AGREGAR startTime (requerido)
+  endTime: endTime,
+  status: auctionForm.scheduled ? 'scheduled' as any : 'active',
+  categoryId: auctionForm.categoryId,
+  bids: [],
+  featured: auctionForm.featured || false,
+  isFlash: totalMinutes <= 60, // Si dura 1 hora o menos, es flash
+  condition: auctionForm.condition || 'new',
+  createdBy: user.id,
+  createdAt: new Date()  // ← AGREGAR createdAt
+};
 
       // Guardar en Firebase
       try {
