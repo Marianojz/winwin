@@ -24,20 +24,19 @@ export interface Auction {
   title: string;
   description: string;
   images: string[];
-  // Compatibilidad: algunas partes antiguas usan startPrice.
-  // Las reglas de Firebase requieren startingPrice. Soportamos ambos.
-  startPrice: number;
-  startingPrice?: number;
+  startingPrice: number;  // ← Asegúrate que sea startingPrice
   currentPrice: number;
   buyNowPrice?: number;
+  startTime: Date;        // ← Requerido
   endTime: Date;
-  status: 'active' | 'ended' | 'sold';
+  status: 'active' | 'ended' | 'sold' | 'cancelled' | 'scheduled'; // ← Agregar 'scheduled'
   categoryId: string;
   bids: Bid[];
   winnerId?: string;
   featured?: boolean;
   isFlash?: boolean;
   condition?: 'new' | 'like-new' | 'excellent' | 'good' | 'fair';
+  createdAt?: Date;       // ← Recomendado
 }
 
 export interface Bid {
