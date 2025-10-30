@@ -2578,7 +2578,7 @@ const AdminPanel = () => {
                     placeholder="ID de pedido, usuario..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem }}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
                   />
                 </div>
                 <div>
@@ -2589,7 +2589,7 @@ const AdminPanel = () => {
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value as OrderStatus | 'all')}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem }}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
                   >
                     <option value="all">Todos los estados</option>
                     <option value="pending_payment">⏳ Pago Pendiente</option>
@@ -2992,7 +2992,7 @@ const AdminPanel = () => {
                     placeholder="Bot Argentina"
                     value={botForm.name}
                     onChange={(e) => setBotForm({...botForm, name: e.target.value})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem }}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
                   />
                 </div>
                 <div>
@@ -3003,7 +3003,7 @@ const AdminPanel = () => {
                     type="number" 
                     value={botForm.balance}
                     onChange={(e) => setBotForm({...botForm, balance: Number(e.target.value)})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem }}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
                     min="0"
                   />
                 </div>
@@ -3015,7 +3015,7 @@ const AdminPanel = () => {
                     type="number" 
                     value={botForm.maxBidAmount}
                     onChange={(e) => setBotForm({...botForm, maxBidAmount: Number(e.target.value)})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem }}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
                     min="0"
                   />
                 </div>
@@ -3029,7 +3029,7 @@ const AdminPanel = () => {
                     type="number" 
                     value={botForm.intervalMin}
                     onChange={(e) => setBotForm({...botForm, intervalMin: Number(e.target.value)})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem }}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
                     min="1"
                   />
                 </div>
@@ -3041,7 +3041,7 @@ const AdminPanel = () => {
                     type="number" 
                     value={botForm.intervalMax}
                     onChange={(e) => setBotForm({...botForm, intervalMax: Number(e.target.value)})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem }}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
                     min="1"
                   />
                 </div>
