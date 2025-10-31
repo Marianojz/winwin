@@ -183,24 +183,24 @@ const newAuction: Auction = {
       alert(successMessage);
 
       // Resetear formulario
-      setAuctionForm({
-        title: '',
-        description: '',
-        startPrice: 1000,
-        currentPrice: 1000,
-        buyNowPrice: 0,
-        categoryId: '1',
-        images: [] as string[],
-        durationDays: 0,
-        durationHours: 0,
-        durationMinutes: 30,
-        condition: 'new' as 'new' | 'like-new' | 'excellent' | 'good' | 'fair',
-        featured: false,
-        allowExtension: true,
-        scheduled: false,
-        scheduledDate: '',
-        scheduledTime: ''
-      });
+setAuctionForm({
+  title: '',
+  description: '',
+  startingPrice: 1000,     // ← CAMBIADO
+  currentPrice: 1000,
+  buyNowPrice: 0,
+  categoryId: '1',
+  images: [] as string[],
+  durationDays: 0,
+  durationHours: 0,
+  durationMinutes: 30,
+  condition: 'new' as 'new' | 'like-new' | 'excellent' | 'good' | 'fair',
+  featured: false,
+  allowExtension: true,
+  scheduled: false,
+  scheduledDate: '',
+  scheduledTime: ''
+});
 
       // Volver a la lista de subastas
       setActiveTab('auctions');
