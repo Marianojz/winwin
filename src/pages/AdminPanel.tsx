@@ -619,11 +619,11 @@ const [auctionForm, setAuctionForm] = useState({
     }
 
     // Advertencia si se modifica precio inicial y ya hay ofertas
-    if (editingAuction.bids.length > 0 && auctionForm.startPrice !== editingAuction.startingPrice) {
-      if (!window.confirm('⚠️ ADVERTENCIA: Esta subasta ya tiene ofertas.\n\n¿Estás seguro de cambiar el precio inicial?\n\nEsto puede afectar la validez de las ofertas existentes.')) {
-        return;
-      }
-    }
+if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAuction.startingPrice) {  // ← CAMBIADO
+  if (!window.confirm('⚠️ ADVERTENCIA: Esta subasta ya tiene ofertas.\n\n¿Estás seguro de cambiar el precio inicial?\n\nEsto puede afectar la validez de las ofertas existentes.')) {
+    return;
+  }
+}
 
     // Calcular nueva fecha de finalización basada en duración
     const totalMinutes = (auctionForm.durationDays * 24 * 60) + (auctionForm.durationHours * 60) + auctionForm.durationMinutes;
