@@ -1,5 +1,6 @@
-import { Mail, MapPin, FileText, Award, ShoppingBag, Gavel } from 'lucide-react';
+import { Mail, MapPin, FileText, Award, ShoppingBag, Gavel, LogOut } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { auth } from '../config/firebase';
 
 const Perfil = () => {
   const { user, auctions } = useStore();
@@ -12,6 +13,17 @@ const Perfil = () => {
 
   // Generar avatar URL (Gravatar con fallback a ui-avatars)
   const avatarUrl = user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || 'U')}&size=200&background=FF6B00&color=fff&bold=true`;
+
+  const handleLogout = async () => {
+    try {
+      await auth.signOut();
+      useStore.getState().setUser(null);
+      localStorage.removeItem('user');
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+    }
+  };
 
   return (
     <div style={{ minHeight: 'calc(100vh - 80px)', padding: '3rem 0' }}>
@@ -94,6 +106,22 @@ const Perfil = () => {
               No has participado en ninguna subasta aún
             </p>
           )}
+        </div>
+
+        {/* Sección de Cerrar Sesión */}
+        <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', marginTop: '2rem' }}>
+          <h2 style={{ marginBottom: '1rem' }}>Cerrar Sesión</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+            Cerrar tu sesión te desconectará de la plataforma de forma segura.
+          </p>
+          <button 
+            onClick={handleLogout}
+            className="btn btn-danger"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+          >
+            <LogOut size={18} />
+            Cerrar Sesión
+          </button>
         </div>
       </div>
     </div>
