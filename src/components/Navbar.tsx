@@ -8,10 +8,21 @@ const Navbar = () => {
   const { user, isAuthenticated, cart, unreadCount, setUser } = useStore();
   const cartItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
 
-  const handleLogout = () => {
+  import { auth } from '../config/firebase'; // AGREGAR ESTE IMPORT
+
+const handleLogout = async () => {
+  try {
+    await auth.signOut(); // CERRAR SESIÓN EN FIREBASE
     setUser(null);
     localStorage.removeItem('user');
-  };
+    console.log('✅ Sesión cerrada correctamente');
+  } catch (error) {
+    console.error('❌ Error al cerrar sesión:', error);
+    // Limpiar igualmente aunque falle Firebase
+    setUser(null);
+    localStorage.removeItem('user');
+  }
+};
 
   // Generar avatar URL
   const avatarUrl = user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.username || 'U')}&size=40&background=FF6B00&color=fff&bold=true`;
