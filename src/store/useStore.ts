@@ -136,7 +136,7 @@ export const useStore = create<AppState>((set, get) => ({
     safeLocalStorageSet('auctions', auctions);
     set({ auctions });
   },
-    addBid: async (auctionId, amount, userId, username) => {
+  addBid: async (auctionId, amount, userId, username) => {
   try {
     console.log('🔥 Intentando guardar oferta en Firebase...');
     
@@ -150,6 +150,21 @@ export const useStore = create<AppState>((set, get) => ({
       return; // Detener la función aquí
     }
     
+    // VALIDACIONES DE MÍNIMO Y MÚLTIPLO
+    if (!auction) {
+      alert('Subasta no encontrada');
+      return;
+    }
+    const currentPrice = auction.currentPrice || 0;
+    if (amount <= currentPrice) {
+      alert(`Tu oferta debe ser mayor a ${currentPrice.toLocaleString()}`);
+      return;
+    }
+    if (amount % 500 !== 0) {
+      alert('La oferta debe ser múltiplo de $500');
+      return;
+    }
+
     const bid = {
       id: Date.now().toString(),
       auctionId,
@@ -169,6 +184,13 @@ export const useStore = create<AppState>((set, get) => ({
     });
 
     console.log('✅ OFERTA GUARDADA EN FIREBASE EXITOSAMENTE');
+    // Actualización optimista local para que el usuario vea el cambio al instante
+    const updatedAuctions = state.auctions.map(a =>
+      a.id === auctionId
+        ? { ...a, currentPrice: amount, bids: [...a.bids, { ...bid, createdAt: new Date(bid.createdAt) as any }] }
+        : a
+    );
+    state.setAuctions(updatedAuctions);
     
   } catch (error) {
     console.error('❌ ERROR CRÍTICO Firebase:', error);

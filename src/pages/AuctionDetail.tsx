@@ -124,6 +124,10 @@ const AuctionDetail = () => {
   }
 
   addBid(auction.id, amount, user!.id, user!.username);
+  // Ajustar el próximo valor sugerido inmediatamente
+  setBidAmount((amount + 500).toString());
+  // Haptics en móvil
+  if (navigator.vibrate) { try { navigator.vibrate(20); } catch {} }
   soundManager.playBid();
 
     
