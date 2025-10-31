@@ -631,14 +631,14 @@ const [auctionForm, setAuctionForm] = useState({
     const newEndTime = new Date(now.getTime() + totalMinutes * 60000);
 
     // Actualizar subasta
-    const updatedAuctions = auctions.map(a => 
-      a.id === editingAuction.id 
-        ? { 
-            ...a, 
-            title: auctionForm.title.trim(),
-            description: auctionForm.description.trim(),
-            startPrice: Number(auctionForm.startingPrice),
-            currentPrice: Math.max(Number(auctionForm.currentPrice), Number(auctionForm.startingPrice)),
+const updatedAuctions = auctions.map(a => 
+  a.id === editingAuction.id 
+    ? { 
+        ...a, 
+        title: auctionForm.title.trim(),
+        description: auctionForm.description.trim(),
+        startingPrice: Number(auctionForm.startingPrice),  // ← CAMBIADO
+        currentPrice: Math.max(Number(auctionForm.currentPrice), Number(auctionForm.startingPrice)),
             buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
             categoryId: auctionForm.categoryId,
             images: auctionForm.images,
