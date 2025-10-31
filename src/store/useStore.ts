@@ -109,9 +109,29 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   // User
-  user: null,
-  setUser: (user) => set({ user, isAuthenticated: !!user }),
-  isAuthenticated: false,
+user: (() => {
+  try {
+    const saved = localStorage.getItem('user');
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+})(),
+setUser: (user) => {
+  if (user) {
+    localStorage.setItem('user', JSON.stringify(user));
+  } else {
+    localStorage.removeItem('user');
+  }
+  set({ user, isAuthenticated: !!user });
+},
+isAuthenticated: (() => {
+  try {
+    return !!localStorage.getItem('user');
+  } catch {
+    return false;
+  }
+})(),
 
   // Auctions
   auctions: (() => {
