@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ShoppingCart, Bell, Home, Store, Gavel, LogOut, LayoutDashboard } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { auth } from '../config/firebase';
 import ThemeToggle from './ThemeToggle';
 import './Navbar.css';
 
@@ -8,21 +9,19 @@ const Navbar = () => {
   const { user, isAuthenticated, cart, unreadCount, setUser } = useStore();
   const cartItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
 
-  import { auth } from '../config/firebase'; // AGREGAR ESTE IMPORT
-
-const handleLogout = async () => {
-  try {
-    await auth.signOut(); // CERRAR SESIÓN EN FIREBASE
-    setUser(null);
-    localStorage.removeItem('user');
-    console.log('✅ Sesión cerrada correctamente');
-  } catch (error) {
-    console.error('❌ Error al cerrar sesión:', error);
-    // Limpiar igualmente aunque falle Firebase
-    setUser(null);
-    localStorage.removeItem('user');
-  }
-};
+  const handleLogout = async () => {
+    try {
+      await auth.signOut(); // CERRAR SESIÓN EN FIREBASE
+      setUser(null);
+      localStorage.removeItem('user');
+      console.log('✅ Sesión cerrada correctamente');
+    } catch (error) {
+      console.error('❌ Error al cerrar sesión:', error);
+      // Limpiar igualmente aunque falle Firebase
+      setUser(null);
+      localStorage.removeItem('user');
+    }
+  };
 
   // Generar avatar URL
   const avatarUrl = user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.username || 'U')}&size=40&background=FF6B00&color=fff&bold=true`;
