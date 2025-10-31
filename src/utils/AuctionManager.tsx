@@ -120,12 +120,15 @@ const AuctionManager = () => {
             console.log(`🔄 Subasta "${auction.title}" finalizó automáticamente`);
             needsUpdate = true;
             
-            // Verificar si hay ganador (última oferta)
-            if (auction.bids.length > 0) {
-              const winningBid = auction.bids[auction.bids.length - 1];
-              const winnerId = winningBid.userId;
-              const winnerName = winningBid.username;
-              const finalPrice = winningBid.amount;
+            // Verificar si hay ganador (OFERTA MÁS ALTA)
+if (auction.bids.length > 0) {
+  // Encontrar la oferta más alta
+  const winningBid = auction.bids.reduce((highest, current) => 
+    current.amount > highest.amount ? current : highest
+  );
+  const winnerId = winningBid.userId;
+  const winnerName = winningBid.username;
+  const finalPrice = winningBid.amount;
 
               // Crear orden de pago para el ganador
               const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000);
