@@ -588,23 +588,23 @@ const [auctionForm, setAuctionForm] = useState({
     const durationMinutes = remainingMinutes % 60;
     
     setAuctionForm({
-      title: auction.title,
-      description: auction.description,
-      startPrice: auction.startingPrice,
-      currentPrice: auction.currentPrice,
-      buyNowPrice: auction.buyNowPrice || 0,
-      categoryId: auction.categoryId,
-      images: auction.images || [],
-      durationDays: durationDays > 0 ? durationDays : 0,
-      durationHours: durationHours > 0 ? durationHours : 0,
-      durationMinutes: durationMinutes > 0 ? durationMinutes : 30,
-      condition: auction.condition || 'new',
-      featured: auction.featured || false,
-      allowExtension: true,
-      scheduled: false,
-      scheduledDate: '',
-      scheduledTime: ''
-    });
+  title: auction.title,
+  description: auction.description,
+  startingPrice: auction.startingPrice,  // ← CAMBIADO
+  currentPrice: auction.currentPrice,
+  buyNowPrice: auction.buyNowPrice || 0,
+  categoryId: auction.categoryId,
+  images: auction.images || [],
+  durationDays: durationDays > 0 ? durationDays : 0,
+  durationHours: durationHours > 0 ? durationHours : 0,
+  durationMinutes: durationMinutes > 0 ? durationMinutes : 30,
+  condition: auction.condition || 'new',
+  featured: auction.featured || false,
+  allowExtension: true,
+  scheduled: false,
+  scheduledDate: '',
+  scheduledTime: ''
+});
     setActiveTab('edit-auction');
   };
 
