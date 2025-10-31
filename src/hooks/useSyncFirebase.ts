@@ -33,23 +33,24 @@ const useSyncFirebase = () => {
           
           // ✅ CORRECCIÓN: Estructura tipada correctamente
           return {
-            id: key,
-            title: auctionData?.title || 'Sin título',
-            description: auctionData?.description || '',
-            images: auctionData?.images || [],
-            startPrice: auctionData?.startPrice || 0,
-            currentPrice: auctionData?.currentPrice || 0,
-            buyNowPrice: auctionData?.buyNowPrice,
-            endTime: new Date(auctionData?.endTime || new Date()),
-            status: auctionData?.status || 'active',
-            categoryId: auctionData?.categoryId || 'general',
-            bids: bids, // ← Ahora es Bid[] correctamente tipado
-            winnerId: auctionData?.winnerId,
-            featured: auctionData?.featured || false,
-            isFlash: auctionData?.isFlash || false,
-            condition: auctionData?.condition || 'good',
-            createdBy: auctionData?.createdBy || 'unknown' // <- AGREGAR ESTA LÍNEA
-          };
+  id: key,
+  title: auctionData?.title || 'Sin título',
+  description: auctionData?.description || '',
+  images: auctionData?.images || [],
+  startingPrice: auctionData?.startingPrice || 0,
+  currentPrice: auctionData?.currentPrice || 0,
+  buyNowPrice: auctionData?.buyNowPrice,
+  startTime: new Date(auctionData?.startTime || new Date()), // ← AGREGAR ESTA LÍNEA
+  endTime: new Date(auctionData?.endTime || new Date()),
+  status: auctionData?.status || 'active',
+  categoryId: auctionData?.categoryId || 'general',
+  bids: bids,
+  winnerId: auctionData?.winnerId,
+  featured: auctionData?.featured || false,
+  isFlash: auctionData?.isFlash || false,
+  condition: auctionData?.condition || 'good',
+  createdBy: auctionData?.createdBy || 'unknown'
+};
         });
         
         console.log('✅ Firebase - Subastas sincronizadas:', auctionsArray.length);

@@ -1,5 +1,8 @@
-import { update, ref } from 'firebase/database';
+// Firebase Realtime Database imports
+import { ref, update } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
+
+// Otras importaciones de Lucide, React, etc.
 import { useState, useEffect } from 'react';
 import { 
   Eye, Edit, Trash2, Users, Clock, AlertCircle, Activity, RefreshCw,
@@ -46,19 +49,19 @@ const AdminPanel = () => {
     }
 
     // Validar precio inicial
-    if (!form.startingPrice || form.startingPrice <= 0) {
-      errors.push('El precio inicial debe ser mayor a $0');
-    }
-    if (form.startingPrice && form.startingPrice < 100) {
-      errors.push('El precio inicial mínimo es $100');
-    }
+if (!form.startingPrice || form.startingPrice <= 0) {  // ← CAMBIADO
+  errors.push('El precio inicial debe ser mayor a $0');
+}
+if (form.startingPrice && form.startingPrice < 100) {  // ← CAMBIADO
+  errors.push('El precio inicial mínimo es $100');
+}
 
-    // Validar precio de Compra Ya (si está activado)
-    if (form.buyNowPrice && form.buyNowPrice > 0) {
-      if (form.buyNowPrice <= form.startingPrice) {
-        errors.push('El precio de "Compra Ya" debe ser mayor al precio inicial');
-      }
-    }
+// Validar precio de Compra Ya (si está activado)
+if (form.buyNowPrice && form.buyNowPrice > 0) {
+  if (form.buyNowPrice <= form.startingPrice) {  // ← CAMBIADO
+    errors.push('El precio de "Compra Ya" debe ser mayor al precio inicial');
+  }
+}
 
     // Validar imágenes
     if (!form.images || form.images.length === 0) {
@@ -123,12 +126,12 @@ const AdminPanel = () => {
       const endTime = new Date(startTime.getTime() + totalMinutes * 60000);
 
       // Sanitizar precio inicial, quitar ceros a izquierda
-      const sanitizedStartingPriceStr = String(auctionForm.startingPrice ?? '').replace(/^0+/, '');
-      if (!sanitizedStartingPriceStr || isNaN(Number(sanitizedStartingPriceStr)) || Number(sanitizedStartingPriceStr) < 100) {
-        alert('El precio inicial debe ser un número mayor o igual a $100 (sin ceros a la izquierda).');
-        return;
-      }
-      const sanitizedStartingPrice = Number(sanitizedStartingPriceStr);
+const sanitizedstartPriceStr = String(auctionForm.startingPrice ?? '').replace(/^0+/, '');  // ← CAMBIADO
+if (!sanitizedstartPriceStr || isNaN(Number(sanitizedstartPriceStr)) || Number(sanitizedstartPriceStr) < 100) {
+  alert('El precio inicial debe ser un número mayor o igual a $100 (sin ceros a la izquierda).');
+  return;
+}
+const sanitizedstartPrice = Number(sanitizedstartPriceStr);
 
       // Verificar formato de otros campos claves
       if (!auctionForm.title || !auctionForm.description || !auctionForm.images?.length) {
@@ -137,23 +140,25 @@ const AdminPanel = () => {
       }
 
       // Crear objeto de subasta
-      const newAuction = {
-        title: auctionForm.title.trim(),
-        description: auctionForm.description.trim(),
-        images: auctionForm.images,
-        startingPrice: sanitizedStartingPrice,
-        currentPrice: sanitizedStartingPrice,
-        buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
-        endTime: endTime,
-        status: auctionForm.scheduled ? 'scheduled' as any : 'active',
-        categoryId: auctionForm.categoryId,
-        bids: [],
-        featured: auctionForm.featured || false,
-        isFlash: totalMinutes <= 60, // Si dura 1 hora o menos, es flash
-        condition: auctionForm.condition || 'new',
-        id: `auction_${Date.now()}`,
-        createdBy: user.id
-      };
+const newAuction: Auction = {
+  id: `auction_${Date.now()}`,
+  title: auctionForm.title.trim(),
+  description: auctionForm.description.trim(),
+  images: auctionForm.images,
+  startingPrice: sanitizedstartPrice,  // ← CAMBIAR a startingPrice
+  currentPrice: sanitizedstartPrice,
+  buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
+  startTime: new Date(),  // ← AGREGAR startTime (requerido)
+  endTime: endTime,
+  status: auctionForm.scheduled ? 'scheduled' as any : 'active',
+  categoryId: auctionForm.categoryId,
+  bids: [],
+  featured: auctionForm.featured || false,
+  isFlash: totalMinutes <= 60, // Si dura 1 hora o menos, es flash
+  condition: auctionForm.condition || 'new',
+  createdBy: user.id,
+  createdAt: new Date()  // ← AGREGAR createdAt
+};
 
       // Guardar en Firebase
       try {
@@ -181,24 +186,24 @@ const AdminPanel = () => {
       alert(successMessage);
 
       // Resetear formulario
-      setAuctionForm({
-        title: '',
-        description: '',
-        startingPrice: 1000,
-        currentPrice: 1000,
-        buyNowPrice: 0,
-        categoryId: '1',
-        images: [] as string[],
-        durationDays: 0,
-        durationHours: 0,
-        durationMinutes: 30,
-        condition: 'new' as 'new' | 'like-new' | 'excellent' | 'good' | 'fair',
-        featured: false,
-        allowExtension: true,
-        scheduled: false,
-        scheduledDate: '',
-        scheduledTime: ''
-      });
+setAuctionForm({
+  title: '',
+  description: '',
+  startingPrice: 1000,     // ← CAMBIADO
+  currentPrice: 1000,
+  buyNowPrice: 0,
+  categoryId: '1',
+  images: [] as string[],
+  durationDays: 0,
+  durationHours: 0,
+  durationMinutes: 30,
+  condition: 'new' as 'new' | 'like-new' | 'excellent' | 'good' | 'fair',
+  featured: false,
+  allowExtension: true,
+  scheduled: false,
+  scheduledDate: '',
+  scheduledTime: ''
+});
 
       // Volver a la lista de subastas
       setActiveTab('auctions');
@@ -228,25 +233,25 @@ const AdminPanel = () => {
 });
 
   // Estados para subastas
-  const [editingAuction, setEditingAuction] = useState<Auction | null>(null);
-  const [auctionForm, setAuctionForm] = useState({
-    title: '',
-    description: '',
-    startingPrice: 0,
-    currentPrice: 0,
-    buyNowPrice: 0,
-    categoryId: '1',
-    images: [] as string[],
-    durationDays: 0,
-    durationHours: 0,
-    durationMinutes: 30,
-    condition: 'new' as 'new' | 'like-new' | 'excellent' | 'good' | 'fair',
-    featured: false,
-    allowExtension: true,
-    scheduled: false,
-    scheduledDate: '',
-    scheduledTime: ''
-  });
+const [editingAuction, setEditingAuction] = useState<Auction | null>(null);
+const [auctionForm, setAuctionForm] = useState({
+  title: '',
+  description: '',
+  startingPrice: 0,  // ← CAMBIADO de startPrice a startingPrice
+  currentPrice: 0,
+  buyNowPrice: 0,
+  categoryId: '1',
+  images: [] as string[],
+  durationDays: 0,
+  durationHours: 0,
+  durationMinutes: 30,
+  condition: 'new' as 'new' | 'like-new' | 'excellent' | 'good' | 'fair',
+  featured: false,
+  allowExtension: true,
+  scheduled: false,
+  scheduledDate: '',
+  scheduledTime: ''
+});
 
   // Estados para bots
   const [botForm, setBotForm] = useState({
@@ -586,23 +591,23 @@ const AdminPanel = () => {
     const durationMinutes = remainingMinutes % 60;
     
     setAuctionForm({
-      title: auction.title,
-      description: auction.description,
-      startingPrice: (auction as any).startingPrice ?? (auction as any).startPrice,
-      currentPrice: auction.currentPrice,
-      buyNowPrice: auction.buyNowPrice || 0,
-      categoryId: auction.categoryId,
-      images: auction.images || [],
-      durationDays: durationDays > 0 ? durationDays : 0,
-      durationHours: durationHours > 0 ? durationHours : 0,
-      durationMinutes: durationMinutes > 0 ? durationMinutes : 30,
-      condition: auction.condition || 'new',
-      featured: auction.featured || false,
-      allowExtension: true,
-      scheduled: false,
-      scheduledDate: '',
-      scheduledTime: ''
-    });
+  title: auction.title,
+  description: auction.description,
+  startingPrice: auction.startingPrice,  // ← CAMBIADO
+  currentPrice: auction.currentPrice,
+  buyNowPrice: auction.buyNowPrice || 0,
+  categoryId: auction.categoryId,
+  images: auction.images || [],
+  durationDays: durationDays > 0 ? durationDays : 0,
+  durationHours: durationHours > 0 ? durationHours : 0,
+  durationMinutes: durationMinutes > 0 ? durationMinutes : 30,
+  condition: auction.condition || 'new',
+  featured: auction.featured || false,
+  allowExtension: true,
+  scheduled: false,
+  scheduledDate: '',
+  scheduledTime: ''
+});
     setActiveTab('edit-auction');
   };
 
@@ -617,11 +622,11 @@ const AdminPanel = () => {
     }
 
     // Advertencia si se modifica precio inicial y ya hay ofertas
-    if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== ((editingAuction as any).startingPrice ?? (editingAuction as any).startPrice)) {
-      if (!window.confirm('⚠️ ADVERTENCIA: Esta subasta ya tiene ofertas.\n\n¿Estás seguro de cambiar el precio inicial?\n\nEsto puede afectar la validez de las ofertas existentes.')) {
-        return;
-      }
-    }
+if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAuction.startingPrice) {  // ← CAMBIADO
+  if (!window.confirm('⚠️ ADVERTENCIA: Esta subasta ya tiene ofertas.\n\n¿Estás seguro de cambiar el precio inicial?\n\nEsto puede afectar la validez de las ofertas existentes.')) {
+    return;
+  }
+}
 
     // Calcular nueva fecha de finalización basada en duración
     const totalMinutes = (auctionForm.durationDays * 24 * 60) + (auctionForm.durationHours * 60) + auctionForm.durationMinutes;
@@ -629,14 +634,14 @@ const AdminPanel = () => {
     const newEndTime = new Date(now.getTime() + totalMinutes * 60000);
 
     // Actualizar subasta
-    const updatedAuctions = auctions.map(a => 
-      a.id === editingAuction.id 
-        ? { 
-            ...a, 
-            title: auctionForm.title.trim(),
-            description: auctionForm.description.trim(),
-            startingPrice: Number(auctionForm.startingPrice),
-            currentPrice: Math.max(Number(auctionForm.currentPrice), Number(auctionForm.startingPrice)),
+const updatedAuctions = auctions.map(a => 
+  a.id === editingAuction.id 
+    ? { 
+        ...a, 
+        title: auctionForm.title.trim(),
+        description: auctionForm.description.trim(),
+        startingPrice: Number(auctionForm.startingPrice),  // ← CAMBIADO
+        currentPrice: Math.max(Number(auctionForm.currentPrice), Number(auctionForm.startingPrice)),
             buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
             categoryId: auctionForm.categoryId,
             images: auctionForm.images,
