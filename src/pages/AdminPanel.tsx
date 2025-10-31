@@ -1,5 +1,8 @@
-import { update, ref } from 'firebase/database';
+// Firebase Realtime Database imports
+import { ref, update } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
+
+// Otras importaciones de Lucide, React, etc.
 import { useState, useEffect } from 'react';
 import { 
   Eye, Edit, Trash2, Users, Clock, AlertCircle, Activity, RefreshCw,
