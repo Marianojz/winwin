@@ -3,7 +3,7 @@ import { ref, update } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
 
 // Otras importaciones de Lucide, React, etc.
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Eye, Edit, Trash2, Users, Clock, AlertCircle, Activity, RefreshCw,
   Gavel, Package, Bot, DollarSign, Plus, XCircle,
@@ -19,7 +19,7 @@ import { formatCurrency, formatTimeAgo } from '../utils/helpers';
 import { Product, Auction, Order, OrderStatus } from '../types';
 import ImageUploader from '../components/ImageUploader';
 
-const AdminPanel = () => {
+const AdminPanel = (): React.ReactElement => {
   const { 
     user, auctions, products, bots, orders,
     addBot, updateBot, deleteBot, setProducts, setAuctions, updateOrderStatus 
@@ -278,44 +278,44 @@ const [auctionForm, setAuctionForm] = useState({
   const getDashboardStats = () => {
     // Usuarios
     const totalUsers = realUsers.length;
-    const activeUsers = realUsers.filter(u => u.active !== false).length;
+    const activeUsers = realUsers.filter((u: { active: boolean; }) => u.active !== false).length;
     
     // Subastas
-    const activeAuctions = auctions.filter(a => a.status === 'active').length;
-    const endedAuctions = auctions.filter(a => a.status === 'ended').length;
-    const totalBids = auctions.reduce((sum, a) => sum + (a.bids?.length || 0), 0);
+    const activeAuctions = auctions.filter((a: { status: string; }) => a.status === 'active').length;
+    const endedAuctions = auctions.filter((a: { status: string; }) => a.status === 'ended').length;
+    const totalBids = auctions.reduce((sum: any, a: { bids: string | any[]; }) => sum + (a.bids?.length || 0), 0);
     
     // Productos
     const totalProducts = products.length;
-    const activeProducts = products.filter(p => p.active !== false).length;
-    const lowStockProducts = products.filter(p => p.stock > 0 && p.stock < 5).length;
-    const outOfStockProducts = products.filter(p => p.stock === 0).length;
+    const activeProducts = products.filter((p: { active: boolean; }) => p.active !== false).length;
+    const lowStockProducts = products.filter((p: { stock: number; }) => p.stock > 0 && p.stock < 5).length;
+    const outOfStockProducts = products.filter((p: { stock: number; }) => p.stock === 0).length;
     
     // Pedidos
     const totalOrders = orders.length;
-    const pendingPayment = orders.filter(o => o.status === 'pending_payment').length;
-    const processing = orders.filter(o => o.status === 'processing').length;
-    const inTransit = orders.filter(o => o.status === 'in_transit').length;
-    const delivered = orders.filter(o => o.status === 'delivered').length;
+    const pendingPayment = orders.filter((o: { status: string; }) => o.status === 'pending_payment').length;
+    const processing = orders.filter((o: { status: string; }) => o.status === 'processing').length;
+    const inTransit = orders.filter((o: { status: string; }) => o.status === 'in_transit').length;
+    const delivered = orders.filter((o: { status: string; }) => o.status === 'delivered').length;
     
     // Ingresos
     const totalRevenue = orders
-      .filter(o => ['payment_confirmed', 'processing', 'in_transit', 'delivered'].includes(o.status))
-      .reduce((sum, o) => sum + o.amount, 0);
+      .filter((o: { status: string; }) => ['payment_confirmed', 'processing', 'in_transit', 'delivered'].includes(o.status))
+      .reduce((sum: any, o: { amount: any; }) => sum + o.amount, 0);
     
     const monthRevenue = orders
-      .filter(o => {
+      .filter((o: { createdAt: string | number | Date; status: string; }) => {
         const orderDate = new Date(o.createdAt);
         const now = new Date();
         return orderDate.getMonth() === now.getMonth() && 
                orderDate.getFullYear() === now.getFullYear() &&
                ['payment_confirmed', 'processing', 'in_transit', 'delivered'].includes(o.status);
       })
-      .reduce((sum, o) => sum + o.amount, 0);
+      .reduce((sum: any, o: { amount: any; }) => sum + o.amount, 0);
     
     // Bots
-    const activeBots = bots.filter(b => b.isActive).length;
-    const totalBotsBalance = bots.reduce((sum, b) => sum + b.balance, 0);
+    const activeBots = bots.filter((b: { isActive: any; }) => b.isActive).length;
+    const totalBotsBalance = bots.reduce((sum: any, b: { balance: any; }) => sum + b.balance, 0);
     
     return {
       users: { total: totalUsers, active: activeUsers },
@@ -346,11 +346,11 @@ const [auctionForm, setAuctionForm] = useState({
     
     // Últimas 5 pujas
     const recentBids = auctions
-      .flatMap(a => a.bids?.map(b => ({ ...b, auctionTitle: a.title })) || [])
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .flatMap((a: { bids: any[]; title: any; }) => a.bids?.map((b: any) => ({ ...b, auctionTitle: a.title })) || [])
+      .sort((a: { createdAt: string | number | Date; }, b: { createdAt: string | number | Date; }) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 5);
     
-    recentBids.forEach(bid => {
+    recentBids.forEach((bid: { username: any; amount: number; auctionTitle: any; createdAt: any; }) => {
       activities.push({
         type: 'bid',
         message: `${bid.username} pujó ${formatCurrency(bid.amount)} en "${bid.auctionTitle}"`,
@@ -368,7 +368,7 @@ const [auctionForm, setAuctionForm] = useState({
     const now = new Date();
     const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     
-    return auctions.filter(a => {
+    return auctions.filter((a: { endTime: string | number | Date; status: string; }) => {
       const endTime = new Date(a.endTime);
       return a.status === 'active' && endTime > now && endTime <= tomorrow;
     });
@@ -377,9 +377,9 @@ const [auctionForm, setAuctionForm] = useState({
   const stats = getDashboardStats();
 
   // Variables calculadas para filtros del inventario
-  const lowStockProducts = products.filter(p => p.stock > 0 && p.stock < 5);
-  const outOfStockProducts = products.filter(p => p.stock === 0);
-  const totalInventoryValue = products.reduce((sum, p) => sum + (p.price * p.stock), 0);
+  const lowStockProducts = products.filter((p: { stock: number; }) => p.stock > 0 && p.stock < 5);
+  const outOfStockProducts = products.filter((p: { stock: number; }) => p.stock === 0);
+  const totalInventoryValue = products.reduce((sum: number, p: { price: number; stock: number; }) => sum + (p.price * p.stock), 0);
 
   // Cargar usuarios reales de Firebase
   const loadUsers = async () => {
@@ -387,7 +387,7 @@ const [auctionForm, setAuctionForm] = useState({
     try {
       const usersQuery = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
       const usersSnapshot = await getDocs(usersQuery);
-      const usersData = usersSnapshot.docs.map(doc => ({
+      const usersData = usersSnapshot.docs.map((doc: { id: any; data: () => any; }) => ({
         id: doc.id,
         ...doc.data()
       }));
@@ -517,7 +517,7 @@ const [auctionForm, setAuctionForm] = useState({
         updatedAt: new Date().toISOString()
       };
 
-      const updatedProducts = products.map(p =>
+      const updatedProducts = products.map((p: { id: any; }) =>
         p.id === editingProduct.id ? updatedProduct : p
       );
       setProducts(updatedProducts);
@@ -569,9 +569,9 @@ const [auctionForm, setAuctionForm] = useState({
 };
 
   const handleDeleteProduct = (productId: string) => {
-    const product = products.find(p => p.id === productId);
+    const product = products.find((p: { id: string; }) => p.id === productId);
     if (window.confirm(`¿Estás seguro de eliminar "${product?.name}"?\n\nEsta acción no se puede deshacer.`)) {
-      const updatedProducts = products.filter(p => p.id !== productId);
+      const updatedProducts = products.filter((p: { id: string; }) => p.id !== productId);
       setProducts(updatedProducts);
       alert('🗑️ Producto eliminado correctamente');
     }
@@ -634,7 +634,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     const newEndTime = new Date(now.getTime() + totalMinutes * 60000);
 
     // Actualizar subasta
-const updatedAuctions = auctions.map(a => 
+const updatedAuctions = auctions.map((a: { id: any; }) => 
   a.id === editingAuction.id 
     ? { 
         ...a, 
@@ -659,9 +659,9 @@ const updatedAuctions = auctions.map(a =>
     setActiveTab('auctions');
   };
   const handleDeleteAuction = (auctionId: string) => {
-    const auction = auctions.find(a => a.id === auctionId);
+    const auction = auctions.find((a: { id: string; }) => a.id === auctionId);
     if (window.confirm(`¿Estás seguro de eliminar "${auction?.title}"?\n\nSe perderán todas las ofertas asociadas.`)) {
-      const updatedAuctions = auctions.filter(a => a.id !== auctionId);
+      const updatedAuctions = auctions.filter((a: { id: string; }) => a.id !== auctionId);
       setAuctions(updatedAuctions);
       alert('🗑️ Subasta eliminada correctamente');
     }
@@ -700,7 +700,7 @@ const updatedAuctions = auctions.map(a =>
   };
 
   // Filtrar pedidos
-  const filteredOrders = orders.filter(order => {
+  const filteredOrders = orders.filter((order: { id: string; userId: string; status: any; }) => {
     const matchesSearch = order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          order.userId.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || order.status === filterStatus;
@@ -734,11 +734,11 @@ const updatedAuctions = auctions.map(a =>
 
   const getTotalStats = () => {
     const stats = {
-      pending: orders.filter(o => o.status === 'pending_payment').length,
-      processing: orders.filter(o => o.status === 'processing').length,
-      shipped: orders.filter(o => o.status === 'shipped').length,
-      delivered: orders.filter(o => o.status === 'delivered').length,
-      revenue: orders.filter(o => o.status === 'delivered').reduce((sum, o) => sum + o.amount, 0)
+      pending: orders.filter((o: { status: string; }) => o.status === 'pending_payment').length,
+      processing: orders.filter((o: { status: string; }) => o.status === 'processing').length,
+      shipped: orders.filter((o: { status: string; }) => o.status === 'shipped').length,
+      delivered: orders.filter((o: { status: string; }) => o.status === 'delivered').length,
+      revenue: orders.filter((o: { status: string; }) => o.status === 'delivered').reduce((sum: any, o: { amount: any; }) => sum + o.amount, 0)
     };
     return stats;
   };
@@ -913,7 +913,7 @@ const updatedAuctions = auctions.map(a =>
                       <div>
                         <strong>{getAuctionsEndingSoon().length}</strong> subastas finalizan en las próximas 24hs
                         <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                          {getAuctionsEndingSoon().map(a => a.title).join(', ')}
+                          {getAuctionsEndingSoon().map((a: { title: any; }) => a.title).join(', ')}
                         </div>
                       </div>
                     </div>
@@ -1104,7 +1104,7 @@ const updatedAuctions = auctions.map(a =>
                     </tr>
                   </thead>
                   <tbody>
-                    {realUsers.map(u => (
+                    {realUsers.map((u: { id: any; displayName: string; email: string; phoneNumber: any; isAdmin: any; createdAt: { seconds: number; }; }) => (
                       <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
                         <td style={{ padding: '1rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -1167,7 +1167,7 @@ const updatedAuctions = auctions.map(a =>
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map(product => (
+                  {products.map((product: Product) => (
                     <tr key={product.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '1rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -1245,7 +1245,7 @@ const updatedAuctions = auctions.map(a =>
             <input 
               type="text" 
               value={productForm.name}
-              onChange={(e) => setProductForm({...productForm, name: e.target.value})}
+              onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, name: e.target.value})}
               placeholder="Ej: iPhone 15 Pro Max 256GB"
               maxLength={100}
               style={{ 
@@ -1268,7 +1268,7 @@ const updatedAuctions = auctions.map(a =>
             </label>
             <textarea 
               value={productForm.description}
-              onChange={(e) => setProductForm({...productForm, description: e.target.value})}
+              onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, description: e.target.value})}
               placeholder="Describe tu producto en detalle: características, especificaciones, estado, etc."
               maxLength={2000}
               style={{ 
@@ -1293,7 +1293,7 @@ const updatedAuctions = auctions.map(a =>
             </label>
             <select 
               value={productForm.categoryId}
-              onChange={(e) => setProductForm({...productForm, categoryId: e.target.value})}
+              onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, categoryId: e.target.value})}
               style={{ 
                 width: '100%', 
                 padding: '0.875rem', 
@@ -1351,7 +1351,7 @@ const updatedAuctions = auctions.map(a =>
               <input 
                 type="number" 
                 value={productForm.price || ''}
-                onChange={(e) => setProductForm({...productForm, price: Number(e.target.value)})}
+                onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, price: Number(e.target.value)})}
                 placeholder="0"
                 min="100"
                 step="100"
@@ -1378,7 +1378,7 @@ const updatedAuctions = auctions.map(a =>
             <input 
               type="number" 
               value={productForm.stock || ''}
-              onChange={(e) => setProductForm({...productForm, stock: Number(e.target.value)})}
+              onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, stock: Number(e.target.value)})}
               placeholder="0"
               min="0"
               style={{ 
@@ -1416,7 +1416,7 @@ const updatedAuctions = auctions.map(a =>
                   type="button"
                   onClick={() => {
                     const badges = productForm.badges.includes(badge)
-                      ? productForm.badges.filter(b => b !== badge)
+                      ? productForm.badges.filter((b: string) => b !== badge)
                       : [...productForm.badges, badge];
                     setProductForm({...productForm, badges});
                   }}
@@ -1445,7 +1445,7 @@ const updatedAuctions = auctions.map(a =>
               <input 
                 type="checkbox" 
                 checked={productForm.active}
-                onChange={(e) => setProductForm({...productForm, active: e.target.checked})}
+                onChange={(e: { target: { checked: any; }; }) => setProductForm({...productForm, active: e.target.checked})}
                 style={{ width: '20px', height: '20px', cursor: 'pointer' }}
               />
               <span style={{ fontWeight: 600 }}>Producto Activo (visible en la tienda)</span>
@@ -1455,7 +1455,7 @@ const updatedAuctions = auctions.map(a =>
               <input 
                 type="checkbox" 
                 checked={productForm.featured}
-                onChange={(e) => setProductForm({...productForm, featured: e.target.checked})}
+                onChange={(e: { target: { checked: any; }; }) => setProductForm({...productForm, featured: e.target.checked})}
                 style={{ width: '20px', height: '20px', cursor: 'pointer' }}
               />
               <span style={{ fontWeight: 600 }}>Producto Destacado (aparece primero)</span>
@@ -1526,7 +1526,7 @@ const updatedAuctions = auctions.map(a =>
             <input 
               type="text" 
               value={productForm.name}
-              onChange={(e) => setProductForm({...productForm, name: e.target.value})}
+              onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, name: e.target.value})}
               placeholder="Ej: iPhone 15 Pro Max 256GB"
               maxLength={100}
               style={{ 
@@ -1549,7 +1549,7 @@ const updatedAuctions = auctions.map(a =>
             </label>
             <textarea 
               value={productForm.description}
-              onChange={(e) => setProductForm({...productForm, description: e.target.value})}
+              onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, description: e.target.value})}
               placeholder="Describe tu producto en detalle: características, especificaciones, estado, etc."
               maxLength={2000}
               style={{ 
@@ -1574,7 +1574,7 @@ const updatedAuctions = auctions.map(a =>
             </label>
             <select 
               value={productForm.categoryId}
-              onChange={(e) => setProductForm({...productForm, categoryId: e.target.value})}
+              onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, categoryId: e.target.value})}
               style={{ 
                 width: '100%', 
                 padding: '0.875rem', 
@@ -1632,7 +1632,7 @@ const updatedAuctions = auctions.map(a =>
               <input 
                 type="number" 
                 value={productForm.price || ''}
-                onChange={(e) => setProductForm({...productForm, price: Number(e.target.value)})}
+                onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, price: Number(e.target.value)})}
                 placeholder="0"
                 min="100"
                 step="100"
@@ -1659,7 +1659,7 @@ const updatedAuctions = auctions.map(a =>
             <input 
               type="number" 
               value={productForm.stock || ''}
-              onChange={(e) => setProductForm({...productForm, stock: Number(e.target.value)})}
+              onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, stock: Number(e.target.value)})}
               placeholder="0"
               min="0"
               style={{ 
@@ -1697,7 +1697,7 @@ const updatedAuctions = auctions.map(a =>
                   type="button"
                   onClick={() => {
                     const badges = productForm.badges.includes(badge)
-                      ? productForm.badges.filter(b => b !== badge)
+                      ? productForm.badges.filter((b: string) => b !== badge)
                       : [...productForm.badges, badge];
                     setProductForm({...productForm, badges});
                   }}
@@ -1726,7 +1726,7 @@ const updatedAuctions = auctions.map(a =>
               <input 
                 type="checkbox" 
                 checked={productForm.active}
-                onChange={(e) => setProductForm({...productForm, active: e.target.checked})}
+                onChange={(e: { target: { checked: any; }; }) => setProductForm({...productForm, active: e.target.checked})}
                 style={{ width: '20px', height: '20px', cursor: 'pointer' }}
               />
               <span style={{ fontWeight: 600 }}>Producto Activo (visible en la tienda)</span>
@@ -1736,7 +1736,7 @@ const updatedAuctions = auctions.map(a =>
               <input 
                 type="checkbox" 
                 checked={productForm.featured}
-                onChange={(e) => setProductForm({...productForm, featured: e.target.checked})}
+                onChange={(e: { target: { checked: any; }; }) => setProductForm({...productForm, featured: e.target.checked})}
                 style={{ width: '20px', height: '20px', cursor: 'pointer' }}
               />
               <span style={{ fontWeight: 600 }}>Producto Destacado (aparece primero)</span>
@@ -1806,7 +1806,7 @@ const updatedAuctions = auctions.map(a =>
             <input 
               type="text" 
               value={productForm.name}
-              onChange={(e) => setProductForm({...productForm, name: e.target.value})}
+              onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, name: e.target.value})}
               maxLength={100}
               style={{ 
                 width: '100%', 
@@ -1828,7 +1828,7 @@ const updatedAuctions = auctions.map(a =>
             </label>
             <textarea 
               value={productForm.description}
-              onChange={(e) => setProductForm({...productForm, description: e.target.value})}
+              onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, description: e.target.value})}
               maxLength={2000}
               style={{ 
                 width: '100%', 
@@ -1852,7 +1852,7 @@ const updatedAuctions = auctions.map(a =>
             </label>
             <select 
               value={productForm.categoryId}
-              onChange={(e) => setProductForm({...productForm, categoryId: e.target.value})}
+              onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, categoryId: e.target.value})}
               style={{ 
                 width: '100%', 
                 padding: '0.875rem', 
@@ -1910,7 +1910,7 @@ const updatedAuctions = auctions.map(a =>
               <input 
                 type="number" 
                 value={productForm.price || ''}
-                onChange={(e) => setProductForm({...productForm, price: Number(e.target.value)})}
+                onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, price: Number(e.target.value)})}
                 min="100"
                 step="100"
                 style={{ 
@@ -1933,7 +1933,7 @@ const updatedAuctions = auctions.map(a =>
             <input 
               type="number" 
               value={productForm.stock || ''}
-              onChange={(e) => setProductForm({...productForm, stock: Number(e.target.value)})}
+              onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, stock: Number(e.target.value)})}
               min="0"
               style={{ 
                 width: '100%', 
@@ -1967,7 +1967,7 @@ const updatedAuctions = auctions.map(a =>
                   type="button"
                   onClick={() => {
                     const badges = productForm.badges.includes(badge)
-                      ? productForm.badges.filter(b => b !== badge)
+                      ? productForm.badges.filter((b: string) => b !== badge)
                       : [...productForm.badges, badge];
                     setProductForm({...productForm, badges});
                   }}
@@ -1996,7 +1996,7 @@ const updatedAuctions = auctions.map(a =>
               <input 
                 type="checkbox" 
                 checked={productForm.active}
-                onChange={(e) => setProductForm({...productForm, active: e.target.checked})}
+                onChange={(e: { target: { checked: any; }; }) => setProductForm({...productForm, active: e.target.checked})}
                 style={{ width: '20px', height: '20px', cursor: 'pointer' }}
               />
               <span style={{ fontWeight: 600 }}>Producto Activo</span>
@@ -2006,7 +2006,7 @@ const updatedAuctions = auctions.map(a =>
               <input 
                 type="checkbox" 
                 checked={productForm.featured}
-                onChange={(e) => setProductForm({...productForm, featured: e.target.checked})}
+                onChange={(e: { target: { checked: any; }; }) => setProductForm({...productForm, featured: e.target.checked})}
                 style={{ width: '20px', height: '20px', cursor: 'pointer' }}
               />
               <span style={{ fontWeight: 600 }}>Producto Destacado</span>
@@ -2062,7 +2062,7 @@ const updatedAuctions = auctions.map(a =>
                   </tr>
                 </thead>
                 <tbody>
-                  {auctions.map(auction => {
+                  {auctions.map((auction: Auction) => {
                     const timeLeft = new Date(auction.endTime).getTime() - Date.now();
                     const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
                     const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
@@ -2174,7 +2174,7 @@ const updatedAuctions = auctions.map(a =>
                       type="text" 
                       placeholder="Ej: iPhone 15 Pro Max 256GB - Nuevo en Caja"
                       value={auctionForm.title}
-                      onChange={(e) => setAuctionForm({...auctionForm, title: e.target.value})}
+                      onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, title: e.target.value})}
                       maxLength={100}
                       style={{ 
                         width: '100%', 
@@ -2197,7 +2197,7 @@ const updatedAuctions = auctions.map(a =>
                     <textarea 
                       placeholder="Describe el producto en detalle: características, estado, accesorios incluidos, etc."
                       value={auctionForm.description}
-                      onChange={(e) => setAuctionForm({...auctionForm, description: e.target.value})}
+                      onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, description: e.target.value})}
                       maxLength={2000}
                       style={{ 
                         width: '100%', 
@@ -2220,7 +2220,7 @@ const updatedAuctions = auctions.map(a =>
                       <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Categoría *</label>
                       <select 
                         value={auctionForm.categoryId}
-                        onChange={(e) => setAuctionForm({...auctionForm, categoryId: e.target.value})}
+                        onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, categoryId: e.target.value})}
                         style={{ 
                           width: '100%', 
                           padding: '0.875rem', 
@@ -2242,7 +2242,7 @@ const updatedAuctions = auctions.map(a =>
                       <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Condición *</label>
                       <select 
                         value={auctionForm.condition}
-                        onChange={(e) => setAuctionForm({...auctionForm, condition: e.target.value as any})}
+                        onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, condition: e.target.value as any})}
                         style={{ 
                           width: '100%', 
                           padding: '0.875rem', 
@@ -2291,7 +2291,7 @@ const updatedAuctions = auctions.map(a =>
                       type="number" 
                       placeholder="1000"
                       value={auctionForm.startingPrice}
-                      onChange={(e) => setAuctionForm({...auctionForm, startingPrice: Number(e.target.value)})}
+                      onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, startingPrice: Number(e.target.value)})}
                       min="100"
                       step="500"
                       style={{ 
@@ -2317,7 +2317,7 @@ const updatedAuctions = auctions.map(a =>
                     <input 
                       type="number" 
                       value={auctionForm.currentPrice}
-                      onChange={(e) => setAuctionForm({...auctionForm, currentPrice: Number(e.target.value)})}
+                      onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, currentPrice: Number(e.target.value)})}
                       min={auctionForm.startingPrice}
                       step="500"
                       style={{ 
@@ -2342,7 +2342,7 @@ const updatedAuctions = auctions.map(a =>
                       type="number" 
                       placeholder="0 para desactivar"
                       value={auctionForm.buyNowPrice}
-                      onChange={(e) => setAuctionForm({...auctionForm, buyNowPrice: Number(e.target.value)})}
+                      onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, buyNowPrice: Number(e.target.value)})}
                       min="0"
                       step="500"
                       style={{ 
@@ -2381,7 +2381,7 @@ const updatedAuctions = auctions.map(a =>
                     <input 
                       type="number" 
                       value={auctionForm.durationDays}
-                      onChange={(e) => setAuctionForm({...auctionForm, durationDays: Number(e.target.value)})}
+                      onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, durationDays: Number(e.target.value)})}
                       min="0"
                       max="7"
                       style={{ 
@@ -2402,7 +2402,7 @@ const updatedAuctions = auctions.map(a =>
                     <input 
                       type="number" 
                       value={auctionForm.durationHours}
-                      onChange={(e) => setAuctionForm({...auctionForm, durationHours: Number(e.target.value)})}
+                      onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, durationHours: Number(e.target.value)})}
                       min="0"
                       max="23"
                       style={{ 
@@ -2423,7 +2423,7 @@ const updatedAuctions = auctions.map(a =>
                     <input 
                       type="number" 
                       value={auctionForm.durationMinutes}
-                      onChange={(e) => setAuctionForm({...auctionForm, durationMinutes: Number(e.target.value)})}
+                      onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, durationMinutes: Number(e.target.value)})}
                       min="0"
                       max="59"
                       step="5"
@@ -2479,7 +2479,7 @@ const updatedAuctions = auctions.map(a =>
                     <input 
                       type="checkbox"
                       checked={auctionForm.featured}
-                      onChange={(e) => setAuctionForm({...auctionForm, featured: e.target.checked})}
+                      onChange={(e: { target: { checked: any; }; }) => setAuctionForm({...auctionForm, featured: e.target.checked})}
                       style={{ width: '20px', height: '20px', cursor: 'pointer' }}
                     />
                     <div style={{ flex: 1 }}>
@@ -2504,7 +2504,7 @@ const updatedAuctions = auctions.map(a =>
                     <input 
                       type="checkbox"
                       checked={auctionForm.allowExtension}
-                      onChange={(e) => setAuctionForm({...auctionForm, allowExtension: e.target.checked})}
+                      onChange={(e: { target: { checked: any; }; }) => setAuctionForm({...auctionForm, allowExtension: e.target.checked})}
                       style={{ width: '20px', height: '20px', cursor: 'pointer' }}
                     />
                     <div style={{ flex: 1 }}>
@@ -2582,7 +2582,7 @@ const updatedAuctions = auctions.map(a =>
                     type="text"
                     placeholder="ID de pedido, usuario..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e: { target: { value: any; }; }) => setSearchTerm(e.target.value)}
                     style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
                   />
                 </div>
@@ -2593,7 +2593,7 @@ const updatedAuctions = auctions.map(a =>
                   </label>
                   <select
                     value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value as OrderStatus | 'all')}
+                    onChange={(e: { target: { value: string; }; }) => setFilterStatus(e.target.value as OrderStatus | 'all')}
                     style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
                   >
                     <option value="all">Todos los estados</option>
@@ -2622,7 +2622,7 @@ const updatedAuctions = auctions.map(a =>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {filteredOrders.map(order => {
+                  {filteredOrders.map((order: { status: string; deliveryMethod: string; expiresAt: string | number | Date; id: string | any[]; type: string; createdAt: string | number | Date; amount: number; }) => {
                     const statusBadge = getStatusBadge(order.status);
                     const deliveryBadge = getDeliveryMethodBadge(order.deliveryMethod);
                     const timeLeft = order.expiresAt ? new Date(order.expiresAt).getTime() - Date.now() : 0;
@@ -2688,7 +2688,7 @@ const updatedAuctions = auctions.map(a =>
                           <button 
                             className="btn btn-outline"
                             style={{ padding: '0.625rem 1rem' }}
-                            onClick={(e) => {
+                            onClick={(e: { stopPropagation: () => void; }) => {
                               e.stopPropagation();
                               setSelectedOrder(order);
                             }}
@@ -2734,7 +2734,7 @@ const updatedAuctions = auctions.map(a =>
                 overflow: 'auto',
                 padding: '2rem'
               }}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e: { stopPropagation: () => any; }) => e.stopPropagation()}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1.5rem' }}>
                 <div>
@@ -2911,12 +2911,12 @@ const updatedAuctions = auctions.map(a =>
                 </thead>
                 <tbody>
                   {products
-                    .filter(p => {
+                    .filter((p: { stock: number; }) => {
                       if (inventoryFilter === 'low') return p.stock < 5 && p.stock > 0;
                       if (inventoryFilter === 'out') return p.stock === 0;
                       return true;
                     })
-                    .map(product => (
+                    .map((product: Product) => (
                       <tr key={product.id} style={{ borderBottom: '1px solid var(--border)' }}>
                         <td style={{ padding: '1rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -2996,7 +2996,7 @@ const updatedAuctions = auctions.map(a =>
                     type="text" 
                     placeholder="Bot Argentina"
                     value={botForm.name}
-                    onChange={(e) => setBotForm({...botForm, name: e.target.value})}
+                    onChange={(e: { target: { value: any; }; }) => setBotForm({...botForm, name: e.target.value})}
                     style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
                   />
                 </div>
@@ -3007,7 +3007,7 @@ const updatedAuctions = auctions.map(a =>
                   <input 
                     type="number" 
                     value={botForm.balance}
-                    onChange={(e) => setBotForm({...botForm, balance: Number(e.target.value)})}
+                    onChange={(e: { target: { value: any; }; }) => setBotForm({...botForm, balance: Number(e.target.value)})}
                     style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
                     min="0"
                   />
@@ -3019,7 +3019,7 @@ const updatedAuctions = auctions.map(a =>
                   <input 
                     type="number" 
                     value={botForm.maxBidAmount}
-                    onChange={(e) => setBotForm({...botForm, maxBidAmount: Number(e.target.value)})}
+                    onChange={(e: { target: { value: any; }; }) => setBotForm({...botForm, maxBidAmount: Number(e.target.value)})}
                     style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
                     min="0"
                   />
@@ -3033,7 +3033,7 @@ const updatedAuctions = auctions.map(a =>
                   <input 
                     type="number" 
                     value={botForm.intervalMin}
-                    onChange={(e) => setBotForm({...botForm, intervalMin: Number(e.target.value)})}
+                    onChange={(e: { target: { value: any; }; }) => setBotForm({...botForm, intervalMin: Number(e.target.value)})}
                     style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
                     min="1"
                   />
@@ -3045,7 +3045,7 @@ const updatedAuctions = auctions.map(a =>
                   <input 
                     type="number" 
                     value={botForm.intervalMax}
-                    onChange={(e) => setBotForm({...botForm, intervalMax: Number(e.target.value)})}
+                    onChange={(e: { target: { value: any; }; }) => setBotForm({...botForm, intervalMax: Number(e.target.value)})}
                     style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}
                     min="1"
                   />
@@ -3061,7 +3061,7 @@ const updatedAuctions = auctions.map(a =>
               </div>
             ) : (
               <div style={{ display: 'grid', gap: '1rem' }}>
-                {bots.map(bot => (
+                {bots.map((bot: { id: any; name: any; isActive: any; balance: number; intervalMin: any; intervalMax: any; maxBidAmount: number; }) => (
                   <div 
                     key={bot.id} 
                     style={{ 
@@ -3144,7 +3144,7 @@ const updatedAuctions = auctions.map(a =>
                       type="text" 
                       placeholder="Ej: iPhone 15 Pro Max 256GB - Nuevo en Caja"
                       value={auctionForm.title}
-                      onChange={(e) => setAuctionForm({...auctionForm, title: e.target.value})}
+                      onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, title: e.target.value})}
                       maxLength={100}
                       style={{ 
                         width: '100%', 
@@ -3167,7 +3167,7 @@ const updatedAuctions = auctions.map(a =>
                     <textarea 
                       placeholder="Describe el producto en detalle: características, estado, accesorios incluidos, etc."
                       value={auctionForm.description}
-                      onChange={(e) => setAuctionForm({...auctionForm, description: e.target.value})}
+                      onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, description: e.target.value})}
                       maxLength={2000}
                       style={{ 
                         width: '100%', 
@@ -3190,7 +3190,7 @@ const updatedAuctions = auctions.map(a =>
                       <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Categoría *</label>
                       <select 
                         value={auctionForm.categoryId}
-                        onChange={(e) => setAuctionForm({...auctionForm, categoryId: e.target.value})}
+                        onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, categoryId: e.target.value})}
                         style={{ 
                           width: '100%', 
                           padding: '0.875rem', 
@@ -3212,7 +3212,7 @@ const updatedAuctions = auctions.map(a =>
                       <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Condición *</label>
                       <select 
                         value={auctionForm.condition}
-                        onChange={(e) => setAuctionForm({...auctionForm, condition: e.target.value as any})}
+                        onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, condition: e.target.value as any})}
                         style={{ 
                           width: '100%', 
                           padding: '0.875rem', 
@@ -3261,7 +3261,7 @@ const updatedAuctions = auctions.map(a =>
                       type="number" 
                       placeholder="1000"
                       value={auctionForm.startingPrice}
-                      onChange={(e) => setAuctionForm({...auctionForm, startingPrice: Number(e.target.value)})}
+                      onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, startingPrice: Number(e.target.value)})}
                       min="100"
                       step="500"
                       style={{ 
@@ -3286,7 +3286,7 @@ const updatedAuctions = auctions.map(a =>
                       type="number" 
                       placeholder="Dejar en 0 para desactivar"
                       value={auctionForm.buyNowPrice}
-                      onChange={(e) => setAuctionForm({...auctionForm, buyNowPrice: Number(e.target.value)})}
+                      onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, buyNowPrice: Number(e.target.value)})}
                       min="0"
                       step="500"
                       style={{ 
@@ -3317,7 +3317,7 @@ const updatedAuctions = auctions.map(a =>
                     <input 
                       type="number" 
                       value={auctionForm.durationDays}
-                      onChange={(e) => setAuctionForm({...auctionForm, durationDays: Number(e.target.value)})}
+                      onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, durationDays: Number(e.target.value)})}
                       min="0"
                       max="7"
                       style={{ 
@@ -3338,7 +3338,7 @@ const updatedAuctions = auctions.map(a =>
                     <input 
                       type="number" 
                       value={auctionForm.durationHours}
-                      onChange={(e) => setAuctionForm({...auctionForm, durationHours: Number(e.target.value)})}
+                      onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, durationHours: Number(e.target.value)})}
                       min="0"
                       max="23"
                       style={{ 
@@ -3359,7 +3359,7 @@ const updatedAuctions = auctions.map(a =>
                     <input 
                       type="number" 
                       value={auctionForm.durationMinutes}
-                      onChange={(e) => setAuctionForm({...auctionForm, durationMinutes: Number(e.target.value)})}
+                      onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, durationMinutes: Number(e.target.value)})}
                       min="0"
                       max="59"
                       step="5"
@@ -3418,7 +3418,7 @@ const updatedAuctions = auctions.map(a =>
                     <input 
                       type="checkbox"
                       checked={auctionForm.featured}
-                      onChange={(e) => setAuctionForm({...auctionForm, featured: e.target.checked})}
+                      onChange={(e: { target: { checked: any; }; }) => setAuctionForm({...auctionForm, featured: e.target.checked})}
                       style={{ width: '20px', height: '20px', cursor: 'pointer' }}
                     />
                     <div style={{ flex: 1 }}>
@@ -3443,7 +3443,7 @@ const updatedAuctions = auctions.map(a =>
                     <input 
                       type="checkbox"
                       checked={auctionForm.allowExtension}
-                      onChange={(e) => setAuctionForm({...auctionForm, allowExtension: e.target.checked})}
+                      onChange={(e: { target: { checked: any; }; }) => setAuctionForm({...auctionForm, allowExtension: e.target.checked})}
                       style={{ width: '20px', height: '20px', cursor: 'pointer' }}
                     />
                     <div style={{ flex: 1 }}>
@@ -3468,7 +3468,7 @@ const updatedAuctions = auctions.map(a =>
                     <input 
                       type="checkbox"
                       checked={auctionForm.scheduled}
-                      onChange={(e) => setAuctionForm({...auctionForm, scheduled: e.target.checked})}
+                      onChange={(e: { target: { checked: any; }; }) => setAuctionForm({...auctionForm, scheduled: e.target.checked})}
                       style={{ width: '20px', height: '20px', cursor: 'pointer' }}
                     />
                     <div style={{ flex: 1 }}>
@@ -3497,7 +3497,7 @@ const updatedAuctions = auctions.map(a =>
                         <input 
                           type="date"
                           value={auctionForm.scheduledDate}
-                          onChange={(e) => setAuctionForm({...auctionForm, scheduledDate: e.target.value})}
+                          onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, scheduledDate: e.target.value})}
                           min={new Date().toISOString().split('T')[0]}
                           style={{ 
                             width: '100%', 
@@ -3515,7 +3515,7 @@ const updatedAuctions = auctions.map(a =>
                         <input 
                           type="time"
                           value={auctionForm.scheduledTime}
-                          onChange={(e) => setAuctionForm({...auctionForm, scheduledTime: e.target.value})}
+                          onChange={(e: { target: { value: any; }; }) => setAuctionForm({...auctionForm, scheduledTime: e.target.value})}
                           style={{ 
                             width: '100%', 
                             padding: '0.875rem', 
