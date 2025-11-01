@@ -589,8 +589,16 @@ const [auctionForm, setAuctionForm] = useState({
       // EDITAR PRODUCTO EXISTENTE
       const updatedProduct: Product = {
         ...editingProduct,
-        ...productForm,
+        name: productForm.name,
+        description: productForm.description,
+        price: productForm.price,
+        stock: productForm.stock,
+        categoryId: productForm.categoryId,
+        images: productForm.images || [],
+        badges: productForm.badges || [],
         stickers: productForm.stickers || [],
+        active: productForm.active,
+        featured: productForm.featured,
         updatedAt: new Date().toISOString()
       };
 
@@ -708,25 +716,26 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     const newEndTime = new Date(now.getTime() + totalMinutes * 60000);
 
     // Actualizar subasta
-    const updatedAuctions: Auction[] = auctions.map((a: Auction) => 
-      a.id === editingAuction.id 
-        ? { 
-            ...a, 
-            title: auctionForm.title.trim(),
-            description: auctionForm.description.trim(),
-            startingPrice: Number(auctionForm.startingPrice),  // ← CAMBIADO
-            currentPrice: Math.max(Number(auctionForm.currentPrice), Number(auctionForm.startingPrice)),
-            buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
-            categoryId: auctionForm.categoryId,
-            images: auctionForm.images,
-            stickers: auctionForm.stickers || [],
-            condition: auctionForm.condition,
-            featured: auctionForm.featured,
-            endTime: newEndTime,
-            isFlash: totalMinutes <= 60
-          } as Auction
-        : a
-    );
+    const updatedAuctions: Auction[] = auctions.map((a: Auction) => {
+      if (a.id === editingAuction.id) {
+        return {
+          ...a,
+          title: auctionForm.title.trim(),
+          description: auctionForm.description.trim(),
+          startingPrice: Number(auctionForm.startingPrice),
+          currentPrice: Math.max(Number(auctionForm.currentPrice), Number(auctionForm.startingPrice)),
+          buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
+          categoryId: auctionForm.categoryId,
+          images: auctionForm.images,
+          stickers: auctionForm.stickers || [],
+          condition: auctionForm.condition,
+          featured: auctionForm.featured,
+          endTime: newEndTime,
+          isFlash: totalMinutes <= 60
+        };
+      }
+      return a;
+    });
     
     setAuctions(updatedAuctions);
     alert('✅ Subasta actualizada correctamente');
@@ -901,12 +910,16 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     return stats;
   };
 
+  // Helper para filtrar subastas con ganador (evita problemas de tipo)
+  const getAuctionsWithWinner = (auctionsList: Auction[]): Auction[] => {
+    return auctionsList.filter((a: Auction) => Boolean(a.winnerId));
+  };
+
   // Estadísticas mejoradas: ingresos por subastas y tienda, más buscado, más cliqueado
   const getEnhancedStats = () => {
     // Ingresos por subastas (ventas ganadas)
-    const auctionRevenue = auctions
-      .filter((a: Auction) => a.winnerId !== undefined && a.winnerId !== null)
-      .reduce((sum: number, a: Auction) => sum + (a.currentPrice || 0), 0);
+    const auctionsWithWinner = getAuctionsWithWinner(auctions);
+    const auctionRevenue = auctionsWithWinner.reduce((sum: number, a: Auction) => sum + (a.currentPrice || 0), 0);
 
     // Ingresos por tienda (pedidos entregados)
     const storeRevenue = orders
@@ -973,14 +986,6 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
 };
 
 export default AdminPanel;
-
-
-
-
-
-
-
-
 
 
 
