@@ -7,10 +7,22 @@ import './index.css'
 
 function Root() {
   const setUser = useStore(s => s.setUser)
+  
   React.useEffect(() => {
-    const unsubscribe = attachAuthListener((user) => setUser(user))
-    return () => unsubscribe()
-  }, [setUser])
+    const unsubscribe = attachAuthListener((user) => {
+      // Solo actualizar si el usuario en localStorage es diferente
+      const currentUser = useStore.getState().user;
+      if (!user && currentUser) {
+        console.log('🔐 Usuario deslogueado de Firebase, limpiando estado');
+        setUser(null);
+      } else if (user && (!currentUser || currentUser.id !== user.uid)) {
+        console.log('🔐 Usuario autenticado en Firebase, actualizando estado');
+        setUser(user);
+      }
+    });
+    return () => unsubscribe();
+  }, [setUser]);
+  
   return (
     <React.StrictMode>
       <App />

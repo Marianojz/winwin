@@ -116,79 +116,82 @@ const AuctionManager = () => {
           });
           
           // Si el tiempo de finalización ya pasó
-          if (endTime <= now) {
-            console.log(`🔄 Subasta "${auction.title}" finalizó automáticamente`);
-            needsUpdate = true;
-            
-            // Verificar si hay ganador (última oferta)
-            if (auction.bids.length > 0) {
-              const winningBid = auction.bids[auction.bids.length - 1];
-              const winnerId = winningBid.userId;
-              const winnerName = winningBid.username;
-              const finalPrice = winningBid.amount;
+if (endTime <= now) {
+  console.log(`🔄 Subasta "${auction.title}" finalizó automáticamente`);
+  needsUpdate = true;
+  
+  // Verificar si hay ganador (OFERTA MÁS ALTA)
+  if (auction.bids.length > 0) {
+    // Encontrar la oferta más alta
+    const winningBid = auction.bids.reduce((highest, current) => 
+      current.amount > highest.amount ? current : highest
+    );
+    const winnerId = winningBid.userId;
+    const winnerName = winningBid.username;
+    const finalPrice = winningBid.amount;
 
-              // Crear orden de pago para el ganador
-              const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-              
-              const order: Order = {
-                id: `ORD-${Date.now()}`,
-                userId: winnerId,
-                userName: winnerName,
-                productId: auction.id,
-                productName: auction.title,
-                productImage: auction.images[0] || '',
-                productType: 'auction',
-                type: 'auction',
-                amount: finalPrice,
-                status: 'pending_payment',
-                deliveryMethod: 'shipping',
-                createdAt: now,
-                expiresAt: expiresAt,
-                address: { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } }
-              };
+    // Crear orden de pago para el ganador
+    const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+    
+    const order: Order = {
+      id: `ORD-${Date.now()}`,
+      userId: winnerId,
+      userName: winnerName,
+      productId: auction.id,
+      productName: auction.title,
+      productImage: auction.images[0] || '',
+      productType: 'auction',
+      type: 'auction',
+      amount: finalPrice,
+      status: 'pending_payment',
+      deliveryMethod: 'shipping',
+      createdAt: now,
+      expiresAt: expiresAt,
+      address: { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } }
+    };
 
-              addOrder(order);
-              console.log(`📝 Orden creada para ${winnerName}: ${finalPrice}`);
+    addOrder(order);
+    console.log(`📝 Orden creada para ${winnerName}: ${finalPrice}`);
 
-              // Notificar al ganador
-              addNotification({
-                userId: winnerId,
-                type: 'auction_won',
-                title: '🎉 ¡Ganaste la subasta!',
-                message: `Ganaste "${auction.title}" por $${finalPrice.toLocaleString()}. Tenés 48hs para pagar.`,
-                read: false,
-                link: '/notificaciones'
-              });
+    // Notificar al ganador
+    addNotification({
+      userId: winnerId,
+      type: 'auction_won',
+      title: '🎉 ¡Ganaste la subasta!',
+      message: `Ganaste "${auction.title}" por $${finalPrice.toLocaleString()}. Tenés 48hs para pagar.`,
+      read: false,
+      link: '/notificaciones'
+    });
 
-              // Reproducir sonido de victoria
-              soundManager.playWon();
-              // Efecto visual: papel picado para el usuario ganador
-              if (user && user.id === winnerId) {
-                launchConfettiFromTop(3500);
-              }
+    // Reproducir sonido de victoria
+    soundManager.playWon();
+    // Efecto visual: papel picado para el usuario ganador
+    if (user && user.id === winnerId) {
+      launchConfettiFromTop(3500);
+    }
 
-              // Notificar al admin
-              addNotification({
-                userId: 'admin',
-                type: 'auction_won',
-                title: '🎯 Subasta Finalizada',
-                message: `${winnerName} ganó "${auction.title}" por $${finalPrice.toLocaleString()}. Esperando pago.`,
-                read: false
-              });
+    // Notificar al admin
+    addNotification({
+      userId: 'admin',
+      type: 'auction_won',
+      title: '🎯 Subasta Finalizada',
+      message: `${winnerName} ganó "${auction.title}" por $${finalPrice.toLocaleString()}. Esperando pago.`,
+      read: false
+    });
 
-              return {
-                ...auction,
-                status: 'ended' as const,
-                winnerId: winnerId
-              };
-            }
-            
-            // Si no hay ofertas, marcar como finalizada sin ganador
-            return {
-              ...auction,
-              status: 'ended' as const
-            };
-          }
+    return {
+      ...auction,
+      status: 'ended' as const,
+      winnerId: winnerId
+    };
+  }
+  
+  // Si no hay ofertas, marcar como finalizada sin ganador
+  return {
+    ...auction,
+    status: 'ended' as const
+  };
+}
         }
         return auction;
       });
