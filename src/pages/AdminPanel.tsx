@@ -1,5 +1,5 @@
 // Firebase Realtime Database imports
-import { ref, update, remove, onValue } from 'firebase/database';
+import { ref, update } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
 
 // Otras importaciones de Lucide, React, etc.
@@ -8,9 +8,7 @@ import {
   Eye, Edit, Trash2, Users, Clock, AlertCircle, Activity, RefreshCw,
   Gavel, Package, Bot, DollarSign, Plus, XCircle,
   TrendingUp, ShoppingCart, Bell, AlertTriangle,
-  Search, Filter, ShoppingBag, MapPin, BarChart3,
-  CheckCircle, Truck, Award, Star, Image as ImageIcon,
-  Calendar, Clock as ClockIcon, Tag, Zap, Settings
+  Search, Filter, ShoppingBag, MapPin, BarChart3
 } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -18,99 +16,16 @@ import UserDetailsModal from '../components/UserDetailsModal';
 import StatsCard from '../components/StatsCard';
 import { useStore } from '../store/useStore';
 import { formatCurrency, formatTimeAgo } from '../utils/helpers';
-import { Product, Auction, Order, OrderStatus, User, Bot } from '../types';
+import { Product, Auction, Order, OrderStatus } from '../types';
 import ImageUploader from '../components/ImageUploader';
 
 const AdminPanel = () => {
   const { 
     user, auctions, products, bots, orders,
-    addBot, updateBot, deleteBot, setProducts, setAuctions, updateOrderStatus, setBots
+    addBot, updateBot, deleteBot, setProducts, setAuctions, updateOrderStatus 
   } = useStore();
-  
   // ============================================
-  // ESTADOS PRINCIPALES
-  // ============================================
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [realUsers, setRealUsers] = useState<any[]>([]);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [loadingUsers, setLoadingUsers] = useState(true);
-  
-  // Estados para productos
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [productForm, setProductForm] = useState({
-    name: '',
-    description: '',
-    price: 0,
-    stock: 0,
-    categoryId: '1',
-    images: [] as string[],
-    badges: [] as string[],
-    active: true,
-    featured: false
-  });
-
-  // Estados para subastas - CORREGIDOS
-  const [editingAuction, setEditingAuction] = useState<Auction | null>(null);
-  const [auctionForm, setAuctionForm] = useState({
-    title: '',
-    description: '',
-    startingPrice: 1000, // PRECIO INICIAL POR DEFECTO
-    buyNowPrice: 0,
-    categoryId: '1',
-    images: [] as string[],
-    durationDays: 0,
-    durationHours: 0,
-    durationMinutes: 30,
-    condition: 'new' as 'new' | 'like-new' | 'excellent' | 'good' | 'fair',
-    featured: false,
-    allowExtension: true,
-    scheduled: false,
-    scheduledDate: '',
-    scheduledTime: ''
-  });
-
-  // Estados para bots
-  const [botForm, setBotForm] = useState({
-    name: '',
-    balance: 10000,
-    intervalMin: 5,
-    intervalMax: 15,
-    maxBidAmount: 5000,
-    targetAuctions: [] as string[]
-  });
-
-  // Estados para inventario
-  const [inventoryFilter, setInventoryFilter] = useState('all');
-
-  // Estados para pedidos
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<OrderStatus | 'all'>('all');
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  
-  // ============================================
-  // EFFECTS Y CARGA DE DATOS
-  // ============================================
-  
-  // Cargar usuarios reales de Firebase Realtime Database
-  useEffect(() => {
-    const usersRef = ref(realtimeDb, 'users');
-    const unsubscribe = onValue(usersRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const usersArray = Object.keys(data).map(key => ({
-          id: key,
-          ...data[key]
-        }));
-        setRealUsers(usersArray);
-      }
-      setLoadingUsers(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // ============================================
-  // FUNCIONES PARA CREAR SUBASTA - CORREGIDAS
+  // FUNCIONES PARA CREAR SUBASTA
   // ============================================
   
   // Función para validar el formulario de subasta
@@ -133,26 +48,20 @@ const AdminPanel = () => {
       errors.push('La descripción no puede superar los 2000 caracteres');
     }
 
-    // Validar precio inicial - CORREGIDO
-    if (!form.startingPrice || form.startingPrice <= 0) {
-      errors.push('El precio inicial debe ser mayor a $0');
-    }
-    if (form.startingPrice && form.startingPrice < 100) {
-      errors.push('El precio inicial mínimo es $100');
-    }
-    if (form.startingPrice && form.startingPrice % 500 !== 0) {
-      errors.push('El precio inicial debe ser múltiplo de $500');
-    }
+    // Validar precio inicial
+if (!form.startingPrice || form.startingPrice <= 0) {  // ← CAMBIADO
+  errors.push('El precio inicial debe ser mayor a $0');
+}
+if (form.startingPrice && form.startingPrice < 100) {  // ← CAMBIADO
+  errors.push('El precio inicial mínimo es $100');
+}
 
-    // Validar precio de Compra Ya (si está activado)
-    if (form.buyNowPrice && form.buyNowPrice > 0) {
-      if (form.buyNowPrice <= form.startingPrice) {
-        errors.push('El precio de "Compra Ya" debe ser mayor al precio inicial');
-      }
-      if (form.buyNowPrice % 500 !== 0) {
-        errors.push('El precio "Compra Ya" debe ser múltiplo de $500');
-      }
-    }
+// Validar precio de Compra Ya (si está activado)
+if (form.buyNowPrice && form.buyNowPrice > 0) {
+  if (form.buyNowPrice <= form.startingPrice) {  // ← CAMBIADO
+    errors.push('El precio de "Compra Ya" debe ser mayor al precio inicial');
+  }
+}
 
     // Validar imágenes
     if (!form.images || form.images.length === 0) {
@@ -189,7 +98,7 @@ const AdminPanel = () => {
     };
   };
 
-  // Función para crear subasta en Firebase - CORREGIDA
+  // Función para crear subasta en Firebase
   const handleCreateAuction = async () => {
     // Validar formulario
     const validation = validateAuctionForm(auctionForm);
@@ -202,7 +111,6 @@ const AdminPanel = () => {
       alert('Debes estar autenticado para crear subastas.');
       return;
     }
-
     try {
       // Calcular fecha de finalización
       const now = new Date();
@@ -211,56 +119,61 @@ const AdminPanel = () => {
       // Si está programada, usar la fecha programada
       if (auctionForm.scheduled && auctionForm.scheduledDate && auctionForm.scheduledTime) {
         startTime = new Date(`${auctionForm.scheduledDate}T${auctionForm.scheduledTime}`);
-        if (startTime <= now) {
-          alert('La fecha programada debe ser futura');
-          return;
-        }
       }
 
       // Calcular end time basado en duración
       const totalMinutes = (auctionForm.durationDays * 24 * 60) + (auctionForm.durationHours * 60) + auctionForm.durationMinutes;
       const endTime = new Date(startTime.getTime() + totalMinutes * 60000);
 
-      // Validar y sanitizar precios
-      const startingPrice = Number(auctionForm.startingPrice);
-      const buyNowPrice = auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined;
+      // Sanitizar precio inicial, quitar ceros a izquierda
+const sanitizedstartPriceStr = String(auctionForm.startingPrice ?? '').replace(/^0+/, '');  // ← CAMBIADO
+if (!sanitizedstartPriceStr || isNaN(Number(sanitizedstartPriceStr)) || Number(sanitizedstartPriceStr) < 100) {
+  alert('El precio inicial debe ser un número mayor o igual a $100 (sin ceros a la izquierda).');
+  return;
+}
+const sanitizedstartPrice = Number(sanitizedstartPriceStr);
 
-      if (startingPrice < 100 || startingPrice % 500 !== 0) {
-        alert('El precio inicial debe ser mínimo $100 y múltiplo de $500');
+      // Verificar formato de otros campos claves
+      if (!auctionForm.title || !auctionForm.description || !auctionForm.images?.length) {
+        alert('Todos los campos requeridos deben estar completos y válidos.');
         return;
       }
 
-      if (buyNowPrice && (buyNowPrice <= startingPrice || buyNowPrice % 500 !== 0)) {
-        alert('El precio "Compra Ya" debe ser mayor al inicial y múltiplo de $500');
-        return;
-      }
-
-      // Crear objeto de subasta CORREGIDO
-      const newAuction: Auction = {
-        id: `auction_${Date.now()}`,
-        title: auctionForm.title.trim(),
-        description: auctionForm.description.trim(),
-        images: auctionForm.images,
-        startingPrice: startingPrice,
-        currentPrice: startingPrice, // Mismo que startingPrice inicialmente
-        buyNowPrice: buyNowPrice,
-        startTime: startTime, // Usar startTime calculado
-        endTime: endTime,
-        status: auctionForm.scheduled ? 'scheduled' : 'active',
-        categoryId: auctionForm.categoryId,
-        bids: [],
-        featured: auctionForm.featured || false,
-        isFlash: totalMinutes <= 60, // Si dura 1 hora o menos, es flash
-        condition: auctionForm.condition || 'new',
-        createdBy: user.id,
-        createdAt: new Date(),
-        winnerId: undefined
-      };
+      // Crear objeto de subasta
+const newAuction: Auction = {
+  id: `auction_${Date.now()}`,
+  title: auctionForm.title.trim(),
+  description: auctionForm.description.trim(),
+  images: auctionForm.images,
+  startingPrice: sanitizedstartPrice,  // ← CAMBIAR a startingPrice
+  currentPrice: sanitizedstartPrice,
+  buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
+  startTime: new Date(),  // ← AGREGAR startTime (requerido)
+  endTime: endTime,
+  status: auctionForm.scheduled ? 'scheduled' as any : 'active',
+  categoryId: auctionForm.categoryId,
+  bids: [],
+  featured: auctionForm.featured || false,
+  isFlash: totalMinutes <= 60, // Si dura 1 hora o menos, es flash
+  condition: auctionForm.condition || 'new',
+  createdBy: user.id,
+  createdAt: new Date()  // ← AGREGAR createdAt
+};
 
       // Guardar en Firebase
-      console.log('🔥 Guardando subasta en Firebase...');
-      await update(ref(realtimeDb, `auctions/${newAuction.id}`), newAuction);
-      console.log('✅ Subasta guardada en Firebase correctamente');
+      try {
+        console.log('🔥 Guardando subasta en Firebase...');
+        await update(ref(realtimeDb, `auctions/${newAuction.id}`), newAuction);
+        console.log('✅ Subasta guardada en Firebase correctamente');
+      } catch (error) {
+        console.error('❌ Error guardando en Firebase:', error);
+        
+        if (error instanceof Error) {
+          alert('Error guardando en Firebase: ' + error.message);
+        } else {
+          alert('Error guardando en Firebase: Error desconocido');
+        }
+      }
 
       // Actualizar estado local
       setAuctions([...auctions, newAuction]);
@@ -272,24 +185,25 @@ const AdminPanel = () => {
       
       alert(successMessage);
 
-      // Resetear formulario con valores por defecto MEJORADOS
-      setAuctionForm({
-        title: '',
-        description: '',
-        startingPrice: 1000, // Precio inicial por defecto
-        buyNowPrice: 0,
-        categoryId: '1',
-        images: [] as string[],
-        durationDays: 0,
-        durationHours: 0,
-        durationMinutes: 30,
-        condition: 'new',
-        featured: false,
-        allowExtension: true,
-        scheduled: false,
-        scheduledDate: '',
-        scheduledTime: ''
-      });
+      // Resetear formulario
+setAuctionForm({
+  title: '',
+  description: '',
+  startingPrice: 1000,     // ← CAMBIADO
+  currentPrice: 1000,
+  buyNowPrice: 0,
+  categoryId: '1',
+  images: [] as string[],
+  durationDays: 0,
+  durationHours: 0,
+  durationMinutes: 30,
+  condition: 'new' as 'new' | 'like-new' | 'excellent' | 'good' | 'fair',
+  featured: false,
+  allowExtension: true,
+  scheduled: false,
+  scheduledDate: '',
+  scheduledTime: ''
+});
 
       // Volver a la lista de subastas
       setActiveTab('auctions');
@@ -299,120 +213,64 @@ const AdminPanel = () => {
       alert(`❌ Error al crear subasta: ${error.message}`);
     }
   };
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [realUsers, setRealUsers] = useState<any[]>([]);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  
+  // Estados para productos
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [productForm, setProductForm] = useState({
+  name: '',
+  description: '',
+  price: 0,
+  stock: 0,
+  categoryId: '1',
+  images: [] as string[],
+  badges: [] as string[],
+  active: true,
+  featured: false
+});
 
-  // ============================================
-  // FUNCIONES PARA PRODUCTOS - MEJORADAS
-  // ============================================
+  // Estados para subastas
+const [editingAuction, setEditingAuction] = useState<Auction | null>(null);
+const [auctionForm, setAuctionForm] = useState({
+  title: '',
+  description: '',
+  startingPrice: 0,  // ← CAMBIADO de startPrice a startingPrice
+  currentPrice: 0,
+  buyNowPrice: 0,
+  categoryId: '1',
+  images: [] as string[],
+  durationDays: 0,
+  durationHours: 0,
+  durationMinutes: 30,
+  condition: 'new' as 'new' | 'like-new' | 'excellent' | 'good' | 'fair',
+  featured: false,
+  allowExtension: true,
+  scheduled: false,
+  scheduledDate: '',
+  scheduledTime: ''
+});
 
-  const handleCreateProduct = async () => {
-    if (!user) return;
+  // Estados para bots
+  const [botForm, setBotForm] = useState({
+    name: '',
+    balance: 10000,
+    intervalMin: 5,
+    intervalMax: 15,
+    maxBidAmount: 5000,
+    targetAuctions: [] as string[]
+  });
 
-    try {
-      const newProduct: Product = {
-        id: `product_${Date.now()}`,
-        ...productForm,
-        createdAt: new Date(),
-        createdBy: user.id,
-        ratings: [],
-        averageRating: 0,
-        updatedAt: new Date()
-      };
+  // Estados para inventario
+  const [inventoryFilter, setInventoryFilter] = useState('all');
 
-      await update(ref(realtimeDb, `products/${newProduct.id}`), newProduct);
-      setProducts([...products, newProduct]);
-      
-      // Reset form
-      setProductForm({
-        name: '',
-        description: '',
-        price: 0,
-        stock: 0,
-        categoryId: '1',
-        images: [] as string[],
-        badges: [] as string[],
-        active: true,
-        featured: false
-      });
-      
-      alert('✅ Producto creado correctamente');
-      setActiveTab('products');
-    } catch (error: any) {
-      console.error('Error creando producto:', error);
-      alert('❌ Error al crear producto: ' + error.message);
-    }
-  };
-
-  // ============================================
-  // FUNCIONES PARA BOTS - MEJORADAS
-  // ============================================
-
-  const handleCreateBot = () => {
-    if (!botForm.name) {
-      alert('⚠️ Por favor ingresa un nombre para el bot');
-      return;
-    }
-
-    const newBot: Bot = {
-      id: `bot_${Date.now()}`,
-      ...botForm,
-      isActive: true,
-      createdAt: new Date(),
-      lastActivity: new Date()
-    };
-
-    addBot(newBot);
-    
-    // Reset form
-    setBotForm({
-      name: '',
-      balance: 10000,
-      intervalMin: 5,
-      intervalMax: 15,
-      maxBidAmount: 5000,
-      targetAuctions: [] as string[]
-    });
-    
-    alert('✅ Bot creado correctamente');
-  };
-
-  // ============================================
-  // FUNCIONES DE ELIMINACIÓN - MEJORADAS
-  // ============================================
-
-  const handleDeleteAuction = async (auctionId: string) => {
-    const auction = auctions.find(a => a.id === auctionId);
-    if (!window.confirm(`¿Estás seguro de eliminar "${auction?.title}"?\n\nSe perderán todas las ofertas asociadas.`)) {
-      return;
-    }
-
-    try {
-      await remove(ref(realtimeDb, `auctions/${auctionId}`));
-      const updatedAuctions = auctions.filter(a => a.id !== auctionId);
-      setAuctions(updatedAuctions);
-      alert('🗑️ Subasta eliminada correctamente');
-    } catch (error: any) {
-      console.error('Error eliminando subasta:', error);
-      alert('❌ Error al eliminar subasta: ' + error.message);
-    }
-  };
-
-  const handleDeleteProduct = async (productId: string) => {
-    const product = products.find(p => p.id === productId);
-    if (!window.confirm(`¿Estás seguro de eliminar "${product?.name}"?\n\nEsta acción no se puede deshacer.`)) {
-      return;
-    }
-
-    try {
-      await remove(ref(realtimeDb, `products/${productId}`));
-      const updatedProducts = products.filter(p => p.id !== productId);
-      setProducts(updatedProducts);
-      alert('🗑️ Producto eliminado correctamente');
-    } catch (error: any) {
-      console.error('Error eliminando producto:', error);
-      alert('❌ Error al eliminar producto: ' + error.message);
-    }
-  };
-
+  // Estados para pedidos
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<OrderStatus | 'all'>('all');
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  
   // ============================================
   // FUNCIONES PARA ESTADÍSTICAS DEL DASHBOARD
   // ============================================
@@ -523,102 +381,199 @@ const AdminPanel = () => {
   const outOfStockProducts = products.filter(p => p.stock === 0);
   const totalInventoryValue = products.reduce((sum, p) => sum + (p.price * p.stock), 0);
 
+  // Cargar usuarios reales de Firebase
+  const loadUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const usersQuery = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+      const usersSnapshot = await getDocs(usersQuery);
+      const usersData = usersSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setRealUsers(usersData);
+      console.log('✅ Usuarios cargados:', usersData.length);
+    } catch (error) {
+      console.error('❌ Error al cargar usuarios:', error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'users') {
+      loadUsers();
+    }
+  }, [activeTab]);
+
+  // Protección de acceso
+  if (!user?.isAdmin) {
+    return (
+      <div style={{ minHeight: 'calc(100vh - 80px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem' }}>
+        <div style={{ textAlign: 'center', background: 'var(--bg-secondary)', padding: '3rem', borderRadius: '1.5rem', maxWidth: '500px' }}>
+          <AlertCircle size={64} color="var(--error)" style={{ marginBottom: '1.5rem' }} />
+          <h2 style={{ marginBottom: '1rem' }}>Acceso Denegado</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
+            Solo los administradores pueden acceder a este panel de control.
+          </p>
+          <button onClick={() => window.location.href = '/'} className="btn btn-primary">
+            Volver al Inicio
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+
   // Funciones para Productos
   const handleEditProduct = (product: Product) => {
-    setEditingProduct(product);
-    setProductForm({
-      name: product.name,
-      description: product.description,
-      price: product.price,
-      stock: product.stock,
-      categoryId: product.categoryId,
-      images: product.images || [],
-      badges: product.badges || [],
-      active: product.active !== undefined ? product.active : true,
-      featured: product.featured || false
-    });
-    setActiveTab('edit-product');
-  };
-
+  setEditingProduct(product);
+  setProductForm({
+    name: product.name,
+    description: product.description,
+    price: product.price,
+    stock: product.stock,
+    categoryId: product.categoryId,
+    images: product.images || [],
+    badges: product.badges || [],
+    active: product.active !== undefined ? product.active : true,
+    featured: product.featured || false
+  });
+  setActiveTab('edit-product');
+};
+  const handleCreateProduct = () => {
+  // Resetear formulario
+  setProductForm({
+    name: '',
+    description: '',
+    price: 0,
+    stock: 0,
+    categoryId: '1',
+    images: [] as string[],
+    badges: [] as string[],
+    active: true,
+    featured: false
+  });
+  setEditingProduct(null);
+  setActiveTab('create-product');
+};
   const validateProductForm = (): { valid: boolean; errors: string[] } => {
-    const errors: string[] = [];
+  const errors: string[] = [];
 
-    // Validar nombre
-    if (!productForm.name || productForm.name.trim().length < 5) {
-      errors.push('El nombre debe tener al menos 5 caracteres');
-    }
-    if (productForm.name && productForm.name.length > 100) {
-      errors.push('El nombre no puede superar los 100 caracteres');
-    }
+  // Validar nombre
+  if (!productForm.name || productForm.name.trim().length < 5) {
+    errors.push('El nombre debe tener al menos 5 caracteres');
+  }
+  if (productForm.name && productForm.name.length > 100) {
+    errors.push('El nombre no puede superar los 100 caracteres');
+  }
 
-    // Validar descripción
-    if (!productForm.description || productForm.description.trim().length < 20) {
-      errors.push('La descripción debe tener al menos 20 caracteres');
-    }
-    if (productForm.description && productForm.description.length > 2000) {
-      errors.push('La descripción no puede superar los 2000 caracteres');
-    }
+  // Validar descripción
+  if (!productForm.description || productForm.description.trim().length < 20) {
+    errors.push('La descripción debe tener al menos 20 caracteres');
+  }
+  if (productForm.description && productForm.description.length > 2000) {
+    errors.push('La descripción no puede superar los 2000 caracteres');
+  }
 
-    // Validar precio
-    if (!productForm.price || productForm.price < 100) {
-      errors.push('El precio mínimo es $100');
-    }
+  // Validar precio
+  if (!productForm.price || productForm.price < 100) {
+    errors.push('El precio mínimo es $100');
+  }
 
-    // Validar stock
-    if (productForm.stock < 0) {
-      errors.push('El stock no puede ser negativo');
-    }
+  // Validar stock
+  if (productForm.stock < 0) {
+    errors.push('El stock no puede ser negativo');
+  }
 
-    // Validar imágenes
-    if (productForm.images.length === 0) {
-      errors.push('Debes agregar al menos 1 imagen del producto');
-    }
-    if (productForm.images.length > 5) {
-      errors.push('Máximo 5 imágenes por producto');
-    }
+  // Validar imágenes
+  if (productForm.images.length === 0) {
+    errors.push('Debes agregar al menos 1 imagen del producto');
+  }
+  if (productForm.images.length > 5) {
+    errors.push('Máximo 5 imágenes por producto');
+  }
 
-    return {
-      valid: errors.length === 0,
-      errors
-    };
+  return {
+    valid: errors.length === 0,
+    errors
   };
+};
 
   const handleSaveProduct = async () => {
-    // Validar formulario
-    const validation = validateProductForm();
-    if (!validation.valid) {
-      alert(`❌ Errores en el formulario:\n\n${validation.errors.join('\n')}`);
-      return;
+  // Validar formulario
+  const validation = validateProductForm();
+  if (!validation.valid) {
+    alert(`❌ Errores en el formulario:\n\n${validation.errors.join('\n')}`);
+    return;
+  }
+
+  try {
+    if (editingProduct) {
+      // EDITAR PRODUCTO EXISTENTE
+      const updatedProduct = {
+        ...editingProduct,
+        ...productForm,
+        updatedAt: new Date().toISOString()
+      };
+
+      const updatedProducts = products.map(p =>
+        p.id === editingProduct.id ? updatedProduct : p
+      );
+      setProducts(updatedProducts);
+
+      // TODO: Guardar en Firebase cuando esté configurado
+      // await updateDoc(doc(db, 'products', editingProduct.id), updatedProduct);
+
+      alert('✅ Producto actualizado correctamente');
+      setEditingProduct(null);
+      setActiveTab('products');
+
+    } else {
+      // CREAR PRODUCTO NUEVO
+      const newProduct = {
+        ...productForm,
+        id: `product_${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        ratings: [],
+        averageRating: 0
+      };
+
+      setProducts([...products, newProduct as Product]);
+
+      // TODO: Guardar en Firebase cuando esté configurado
+      // await addDoc(collection(db, 'products'), newProduct);
+
+      alert('✅ Producto creado correctamente');
+      
+      // Resetear formulario
+      setProductForm({
+        name: '',
+        description: '',
+        price: 0,
+        stock: 0,
+        categoryId: '1',
+        images: [] as string[],
+        badges: [] as string[],
+        active: true,
+        featured: false
+      });
+
+      setActiveTab('products');
     }
+  } catch (error: any) {
+    console.error('❌ Error guardando producto:', error);
+    alert(`❌ Error al guardar producto: ${error.message}`);
+  }
+};
 
-    try {
-      if (editingProduct) {
-        // EDITAR PRODUCTO EXISTENTE
-        const updatedProduct = {
-          ...editingProduct,
-          ...productForm,
-          updatedAt: new Date()
-        };
-
-        // Actualizar en Firebase
-        await update(ref(realtimeDb, `products/${editingProduct.id}`), updatedProduct);
-
-        const updatedProducts = products.map(p =>
-          p.id === editingProduct.id ? updatedProduct : p
-        );
-        setProducts(updatedProducts);
-
-        alert('✅ Producto actualizado correctamente');
-        setEditingProduct(null);
-        setActiveTab('products');
-
-      } else {
-        // CREAR PRODUCTO NUEVO
-        await handleCreateProduct();
-      }
-    } catch (error: any) {
-      console.error('❌ Error guardando producto:', error);
-      alert(`❌ Error al guardar producto: ${error.message}`);
+  const handleDeleteProduct = (productId: string) => {
+    const product = products.find(p => p.id === productId);
+    if (window.confirm(`¿Estás seguro de eliminar "${product?.name}"?\n\nEsta acción no se puede deshacer.`)) {
+      const updatedProducts = products.filter(p => p.id !== productId);
+      setProducts(updatedProducts);
+      alert('🗑️ Producto eliminado correctamente');
     }
   };
 
@@ -636,26 +591,27 @@ const AdminPanel = () => {
     const durationMinutes = remainingMinutes % 60;
     
     setAuctionForm({
-      title: auction.title,
-      description: auction.description,
-      startingPrice: auction.startingPrice,
-      buyNowPrice: auction.buyNowPrice || 0,
-      categoryId: auction.categoryId,
-      images: auction.images || [],
-      durationDays: durationDays > 0 ? durationDays : 0,
-      durationHours: durationHours > 0 ? durationHours : 0,
-      durationMinutes: durationMinutes > 0 ? durationMinutes : 30,
-      condition: auction.condition || 'new',
-      featured: auction.featured || false,
-      allowExtension: true,
-      scheduled: false,
-      scheduledDate: '',
-      scheduledTime: ''
-    });
+  title: auction.title,
+  description: auction.description,
+  startingPrice: auction.startingPrice,  // ← CAMBIADO
+  currentPrice: auction.currentPrice,
+  buyNowPrice: auction.buyNowPrice || 0,
+  categoryId: auction.categoryId,
+  images: auction.images || [],
+  durationDays: durationDays > 0 ? durationDays : 0,
+  durationHours: durationHours > 0 ? durationHours : 0,
+  durationMinutes: durationMinutes > 0 ? durationMinutes : 30,
+  condition: auction.condition || 'new',
+  featured: auction.featured || false,
+  allowExtension: true,
+  scheduled: false,
+  scheduledDate: '',
+  scheduledTime: ''
+});
     setActiveTab('edit-auction');
   };
 
-  const handleSaveAuction = async () => {
+  const handleSaveAuction = () => {
     if (!editingAuction) return;
 
     // Validar formulario (reutilizamos la misma validación de crear)
@@ -666,11 +622,11 @@ const AdminPanel = () => {
     }
 
     // Advertencia si se modifica precio inicial y ya hay ofertas
-    if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAuction.startingPrice) {
-      if (!window.confirm('⚠️ ADVERTENCIA: Esta subasta ya tiene ofertas.\n\n¿Estás seguro de cambiar el precio inicial?\n\nEsto puede afectar la validez de las ofertas existentes.')) {
-        return;
-      }
-    }
+if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAuction.startingPrice) {  // ← CAMBIADO
+  if (!window.confirm('⚠️ ADVERTENCIA: Esta subasta ya tiene ofertas.\n\n¿Estás seguro de cambiar el precio inicial?\n\nEsto puede afectar la validez de las ofertas existentes.')) {
+    return;
+  }
+}
 
     // Calcular nueva fecha de finalización basada en duración
     const totalMinutes = (auctionForm.durationDays * 24 * 60) + (auctionForm.durationHours * 60) + auctionForm.durationMinutes;
@@ -678,38 +634,59 @@ const AdminPanel = () => {
     const newEndTime = new Date(now.getTime() + totalMinutes * 60000);
 
     // Actualizar subasta
-    const updatedAuction = { 
-      ...editingAuction, 
-      title: auctionForm.title.trim(),
-      description: auctionForm.description.trim(),
-      startingPrice: Number(auctionForm.startingPrice),
-      currentPrice: Math.max(Number(auctionForm.startingPrice), editingAuction.currentPrice),
-      buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
-      categoryId: auctionForm.categoryId,
-      images: auctionForm.images,
-      condition: auctionForm.condition,
-      featured: auctionForm.featured,
-      endTime: newEndTime,
-      isFlash: totalMinutes <= 60,
-      updatedAt: new Date()
-    };
-
-    try {
-      // Actualizar en Firebase
-      await update(ref(realtimeDb, `auctions/${editingAuction.id}`), updatedAuction);
-      
-      const updatedAuctions = auctions.map(a => 
-        a.id === editingAuction.id ? updatedAuction : a
-      );
-      
+const updatedAuctions = auctions.map(a => 
+  a.id === editingAuction.id 
+    ? { 
+        ...a, 
+        title: auctionForm.title.trim(),
+        description: auctionForm.description.trim(),
+        startingPrice: Number(auctionForm.startingPrice),  // ← CAMBIADO
+        currentPrice: Math.max(Number(auctionForm.currentPrice), Number(auctionForm.startingPrice)),
+            buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
+            categoryId: auctionForm.categoryId,
+            images: auctionForm.images,
+            condition: auctionForm.condition,
+            featured: auctionForm.featured,
+            endTime: newEndTime,
+            isFlash: totalMinutes <= 60
+          }
+        : a
+    );
+    
+    setAuctions(updatedAuctions);
+    alert('✅ Subasta actualizada correctamente');
+    setEditingAuction(null);
+    setActiveTab('auctions');
+  };
+  const handleDeleteAuction = (auctionId: string) => {
+    const auction = auctions.find(a => a.id === auctionId);
+    if (window.confirm(`¿Estás seguro de eliminar "${auction?.title}"?\n\nSe perderán todas las ofertas asociadas.`)) {
+      const updatedAuctions = auctions.filter(a => a.id !== auctionId);
       setAuctions(updatedAuctions);
-      alert('✅ Subasta actualizada correctamente');
-      setEditingAuction(null);
-      setActiveTab('auctions');
-    } catch (error: any) {
-      console.error('❌ Error actualizando subasta:', error);
-      alert(`❌ Error al actualizar subasta: ${error.message}`);
+      alert('🗑️ Subasta eliminada correctamente');
     }
+  };
+
+  // Funciones para Bots
+  const handleAddBot = () => {
+    if (!botForm.name) {
+      alert('⚠️ Por favor ingresa un nombre para el bot');
+      return;
+    }
+    addBot({
+      id: Date.now().toString(),
+      ...botForm,
+      isActive: true
+    });
+    setBotForm({
+      name: '',
+      balance: 10000,
+      intervalMin: 5,
+      intervalMax: 15,
+      maxBidAmount: 5000,
+      targetAuctions: []
+    });
+    alert('✅ Bot creado correctamente');
   };
 
   // Función de Reset
@@ -731,20 +708,20 @@ const AdminPanel = () => {
   });
 
   const getStatusBadge = (status: OrderStatus) => {
-    const badges = {
-      pending_payment: { className: 'badge-warning', text: '⏳ Pago Pendiente' },
-      payment_expired: { className: 'badge-error', text: '❌ Expirado' },
-      payment_confirmed: { className: 'badge-success', text: '✅ Pago Confirmado' },
-      processing: { className: 'badge-info', text: '🔄 Procesando' },
-      preparing: { className: 'badge-info', text: '📦 Preparando' },
-      shipped: { className: 'badge-primary', text: '🚢 Enviado' },
-      in_transit: { className: 'badge-primary', text: '🚚 En Tránsito' },
-      delivered: { className: 'badge-success', text: '✅ Entregado' },
-      cancelled: { className: 'badge-secondary', text: '🚫 Cancelado' },
-      expired: { className: 'badge-error', text: '⌛ Expirado' }
-    };
-    return badges[status] || { className: 'badge-secondary', text: '❓ Desconocido' };
+  const badges = {
+    pending_payment: { className: 'badge-warning', text: '⏳ Pago Pendiente' },
+    payment_expired: { className: 'badge-error', text: '❌ Expirado' },
+    payment_confirmed: { className: 'badge-success', text: '✅ Pago Confirmado' },
+    processing: { className: 'badge-info', text: '🔄 Procesando' },
+    preparing: { className: 'badge-info', text: '📦 Preparando' },
+    shipped: { className: 'badge-primary', text: '🚢 Enviado' },
+    in_transit: { className: 'badge-primary', text: '🚚 En Tránsito' },
+    delivered: { className: 'badge-success', text: '✅ Entregado' },
+    cancelled: { className: 'badge-secondary', text: '🚫 Cancelado' },
+    expired: { className: 'badge-error', text: '⌛ Expirado' }
   };
+  return badges[status] || { className: 'badge-secondary', text: '❓ Desconocido' };
+};
 
   const getDeliveryMethodBadge = (method: string) => {
     const badges = {
@@ -767,24 +744,6 @@ const AdminPanel = () => {
   };
 
   const orderStats = getTotalStats();
-
-  // Protección de acceso
-  if (!user?.isAdmin) {
-    return (
-      <div style={{ minHeight: 'calc(100vh - 80px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem' }}>
-        <div style={{ textAlign: 'center', background: 'var(--bg-secondary)', padding: '3rem', borderRadius: '1.5rem', maxWidth: '500px' }}>
-          <AlertCircle size={64} color="var(--error)" style={{ marginBottom: '1.5rem' }} />
-          <h2 style={{ marginBottom: '1rem' }}>Acceso Denegado</h2>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
-            Solo los administradores pueden acceder a este panel de control.
-          </p>
-          <button onClick={() => window.location.href = '/'} className="btn btn-primary">
-            Volver al Inicio
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div style={{ minHeight: 'calc(100vh - 80px)', padding: '2rem', background: 'var(--bg-primary)' }}>
@@ -809,7 +768,7 @@ const AdminPanel = () => {
           </button>
         </div>
 
-        {/* Navegación Tabs - MEJORADA */}
+        {/* Navegación Tabs */}
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap', background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
           {[
             { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
@@ -825,47 +784,15 @@ const AdminPanel = () => {
             const Icon = tab.icon;
             return (
               <button
-                key={tab.id}
-                onClick={() => {
-                  if (tab.id === 'create-product') {
-                    setProductForm({
-                      name: '',
-                      description: '',
-                      price: 0,
-                      stock: 0,
-                      categoryId: '1',
-                      images: [] as string[],
-                      badges: [] as string[],
-                      active: true,
-                      featured: false
-                    });
-                    setEditingProduct(null);
-                    setActiveTab('create-product');
-                  } else if (tab.id === 'create-auction') {
-                    setAuctionForm({
-                      title: '',
-                      description: '',
-                      startingPrice: 1000,
-                      buyNowPrice: 0,
-                      categoryId: '1',
-                      images: [] as string[],
-                      durationDays: 0,
-                      durationHours: 0,
-                      durationMinutes: 30,
-                      condition: 'new',
-                      featured: false,
-                      allowExtension: true,
-                      scheduled: false,
-                      scheduledDate: '',
-                      scheduledTime: ''
-                    });
-                    setEditingAuction(null);
-                    setActiveTab('create-auction');
-                  } else {
-                    setActiveTab(tab.id);
-                  }
-                }}
-                style={{
+  key={tab.id}
+  onClick={() => {
+    if (tab.id === 'create-product') {
+      handleCreateProduct();
+    } else {
+      setActiveTab(tab.id);
+    }
+  }}
+  style={{
                   padding: '0.875rem 1.5rem',
                   background: activeTab === tab.id ? 'var(--primary)' : 'transparent',
                   color: activeTab === tab.id ? 'white' : 'var(--text-primary)',
@@ -1135,469 +1062,89 @@ const AdminPanel = () => {
             </div>
           </div>
         )}
-
-        {/* CREATE AUCTION TAB - FORMULARIO MEJORADO */}
-        {activeTab === 'create-auction' && (
+        {/* USERS TAB */}
+        {activeTab === 'users' && (
           <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
-            <div style={{ marginBottom: '2rem' }}>
-              <h3 style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <Plus size={28} color="var(--primary)" />
-                Crear Nueva Subasta
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: 0 }}>
+                <Users size={28} />
+                Usuarios Registrados ({realUsers.length})
               </h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>
-                Completa todos los campos para publicar una nueva subasta
-              </p>
+              <button 
+                onClick={loadUsers}
+                className="btn btn-outline"
+                disabled={loadingUsers}
+              >
+                <RefreshCw size={16} className={loadingUsers ? 'spinning' : ''} />
+                Recargar
+              </button>
             </div>
 
-            <div style={{ display: 'grid', gap: '2rem' }}>
-              
-              {/* SECCIÓN 1: INFORMACIÓN BÁSICA */}
-              <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
-                <h4 style={{ marginBottom: '1.5rem', fontSize: '1.125rem', fontWeight: 600 }}>
-                  📝 Información Básica
-                </h4>
-                
-                <div style={{ display: 'grid', gap: '1.5rem' }}>
-                  {/* Título */}
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                      Título de la Subasta *
-                    </label>
-                    <input 
-                      type="text" 
-                      placeholder="Ej: iPhone 15 Pro Max 256GB - Nuevo en Caja"
-                      value={auctionForm.title}
-                      onChange={(e) => setAuctionForm({...auctionForm, title: e.target.value})}
-                      maxLength={100}
-                      style={{ 
-                        width: '100%', 
-                        padding: '0.875rem', 
-                        borderRadius: '0.5rem', 
-                        fontSize: '1rem',
-                        border: '2px solid var(--border)'
-                      }}
-                    />
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                      {auctionForm.title.length}/100 caracteres
-                    </div>
-                  </div>
-
-                  {/* Descripción */}
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                      Descripción Detallada *
-                    </label>
-                    <textarea 
-                      placeholder="Describe el producto en detalle: características, estado, accesorios incluidos, etc."
-                      value={auctionForm.description}
-                      onChange={(e) => setAuctionForm({...auctionForm, description: e.target.value})}
-                      maxLength={2000}
-                      style={{ 
-                        width: '100%', 
-                        padding: '0.875rem', 
-                        borderRadius: '0.5rem', 
-                        minHeight: '150px', 
-                        fontSize: '1rem', 
-                        resize: 'vertical',
-                        border: '2px solid var(--border)'
-                      }}
-                    />
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                      {auctionForm.description.length}/2000 caracteres
-                    </div>
-                  </div>
-
-                  {/* Categoría y Condición */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Categoría *</label>
-                      <select 
-                        value={auctionForm.categoryId}
-                        onChange={(e) => setAuctionForm({...auctionForm, categoryId: e.target.value})}
-                        style={{ 
-                          width: '100%', 
-                          padding: '0.875rem', 
-                          borderRadius: '0.5rem',
-                          fontSize: '1rem',
-                          border: '2px solid var(--border)'
-                        }}
-                      >
-                        <option value="1">📱 Electrónica</option>
-                        <option value="2">👕 Moda</option>
-                        <option value="3">🏠 Hogar</option>
-                        <option value="4">🎮 Gaming</option>
-                        <option value="5">📚 Libros</option>
-                        <option value="6">🎨 Arte y Coleccionables</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Condición *</label>
-                      <select 
-                        value={auctionForm.condition}
-                        onChange={(e) => setAuctionForm({...auctionForm, condition: e.target.value as any})}
-                        style={{ 
-                          width: '100%', 
-                          padding: '0.875rem', 
-                          borderRadius: '0.5rem',
-                          fontSize: '1rem',
-                          border: '2px solid var(--border)'
-                        }}
-                      >
-                        <option value="new">✨ Nuevo</option>
-                        <option value="like-new">💎 Como Nuevo</option>
-                        <option value="excellent">⭐ Excelente</option>
-                        <option value="good">👍 Bueno</option>
-                        <option value="fair">🔧 Regular</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
+            {loadingUsers ? (
+              <div style={{ textAlign: 'center', padding: '3rem' }}>
+                <RefreshCw size={48} color="var(--primary)" className="spinning" />
+                <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>Cargando usuarios...</p>
               </div>
-
-              {/* SECCIÓN 2: IMÁGENES */}
-              <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
-                <h4 style={{ marginBottom: '1.5rem', fontSize: '1.125rem', fontWeight: 600 }}>
-                  📸 Imágenes del Producto
-                </h4>
-                <ImageUploader
-                  images={auctionForm.images}
-                  onChange={(images) => setAuctionForm({...auctionForm, images})}
-                  maxImages={3}
-                  maxSizeMB={5}
-                />
+            ) : realUsers.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem' }}>
+                <Users size={64} color="var(--text-secondary)" />
+                <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>No hay usuarios registrados</p>
               </div>
-
-              {/* SECCIÓN 3: PRECIOS */}
-              <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
-                <h4 style={{ marginBottom: '1.5rem', fontSize: '1.125rem', fontWeight: 600 }}>
-                  💰 Configuración de Precios
-                </h4>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                  {/* Precio Inicial */}
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                      Precio Inicial de Subasta *
-                    </label>
-                    <input 
-                      type="number" 
-                      placeholder="1000"
-                      value={auctionForm.startingPrice}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Prevenir ceros a la izquierda
-                        const numericValue = value === '' ? 1000 : Math.max(100, parseInt(value) || 1000);
-                        setAuctionForm({...auctionForm, startingPrice: numericValue});
-                      }}
-                      min="100"
-                      step="500"
-                      style={{ 
-                        width: '100%', 
-                        padding: '0.875rem', 
-                        borderRadius: '0.5rem',
-                        fontSize: '1rem',
-                        border: '2px solid var(--border)'
-                      }}
-                    />
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                      💡 Precio mínimo: $100 • Múltiplo de $500
-                    </div>
-                  </div>
-
-                  {/* Compra Ya */}
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                      Precio "Compra Ya" (Opcional)
-                    </label>
-                    <input 
-                      type="number" 
-                      placeholder="Dejar en 0 para desactivar"
-                      value={auctionForm.buyNowPrice}
-                      onChange={(e) => setAuctionForm({...auctionForm, buyNowPrice: Number(e.target.value)})}
-                      min="0"
-                      step="500"
-                      style={{ 
-                        width: '100%', 
-                        padding: '0.875rem', 
-                        borderRadius: '0.5rem',
-                        fontSize: '1rem',
-                        border: '2px solid var(--border)'
-                      }}
-                    />
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                      💡 Si se activa, debe ser mayor al precio inicial
-                    </div>
-                  </div>
-                </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600 }}>Usuario</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600 }}>Email</th>
+                      <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 600 }}>Teléfono</th>
+                      <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 600 }}>Rol</th>
+                      <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 600 }}>Registro</th>
+                      <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 600 }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {realUsers.map(u => (
+                      <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '1rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'var(--primary)' }}>
+                              {u.displayName?.charAt(0).toUpperCase() || u.email?.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600 }}>{u.displayName || 'Sin nombre'}</div>
+                              <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>ID: {u.id}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '1rem' }}>{u.email}</td>
+                        <td style={{ padding: '1rem', textAlign: 'center' }}>
+                          {u.phoneNumber || '-'}
+                        </td>
+                        <td style={{ padding: '1rem', textAlign: 'center' }}>
+                          <span className={u.isAdmin ? 'badge badge-primary' : 'badge badge-secondary'}>
+                            {u.isAdmin ? 'Admin' : 'Usuario'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem', textAlign: 'center', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                          {u.createdAt ? new Date(u.createdAt.seconds * 1000).toLocaleDateString('es-AR') : '-'}
+                        </td>
+                        <td style={{ padding: '1rem', textAlign: 'center' }}>
+                          <button 
+                            onClick={() => setSelectedUser(u)}
+                            className="btn btn-outline"
+                            style={{ padding: '0.5rem 0.75rem' }}
+                          >
+                            <Eye size={16} />
+                            Ver Detalles
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-
-              {/* SECCIÓN 4: DURACIÓN */}
-              <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
-                <h4 style={{ marginBottom: '1.5rem', fontSize: '1.125rem', fontWeight: 600 }}>
-                  ⏱️ Duración de la Subasta
-                </h4>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
-                  {/* Días */}
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Días</label>
-                    <input 
-                      type="number" 
-                      value={auctionForm.durationDays}
-                      onChange={(e) => setAuctionForm({...auctionForm, durationDays: Number(e.target.value)})}
-                      min="0"
-                      max="7"
-                      style={{ 
-                        width: '100%', 
-                        padding: '0.875rem', 
-                        borderRadius: '0.5rem',
-                        fontSize: '1rem',
-                        textAlign: 'center',
-                        fontWeight: 600,
-                        border: '2px solid var(--border)'
-                      }}
-                    />
-                  </div>
-
-                  {/* Horas */}
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Horas</label>
-                    <input 
-                      type="number" 
-                      value={auctionForm.durationHours}
-                      onChange={(e) => setAuctionForm({...auctionForm, durationHours: Number(e.target.value)})}
-                      min="0"
-                      max="23"
-                      style={{ 
-                        width: '100%', 
-                        padding: '0.875rem', 
-                        borderRadius: '0.5rem',
-                        fontSize: '1rem',
-                        textAlign: 'center',
-                        fontWeight: 600,
-                        border: '2px solid var(--border)'
-                      }}
-                    />
-                  </div>
-
-                  {/* Minutos */}
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Minutos</label>
-                    <input 
-                      type="number" 
-                      value={auctionForm.durationMinutes}
-                      onChange={(e) => setAuctionForm({...auctionForm, durationMinutes: Number(e.target.value)})}
-                      min="0"
-                      max="59"
-                      step="5"
-                      style={{ 
-                        width: '100%', 
-                        padding: '0.875rem', 
-                        borderRadius: '0.5rem',
-                        fontSize: '1rem',
-                        textAlign: 'center',
-                        fontWeight: 600,
-                        border: '2px solid var(--border)'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ 
-                  padding: '1rem', 
-                  background: 'var(--primary-light)', 
-                  borderRadius: '0.5rem',
-                  border: '2px solid var(--primary)',
-                  textAlign: 'center'
-                }}>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
-                    Duración Total
-                  </div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>
-                    {auctionForm.durationDays > 0 && `${auctionForm.durationDays}d `}
-                    {auctionForm.durationHours > 0 && `${auctionForm.durationHours}h `}
-                    {auctionForm.durationMinutes}min
-                  </div>
-                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                    💡 Mínimo: 5 minutos • Máximo: 7 días
-                  </div>
-                </div>
-              </div>
-
-              {/* SECCIÓN 5: OPCIONES AVANZADAS */}
-              <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
-                <h4 style={{ marginBottom: '1.5rem', fontSize: '1.125rem', fontWeight: 600 }}>
-                  ⚙️ Opciones Avanzadas
-                </h4>
-                
-                <div style={{ display: 'grid', gap: '1rem' }}>
-                  {/* Destacada */}
-                  <label style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '1rem',
-                    padding: '1rem',
-                    background: 'var(--bg-secondary)',
-                    borderRadius: '0.5rem',
-                    cursor: 'pointer',
-                    border: '2px solid ' + (auctionForm.featured ? 'var(--primary)' : 'var(--border)')
-                  }}>
-                    <input 
-                      type="checkbox"
-                      checked={auctionForm.featured}
-                      onChange={(e) => setAuctionForm({...auctionForm, featured: e.target.checked})}
-                      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>⭐ Marcar como Destacada</div>
-                      <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                        La subasta aparecerá con efecto especial en la página principal
-                      </div>
-                    </div>
-                  </label>
-
-                  {/* Extensión Automática */}
-                  <label style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '1rem',
-                    padding: '1rem',
-                    background: 'var(--bg-secondary)',
-                    borderRadius: '0.5rem',
-                    cursor: 'pointer',
-                    border: '2px solid ' + (auctionForm.allowExtension ? 'var(--primary)' : 'var(--border)')
-                  }}>
-                    <input 
-                      type="checkbox"
-                      checked={auctionForm.allowExtension}
-                      onChange={(e) => setAuctionForm({...auctionForm, allowExtension: e.target.checked})}
-                      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>🛡️ Permitir Extensión Automática (Anti-Sniping)</div>
-                      <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                        Si alguien oferta en los últimos 2 minutos, se extiende 2 minutos más
-                      </div>
-                    </div>
-                  </label>
-
-                  {/* Programar Inicio */}
-                  <label style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '1rem',
-                    padding: '1rem',
-                    background: 'var(--bg-secondary)',
-                    borderRadius: '0.5rem',
-                    cursor: 'pointer',
-                    border: '2px solid ' + (auctionForm.scheduled ? 'var(--primary)' : 'var(--border)')
-                  }}>
-                    <input 
-                      type="checkbox"
-                      checked={auctionForm.scheduled}
-                      onChange={(e) => setAuctionForm({...auctionForm, scheduled: e.target.checked})}
-                      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>📅 Programar Inicio de Subasta</div>
-                      <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                        La subasta iniciará automáticamente en la fecha y hora seleccionada
-                      </div>
-                    </div>
-                  </label>
-
-                  {/* Fecha y Hora Programada */}
-                  {auctionForm.scheduled && (
-                    <div style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: '1fr 1fr', 
-                      gap: '1rem',
-                      padding: '1rem',
-                      background: 'var(--bg-secondary)',
-                      borderRadius: '0.5rem',
-                      border: '2px solid var(--primary)'
-                    }}>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                          Fecha de Inicio
-                        </label>
-                        <input 
-                          type="date"
-                          value={auctionForm.scheduledDate}
-                          onChange={(e) => setAuctionForm({...auctionForm, scheduledDate: e.target.value})}
-                          min={new Date().toISOString().split('T')[0]}
-                          style={{ 
-                            width: '100%', 
-                            padding: '0.875rem', 
-                            borderRadius: '0.5rem',
-                            fontSize: '1rem',
-                            border: '2px solid var(--border)'
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                          Hora de Inicio
-                        </label>
-                        <input 
-                          type="time"
-                          value={auctionForm.scheduledTime}
-                          onChange={(e) => setAuctionForm({...auctionForm, scheduledTime: e.target.value})}
-                          style={{ 
-                            width: '100%', 
-                            padding: '0.875rem', 
-                            borderRadius: '0.5rem',
-                            fontSize: '1rem',
-                            border: '2px solid var(--border)'
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* BOTONES DE ACCIÓN */}
-              <div style={{ display: 'flex', gap: '1rem', paddingTop: '1rem' }}>
-                <button 
-                  onClick={handleCreateAuction}
-                  className="btn btn-primary" 
-                  style={{ flex: 1, padding: '1rem', fontSize: '1.0625rem', fontWeight: 600 }}
-                >
-                  <Plus size={20} />
-                  Publicar Subasta
-                </button>
-                <button 
-                  onClick={() => {
-                    if (window.confirm('¿Descartar cambios y volver?')) {
-                      setAuctionForm({
-                        title: '',
-                        description: '',
-                        startingPrice: 1000,
-                        buyNowPrice: 0,
-                        categoryId: '1',
-                        images: [] as string[],
-                        durationDays: 0,
-                        durationHours: 0,
-                        durationMinutes: 30,
-                        condition: 'new',
-                        featured: false,
-                        allowExtension: true,
-                        scheduled: false,
-                        scheduledDate: '',
-                        scheduledTime: ''
-                      });
-                      setActiveTab('auctions');
-                    }
-                  }}
-                  className="btn btn-outline"
-                  style={{ padding: '1rem', minWidth: '150px' }}
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -4041,3 +3588,40 @@ const AdminPanel = () => {
 
 
 export default AdminPanel;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
