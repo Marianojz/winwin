@@ -353,7 +353,7 @@ const [auctionForm, setAuctionForm] = useState({
     
     // Productos
     const totalProducts = products.length;
-    const activeProducts = products.filter((p: { active: boolean; }) => p.active !== false).length;
+    const activeProducts = products.filter((p: Product) => p.active !== false).length;
     const lowStockProducts = products.filter((p: { stock: number; }) => p.stock > 0 && p.stock < 5).length;
     const outOfStockProducts = products.filter((p: { stock: number; }) => p.stock === 0).length;
     
@@ -594,9 +594,9 @@ const [auctionForm, setAuctionForm] = useState({
         updatedAt: new Date().toISOString()
       };
 
-      const updatedProducts = products.map((p: { id: any; }) =>
+      const updatedProducts = products.map((p: Product) =>
         p.id === editingProduct.id ? updatedProduct : p
-      );
+      ) as Product[];
       setProducts(updatedProducts);
       logProductAction('Producto actualizado', editingProduct.id, user?.id, user?.username, { name: productForm.name });
       alert('✅ Producto actualizado correctamente');
@@ -708,7 +708,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     const newEndTime = new Date(now.getTime() + totalMinutes * 60000);
 
     // Actualizar subasta
-const updatedAuctions = auctions.map((a: { id: any; }) => 
+const updatedAuctions = auctions.map((a: Auction) => 
   a.id === editingAuction.id 
     ? { 
         ...a, 
@@ -724,9 +724,9 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
             featured: auctionForm.featured,
             endTime: newEndTime,
             isFlash: totalMinutes <= 60
-          }
+          } as Auction
         : a
-    );
+    ) as Auction[];
     
     setAuctions(updatedAuctions);
     alert('✅ Subasta actualizada correctamente');
@@ -905,8 +905,8 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
   const getEnhancedStats = () => {
     // Ingresos por subastas (ventas ganadas)
     const auctionRevenue = auctions
-      .filter((a: { winnerId: any; }) => a.winnerId)
-      .reduce((sum: number, a: { currentPrice: number }) => sum + (a.currentPrice || 0), 0);
+      .filter((a: Auction) => a.winnerId)
+      .reduce((sum: number, a: Auction) => sum + (a.currentPrice || 0), 0);
 
     // Ingresos por tienda (pedidos entregados)
     const storeRevenue = orders
@@ -1373,7 +1373,7 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
                   {formatCurrency(enhancedStats.auctionRevenue)}
                 </div>
                 <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                  {auctions.filter((a: { winnerId: any; }) => a.winnerId).length} subastas ganadas
+                  {auctions.filter((a: Auction) => a.winnerId).length} subastas ganadas
                 </div>
               </div>
 
