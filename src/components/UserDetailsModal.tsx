@@ -4,6 +4,7 @@ import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../config/firebase';
+import MapPicker from './MapPicker';
 
 interface UserData {
   id: string;
@@ -36,7 +37,10 @@ const UserDetailsModal = ({ user, onClose, onUpdate }: UserDetailsModalProps) =>
     dni: user.dni,
     address: user.address,
     locality: user.locality,
-    province: user.province
+    province: user.province,
+    latitude: user.latitude || 0,
+    longitude: user.longitude || 0,
+    mapAddress: user.mapAddress || ''
   });
 
   // Función para guardar cambios
@@ -48,7 +52,10 @@ const UserDetailsModal = ({ user, onClose, onUpdate }: UserDetailsModalProps) =>
         dni: editedUser.dni,
         address: editedUser.address,
         locality: editedUser.locality,
-        province: editedUser.province
+        province: editedUser.province,
+        latitude: editedUser.latitude,
+        longitude: editedUser.longitude,
+        mapAddress: editedUser.mapAddress
       });
       alert('✅ Usuario actualizado correctamente');
       setIsEditing(false);
@@ -413,35 +420,101 @@ const UserDetailsModal = ({ user, onClose, onUpdate }: UserDetailsModalProps) =>
                 <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.5rem' }}>
                   Ubicación en el Mapa
                 </label>
-                {user.mapAddress && (
-                  <p style={{ 
-                    margin: '0 0 0.5rem 0', 
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.875rem',
-                    fontStyle: 'italic'
-                  }}>
-                    📍 {user.mapAddress}
-                  </p>
+                {isEditing ? (
+                  <>
+                    <p style={{ 
+                      margin: '0 0 0.5rem 0', 
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.875rem'
+                    }}>
+                      📍 Arrastrá el marcador o hacé clic en el mapa para cambiar la ubicación
+                    </p>
+                    <div style={{ 
+                      height: '300px', 
+                      borderRadius: '0.75rem', 
+                      overflow: 'hidden',
+                      border: '2px solid var(--border)'
+                    }}>
+                      <MapPicker
+                        onLocationSelect={(lat, lng, address) => {
+                          setEditedUser({
+                            ...editedUser,
+                            latitude: lat,
+                            longitude: lng,
+                            mapAddress: address
+                          });
+                        }}
+                        initialPosition={editedUser.latitude && editedUser.longitude ? [editedUser.latitude, editedUser.longitude] : undefined}
+                        locality={editedUser.locality}
+                        province={editedUser.province}
+                      />
+                    </div>
+                    {editedUser.mapAddress && (
+                      <p style={{ 
+                        margin: '0.5rem 0 0 0', 
+                        fontSize: '0.875rem', 
+                        color: 'var(--text-secondary)' 
+                      }}>
+                        📍 {editedUser.mapAddress}
+                      </p>
+                    )}
+                    <p style={{ 
+                      margin: '0.5rem 0 0 0', 
+                      fontSize: '0.75rem', 
+                      color: 'var(--text-tertiary)' 
+                    }}>
+                      Coordenadas: {editedUser.latitude.toFixed(6)}, {editedUser.longitude.toFixed(6)}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    {user.mapAddress && (
+                      <p style={{ 
+                        margin: '0 0 0.5rem 0', 
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.875rem',
+                        fontStyle: 'italic'
+                      }}>
+                        📍 {user.mapAddress}
+                      </p>
+                    )}
+                    <div style={{ 
+                      height: '300px', 
+                      borderRadius: '0.75rem', 
+                      overflow: 'hidden',
+                      border: '2px solid var(--border)'
+                    }}>
+                      {user.latitude && user.longitude ? (
+                        <iframe
+                          src={`https://www.openstreetmap.org/export/embed.html?bbox=${user.longitude-0.01},${user.latitude-0.01},${user.longitude+0.01},${user.latitude+0.01}&layer=mapnik&marker=${user.latitude},${user.longitude}`}
+                          style={{ width: '100%', height: '100%', border: 'none' }}
+                        />
+                      ) : (
+                        <div style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          background: 'var(--bg-tertiary)',
+                          color: 'var(--text-secondary)'
+                        }}>
+                          No hay ubicación registrada
+                        </div>
+                      )}
+                    </div>
+                    {user.latitude && user.longitude && (
+                      <p style={{ 
+                        margin: '0.5rem 0 0 0', 
+                        fontSize: '0.75rem', 
+                        color: 'var(--text-secondary)',
+                        textAlign: 'center'
+                      }}>
+                        Coordenadas: {user.latitude.toFixed(6)}, {user.longitude.toFixed(6)}
+                      </p>
+                    )}
+                  </>
                 )}
-                <div style={{ 
-                  height: '300px', 
-                  borderRadius: '0.75rem', 
-                  overflow: 'hidden',
-                  border: '2px solid var(--border)'
-                }}>
-                  <iframe
-                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${user.longitude-0.01},${user.latitude-0.01},${user.longitude+0.01},${user.latitude+0.01}&layer=mapnik&marker=${user.latitude},${user.longitude}`}
-                    style={{ width: '100%', height: '100%', border: 'none' }}
-                  />
-                </div>
-                <p style={{ 
-                  margin: '0.5rem 0 0 0', 
-                  fontSize: '0.75rem', 
-                  color: 'var(--text-secondary)',
-                  textAlign: 'center'
-                }}>
-                  Coordenadas: {user.latitude.toFixed(6)}, {user.longitude.toFixed(6)}
-                </p>
               </div>
             </div>
           </div>

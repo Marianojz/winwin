@@ -3,6 +3,7 @@ import { useStore } from '../store/useStore';
 import { Order } from '../types';
 import { soundManager } from '../utils/sounds';
 import { launchConfettiFromTop } from '../utils/celebrations';
+import { createAutoMessage, saveMessage } from './messages';
 
 /**
  * Gestor de subastas que actualiza estados, crea órdenes y detecta ofertas superadas
@@ -162,6 +163,25 @@ if (endTime <= now) {
       read: false,
       link: '/notificaciones'
     });
+
+    // Crear mensaje automático para el ganador
+    try {
+      const autoMsg = createAutoMessage(
+        winnerId,
+        winnerName,
+        'auction_won',
+        {
+          auctionTitle: auction.title,
+          auctionId: auction.id,
+          amount: finalPrice,
+          orderId: order.id
+        }
+      );
+      saveMessage(autoMsg);
+      console.log(`💬 Mensaje automático enviado a ${winnerName}`);
+    } catch (error) {
+      console.error('Error creando mensaje automático:', error);
+    }
 
     // Reproducir sonido de victoria
     soundManager.playWon();

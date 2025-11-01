@@ -4,9 +4,35 @@ import { useStore } from '../store/useStore';
 import AuctionCard from '../components/AuctionCard';
 import ProductCard from '../components/ProductCard';
 import { Product } from '../types';
+import { HomeConfig, defaultHomeConfig } from '../types/homeConfig';
+import { useEffect, useState } from 'react';
 
 const Home = () => {
   const { auctions, products } = useStore();
+  const [homeConfig, setHomeConfig] = useState<HomeConfig>(defaultHomeConfig);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('homeConfig');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setHomeConfig({
+          ...defaultHomeConfig,
+          ...parsed,
+          banners: parsed.banners?.map((b: any) => ({
+            ...b,
+            createdAt: b.createdAt ? new Date(b.createdAt) : new Date()
+          })) || [],
+          promotions: parsed.promotions?.map((p: any) => ({
+            ...p,
+            createdAt: p.createdAt ? new Date(p.createdAt) : new Date()
+          })) || []
+        });
+      }
+    } catch (error) {
+      console.error('Error cargando configuración del inicio:', error);
+    }
+  }, []);
   
   // Filtrar subastas destacadas y activas (primero destacadas, luego por fecha)
   const featuredAuctions = auctions
@@ -34,11 +60,10 @@ const Home = () => {
           <div className="hero-content">
             <div className="hero-text">
               <h1 className="hero-title">
-                Bienvenido a <span className="text-gradient">Subasta Argenta</span>
+                {homeConfig.heroTitle || 'Bienvenido a Subasta Argenta'}
               </h1>
               <p className="hero-subtitle">
-                La plataforma líder de subastas y ventas online en Argentina. 
-                Descubrí productos únicos y conseguí las mejores ofertas.
+                {homeConfig.heroSubtitle || 'La plataforma líder de subastas y ventas online en Argentina. Descubrí productos únicos y conseguí las mejores ofertas.'}
               </p>
               <div className="hero-buttons">
                 <Link to="/subastas" className="btn btn-primary btn-lg">
@@ -67,13 +92,41 @@ const Home = () => {
             </div>
             <div className="hero-image">
               <img 
-                src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800" 
+                src={homeConfig.heroImageUrl || "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800"} 
                 alt="Subasta" 
               />
             </div>
           </div>
         </div>
       </section>
+
+      {/* Banners Publicitarios */}
+      {homeConfig.banners.filter(b => b.active).length > 0 && (
+        <section className="banners" style={{ padding: '2rem 0', background: 'var(--bg-secondary)' }}>
+          <div className="container">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+              {homeConfig.banners.filter(b => b.active).map(banner => (
+                <div key={banner.id} style={{ position: 'relative', borderRadius: '1rem', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                  {banner.imageUrl && (
+                    <img src={banner.imageUrl} alt={banner.title} style={{ width: '100%', height: '200px', objectFit: 'cover' }} />
+                  )}
+                  {banner.title && (
+                    <div style={{ padding: '1rem', background: 'rgba(0,0,0,0.7)', color: 'white', position: banner.imageUrl ? 'absolute' : 'relative', bottom: 0, left: 0, right: 0 }}>
+                      <h3 style={{ margin: 0, fontSize: '1.125rem' }}>{banner.title}</h3>
+                      {banner.description && <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem' }}>{banner.description}</p>}
+                      {banner.link && banner.linkText && (
+                        <Link to={banner.link} style={{ display: 'inline-block', marginTop: '0.75rem', color: 'white', textDecoration: 'underline', fontWeight: 600 }}>
+                          {banner.linkText} →
+                        </Link>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Featured Auction */}
       {featuredAuction && (
@@ -88,6 +141,28 @@ const Home = () => {
             </div>
             <div className="featured-auction-content">
               <AuctionCard auction={featuredAuction} />
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Promociones Especiales */}
+      {homeConfig.promotions.filter(p => p.active).length > 0 && (
+        <section className="promotions" style={{ padding: '2rem 0' }}>
+          <div className="container">
+            <h2 className="section-title">Promociones Especiales</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+              {homeConfig.promotions.filter(p => p.active).map(promo => (
+                <div key={promo.id} style={{ background: 'var(--bg-secondary)', borderRadius: '1rem', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                  {promo.imageUrl && (
+                    <img src={promo.imageUrl} alt={promo.title} style={{ width: '100%', height: '180px', objectFit: 'cover' }} />
+                  )}
+                  <div style={{ padding: '1.5rem' }}>
+                    <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem' }}>{promo.title}</h3>
+                    <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>{promo.description}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -409,6 +484,11 @@ const Home = () => {
         }
 
         @media (max-width: 768px) {
+          .hero {
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+          }
+
           .hero-content {
             grid-template-columns: 1fr;
             gap: 2rem;
@@ -419,16 +499,67 @@ const Home = () => {
           }
 
           .hero-stats {
-            gap: 1.5rem;
+            gap: 1rem;
+            flex-wrap: wrap;
+            justify-content: center;
           }
 
           .stat-number {
-            font-size: 2rem;
+            font-size: 1.75rem;
+          }
+
+          .stat-label {
+            font-size: 0.75rem;
+          }
+
+          .hero-buttons {
+            flex-direction: column;
+          }
+
+          .hero-buttons .btn {
+            width: 100%;
           }
 
           .section-header {
             flex-direction: column;
             gap: 1rem;
+          }
+
+          .features-grid {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+          }
+
+          .products-grid {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+          }
+
+          .steps {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+          }
+
+          .featured-auction-content {
+            max-width: 100%;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .hero-title {
+            font-size: 1.75rem !important;
+          }
+
+          .hero-subtitle {
+            font-size: 1rem;
+          }
+
+          .hero-stats {
+            gap: 0.75rem;
+          }
+
+          .stat-number {
+            font-size: 1.5rem;
           }
         }
       `}</style>

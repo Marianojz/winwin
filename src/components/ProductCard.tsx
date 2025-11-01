@@ -24,7 +24,10 @@ const ProductCard = ({ product }: ProductCardProps) => {
   };
 
   return (
-    <Link to={`/producto/${product.id}`} className="product-card">
+    <Link 
+      to={`/producto/${product.id}`} 
+      className="product-card hover-lift fade-in"
+    >
       <div className="product-card-image">
         <img src={product.images[0]} alt={product.name} loading="lazy" />
         {product.stock < 5 && product.stock > 0 && (

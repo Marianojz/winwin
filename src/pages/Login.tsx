@@ -8,6 +8,9 @@ import { auth, db } from '../config/firebase';
 import { useStore } from '../store/useStore';
 import { User } from '../types';
 
+// Acceso directo al store para métodos que no están en el hook
+const useStoreDirect = useStore;
+
 const Login = () => {
   const navigate = useNavigate();
   const { setUser } = useStore();
@@ -19,10 +22,24 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    
+    // Validación básica antes de intentar
+    if (!email.trim() || !password.trim()) {
+      setError('Por favor, completá todos los campos');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      // Limpiar estado previo antes de intentar login
+      setUser(null);
+      localStorage.removeItem('user');
+      
+      // Pequeño delay para evitar múltiples clicks rápidos
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
       const user = userCredential.user;
 
       if (!user.emailVerified) {
@@ -32,43 +49,77 @@ const Login = () => {
         return;
       }
 
+      // Esperar un momento para asegurar que Firebase está listo
+      await new Promise(resolve => setTimeout(resolve, 200));
+
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        
-        const fullUser: User = {
-  id: user.uid,
-  email: user.email!,
-  username: userData.username || 'Usuario',
-  avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username || user.email?.split('@')[0] || 'U')}&size=200&background=FF6B00&color=fff&bold=true`,
-  isAdmin: userData.role === 'admin',
-  dni: userData.dni || '',
-  createdAt: userData.createdAt ? new Date(userData.createdAt) : new Date(),
-  address: userData.address ? {
-    street: userData.address,
-    locality: userData.locality,
-    province: userData.province,
-    location: {
-      lat: userData.latitude || 0,
-      lng: userData.longitude || 0
-    }
-  } : undefined
-};
-
-        setUser(fullUser);
-        localStorage.setItem('user', JSON.stringify(fullUser));
-        
-        if (fullUser.isAdmin) {
-          navigate('/admin');
-        } else {
-          navigate('/');
-        }
-      } else {
+      if (!userDoc.exists()) {
         setError('No se encontraron datos del usuario');
+        await auth.signOut();
+        setLoading(false);
+        return;
+      }
+
+      const userData = userDoc.data();
+      
+      // Verificar que el usuario está activo
+      if (userData.active === false) {
+        setError('Tu cuenta ha sido suspendida. Contactá al administrador.');
+        await auth.signOut();
+        setLoading(false);
+        return;
+      }
+      
+      const fullUser: User = {
+        id: user.uid,
+        email: user.email!,
+        username: userData.username || 'Usuario',
+        avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username || user.email?.split('@')[0] || 'U')}&size=200&background=FF6B00&color=fff&bold=true`,
+        isAdmin: userData.role === 'admin' || userData.isAdmin === true,
+        dni: userData.dni || '',
+        phone: userData.phone || '',
+        createdAt: userData.createdAt ? new Date(userData.createdAt) : new Date(),
+        address: userData.address ? {
+          street: userData.address,
+          locality: userData.locality,
+          province: userData.province,
+          location: {
+            lat: userData.latitude || 0,
+            lng: userData.longitude || 0
+          }
+        } : undefined
+      };
+
+      // Establecer usuario en múltiples lugares para asegurar sincronización
+      setUser(fullUser);
+      localStorage.setItem('user', JSON.stringify(fullUser));
+      
+      // Esperar un momento antes de navegar para asegurar que todo está sincronizado
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Recargar notificaciones si existe el método
+      try {
+        const { loadUserNotifications } = useStore.getState();
+        if (loadUserNotifications) {
+          loadUserNotifications();
+        }
+      } catch (err) {
+        console.warn('No se pudo cargar notificaciones:', err);
+      }
+
+      // Navegar según rol
+      if (fullUser.isAdmin) {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/', { replace: true });
       }
     } catch (err: any) {
       console.error('Error en login:', err);
+      
+      // Limpiar estado en caso de error
+      setUser(null);
+      localStorage.removeItem('user');
       
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
         setError('Email o contraseña incorrectos');
@@ -78,6 +129,8 @@ const Login = () => {
         setError('Demasiados intentos fallidos. Intentá más tarde.');
       } else if (err.code === 'auth/invalid-email') {
         setError('Email inválido');
+      } else if (err.code === 'auth/network-request-failed') {
+        setError('Error de conexión. Verificá tu internet.');
       } else {
         setError('Error al iniciar sesión. Intentá nuevamente.');
       }

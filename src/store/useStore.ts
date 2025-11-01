@@ -34,10 +34,12 @@ interface AppState {
   notifications: Notification[];
   unreadCount: number;
   loadUserNotifications: () => void;
+  clearNotifications: () => void;
   addNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => void;
   markNotificationAsRead: (notificationId: string) => void;
   deleteNotification: (notificationId: string) => void;
   markAsRead: (notificationId: string) => void;
+  markAllAsRead: () => void;
 
   // Bots (Admin only)
   bots: Bot[];
@@ -48,6 +50,7 @@ interface AppState {
 
   // Orders (Admin)
   orders: Order[];
+  setOrders: (orders: Order[]) => void;
   addOrder: (order: Order) => void;
   updateOrderStatus: (orderId: string, status: OrderStatus, updates?: Partial<Order>) => void;
 }
@@ -121,6 +124,8 @@ setUser: (user) => {
   if (user) {
     localStorage.setItem('user', JSON.stringify(user));
   } else {
+    // Limpiar notificaciones cuando el usuario se desloguea
+    set({ notifications: [], unreadCount: 0 });
     localStorage.removeItem('user');
   }
   set({ user, isAuthenticated: !!user });
@@ -315,40 +320,103 @@ isAuthenticated: (() => {
       }
       
       const parsed = JSON.parse(saved);
-      const notifications = parsed.map((n: any) => ({
-        ...n,
-        createdAt: new Date(n.createdAt)
-      }));
+      const now = Date.now();
+      // Filtrar notificaciones leídas que tienen más de 7 días
+      const filtered = parsed.filter((n: any) => {
+        if (!n.read) return true;
+        if (n.readAt) {
+          const readTime = new Date(n.readAt).getTime();
+          return (now - readTime) < (7 * 24 * 60 * 60 * 1000); // 7 días
+        }
+        return true;
+      });
+      
+      // Actualizar localStorage si se filtraron notificaciones
+      if (filtered.length !== parsed.length) {
+        localStorage.setItem(storageKey, JSON.stringify(filtered));
+      }
+      
+      const notifications = filtered.map((n: any) => {
+        // Normalizar read a boolean estricto - verificar múltiples formatos
+        let readValue = false;
+        if (n.read === true) {
+          readValue = true;
+        } else if (n.read === 'true') {
+          readValue = true;
+        } else if (n.read === 1) {
+          readValue = true;
+        } else if (String(n.read).toLowerCase() === 'true') {
+          readValue = true;
+        }
+        
+        return {
+          ...n,
+          createdAt: new Date(n.createdAt),
+          read: Boolean(readValue), // Forzar boolean estricto
+          readAt: n.readAt ? new Date(n.readAt) : undefined
+        };
+      });
       
       const unreadCount = notifications.filter((n: any) => !n.read).length;
       
       set({ notifications, unreadCount });
-      console.log(`✅ Cargadas ${notifications.length} notificaciones para ${user.username}`);
+      console.log(`✅ Cargadas ${notifications.length} notificaciones para ${user.username} (${unreadCount} no leídas)`);
+      console.log('📋 Detalle de notificaciones:', notifications.map(n => ({ id: n.id, read: n.read, readAt: n.readAt })));
     } catch (error) {
       console.error('Error cargando notificaciones:', error);
       set({ notifications: [], unreadCount: 0 });
     }
   },
   
+  clearNotifications: () => {
+    set({ notifications: [], unreadCount: 0 });
+  },
+  
   addNotification: (notification) => {
     const newNotification = {
       ...notification,
-      id: Date.now().toString(),
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // ID único
       createdAt: new Date(),
       read: false
     };
+    const user = get().user;
+    if (user) {
+      const storageKey = `notifications_${user.id}`;
+      const currentNotifications = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      currentNotifications.push(newNotification);
+      localStorage.setItem(storageKey, JSON.stringify(currentNotifications));
+    }
     set(state => ({
       notifications: [newNotification, ...state.notifications],
       unreadCount: state.unreadCount + 1
     }));
   },
   markNotificationAsRead: (notificationId) => {
-    set(state => ({
-      notifications: state.notifications.map(n =>
-        n.id === notificationId ? { ...n, read: true } : n
-      ),
+    const user = get().user;
+    const state = get();
+    const updatedNotifications = state.notifications.map(n => {
+      if (n.id === notificationId) {
+        const updated = { ...n, read: true, readAt: new Date() };
+        // Programar eliminación después de 7 días
+        // La eliminación automática se hace en loadUserNotifications
+        return updated;
+      }
+      return n;
+    });
+    
+    if (user) {
+      const storageKey = `notifications_${user.id}`;
+      const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      const updated = saved.map((n: any) => 
+        n.id === notificationId ? { ...n, read: true, readAt: new Date().toISOString() } : n
+      );
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+    }
+    
+    set({
+      notifications: updatedNotifications,
       unreadCount: Math.max(0, state.unreadCount - 1)
-    }));
+    });
   },
   deleteNotification: (notificationId) => {
     set(state => {
@@ -362,12 +430,129 @@ isAuthenticated: (() => {
     });
   },
   markAsRead: (notificationId) => {
-    set(state => ({
-      notifications: state.notifications.map(n =>
-        n.id === notificationId ? { ...n, read: true } : n
-      ),
-      unreadCount: Math.max(0, state.unreadCount - 1)
+    const user = get().user;
+    const state = get();
+    
+    if (!user) return;
+    
+    // Buscar la notificación para verificar si ya estaba leída
+    const notification = state.notifications.find(n => n.id === notificationId);
+    const wasAlreadyRead = notification?.read === true || notification?.read === 'true';
+    
+    // Si ya estaba leída, no hacer nada
+    if (wasAlreadyRead) {
+      console.log(`⚠️ Notificación ${notificationId} ya estaba leída`);
+      return;
+    }
+    
+    // Actualizar en localStorage PRIMERO
+    const storageKey = `notifications_${user.id}`;
+    const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    const updated = saved.map((n: any) => {
+      // Normalizar read para asegurar que sea boolean
+      const isRead = n.read === true || n.read === 'true';
+      if (n.id === notificationId && !isRead) {
+        return { ...n, read: true, readAt: new Date().toISOString() };
+      }
+      return n;
+    });
+    localStorage.setItem(storageKey, JSON.stringify(updated));
+    
+    // Recargar desde localStorage para garantizar sincronización
+    const reloaded = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    const now = Date.now();
+    const filtered = reloaded.filter((n: any) => {
+      if (!n.read) return true;
+      if (n.readAt) {
+        const readTime = new Date(n.readAt).getTime();
+        return (now - readTime) < (7 * 24 * 60 * 60 * 1000); // 7 días
+      }
+      return true;
+    });
+    
+    const notifications = filtered.map((n: any) => {
+      // Normalizar read a boolean estricto
+      let readValue = false;
+      if (n.read === true) {
+        readValue = true;
+      } else if (n.read === 'true') {
+        readValue = true;
+      } else if (n.read === 1) {
+        readValue = true;
+      }
+      
+      return {
+        ...n,
+        createdAt: new Date(n.createdAt),
+        read: Boolean(readValue), // Forzar boolean estricto
+        readAt: n.readAt ? new Date(n.readAt) : undefined
+      };
+    });
+    
+    const newUnreadCount = notifications.filter((n: any) => !n.read).length;
+    
+    set({
+      notifications,
+      unreadCount: newUnreadCount
+    });
+    
+    console.log(`✅ Notificación ${notificationId} marcada como leída. No leídas restantes: ${newUnreadCount}`);
+  },
+  
+  markAllAsRead: () => {
+    const user = get().user;
+    const state = get();
+    
+    if (!user) return;
+    
+    const unreadNotifications = state.notifications.filter(n => !n.read);
+    
+    if (unreadNotifications.length === 0) {
+      console.log('⚠️ No hay notificaciones sin leer');
+      return;
+    }
+    
+    // Actualizar en localStorage
+    const storageKey = `notifications_${user.id}`;
+    const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    const updated = saved.map((n: any) => {
+      const isRead = n.read === true || n.read === 'true';
+      if (!isRead) {
+        // Asegurar que read se guarde como boolean true, no string
+        return { ...n, read: true, readAt: new Date().toISOString() };
+      }
+      // Asegurar que read se guarde como boolean, no string
+      return { ...n, read: n.read === true || n.read === 'true' ? true : false };
+    });
+    // Guardar con read como boolean estricto
+    localStorage.setItem(storageKey, JSON.stringify(updated));
+    console.log('💾 Guardadas notificaciones en localStorage:', updated.length, 'notificaciones');
+    
+    // Recargar desde localStorage para garantizar sincronización
+    const reloaded = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    const now = Date.now();
+    const filtered = reloaded.filter((n: any) => {
+      if (!n.read) return true;
+      if (n.readAt) {
+        const readTime = new Date(n.readAt).getTime();
+        return (now - readTime) < (7 * 24 * 60 * 60 * 1000); // 7 días
+      }
+      return true;
+    });
+    
+    const notifications = filtered.map((n: any) => ({
+      ...n,
+      createdAt: new Date(n.createdAt),
+      read: n.read === true || n.read === 'true',
+      readAt: n.readAt ? new Date(n.readAt) : undefined
     }));
+    
+    set({
+      notifications,
+      unreadCount: 0
+    });
+    
+    console.log(`✅ ${unreadNotifications.length} notificaciones marcadas como leídas`);
   },
 
   // Bots
@@ -398,6 +583,10 @@ isAuthenticated: (() => {
     shippedAt: o.shippedAt ? new Date(o.shippedAt) : undefined,
     deliveredAt: o.deliveredAt ? new Date(o.deliveredAt) : undefined
   })),
+  setOrders: (orders) => {
+    localStorage.setItem('orders', JSON.stringify(orders));
+    set({ orders });
+  },
   addOrder: (order) => {
     const newOrders = [...get().orders, order];
     localStorage.setItem('orders', JSON.stringify(newOrders));
