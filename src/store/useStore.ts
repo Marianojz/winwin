@@ -437,7 +437,7 @@ isAuthenticated: (() => {
     
     // Buscar la notificación para verificar si ya estaba leída
     const notification = state.notifications.find(n => n.id === notificationId);
-    const wasAlreadyRead = notification?.read === true || notification?.read === 'true';
+    const wasAlreadyRead = notification?.read === true || String(notification?.read) === 'true';
     
     // Si ya estaba leída, no hacer nada
     if (wasAlreadyRead) {

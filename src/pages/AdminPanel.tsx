@@ -858,7 +858,7 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
   };
 
   // Filtrar pedidos
-  const filteredOrders = orders.filter((order: { id: string; userId: string; status: any; }) => {
+  const filteredOrders = orders.filter((order: Order) => {
     const matchesSearch = order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          order.userId.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || order.status === filterStatus;
@@ -2962,7 +2962,7 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {filteredOrders.map((order: { status: string; deliveryMethod: string; expiresAt: string | number | Date; id: string | any[]; type: string; createdAt: string | number | Date; amount: number; }) => {
+                  {filteredOrders.map((order: Order) => {
                     const statusBadge = getStatusBadge(order.status);
                     const deliveryBadge = getDeliveryMethodBadge(order.deliveryMethod);
                     const timeLeft = order.expiresAt ? new Date(order.expiresAt).getTime() - Date.now() : 0;
@@ -3030,7 +3030,7 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
                             style={{ padding: '0.625rem 1rem' }}
                             onClick={(e: { stopPropagation: () => void; }) => {
                               e.stopPropagation();
-                              setSelectedOrder(order);
+                              setSelectedOrder(order as Order);
                             }}
                           >
                             <Eye size={16} />
@@ -4456,6 +4456,7 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
                         buyNowPrice: 0,
                         categoryId: '1',
                         images: [] as string[],
+                        stickers: [] as string[],
                         durationDays: 0,
                         durationHours: 0,
                         durationMinutes: 30,
