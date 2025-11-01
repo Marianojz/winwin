@@ -3,6 +3,7 @@ import { Trash2, ShoppingCart, CreditCard, Minus, Plus } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { formatCurrency } from '../utils/helpers';
 import { Order } from '../types';
+import { createAutoMessage, saveMessage } from '../utils/messages';
 
 const Carrito = () => {
   const navigate = useNavigate();
@@ -69,6 +70,25 @@ const Carrito = () => {
           : p
       );
       setProducts(updatedProducts);
+      
+      // Crear mensaje automático para la compra
+      try {
+        const autoMsg = createAutoMessage(
+          user.id,
+          user.username,
+          'purchase',
+          {
+            productName: item.product.name,
+            productId: item.product.id,
+            orderId: order.id,
+            amount: order.amount
+          }
+        );
+        saveMessage(autoMsg);
+        console.log(`💬 Mensaje automático enviado para compra de ${item.product.name}`);
+      } catch (error) {
+        console.error('Error creando mensaje automático:', error);
+      }
     });
 
     // Notificación para el usuario

@@ -201,21 +201,59 @@ const Subastas = () => {
             padding: 2rem 0;
           }
 
+          .page-header h1 {
+            font-size: 1.75rem;
+          }
+
+          .page-header p {
+            font-size: 0.9375rem;
+          }
+
           .filters-section {
             flex-direction: column;
+            gap: 0.75rem;
           }
 
           .search-box,
           .filter-box {
             min-width: 100%;
+            padding: 0.75rem 1rem;
+          }
+
+          .info-banner {
+            padding: 1.5rem;
           }
 
           .info-banner ul {
             grid-template-columns: 1fr;
+            gap: 0.5rem;
           }
 
           .auctions-grid {
             grid-template-columns: 1fr;
+            gap: 1.5rem;
+          }
+
+          .no-results {
+            padding: 2rem 1rem;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .subastas-page {
+            padding: 1.5rem 0;
+          }
+
+          .page-header {
+            margin-bottom: 2rem;
+          }
+
+          .info-banner {
+            padding: 1rem;
+          }
+
+          .info-banner h3 {
+            font-size: 1.125rem;
           }
         }
       `}</style>

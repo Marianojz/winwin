@@ -8,7 +8,8 @@ import {
   Eye, Edit, Trash2, Users, Clock, AlertCircle, Activity, RefreshCw,
   Gavel, Package, Bot, DollarSign, Plus, XCircle,
   TrendingUp, ShoppingCart, Bell, AlertTriangle,
-  Search, Filter, ShoppingBag, MapPin, BarChart3
+  Search, Filter, ShoppingBag, MapPin, BarChart3,
+  MousePointerClick, Image as ImageIcon, Save, Store, Mail, Send
 } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -18,12 +19,75 @@ import { useStore } from '../store/useStore';
 import { formatCurrency, formatTimeAgo } from '../utils/helpers';
 import { Product, Auction, Order, OrderStatus } from '../types';
 import ImageUploader from '../components/ImageUploader';
+import { mockCategories } from '../utils/mockData';
+import { availableStickers, getStickerLabel } from '../utils/stickers';
+import { logAdminAction, logAuctionAction, logProductAction, logOrderAction, logUserAction } from '../utils/actionLogger';
+import { HomeConfig, defaultHomeConfig } from '../types/homeConfig';
+import { 
+  getAllConversations, 
+  getMessages, 
+  saveMessage, 
+  markMessagesAsRead, 
+  getAdminUnreadCount,
+  createMessage,
+  createAutoMessage,
+  deleteConversation,
+  deleteAllConversations
+} from '../utils/messages';
+import { Message, Conversation } from '../types';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 const AdminPanel = (): React.ReactElement => {
   const { 
     user, auctions, products, bots, orders,
-    addBot, updateBot, deleteBot, setProducts, setAuctions, updateOrderStatus 
+    addBot, updateBot, deleteBot, setProducts, setAuctions, setBots, updateOrderStatus 
   } = useStore();
+  
+  // Estados principales
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [realUsers, setRealUsers] = useState<any[]>([]);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [refreshKey, setRefreshKey] = useState(0); // Para forzar re-render sin recargar
+  
+  // Estado para configuración del inicio
+  const [homeConfig, setHomeConfig] = useState<HomeConfig>(() => {
+    try {
+      const saved = localStorage.getItem('homeConfig');
+      return saved ? JSON.parse(saved) : defaultHomeConfig;
+    } catch {
+      return defaultHomeConfig;
+    }
+  });
+  
+  // Estados para mensajería
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [conversationMessages, setConversationMessages] = useState<Message[]>([]);
+  const [newMessageContent, setNewMessageContent] = useState('');
+  const [adminUnreadCount, setAdminUnreadCount] = useState(0);
+  const isMobile = useIsMobile();
+  
+  // Cargar conversaciones y contador
+  useEffect(() => {
+    const loadConversations = () => {
+      setConversations(getAllConversations());
+      setAdminUnreadCount(getAdminUnreadCount());
+    };
+    
+    loadConversations();
+    const interval = setInterval(loadConversations, 5000); // Actualizar cada 5 segundos
+    return () => clearInterval(interval);
+  }, [activeTab]);
+  
+  // Cargar mensajes de conversación seleccionada
+  useEffect(() => {
+    if (selectedConversation) {
+      setConversationMessages(getMessages(selectedConversation));
+      // Marcar como leídos cuando se abre la conversación
+      markMessagesAsRead(selectedConversation, 'admin');
+      setAdminUnreadCount(getAdminUnreadCount());
+    }
+  }, [selectedConversation]);
   // ============================================
   // FUNCIONES PARA CREAR SUBASTA
   // ============================================
@@ -144,10 +208,11 @@ const newAuction: Auction = {
   id: `auction_${Date.now()}`,
   title: auctionForm.title.trim(),
   description: auctionForm.description.trim(),
-  images: auctionForm.images,
-  startingPrice: sanitizedstartPrice,  // ← CAMBIAR a startingPrice
-  currentPrice: sanitizedstartPrice,
-  buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
+        images: auctionForm.images,
+        stickers: auctionForm.stickers || [],
+        startingPrice: sanitizedstartPrice,  // ← CAMBIAR a startingPrice
+        currentPrice: sanitizedstartPrice,
+        buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
   startTime: new Date(),  // ← AGREGAR startTime (requerido)
   endTime: endTime,
   status: auctionForm.scheduled ? 'scheduled' as any : 'active',
@@ -177,6 +242,7 @@ const newAuction: Auction = {
 
       // Actualizar estado local
       setAuctions([...auctions, newAuction]);
+      logAuctionAction('Subasta creada', newAuction.id, user?.id, user?.username, { title: auctionForm.title });
 
       // Mensaje de éxito
       const successMessage = auctionForm.scheduled 
@@ -194,6 +260,7 @@ setAuctionForm({
   buyNowPrice: 0,
   categoryId: '1',
   images: [] as string[],
+  stickers: [] as string[],
   durationDays: 0,
   durationHours: 0,
   durationMinutes: 30,
@@ -213,9 +280,6 @@ setAuctionForm({
       alert(`❌ Error al crear subasta: ${error.message}`);
     }
   };
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [realUsers, setRealUsers] = useState<any[]>([]);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
   const [loadingUsers, setLoadingUsers] = useState(true);
   
   // Estados para productos
@@ -228,6 +292,7 @@ setAuctionForm({
   categoryId: '1',
   images: [] as string[],
   badges: [] as string[],
+  stickers: [] as string[],
   active: true,
   featured: false
 });
@@ -242,6 +307,7 @@ const [auctionForm, setAuctionForm] = useState({
   buyNowPrice: 0,
   categoryId: '1',
   images: [] as string[],
+  stickers: [] as string[],
   durationDays: 0,
   durationHours: 0,
   durationMinutes: 30,
@@ -328,6 +394,8 @@ const [auctionForm, setAuctionForm] = useState({
   };
   
   const getRecentActivity = () => {
+    const clearedTimestamp = localStorage.getItem('clearedActivityTimestamp');
+    const clearedTime = clearedTimestamp ? parseInt(clearedTimestamp) : 0;
     const activities: any[] = [];
     
     // Últimas 5 órdenes
@@ -336,12 +404,15 @@ const [auctionForm, setAuctionForm] = useState({
       .slice(0, 5);
     
     recentOrders.forEach(order => {
-      activities.push({
-        type: 'order',
-        message: `${order.userName} realizó un pedido de ${formatCurrency(order.amount)}`,
-        time: order.createdAt,
-        status: order.status
-      });
+      const orderTime = new Date(order.createdAt).getTime();
+      if (orderTime > clearedTime) {
+        activities.push({
+          type: 'order',
+          message: `${order.userName} realizó un pedido de ${formatCurrency(order.amount)}`,
+          time: order.createdAt,
+          status: order.status
+        });
+      }
     });
     
     // Últimas 5 pujas
@@ -351,12 +422,15 @@ const [auctionForm, setAuctionForm] = useState({
       .slice(0, 5);
     
     recentBids.forEach((bid: { username: any; amount: number; auctionTitle: any; createdAt: any; }) => {
-      activities.push({
-        type: 'bid',
-        message: `${bid.username} pujó ${formatCurrency(bid.amount)} en "${bid.auctionTitle}"`,
-        time: bid.createdAt,
-        status: 'bid'
-      });
+      const bidTime = new Date(bid.createdAt).getTime();
+      if (bidTime > clearedTime) {
+        activities.push({
+          type: 'bid',
+          message: `${bid.username} pujó ${formatCurrency(bid.amount)} en "${bid.auctionTitle}"`,
+          time: bid.createdAt,
+          status: 'bid'
+        });
+      }
     });
     
     return activities
@@ -436,6 +510,7 @@ const [auctionForm, setAuctionForm] = useState({
     categoryId: product.categoryId,
     images: product.images || [],
     badges: product.badges || [],
+    stickers: product.stickers || [],
     active: product.active !== undefined ? product.active : true,
     featured: product.featured || false
   });
@@ -451,6 +526,7 @@ const [auctionForm, setAuctionForm] = useState({
     categoryId: '1',
     images: [] as string[],
     badges: [] as string[],
+    stickers: [] as string[], // Agregar stickers inicializado
     active: true,
     featured: false
   });
@@ -514,6 +590,7 @@ const [auctionForm, setAuctionForm] = useState({
       const updatedProduct = {
         ...editingProduct,
         ...productForm,
+        stickers: productForm.stickers || [],
         updatedAt: new Date().toISOString()
       };
 
@@ -521,10 +598,7 @@ const [auctionForm, setAuctionForm] = useState({
         p.id === editingProduct.id ? updatedProduct : p
       );
       setProducts(updatedProducts);
-
-      // TODO: Guardar en Firebase cuando esté configurado
-      // await updateDoc(doc(db, 'products', editingProduct.id), updatedProduct);
-
+      logProductAction('Producto actualizado', editingProduct.id, user?.id, user?.username, { name: productForm.name });
       alert('✅ Producto actualizado correctamente');
       setEditingProduct(null);
       setActiveTab('products');
@@ -537,14 +611,12 @@ const [auctionForm, setAuctionForm] = useState({
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         ratings: [],
-        averageRating: 0
+        averageRating: 0,
+        stickers: productForm.stickers || []
       };
 
       setProducts([...products, newProduct as Product]);
-
-      // TODO: Guardar en Firebase cuando esté configurado
-      // await addDoc(collection(db, 'products'), newProduct);
-
+      logProductAction('Producto creado', newProduct.id, user?.id, user?.username, { name: productForm.name });
       alert('✅ Producto creado correctamente');
       
       // Resetear formulario
@@ -556,6 +628,7 @@ const [auctionForm, setAuctionForm] = useState({
         categoryId: '1',
         images: [] as string[],
         badges: [] as string[],
+        stickers: [] as string[],
         active: true,
         featured: false
       });
@@ -590,7 +663,7 @@ const [auctionForm, setAuctionForm] = useState({
     const durationHours = Math.floor((remainingMinutes % (24 * 60)) / 60);
     const durationMinutes = remainingMinutes % 60;
     
-    setAuctionForm({
+      setAuctionForm({
   title: auction.title,
   description: auction.description,
   startingPrice: auction.startingPrice,  // ← CAMBIADO
@@ -598,6 +671,7 @@ const [auctionForm, setAuctionForm] = useState({
   buyNowPrice: auction.buyNowPrice || 0,
   categoryId: auction.categoryId,
   images: auction.images || [],
+  stickers: auction.stickers || [],
   durationDays: durationDays > 0 ? durationDays : 0,
   durationHours: durationHours > 0 ? durationHours : 0,
   durationMinutes: durationMinutes > 0 ? durationMinutes : 30,
@@ -645,6 +719,7 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
             buyNowPrice: auctionForm.buyNowPrice > 0 ? Number(auctionForm.buyNowPrice) : undefined,
             categoryId: auctionForm.categoryId,
             images: auctionForm.images,
+            stickers: auctionForm.stickers || [],
             condition: auctionForm.condition,
             featured: auctionForm.featured,
             endTime: newEndTime,
@@ -664,6 +739,41 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
       const updatedAuctions = auctions.filter((a: { id: string; }) => a.id !== auctionId);
       setAuctions(updatedAuctions);
       alert('🗑️ Subasta eliminada correctamente');
+    }
+  };
+
+  // Función para republicar subasta
+  const handleRepublishAuction = (auction: Auction) => {
+    const option = window.confirm(
+      `¿Cómo deseas republicar "${auction.title}"?\n\n` +
+      `Aceptar = Editar antes de republicar\n` +
+      `Cancelar = Republicar tal como está`
+    );
+
+    if (option) {
+      // Editar antes de republicar
+      handleEditAuction(auction);
+    } else {
+      // Republicar tal como está
+      const now = new Date();
+      const endTime = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 días desde ahora
+      
+      const republishedAuction: Auction = {
+        ...auction,
+        id: `auction_${Date.now()}`, // Nuevo ID
+        status: 'active',
+        startTime: now,
+        endTime: endTime,
+        bids: [], // Limpiar ofertas
+        winnerId: undefined,
+        currentPrice: auction.startingPrice,
+        createdAt: now
+      };
+
+      const updatedAuctions = [...auctions, republishedAuction];
+      setAuctions(updatedAuctions);
+      logAuctionAction('Subasta republicada', republishedAuction.id, user?.id, user?.username, { title: auction.title });
+      alert('✅ Subasta republicada correctamente');
     }
   };
 
@@ -689,13 +799,61 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
     alert('✅ Bot creado correctamente');
   };
 
-  // Función de Reset
+  // Función de Reset mejorada - preserva usuarios y logs de ventas
   const handleResetData = () => {
-    if (window.confirm('⚠️ ADVERTENCIA: Esto reiniciará todos los datos a los valores por defecto.\n\n¿Estás seguro de continuar?')) {
-      if (window.confirm('⚠️ ÚLTIMA CONFIRMACIÓN: Se perderán todos los datos actuales. ¿Proceder?')) {
-        window.location.reload();
-        alert('✅ Datos reiniciados correctamente');
+    if (!window.confirm('⚠️ ADVERTENCIA: Esto reiniciará todos los datos EXCEPTO usuarios registrados y logs de ventas.\n\n¿Estás seguro de continuar?')) {
+      return;
+    }
+    
+    if (!window.confirm('⚠️ ÚLTIMA CONFIRMACIÓN:\n\nSe resetearán:\n- Subastas\n- Productos\n- Bots\n- Notificaciones\n\nSe PRESERVARÁN:\n- ✅ Usuarios registrados\n- ✅ Logs de acciones\n- ✅ Historial de pedidos/ventas\n\n¿Proceder?')) {
+      return;
+    }
+
+    try {
+      // Guardar datos a preservar
+      const usersBackup = localStorage.getItem('users') || '[]';
+      const actionLogsBackup = localStorage.getItem('action_logs') || '[]';
+      const ordersBackup = localStorage.getItem('orders') || '[]';
+      
+      // Limpiar todo
+      localStorage.removeItem('auctions');
+      localStorage.removeItem('products');
+      localStorage.removeItem('bots');
+      localStorage.removeItem('notifications');
+      localStorage.removeItem('cart');
+      localStorage.removeItem('theme');
+      
+      // Restaurar datos preservados
+      if (usersBackup !== '[]') {
+        // Los usuarios están en Firebase, no necesitamos restaurar desde localStorage
+        console.log('✅ Usuarios preservados (en Firebase)');
       }
+      if (actionLogsBackup !== '[]') {
+        localStorage.setItem('action_logs', actionLogsBackup);
+        console.log('✅ Logs de acciones preservados');
+      }
+      if (ordersBackup !== '[]') {
+        localStorage.setItem('orders', ordersBackup);
+        console.log('✅ Logs de ventas/pedidos preservados');
+      }
+      
+      // Limpiar estado de la app
+      setAuctions([]);
+      setProducts([]);
+      setBots([]);
+      
+      // Registrar acción en log
+      logAdminAction('Sistema reseteado (preservando usuarios y logs)', user?.id, user?.username);
+      
+      alert('✅ Datos reiniciados correctamente.\n\n✅ Usuarios registrados preservados\n✅ Logs de acciones preservados\n✅ Historial de pedidos preservado');
+      
+      // Recargar para aplicar cambios
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      console.error('Error en reset:', error);
+      alert('❌ Error al resetear datos');
     }
   };
 
@@ -743,10 +901,75 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
     return stats;
   };
 
+  // Estadísticas mejoradas: ingresos por subastas y tienda, más buscado, más cliqueado
+  const getEnhancedStats = () => {
+    // Ingresos por subastas (ventas ganadas)
+    const auctionRevenue = auctions
+      .filter((a: { winnerId: any; }) => a.winnerId)
+      .reduce((sum: number, a: { currentPrice: number }) => sum + (a.currentPrice || 0), 0);
+
+    // Ingresos por tienda (pedidos entregados)
+    const storeRevenue = orders
+      .filter((o: { status: string; }) => o.status === 'delivered')
+      .reduce((sum: number, o: { amount: number }) => sum + (o.amount || 0), 0);
+
+    // Más buscado (simulado por título más común en subastas y productos)
+    const allTitles = [
+      ...auctions.map((a: { title: string }) => a.title),
+      ...products.map((p: { name: string }) => p.name)
+    ];
+    const titleCounts: Record<string, number> = {};
+    allTitles.forEach(title => {
+      const words = title.toLowerCase().split(/\s+/);
+      words.forEach(word => {
+        if (word.length > 3) {
+          titleCounts[word] = (titleCounts[word] || 0) + 1;
+        }
+      });
+    });
+    const mostSearched = Object.entries(titleCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([word, count]) => ({ word, count }));
+
+    // Más cliqueado (simulado por productos/subastas con más vistas)
+    const mostClicked = [
+      ...products
+        .map((p: { id: string; name: string; views?: number }) => ({
+          id: p.id,
+          name: p.name,
+          type: 'product' as const,
+          clicks: p.views || 0
+        })),
+      ...auctions
+        .map((a: { id: string; title: string; bids?: any[] }) => ({
+          id: a.id,
+          name: a.title,
+          type: 'auction' as const,
+          clicks: a.bids?.length || 0
+        }))
+    ]
+      .sort((a, b) => b.clicks - a.clicks)
+      .slice(0, 5);
+
+    return {
+      auctionRevenue,
+      storeRevenue,
+      totalRevenue: auctionRevenue + storeRevenue,
+      mostSearched,
+      mostClicked
+    };
+  };
+
+  const enhancedStats = getEnhancedStats();
   const orderStats = getTotalStats();
 
   return (
-    <div style={{ minHeight: 'calc(100vh - 80px)', padding: '2rem', background: 'var(--bg-primary)' }}>
+    <div style={{ 
+      minHeight: 'calc(100vh - 80px)', 
+      padding: isMobile ? '1rem' : '2rem', 
+      background: 'var(--bg-primary)' 
+    }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         {/* Header con Título y Botón Reset */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -755,13 +978,32 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
               <Activity size={36} color="var(--primary)" />
               Panel de Administración
             </h1>
-            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+            <p style={{ 
+              margin: 0, 
+              color: 'var(--text-secondary)',
+              fontSize: isMobile ? '0.875rem' : '1rem'
+            }}>
               Gestiona productos, subastas, usuarios y pedidos desde un solo lugar
             </p>
           </div>
           <button 
             onClick={handleResetData}
-            style={{ padding: '0.875rem 1.5rem', background: 'var(--error)', color: 'white', borderRadius: '0.75rem', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.9375rem' }}
+            className="hover-lift"
+            style={{ 
+              padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.5rem', 
+              background: 'var(--error)', 
+              color: 'white', 
+              borderRadius: '0.75rem', 
+              border: 'none', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.5rem', 
+              fontWeight: 600, 
+              fontSize: isMobile ? '0.875rem' : '0.9375rem',
+              width: isMobile ? '100%' : 'auto',
+              justifyContent: 'center'
+            }}
           >
             <RefreshCw size={18} />
             Reiniciar Datos
@@ -769,7 +1011,18 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
         </div>
 
         {/* Navegación Tabs */}
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap', background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
+        <div style={{ 
+          display: 'flex', 
+          gap: isMobile ? '0.375rem' : '0.5rem', 
+          marginBottom: '2rem', 
+          flexWrap: 'wrap', 
+          background: 'var(--bg-secondary)', 
+          padding: isMobile ? '0.75rem' : '1rem', 
+          borderRadius: '1rem', 
+          boxShadow: '0 2px 8px var(--shadow)',
+          overflowX: isMobile ? 'auto' : 'visible',
+          WebkitOverflowScrolling: 'touch'
+        }}>
           {[
             { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
             { id: 'users', label: 'Usuarios', icon: Users },
@@ -778,6 +1031,8 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
             { id: 'orders', label: 'Pedidos', icon: ShoppingBag },
             { id: 'inventory', label: 'Inventario', icon: Package },
             { id: 'bots', label: 'Bots', icon: Bot },
+            { id: 'messages', label: `Mensajes${adminUnreadCount > 0 ? ` (${adminUnreadCount})` : ''}`, icon: Mail },
+            { id: 'edit-home', label: 'Editar Inicio', icon: Edit },
             { id: 'create-auction', label: 'Crear Subasta', icon: Plus },
             { id: 'create-product', label: 'Crear Producto', icon: Plus },
           ].map(tab => {
@@ -818,7 +1073,11 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
         {activeTab === 'dashboard' && (
           <div style={{ display: 'grid', gap: '1.5rem' }}>
             {/* Stats Cards - Primera Fila */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(240px, 1fr))', 
+              gap: isMobile ? '1rem' : '1.5rem' 
+            }}>
               <StatsCard
                 title="Usuarios Registrados"
                 value={stats.users.total}
@@ -853,7 +1112,11 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
             </div>
 
             {/* Stats Cards - Segunda Fila */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(240px, 1fr))', 
+              gap: isMobile ? '1rem' : '1.5rem' 
+            }}>
               <StatsCard
                 title="Total de Ofertas"
                 value={stats.auctions.totalBids}
@@ -896,58 +1159,301 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
                 </h3>
                 <div style={{ display: 'grid', gap: '0.875rem' }}>
                   {stats.orders.pendingPayment > 0 && (
-                    <div style={{ padding: '1rem', background: 'var(--warning-light)', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', border: '1px solid var(--warning)' }}>
-                      <Clock size={22} color="var(--warning)" />
-                      <div>
-                        <strong>{stats.orders.pendingPayment}</strong> pedidos pendientes de pago
-                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                          Requieren atención urgente
+                    <div 
+                      onClick={() => setActiveTab('orders')}
+                      style={{ 
+                        padding: '1rem', 
+                        background: 'var(--warning-light)', 
+                        borderRadius: '0.75rem', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        gap: '0.75rem', 
+                        border: '1px solid var(--warning)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--warning)';
+                        e.currentTarget.style.color = 'white';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'var(--warning-light)';
+                        e.currentTarget.style.color = 'var(--text-primary)';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                        <Clock size={22} color="var(--warning)" />
+                        <div>
+                          <strong>{stats.orders.pendingPayment}</strong> pedidos pendientes de pago
+                          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                            Requieren atención urgente
+                          </div>
                         </div>
                       </div>
+                      <button
+                        className="btn btn-warning"
+                        style={{ 
+                          padding: '0.5rem 1rem',
+                          fontSize: '0.875rem',
+                          whiteSpace: 'nowrap'
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveTab('orders');
+                        }}
+                      >
+                        Ver pedidos
+                      </button>
                     </div>
                   )}
                   
                   {getAuctionsEndingSoon().length > 0 && (
-                    <div style={{ padding: '1rem', background: 'var(--info-light)', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', border: '1px solid var(--info)' }}>
-                      <AlertCircle size={22} color="var(--info)" />
-                      <div>
-                        <strong>{getAuctionsEndingSoon().length}</strong> subastas finalizan en las próximas 24hs
-                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                          {getAuctionsEndingSoon().map((a: { title: any; }) => a.title).join(', ')}
+                    <div 
+                      onClick={() => setActiveTab('auctions')}
+                      style={{ 
+                        padding: '1rem', 
+                        background: 'var(--info-light)', 
+                        borderRadius: '0.75rem', 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.75rem', 
+                        border: '1px solid var(--info)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--info)';
+                        e.currentTarget.style.color = 'white';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'var(--info-light)';
+                        e.currentTarget.style.color = 'var(--text-primary)';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                        <AlertCircle size={22} color="var(--info)" />
+                        <div>
+                          <strong>{getAuctionsEndingSoon().length}</strong> subastas finalizan en las próximas 24hs
+                          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                            {getAuctionsEndingSoon().map((a: { title: any; }) => a.title).join(', ')}
+                          </div>
                         </div>
                       </div>
+                      <button
+                        className="btn btn-info"
+                        style={{ 
+                          padding: '0.5rem 1rem',
+                          fontSize: '0.875rem',
+                          whiteSpace: 'nowrap'
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveTab('auctions');
+                        }}
+                      >
+                        Ver subastas
+                      </button>
                     </div>
                   )}
                   
                   {stats.products.lowStock > 0 && (
-                    <div style={{ padding: '1rem', background: 'var(--warning-light)', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', border: '1px solid var(--warning)' }}>
-                      <AlertTriangle size={22} color="var(--warning)" />
-                      <div>
-                        <strong>{stats.products.lowStock}</strong> productos con stock bajo
-                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                          Menos de 5 unidades disponibles
+                    <div 
+                      onClick={() => setActiveTab('products')}
+                      style={{ 
+                        padding: '1rem', 
+                        background: 'var(--warning-light)', 
+                        borderRadius: '0.75rem', 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.75rem', 
+                        border: '1px solid var(--warning)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--warning)';
+                        e.currentTarget.style.color = 'white';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'var(--warning-light)';
+                        e.currentTarget.style.color = 'var(--text-primary)';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                        <AlertTriangle size={22} color="var(--warning)" />
+                        <div>
+                          <strong>{stats.products.lowStock}</strong> productos con stock bajo
+                          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                            Menos de 5 unidades disponibles
+                          </div>
                         </div>
                       </div>
+                      <button
+                        className="btn btn-warning"
+                        style={{ 
+                          padding: '0.5rem 1rem',
+                          fontSize: '0.875rem',
+                          whiteSpace: 'nowrap'
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveTab('products');
+                        }}
+                      >
+                        Ver productos
+                      </button>
                     </div>
                   )}
                   
                   {stats.products.outOfStock > 0 && (
-                    <div style={{ padding: '1rem', background: 'var(--error-light)', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', border: '1px solid var(--error)' }}>
-                      <XCircle size={22} color="var(--error)" />
-                      <div>
-                        <strong>{stats.products.outOfStock}</strong> productos sin stock
-                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                          Requieren reposición urgente
+                    <div 
+                      onClick={() => setActiveTab('products')}
+                      style={{ 
+                        padding: '1rem', 
+                        background: 'var(--error-light)', 
+                        borderRadius: '0.75rem', 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.75rem', 
+                        border: '1px solid var(--error)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--error)';
+                        e.currentTarget.style.color = 'white';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'var(--error-light)';
+                        e.currentTarget.style.color = 'var(--text-primary)';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                        <XCircle size={22} color="var(--error)" />
+                        <div>
+                          <strong>{stats.products.outOfStock}</strong> productos sin stock
+                          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                            Requieren reposición urgente
+                          </div>
                         </div>
                       </div>
+                      <button
+                        className="btn btn-error"
+                        style={{ 
+                          padding: '0.5rem 1rem',
+                          fontSize: '0.875rem',
+                          whiteSpace: 'nowrap'
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveTab('products');
+                        }}
+                      >
+                        Ver productos
+                      </button>
                     </div>
                   )}
                 </div>
               </div>
             )}
 
+            {/* Estadísticas Mejoradas: Ingresos y Análisis */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginTop: '1.5rem' }}>
+              {/* Ingresos por Subastas */}
+              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid var(--border)', boxShadow: '0 2px 8px var(--shadow)' }}>
+                <h4 style={{ fontSize: '1.125rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Gavel size={20} color="var(--primary)" />
+                  Ingresos por Subastas
+                </h4>
+                <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.5rem' }}>
+                  {formatCurrency(enhancedStats.auctionRevenue)}
+                </div>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  {auctions.filter((a: { winnerId: any; }) => a.winnerId).length} subastas ganadas
+                </div>
+              </div>
+
+              {/* Ingresos por Tienda */}
+              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid var(--border)', boxShadow: '0 2px 8px var(--shadow)' }}>
+                <h4 style={{ fontSize: '1.125rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Store size={20} color="var(--success)" />
+                  Ingresos por Tienda
+                </h4>
+                <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--success)', marginBottom: '0.5rem' }}>
+                  {formatCurrency(enhancedStats.storeRevenue)}
+                </div>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  {stats.orders.delivered} pedidos entregados
+                </div>
+              </div>
+
+              {/* Ingresos Totales */}
+              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid var(--border)', boxShadow: '0 2px 8px var(--shadow)' }}>
+                <h4 style={{ fontSize: '1.125rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <DollarSign size={20} color="#f093fb" />
+                  Ingresos Totales
+                </h4>
+                <div style={{ fontSize: '2rem', fontWeight: 700, color: '#f093fb', marginBottom: '0.5rem' }}>
+                  {formatCurrency(enhancedStats.totalRevenue)}
+                </div>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  Subastas + Tienda
+                </div>
+              </div>
+            </div>
+
+            {/* Más Buscado y Más Cliqueado */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem', marginTop: '1.5rem' }}>
+              {/* Más Buscado */}
+              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid var(--border)', boxShadow: '0 2px 8px var(--shadow)' }}>
+                <h4 style={{ fontSize: '1.125rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Search size={20} color="var(--info)" />
+                  Más Buscado
+                </h4>
+                {enhancedStats.mostSearched.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {enhancedStats.mostSearched.map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
+                        <span style={{ fontWeight: 500 }}>{item.word}</span>
+                        <strong style={{ color: 'var(--primary)' }}>{item.count} veces</strong>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '1rem' }}>No hay datos disponibles</p>
+                )}
+              </div>
+
+              {/* Más Cliqueado */}
+              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid var(--border)', boxShadow: '0 2px 8px var(--shadow)' }}>
+                <h4 style={{ fontSize: '1.125rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <MousePointerClick size={20} color="var(--secondary)" />
+                  Más Cliqueado
+                </h4>
+                {enhancedStats.mostClicked.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {enhancedStats.mostClicked.map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
+                          {item.type === 'auction' ? <Gavel size={16} /> : <Package size={16} />}
+                          <span style={{ fontWeight: 500, fontSize: '0.875rem' }}>{item.name}</span>
+                        </div>
+                        <strong style={{ color: 'var(--secondary)' }}>{item.clicks} clicks</strong>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '1rem' }}>No hay datos disponibles</p>
+                )}
+              </div>
+            </div>
+
             {/* Resumen por Categorías */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '1.5rem' }}>
               {/* Resumen de Subastas */}
               <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid var(--border)', boxShadow: '0 2px 8px var(--shadow)' }}>
                 <h4 style={{ fontSize: '1.125rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1025,16 +1531,34 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
 
             {/* Actividad Reciente */}
             <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid var(--border)', boxShadow: '0 2px 8px var(--shadow)' }}>
-              <h4 style={{ fontSize: '1.125rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Activity size={20} color="var(--primary)" />
-                Actividad Reciente
-              </h4>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h4 style={{ fontSize: '1.125rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Activity size={20} color="var(--primary)" />
+                  Actividad Reciente
+                </h4>
+                {getRecentActivity().length > 0 && (
+                  <button 
+                    onClick={() => {
+                      if (window.confirm('¿Limpiar todas las actividades recientes?')) {
+                        localStorage.setItem('clearedActivityTimestamp', Date.now().toString());
+                        // Forzar actualización del componente sin recargar la página
+                        setRefreshKey(prev => prev + 1);
+                      }
+                    }}
+                    className="btn btn-outline"
+                    style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                  >
+                    <Trash2 size={16} />
+                    Limpiar
+                  </button>
+                )}
+              </div>
               {getRecentActivity().length === 0 ? (
                 <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
                   No hay actividad reciente
                 </p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div key={refreshKey} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {getRecentActivity().map((activity, index) => (
                     <div key={index} style={{ 
                       padding: '1rem', 
@@ -1302,12 +1826,11 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
                 border: '2px solid var(--border)'
               }}
             >
-              <option value="1">📱 Electrónica</option>
-              <option value="2">👕 Moda</option>
-              <option value="3">🏠 Hogar</option>
-              <option value="4">🎮 Juegos</option>
-              <option value="5">📚 Libros</option>
-              <option value="6">🎨 Arte</option>
+              {mockCategories.map(cat => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.icon} {cat.name}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -1325,285 +1848,49 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
 />
       </div>
 
-      {/* SECCIÓN 3: PRECIOS Y STOCK */}
+      {/* SECCIÓN 2.5: STICKERS */}
       <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
         <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem' }}>
-          💰 Precio y Stock
+          🎨 Stickers (opcional - para hacer más atractivo visualmente)
         </h4>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-          {/* Precio */}
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-              Precio de Venta *
-            </label>
-            <div style={{ position: 'relative' }}>
-              <span style={{ 
-                position: 'absolute', 
-                left: '1rem', 
-                top: '50%', 
-                transform: 'translateY(-50%)',
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {availableStickers.map((sticker) => (
+            <button
+              key={sticker.id}
+              type="button"
+              onClick={() => {
+                const currentStickers = productForm.stickers || [];
+                const stickers = currentStickers.includes(sticker.id)
+                  ? currentStickers.filter((s: string) => s !== sticker.id)
+                  : [...currentStickers, sticker.id];
+                setProductForm({...productForm, stickers});
+              }}
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '2rem',
+                border: '2px solid',
+                borderColor: (productForm.stickers || []).includes(sticker.id) ? 'var(--primary)' : 'var(--border)',
+                background: (productForm.stickers || []).includes(sticker.id) ? 'var(--primary)' : 'transparent',
+                color: (productForm.stickers || []).includes(sticker.id) ? 'white' : 'var(--text-primary)',
+                cursor: 'pointer',
                 fontWeight: 600,
-                color: 'var(--text-secondary)'
-              }}>
-                $
-              </span>
-              <input 
-                type="number" 
-                value={productForm.price || ''}
-                onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, price: Number(e.target.value)})}
-                placeholder="0"
-                min="100"
-                step="100"
-                style={{ 
-                  width: '100%', 
-                  padding: '0.875rem 0.875rem 0.875rem 2rem', 
-                  borderRadius: '0.5rem',
-                  fontSize: '1.125rem',
-                  fontWeight: 600,
-                  border: '2px solid var(--border)'
-                }}
-              />
-            </div>
-            <small style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
-              Mínimo: $100
-            </small>
-          </div>
-
-          {/* Stock */}
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-              Stock Disponible *
-            </label>
-            <input 
-              type="number" 
-              value={productForm.stock || ''}
-              onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, stock: Number(e.target.value)})}
-              placeholder="0"
-              min="0"
-              style={{ 
-                width: '100%', 
-                padding: '0.875rem', 
-                borderRadius: '0.5rem',
-                fontSize: '1.125rem',
-                fontWeight: 600,
-                border: '2px solid var(--border)'
-              }}
-            />
-            <small style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
-              Cantidad de unidades disponibles
-            </small>
-          </div>
-        </div>
-      </div>
-
-      {/* SECCIÓN 4: BADGES Y OPCIONES */}
-      <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
-        <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem' }}>
-          ⭐ Badges y Opciones Especiales
-        </h4>
-
-        <div style={{ display: 'grid', gap: '1.5rem' }}>
-          {/* Badges predefinidos */}
-          <div>
-            <label style={{ display: 'block', marginBottom: '1rem', fontWeight: 600 }}>
-              Badges del Producto (opcional)
-            </label>
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              {['Nuevo', 'Oferta', '50% OFF', 'Destacado', 'Envío Gratis', 'Hot Sale'].map((badge) => (
-                <button
-                  key={badge}
-                  type="button"
-                  onClick={() => {
-                    const badges = productForm.badges.includes(badge)
-                      ? productForm.badges.filter((b: string) => b !== badge)
-                      : [...productForm.badges, badge];
-                    setProductForm({...productForm, badges});
-                  }}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    borderRadius: '2rem',
-                    border: '2px solid',
-                    borderColor: productForm.badges.includes(badge) ? 'var(--primary)' : 'var(--border)',
-                    background: productForm.badges.includes(badge) ? 'var(--primary)' : 'transparent',
-                    color: productForm.badges.includes(badge) ? 'white' : 'var(--text-primary)',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    fontSize: '0.875rem',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {badge}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Opciones de visibilidad */}
-          <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
-              <input 
-                type="checkbox" 
-                checked={productForm.active}
-                onChange={(e: { target: { checked: any; }; }) => setProductForm({...productForm, active: e.target.checked})}
-                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-              />
-              <span style={{ fontWeight: 600 }}>Producto Activo (visible en la tienda)</span>
-            </label>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
-              <input 
-                type="checkbox" 
-                checked={productForm.featured}
-                onChange={(e: { target: { checked: any; }; }) => setProductForm({...productForm, featured: e.target.checked})}
-                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-              />
-              <span style={{ fontWeight: 600 }}>Producto Destacado (aparece primero)</span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      {/* BOTONES DE ACCIÓN */}
-      <div style={{ display: 'flex', gap: '1rem', paddingTop: '1rem' }}>
-        <button 
-          onClick={handleSaveProduct}
-          className="btn btn-primary" 
-          style={{ flex: 1, padding: '1rem', fontSize: '1.0625rem', fontWeight: 600 }}
-        >
-          <Plus size={20} />
-          Crear Producto
-        </button>
-        <button 
-          onClick={() => {
-            if (window.confirm('¿Descartar cambios y volver?')) {
-              setProductForm({
-                name: '',
-                description: '',
-                price: 0,
-                stock: 0,
-                categoryId: '1',
-                images: [] as string[],
-                badges: [] as string[],
-                active: true,
-                featured: false
-              });
-              setActiveTab('products');
-            }
-          }}
-          className="btn btn-outline"
-          style={{ padding: '1rem', minWidth: '150px' }}
-        >
-          Cancelar
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-        {/* CREATE PRODUCT TAB */}
-{activeTab === 'create-product' && (
-  <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
-    <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-      <Plus size={24} color="var(--success)" />
-      Crear Nuevo Producto
-    </h3>
-
-    <div style={{ display: 'grid', gap: '2rem' }}>
-      
-      {/* SECCIÓN 1: INFORMACIÓN BÁSICA */}
-      <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
-        <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem' }}>
-          📝 Información Básica
-        </h4>
-
-        <div style={{ display: 'grid', gap: '1.5rem' }}>
-          {/* Nombre del producto */}
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-              Nombre del Producto *
-            </label>
-            <input 
-              type="text" 
-              value={productForm.name}
-              onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, name: e.target.value})}
-              placeholder="Ej: iPhone 15 Pro Max 256GB"
-              maxLength={100}
-              style={{ 
-                width: '100%', 
-                padding: '0.875rem', 
-                borderRadius: '0.5rem',
-                fontSize: '1rem',
-                border: '2px solid var(--border)'
-              }}
-            />
-            <small style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
-              {productForm.name.length}/100 caracteres
-            </small>
-          </div>
-
-          {/* Descripción */}
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-              Descripción Detallada *
-            </label>
-            <textarea 
-              value={productForm.description}
-              onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, description: e.target.value})}
-              placeholder="Describe tu producto en detalle: características, especificaciones, estado, etc."
-              maxLength={2000}
-              style={{ 
-                width: '100%', 
-                padding: '0.875rem', 
-                borderRadius: '0.5rem', 
-                minHeight: '150px',
-                fontSize: '1rem',
-                border: '2px solid var(--border)',
-                resize: 'vertical'
-              }}
-            />
-            <small style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
-              {productForm.description.length}/2000 caracteres
-            </small>
-          </div>
-
-          {/* Categoría */}
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-              Categoría *
-            </label>
-            <select 
-              value={productForm.categoryId}
-              onChange={(e: { target: { value: any; }; }) => setProductForm({...productForm, categoryId: e.target.value})}
-              style={{ 
-                width: '100%', 
-                padding: '0.875rem', 
-                borderRadius: '0.5rem',
-                fontSize: '1rem',
-                border: '2px solid var(--border)'
+                fontSize: '0.875rem',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
               }}
             >
-              <option value="1">📱 Electrónica</option>
-              <option value="2">👕 Moda</option>
-              <option value="3">🏠 Hogar</option>
-              <option value="4">🎮 Juegos</option>
-              <option value="5">📚 Libros</option>
-              <option value="6">🎨 Arte</option>
-            </select>
-          </div>
+              <span>{sticker.icon}</span>
+              <span>{sticker.label.replace(/^[^\s]+\s/, '')}</span>
+            </button>
+          ))}
         </div>
-      </div>
-
-      {/* SECCIÓN 2: IMÁGENES */}
-      <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
-        <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem' }}>
-          📸 Imágenes del Producto (Máximo 5)
-        </h4>
-        <ImageUploader
-          images={productForm.images}
-          onChange={(images) => setProductForm({...productForm, images})}
-          maxImages={5}
-        />
+        {(productForm.stickers || []).length > 0 && (
+          <p style={{ marginTop: '0.75rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+            Stickers seleccionados: {(productForm.stickers || []).map(id => getStickerLabel(id)).join(', ')}
+          </p>
+        )}
       </div>
 
       {/* SECCIÓN 3: PRECIOS Y STOCK */}
@@ -1766,6 +2053,7 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
                 categoryId: '1',
                 images: [] as string[],
                 badges: [] as string[],
+                stickers: [] as string[],
                 active: true,
                 featured: false
               });
@@ -1861,12 +2149,11 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
                 border: '2px solid var(--border)'
               }}
             >
-              <option value="1">📱 Electrónica</option>
-              <option value="2">👕 Moda</option>
-              <option value="3">🏠 Hogar</option>
-              <option value="4">🎮 Juegos</option>
-              <option value="5">📚 Libros</option>
-              <option value="6">🎨 Arte</option>
+              {mockCategories.map(cat => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.icon} {cat.name}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -2107,9 +2394,18 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
                         <td style={{ padding: '1rem', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
                             <button 
+                              onClick={() => handleRepublishAuction(auction)}
+                              className="btn btn-outline"
+                              style={{ padding: '0.5rem 0.75rem', color: 'var(--primary)' }}
+                              title="Republicar"
+                            >
+                              <RefreshCw size={16} />
+                            </button>
+                            <button 
                               onClick={() => handleEditAuction(auction)}
                               className="btn btn-outline"
                               style={{ padding: '0.5rem 0.75rem' }}
+                              title="Editar"
                             >
                               <Edit size={16} />
                             </button>
@@ -2117,6 +2413,7 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
                               onClick={() => handleDeleteAuction(auction.id)}
                               className="btn btn-outline"
                               style={{ padding: '0.5rem 0.75rem', color: 'var(--error)' }}
+                              title="Eliminar"
                             >
                               <Trash2 size={16} />
                             </button>
@@ -2229,12 +2526,11 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
                           border: '2px solid var(--border)'
                         }}
                       >
-                        <option value="1">📱 Electrónica</option>
-                        <option value="2">👕 Moda</option>
-                        <option value="3">🏠 Hogar</option>
-                        <option value="4">🎮 Gaming</option>
-                        <option value="5">📚 Libros</option>
-                        <option value="6">🎨 Arte y Coleccionables</option>
+                        {mockCategories.map(cat => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.icon} {cat.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
 
@@ -2273,6 +2569,50 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
                   maxImages={3}
                   maxSizeMB={5}
                 />
+              </div>
+
+              {/* SECCIÓN 2.5: STICKERS */}
+              <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
+                <h4 style={{ marginBottom: '1.5rem', fontSize: '1.125rem', fontWeight: 600 }}>
+                  🎨 Stickers (opcional - para hacer más atractivo visualmente)
+                </h4>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  {availableStickers.map((sticker) => (
+                    <button
+                      key={sticker.id}
+                      type="button"
+                      onClick={() => {
+                        const stickers = auctionForm.stickers.includes(sticker.id)
+                          ? auctionForm.stickers.filter((s: string) => s !== sticker.id)
+                          : [...auctionForm.stickers, sticker.id];
+                        setAuctionForm({...auctionForm, stickers});
+                      }}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '2rem',
+                        border: '2px solid',
+                        borderColor: auctionForm.stickers.includes(sticker.id) ? 'var(--primary)' : 'var(--border)',
+                        background: auctionForm.stickers.includes(sticker.id) ? 'var(--primary)' : 'transparent',
+                        color: auctionForm.stickers.includes(sticker.id) ? 'white' : 'var(--text-primary)',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        fontSize: '0.875rem',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <span>{sticker.icon}</span>
+                      <span>{sticker.label.replace(/^[^\s]+\s/, '')}</span>
+                    </button>
+                  ))}
+                </div>
+                {auctionForm.stickers.length > 0 && (
+                  <p style={{ marginTop: '0.75rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    Stickers seleccionados: {auctionForm.stickers.map(id => getStickerLabel(id)).join(', ')}
+                  </p>
+                )}
               </div>
 
               {/* SECCIÓN 3: PRECIOS */}
@@ -3113,6 +3453,572 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
             )}
           </div>
         )}
+        
+        {/* MESSAGES TAB */}
+        {activeTab === 'messages' && (
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: isMobile ? '1fr' : '350px 1fr', 
+            gap: '1.5rem', 
+            height: isMobile ? 'auto' : 'calc(100vh - 200px)',
+            minHeight: isMobile ? '600px' : 'calc(100vh - 200px)'
+          }}>
+            {/* Lista de Conversaciones */}
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: '1rem', padding: '1.5rem', overflowY: 'auto', boxShadow: '0 2px 8px var(--shadow)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Mail size={24} />
+                  Conversaciones
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  {adminUnreadCount > 0 && (
+                    <span style={{ background: 'var(--error)', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '1rem', fontSize: '0.875rem', fontWeight: 600 }}>
+                      {adminUnreadCount}
+                    </span>
+                  )}
+                  {conversations.length > 0 && (
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`¿Eliminar todas las conversaciones? (${conversations.length} conversaciones)`)) {
+                          deleteAllConversations();
+                          setConversations([]);
+                          setSelectedConversation(null);
+                          setConversationMessages([]);
+                          setAdminUnreadCount(0);
+                        }
+                      }}
+                      className="btn btn-outline"
+                      style={{ 
+                        padding: '0.5rem 0.75rem', 
+                        fontSize: '0.875rem',
+                        color: 'var(--error)',
+                        borderColor: 'var(--error)'
+                      }}
+                      title="Eliminar todas las conversaciones"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              {conversations.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                  <Mail size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
+                  <p>No hay conversaciones</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {conversations.map(conv => (
+                    <div
+                      key={conv.id}
+                      onClick={() => {
+                        setSelectedConversation(conv.id);
+                        setConversationMessages(getMessages(conv.id));
+                        markMessagesAsRead(conv.id, 'admin');
+                      }}
+                      style={{
+                        padding: '1rem',
+                        background: selectedConversation === conv.id ? 'var(--primary)' : 'var(--bg-tertiary)',
+                        color: selectedConversation === conv.id ? 'white' : 'var(--text-primary)',
+                        borderRadius: '0.75rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        border: '1px solid',
+                        borderColor: selectedConversation === conv.id ? 'var(--primary)' : 'var(--border)'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedConversation !== conv.id) {
+                          e.currentTarget.style.background = 'var(--bg-quaternary)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedConversation !== conv.id) {
+                          e.currentTarget.style.background = 'var(--bg-tertiary)';
+                        }
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem', gap: '0.5rem' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, marginBottom: '0.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {conv.username}
+                          </div>
+                          {conv.lastMessage && (
+                            <div style={{ 
+                              fontSize: '0.875rem', 
+                              opacity: 0.8, 
+                              overflow: 'hidden', 
+                              textOverflow: 'ellipsis', 
+                              whiteSpace: 'nowrap',
+                              maxWidth: '100%',
+                              wordBreak: 'break-word'
+                            }}>
+                              {conv.lastMessage.fromUserId === 'admin' ? 'Tú: ' : ''}
+                              {conv.lastMessage.content.length > 35 
+                                ? conv.lastMessage.content.substring(0, 35) + '...'
+                                : conv.lastMessage.content}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                          {conv.unreadCount > 0 && (
+                            <span style={{ 
+                              background: selectedConversation === conv.id ? 'white' : 'var(--error)', 
+                              color: selectedConversation === conv.id ? 'var(--primary)' : 'white',
+                              padding: '0.125rem 0.5rem', 
+                              borderRadius: '1rem', 
+                              fontSize: '0.75rem', 
+                              fontWeight: 600,
+                              minWidth: '20px',
+                              textAlign: 'center'
+                            }}>
+                              {conv.unreadCount}
+                            </span>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`¿Eliminar conversación con ${conv.username}?`)) {
+                                deleteConversation(conv.id);
+                                setConversations(getAllConversations());
+                                if (selectedConversation === conv.id) {
+                                  setSelectedConversation(null);
+                                  setConversationMessages([]);
+                                }
+                                setAdminUnreadCount(getAdminUnreadCount());
+                              }
+                            }}
+                            className="btn"
+                            style={{ 
+                              padding: '0.25rem',
+                              background: 'transparent',
+                              border: 'none',
+                              color: selectedConversation === conv.id ? 'white' : 'var(--error)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              opacity: 0.7
+                            }}
+                            title="Eliminar conversación"
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.opacity = '1';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.opacity = '0.7';
+                            }}
+                          >
+                            <XCircle size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      {conv.lastMessage && (
+                        <div style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: '0.25rem' }}>
+                          {formatTimeAgo(conv.lastMessage.createdAt)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Área de Mensajes */}
+            <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-secondary)', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)', overflow: 'hidden' }}>
+              {selectedConversation ? (
+                <>
+                  {/* Header de conversación */}
+                  <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--bg-tertiary)' }}>
+                    <h3 style={{ margin: 0 }}>
+                      {conversations.find(c => c.id === selectedConversation)?.username || 'Usuario'}
+                    </h3>
+                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                      Conversación activa
+                    </p>
+                  </div>
+
+                  {/* Lista de mensajes */}
+                  <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {conversationMessages.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                        <p>No hay mensajes aún. Iniciá la conversación.</p>
+                      </div>
+                    ) : (
+                      conversationMessages.map(msg => {
+                        const isAdmin = msg.fromUserId === 'admin';
+                        return (
+                          <div
+                            key={msg.id}
+                            style={{
+                              display: 'flex',
+                              justifyContent: isAdmin ? 'flex-end' : 'flex-start',
+                              marginBottom: '0.5rem'
+                            }}
+                          >
+                            <div
+                              style={{
+                                maxWidth: '70%',
+                                padding: '0.875rem 1.25rem',
+                                borderRadius: '1rem',
+                                background: isAdmin ? 'var(--primary)' : 'var(--bg-tertiary)',
+                                color: isAdmin ? 'white' : 'var(--text-primary)',
+                                border: `1px solid ${isAdmin ? 'var(--primary)' : 'var(--border)'}`,
+                                position: 'relative'
+                              }}
+                            >
+                              {!isAdmin && (
+                                <div style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.25rem', opacity: 0.8 }}>
+                                  {msg.fromUsername}
+                                </div>
+                              )}
+                              {msg.isAutoGenerated && (
+                                <div style={{ fontSize: '0.75rem', opacity: 0.7, marginBottom: '0.25rem', fontStyle: 'italic' }}>
+                                  Mensaje automático
+                                </div>
+                              )}
+                              <div style={{ marginBottom: '0.25rem' }}>{msg.content}</div>
+                              <div style={{ fontSize: '0.75rem', opacity: 0.7, textAlign: 'right' }}>
+                                {new Date(msg.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Input para enviar mensaje */}
+                  <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border)', background: 'var(--bg-tertiary)' }}>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!newMessageContent.trim() || !user) return;
+
+                        const userId = selectedConversation.replace('admin_', '');
+                        const message = createMessage(
+                          'admin',
+                          user.username,
+                          userId,
+                          newMessageContent.trim()
+                        );
+                        
+                        saveMessage(message);
+                        setConversationMessages([...conversationMessages, message]);
+                        setNewMessageContent('');
+                        setConversations(getAllConversations());
+                        logAdminAction('Mensaje enviado a usuario', user.id, user.username, { toUserId: userId });
+                      }}
+                      style={{ display: 'flex', gap: '0.75rem' }}
+                    >
+                      <input
+                        type="text"
+                        value={newMessageContent}
+                        onChange={(e) => setNewMessageContent(e.target.value)}
+                        placeholder="Escribí un mensaje..."
+                        style={{ 
+                          flex: 1, 
+                          padding: '0.875rem 1.25rem', 
+                          borderRadius: '0.75rem', 
+                          border: '1px solid var(--border)',
+                          fontSize: '0.9375rem'
+                        }}
+                      />
+                      <button
+                        type="submit"
+                        className="btn btn-primary"
+                        style={{ padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                        disabled={!newMessageContent.trim()}
+                      >
+                        <Send size={18} />
+                        Enviar
+                      </button>
+                    </form>
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Mail size={64} style={{ opacity: 0.3, marginBottom: '1rem' }} />
+                    <p>Seleccioná una conversación para comenzar</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* EDIT HOME TAB */}
+        {activeTab === 'edit-home' && (
+          <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
+            <div style={{ marginBottom: '2rem' }}>
+              <h3 style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Edit size={28} color="var(--primary)" />
+                Editar Página de Inicio
+              </h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>
+                Personaliza banners, publicidades e imágenes del inicio
+              </p>
+            </div>
+
+            <div style={{ display: 'grid', gap: '2rem' }}>
+              {/* Hero Section */}
+              <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
+                <h4 style={{ marginBottom: '1.5rem', fontSize: '1.125rem', fontWeight: 600 }}>
+                  🎯 Hero Section (Título Principal)
+                </h4>
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                      Título Principal
+                    </label>
+                    <input
+                      type="text"
+                      value={homeConfig.heroTitle}
+                      onChange={(e) => setHomeConfig({...homeConfig, heroTitle: e.target.value})}
+                      style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem' }}
+                      placeholder="Bienvenido a Subasta Argenta"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                      Subtítulo
+                    </label>
+                    <textarea
+                      value={homeConfig.heroSubtitle}
+                      onChange={(e) => setHomeConfig({...homeConfig, heroSubtitle: e.target.value})}
+                      style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem', minHeight: '80px' }}
+                      placeholder="La plataforma líder de subastas..."
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                      URL de Imagen Hero
+                    </label>
+                    <input
+                      type="url"
+                      value={homeConfig.heroImageUrl}
+                      onChange={(e) => setHomeConfig({...homeConfig, heroImageUrl: e.target.value})}
+                      style={{ width: '100%', padding: '0.875rem', borderRadius: '0.5rem' }}
+                      placeholder="https://images.unsplash.com/..."
+                    />
+                    {homeConfig.heroImageUrl && (
+                      <img src={homeConfig.heroImageUrl} alt="Preview" style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '0.5rem', marginTop: '0.5rem' }} />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Banners */}
+              <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <h4 style={{ fontSize: '1.125rem', fontWeight: 600 }}>
+                    🎨 Banners Publicitarios
+                  </h4>
+                  <button
+                    onClick={() => {
+                      const newBanner = {
+                        id: `banner_${Date.now()}`,
+                        title: '',
+                        description: '',
+                        imageUrl: '',
+                        active: true,
+                        order: homeConfig.banners.length,
+                        createdAt: new Date(),
+                        link: '',
+                        linkText: ''
+                      };
+                      setHomeConfig({...homeConfig, banners: [...homeConfig.banners, newBanner]});
+                    }}
+                    className="btn btn-primary"
+                    style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                  >
+                    <Plus size={16} />
+                    Agregar Banner
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {homeConfig.banners.map((banner, idx) => (
+                    <div key={banner.id} style={{ padding: '1rem', background: 'var(--bg-secondary)', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
+                      <div style={{ display: 'grid', gap: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <strong>Banner #{idx + 1}</strong>
+                          <button
+                            onClick={() => {
+                              setHomeConfig({...homeConfig, banners: homeConfig.banners.filter(b => b.id !== banner.id)});
+                            }}
+                            className="btn btn-outline"
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Título del banner"
+                          value={banner.title}
+                          onChange={(e) => {
+                            const updated = homeConfig.banners.map(b => b.id === banner.id ? {...b, title: e.target.value} : b);
+                            setHomeConfig({...homeConfig, banners: updated});
+                          }}
+                          style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
+                        />
+                        <input
+                          type="url"
+                          placeholder="URL de la imagen"
+                          value={banner.imageUrl}
+                          onChange={(e) => {
+                            const updated = homeConfig.banners.map(b => b.id === banner.id ? {...b, imageUrl: e.target.value} : b);
+                            setHomeConfig({...homeConfig, banners: updated});
+                          }}
+                          style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
+                        />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                          <input
+                            type="url"
+                            placeholder="Link (opcional)"
+                            value={banner.link || ''}
+                            onChange={(e) => {
+                              const updated = homeConfig.banners.map(b => b.id === banner.id ? {...b, link: e.target.value} : b);
+                              setHomeConfig({...homeConfig, banners: updated});
+                            }}
+                            style={{ padding: '0.75rem', borderRadius: '0.5rem' }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Texto del link"
+                            value={banner.linkText || ''}
+                            onChange={(e) => {
+                              const updated = homeConfig.banners.map(b => b.id === banner.id ? {...b, linkText: e.target.value} : b);
+                              setHomeConfig({...homeConfig, banners: updated});
+                            }}
+                            style={{ padding: '0.75rem', borderRadius: '0.5rem' }}
+                          />
+                        </div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={banner.active}
+                            onChange={(e) => {
+                              const updated = homeConfig.banners.map(b => b.id === banner.id ? {...b, active: e.target.checked} : b);
+                              setHomeConfig({...homeConfig, banners: updated});
+                            }}
+                          />
+                          <span>Activo</span>
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Promociones */}
+              <div style={{ background: 'var(--bg-tertiary)', padding: '1.5rem', borderRadius: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <h4 style={{ fontSize: '1.125rem', fontWeight: 600 }}>
+                    🎁 Promociones Especiales
+                  </h4>
+                  <button
+                    onClick={() => {
+                      const newPromo = {
+                        id: `promo_${Date.now()}`,
+                        title: '',
+                        description: '',
+                        imageUrl: '',
+                        active: true,
+                        order: homeConfig.promotions.length,
+                        createdAt: new Date()
+                      };
+                      setHomeConfig({...homeConfig, promotions: [...homeConfig.promotions, newPromo]});
+                    }}
+                    className="btn btn-primary"
+                    style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                  >
+                    <Plus size={16} />
+                    Agregar Promoción
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {homeConfig.promotions.map((promo, idx) => (
+                    <div key={promo.id} style={{ padding: '1rem', background: 'var(--bg-secondary)', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
+                      <div style={{ display: 'grid', gap: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <strong>Promoción #{idx + 1}</strong>
+                          <button
+                            onClick={() => {
+                              setHomeConfig({...homeConfig, promotions: homeConfig.promotions.filter(p => p.id !== promo.id)});
+                            }}
+                            className="btn btn-outline"
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Título"
+                          value={promo.title}
+                          onChange={(e) => {
+                            const updated = homeConfig.promotions.map(p => p.id === promo.id ? {...p, title: e.target.value} : p);
+                            setHomeConfig({...homeConfig, promotions: updated});
+                          }}
+                          style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
+                        />
+                        <textarea
+                          placeholder="Descripción"
+                          value={promo.description}
+                          onChange={(e) => {
+                            const updated = homeConfig.promotions.map(p => p.id === promo.id ? {...p, description: e.target.value} : p);
+                            setHomeConfig({...homeConfig, promotions: updated});
+                          }}
+                          style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', minHeight: '60px' }}
+                        />
+                        <input
+                          type="url"
+                          placeholder="URL de la imagen"
+                          value={promo.imageUrl}
+                          onChange={(e) => {
+                            const updated = homeConfig.promotions.map(p => p.id === promo.id ? {...p, imageUrl: e.target.value} : p);
+                            setHomeConfig({...homeConfig, promotions: updated});
+                          }}
+                          style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem' }}
+                        />
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={promo.active}
+                            onChange={(e) => {
+                              const updated = homeConfig.promotions.map(p => p.id === promo.id ? {...p, active: e.target.checked} : p);
+                              setHomeConfig({...homeConfig, promotions: updated});
+                            }}
+                          />
+                          <span>Activa</span>
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Botón Guardar */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                <button
+                  onClick={() => {
+                    const updated = {...homeConfig, updatedAt: new Date()};
+                    localStorage.setItem('homeConfig', JSON.stringify(updated));
+                    setHomeConfig(updated);
+                    logAdminAction('Configuración del inicio actualizada', user?.id, user?.username);
+                    alert('✅ Configuración del inicio guardada correctamente');
+                  }}
+                  className="btn btn-primary"
+                  style={{ padding: '0.875rem 2rem', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  <Save size={18} />
+                  Guardar Cambios
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* CREATE AUCTION TAB */}
         {activeTab === 'create-auction' && (
           <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 2px 8px var(--shadow)' }}>
@@ -3199,12 +4105,11 @@ const updatedAuctions = auctions.map((a: { id: any; }) =>
                           border: '2px solid var(--border)'
                         }}
                       >
-                        <option value="1">📱 Electrónica</option>
-                        <option value="2">👕 Moda</option>
-                        <option value="3">🏠 Hogar</option>
-                        <option value="4">🎮 Gaming</option>
-                        <option value="5">📚 Libros</option>
-                        <option value="6">🎨 Arte y Coleccionables</option>
+                        {mockCategories.map(cat => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.icon} {cat.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
 

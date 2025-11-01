@@ -40,8 +40,9 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
   return (
     <Link 
       to={isActive ? `/subastas/${auction.id}` : '#'} 
-      className={`auction-card ${auction.featured ? 'featured-auction' : ''} ${auction.isFlash ? 'flash-auction' : ''}`}
+      className={`auction-card hover-lift fade-in ${auction.featured ? 'featured-auction' : ''} ${auction.isFlash ? 'flash-auction' : ''}`}
       style={{
+        animationDelay: `${Math.random() * 0.2}s`,
         ...(auction.featured && {
           border: '3px solid var(--primary)',
           boxShadow: '0 8px 24px rgba(255, 107, 0, 0.3)',

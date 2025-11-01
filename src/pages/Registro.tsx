@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, User, MapPin, FileText, Loader } from 'lucide-react';
+import { Mail, Lock, User, MapPin, FileText, Loader, Phone } from 'lucide-react';
 import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
@@ -19,6 +19,7 @@ const Registro = () => {
     password: '',
     confirmPassword: '',
     dni: '',
+    phone: '',
     address: '',
     locality: '',
     province: '',
@@ -55,6 +56,11 @@ const Registro = () => {
 
     if (!formData.dni.trim() || formData.dni.length < 7) {
       setError('DNI inválido');
+      return false;
+    }
+
+    if (!formData.phone.trim() || formData.phone.length < 10) {
+      setError('Teléfono inválido (mínimo 10 dígitos)');
       return false;
     }
 
@@ -134,6 +140,7 @@ const Registro = () => {
         email: formData.email,
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.username)}&size=200&background=FF6B00&color=fff&bold=true`,
         dni: formData.dni,
+        phone: formData.phone,
         address: formData.address,
         locality: formData.locality,
         province: formData.province,
@@ -237,19 +244,35 @@ const Registro = () => {
               </div>
             </div>
 
-            <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
-                <Mail size={18} /> Email
-              </label>
-              <input 
-                name="email" 
-                type="email" 
-                placeholder="tu@email.com" 
-                value={formData.email} 
-                onChange={handleChange} 
-                required 
-                style={{ width: '100%', padding: '0.875rem 1.25rem', borderRadius: '0.75rem' }} 
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
+                  <Mail size={18} /> Email
+                </label>
+                <input 
+                  name="email" 
+                  type="email" 
+                  placeholder="tu@email.com" 
+                  value={formData.email} 
+                  onChange={handleChange} 
+                  required 
+                  style={{ width: '100%', padding: '0.875rem 1.25rem', borderRadius: '0.75rem' }} 
+                />
+              </div>
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
+                  <Phone size={18} /> Teléfono *
+                </label>
+                <input 
+                  name="phone" 
+                  type="tel" 
+                  placeholder="11 1234-5678" 
+                  value={formData.phone} 
+                  onChange={handleChange} 
+                  required 
+                  style={{ width: '100%', padding: '0.875rem 1.25rem', borderRadius: '0.75rem' }} 
+                />
+              </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>

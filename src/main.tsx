@@ -14,10 +14,19 @@ function Root() {
       const currentUser = useStore.getState().user;
       if (!user && currentUser) {
         console.log('🔐 Usuario deslogueado de Firebase, limpiando estado');
+        const { clearNotifications } = useStore.getState();
+        clearNotifications(); // Limpiar notificaciones al desloguearse
         setUser(null);
       } else if (user && (!currentUser || currentUser.id !== user.uid)) {
         console.log('🔐 Usuario autenticado en Firebase, actualizando estado');
         setUser(user);
+        // Cargar notificaciones cuando el usuario se autentica
+        setTimeout(() => {
+          const { loadUserNotifications } = useStore.getState();
+          if (loadUserNotifications) {
+            loadUserNotifications();
+          }
+        }, 500);
       }
     });
     return () => unsubscribe();

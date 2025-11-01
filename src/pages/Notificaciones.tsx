@@ -1,9 +1,23 @@
-import { Bell, CheckCircle, TrendingUp, ShoppingBag, Clock } from 'lucide-react';
+import React from 'react';
+import { Bell, CheckCircle, TrendingUp, ShoppingBag, Clock, CheckCheck } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { formatTimeAgo } from '../utils/helpers';
+import { Navigate } from 'react-router-dom';
 
 const Notificaciones = () => {
-  const { notifications, markAsRead } = useStore();
+  const { user, notifications, markAsRead, markAllAsRead, loadUserNotifications, unreadCount } = useStore();
+
+  // Si no hay usuario logueado, redirigir al login
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Cargar notificaciones cuando se monta el componente
+  React.useEffect(() => {
+    if (user && loadUserNotifications) {
+      loadUserNotifications();
+    }
+  }, [user, loadUserNotifications]);
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -30,22 +44,61 @@ const Notificaciones = () => {
   return (
     <div style={{ minHeight: 'calc(100vh - 80px)', padding: '3rem 0' }}>
       <div className="container" style={{ maxWidth: '800px' }}>
-        <h1 style={{ marginBottom: '2rem' }}>
-          <Bell size={36} style={{ display: 'inline', marginRight: '0.75rem' }} />
-          Notificaciones
-        </h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+          <h1 style={{ margin: 0 }}>
+            <Bell size={36} style={{ display: 'inline', marginRight: '0.75rem' }} />
+            Notificaciones
+            {unreadCount > 0 && (
+              <span style={{ 
+                marginLeft: '1rem', 
+                background: 'var(--error)', 
+                color: 'white', 
+                padding: '0.25rem 0.75rem', 
+                borderRadius: '1rem', 
+                fontSize: '0.875rem', 
+                fontWeight: 600 
+              }}>
+                {unreadCount} sin leer
+              </span>
+            )}
+          </h1>
+          {unreadCount > 0 && (
+            <button
+              onClick={() => {
+                if (window.confirm(`¿Marcar las ${unreadCount} notificaciones como leídas?`)) {
+                  markAllAsRead();
+                }
+              }}
+              className="btn btn-primary"
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem',
+                padding: '0.75rem 1.5rem'
+              }}
+            >
+              <CheckCheck size={18} />
+              Marcar todo como leído
+            </button>
+          )}
+        </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {notifications.map(notif => (
+          {notifications.map((notif, index) => (
             <div 
-              key={notif.id} 
-              onClick={() => markAsRead(notif.id)}
+              key={`${notif.id}-${index}-${notif.createdAt?.getTime() || Date.now()}`} 
+              onClick={() => {
+                // Solo marcar como leída si NO está leída
+                if (!notif.read) {
+                  markAsRead(notif.id);
+                }
+              }}
               style={{ 
                 background: notif.read ? 'var(--bg-secondary)' : 'var(--bg-tertiary)', 
                 padding: '1.5rem', 
                 borderRadius: '1rem',
                 borderLeft: notif.read ? 'none' : '4px solid var(--primary)',
-                cursor: 'pointer',
+                cursor: notif.read ? 'default' : 'pointer',
                 transition: 'all 0.2s ease'
               }}
             >

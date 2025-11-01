@@ -13,12 +13,16 @@ const Navbar = () => {
   const handleLogout = async () => {
     try {
       await auth.signOut(); // CERRAR SESIÓN EN FIREBASE
+      const { clearNotifications } = useStore.getState();
+      clearNotifications(); // Limpiar notificaciones
       setUser(null);
       localStorage.removeItem('user');
       console.log('✅ Sesión cerrada correctamente');
     } catch (error) {
       console.error('❌ Error al cerrar sesión:', error);
       // Limpiar igualmente aunque falle Firebase
+      const { clearNotifications } = useStore.getState();
+      clearNotifications(); // Limpiar notificaciones
       setUser(null);
       localStorage.removeItem('user');
     }
