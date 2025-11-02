@@ -977,10 +977,1951 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
   const enhancedStats = getEnhancedStats();
   const orderStats = getTotalStats();
 
-  // TODO: Agregar el JSX principal del componente aquí
+  // Función para enviar mensaje
+  const handleSendMessage = () => {
+    if (!selectedConversation || !newMessageContent.trim()) return;
+    
+    const userId = selectedConversation.split('_')[1];
+    createMessage('admin', 'Administrador', userId, newMessageContent.trim());
+    setNewMessageContent('');
+    setConversationMessages(getMessages(selectedConversation));
+    setAdminUnreadCount(getAdminUnreadCount());
+  };
+
+  // Función para guardar configuración de home
+  const handleSaveHomeConfig = () => {
+    const updatedConfig = { ...homeConfig, updatedAt: new Date() };
+    localStorage.setItem('homeConfig', JSON.stringify(updatedConfig));
+    setHomeConfig(updatedConfig);
+    alert('✅ Configuración del inicio guardada correctamente');
+  };
+
+  const tabs = [
+    { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+    { id: 'auctions', label: 'Subastas', icon: Gavel },
+    { id: 'products', label: 'Productos', icon: Package },
+    { id: 'users', label: 'Usuarios', icon: Users },
+    { id: 'orders', label: 'Pedidos', icon: ShoppingCart },
+    { id: 'bots', label: 'Bots', icon: Bot },
+    { id: 'messages', label: 'Mensajes', icon: Mail, badge: adminUnreadCount > 0 ? adminUnreadCount : undefined },
+    { id: 'home-config', label: 'Editor Home', icon: ImageIcon },
+    { id: 'settings', label: 'Configuración', icon: Activity }
+  ];
+
   return (
-    <div>
-      {/* Componente AdminPanel - JSX pendiente de implementación */}
+    <div style={{ 
+      minHeight: 'calc(100vh - 80px)', 
+      background: 'var(--bg-primary)', 
+      padding: isMobile ? '1rem' : '2rem',
+      paddingTop: '1rem'
+    }}>
+      {/* Header */}
+      <div style={{ marginBottom: '2rem' }}>
+        <h1 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+          Panel de Administración
+        </h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>
+          Gestioná subastas, productos, usuarios y más
+        </p>
+      </div>
+
+      {/* Tabs Navigation */}
+      <div style={{
+        display: 'flex',
+        gap: '0.5rem',
+        marginBottom: '2rem',
+        overflowX: 'auto',
+        paddingBottom: '0.5rem',
+        borderBottom: '2px solid var(--border)'
+      }}>
+        {tabs.map(tab => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: isActive ? 'var(--primary)' : 'transparent',
+                color: isActive ? 'white' : 'var(--text-secondary)',
+                border: `1px solid ${isActive ? 'var(--primary)' : 'var(--border)'}`,
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.2s',
+                position: 'relative'
+              }}
+            >
+              <Icon size={18} />
+              {tab.label}
+              {tab.badge && (
+                <span style={{
+                  background: 'var(--error)',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '20px',
+                  height: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  marginLeft: '0.25rem'
+                }}>
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Dashboard Tab */}
+      {activeTab === 'dashboard' && (
+        <div>
+          {/* Stats Cards */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '1.5rem',
+            marginBottom: '2rem'
+          }}>
+            <StatsCard
+              title="Usuarios Totales"
+              value={stats.users.total}
+              icon={Users}
+              color="var(--primary)"
+              subtitle={`${stats.users.active} activos`}
+            />
+            <StatsCard
+              title="Subastas Activas"
+              value={stats.auctions.active}
+              icon={Gavel}
+              color="var(--success)"
+              subtitle={`${stats.auctions.ended} finalizadas`}
+            />
+            <StatsCard
+              title="Productos"
+              value={stats.products.total}
+              icon={Package}
+              color="var(--warning)"
+              subtitle={`${stats.products.active} activos`}
+            />
+            <StatsCard
+              title="Pedidos Totales"
+              value={stats.orders.total}
+              icon={ShoppingCart}
+              color="var(--info)"
+              subtitle={`${orderStats.delivered} entregados`}
+            />
+            <StatsCard
+              title="Ingresos Totales"
+              value={formatCurrency(enhancedStats.totalRevenue)}
+              icon={DollarSign}
+              color="var(--success)"
+              subtitle={`${formatCurrency(stats.revenue.month)} este mes`}
+            />
+            <StatsCard
+              title="Bots Activos"
+              value={stats.bots.active}
+              icon={Bot}
+              color="var(--secondary)"
+              subtitle={`${stats.bots.totalBalance.toLocaleString()} balance total`}
+            />
+          </div>
+
+          {/* Alertas */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: '1rem',
+            marginBottom: '2rem'
+          }}>
+            {lowStockProducts.length > 0 && (
+              <div style={{
+                background: 'var(--bg-secondary)',
+                padding: '1.5rem',
+                borderRadius: '1rem',
+                border: '1px solid var(--warning)',
+                cursor: 'pointer'
+              }} onClick={() => setActiveTab('products')}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <AlertTriangle size={32} color="var(--warning)" />
+                  <div>
+                    <h3 style={{ margin: 0, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+                      Productos con Stock Bajo
+                    </h3>
+                    <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                      {lowStockProducts.length} productos con stock menor a 5 unidades
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {outOfStockProducts.length > 0 && (
+              <div style={{
+                background: 'var(--bg-secondary)',
+                padding: '1.5rem',
+                borderRadius: '1rem',
+                border: '1px solid var(--error)',
+                cursor: 'pointer'
+              }} onClick={() => setActiveTab('products')}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <XCircle size={32} color="var(--error)" />
+                  <div>
+                    <h3 style={{ margin: 0, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+                      Productos Sin Stock
+                    </h3>
+                    <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                      {outOfStockProducts.length} productos sin stock disponible
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {getAuctionsEndingSoon().length > 0 && (
+              <div style={{
+                background: 'var(--bg-secondary)',
+                padding: '1.5rem',
+                borderRadius: '1rem',
+                border: '1px solid var(--warning)',
+                cursor: 'pointer'
+              }} onClick={() => setActiveTab('auctions')}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <Clock size={32} color="var(--warning)" />
+                  <div>
+                    <h3 style={{ margin: 0, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+                      Subastas Finalizando
+                    </h3>
+                    <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                      {getAuctionsEndingSoon().length} subastas finalizan en las próximas 24 horas
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {orderStats.pending > 0 && (
+              <div style={{
+                background: 'var(--bg-secondary)',
+                padding: '1.5rem',
+                borderRadius: '1rem',
+                border: '1px solid var(--info)',
+                cursor: 'pointer'
+              }} onClick={() => setActiveTab('orders')}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <ShoppingCart size={32} color="var(--info)" />
+                  <div>
+                    <h3 style={{ margin: 0, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+                      Pedidos Pendientes
+                    </h3>
+                    <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                      {orderStats.pending} pedidos esperando pago
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Actividad Reciente */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: '1.5rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)'
+          }}>
+            <h2 style={{ margin: 0, marginBottom: '1.5rem', color: 'var(--text-primary)' }}>
+              Actividad Reciente
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {getRecentActivity().length === 0 ? (
+                <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>
+                  No hay actividad reciente
+                </p>
+              ) : (
+                getRecentActivity().map((activity, idx) => (
+                  <div key={idx} style={{
+                    padding: '1rem',
+                    background: 'var(--bg-primary)',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <p style={{ margin: 0, color: 'var(--text-primary)', fontWeight: 500 }}>
+                        {activity.message}
+                      </p>
+                      <p style={{ margin: '0.25rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                        {formatTimeAgo(activity.time)}
+                      </p>
+                    </div>
+                    <span style={{
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '0.25rem',
+                      background: activity.type === 'order' ? 'var(--info)' : 'var(--primary)',
+                      color: 'white',
+                      fontSize: '0.75rem',
+                      fontWeight: 600
+                    }}>
+                      {activity.type === 'order' ? 'Pedido' : 'Puja'}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Subastas Tab */}
+      {activeTab === 'auctions' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>Gestión de Subastas</h2>
+            <button
+              onClick={() => {
+                setAuctionForm({
+                  title: '',
+                  description: '',
+                  startingPrice: 1000,
+                  currentPrice: 1000,
+                  buyNowPrice: 0,
+                  categoryId: '1',
+                  images: [],
+                  stickers: [],
+                  durationDays: 0,
+                  durationHours: 0,
+                  durationMinutes: 30,
+                  condition: 'new',
+                  featured: false,
+                  allowExtension: true,
+                  scheduled: false,
+                  scheduledDate: '',
+                  scheduledTime: ''
+                });
+                setEditingAuction(null);
+                setActiveTab('create-auction');
+              }}
+              className="btn btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <Plus size={20} />
+              Nueva Subasta
+            </button>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))',
+            gap: '1.5rem'
+          }}>
+            {auctions.map((auction: Auction) => (
+              <div key={auction.id} style={{
+                background: 'var(--bg-secondary)',
+                padding: '1.5rem',
+                borderRadius: '1rem',
+                border: '1px solid var(--border)'
+              }}>
+                <div style={{ marginBottom: '1rem' }}>
+                  {auction.images && auction.images.length > 0 && (
+                    <img
+                      src={auction.images[0]}
+                      alt={auction.title}
+                      style={{
+                        width: '100%',
+                        height: '200px',
+                        objectFit: 'cover',
+                        borderRadius: '0.5rem',
+                        marginBottom: '1rem'
+                      }}
+                    />
+                  )}
+                  <h3 style={{ margin: 0, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+                    {auction.title}
+                  </h3>
+                  <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    Precio actual: {formatCurrency(auction.currentPrice)}
+                  </p>
+                  <p style={{ margin: '0.25rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    Estado: <span style={{
+                      color: auction.status === 'active' ? 'var(--success)' : 'var(--text-secondary)',
+                      fontWeight: 600
+                    }}>
+                      {auction.status === 'active' ? 'Activa' : auction.status === 'ended' ? 'Finalizada' : 'Programada'}
+                    </span>
+                  </p>
+                  <p style={{ margin: '0.25rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    Ofertas: {auction.bids?.length || 0}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => handleEditAuction(auction)}
+                    className="btn btn-secondary"
+                    style={{ flex: 1, minWidth: '100px' }}
+                  >
+                    <Edit size={16} style={{ marginRight: '0.25rem' }} />
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => handleDeleteAuction(auction.id)}
+                    className="btn btn-danger"
+                    style={{ flex: 1, minWidth: '100px' }}
+                  >
+                    <Trash2 size={16} style={{ marginRight: '0.25rem' }} />
+                    Eliminar
+                  </button>
+                  {auction.status === 'ended' && (
+                    <button
+                      onClick={() => handleRepublishAuction(auction)}
+                      className="btn btn-primary"
+                      style={{ flex: 1, minWidth: '100px' }}
+                    >
+                      Republicar
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Create/Edit Auction Tab */}
+      {(activeTab === 'create-auction' || activeTab === 'edit-auction') && (
+        <div>
+          <div style={{ marginBottom: '1.5rem' }}>
+            <button
+              onClick={() => setActiveTab('auctions')}
+              className="btn btn-secondary"
+              style={{ marginBottom: '1rem' }}
+            >
+              ← Volver a Subastas
+            </button>
+            <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>
+              {editingAuction ? 'Editar Subasta' : 'Crear Nueva Subasta'}
+            </h2>
+          </div>
+
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: '2rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            maxWidth: '800px'
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* Título */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Título *
+                </label>
+                <input
+                  type="text"
+                  value={auctionForm.title}
+                  onChange={(e) => setAuctionForm({ ...auctionForm, title: e.target.value })}
+                  placeholder="Ej: iPhone 13 Pro Max 256GB"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '1rem'
+                  }}
+                />
+              </div>
+
+              {/* Descripción */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Descripción *
+                </label>
+                <textarea
+                  value={auctionForm.description}
+                  onChange={(e) => setAuctionForm({ ...auctionForm, description: e.target.value })}
+                  placeholder="Describe el producto detalladamente..."
+                  rows={6}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '1rem',
+                    fontFamily: 'inherit',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+
+              {/* Precios */}
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Precio Inicial * (mín. $100)
+                  </label>
+                  <input
+                    type="number"
+                    value={auctionForm.startingPrice}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      setAuctionForm({ ...auctionForm, startingPrice: value, currentPrice: value });
+                    }}
+                    min="100"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Precio "Compra Ya" (opcional)
+                  </label>
+                  <input
+                    type="number"
+                    value={auctionForm.buyNowPrice}
+                    onChange={(e) => setAuctionForm({ ...auctionForm, buyNowPrice: Number(e.target.value) })}
+                    min="0"
+                    placeholder="0"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Duración */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Duración *
+                </label>
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '100px' }}>
+                    <input
+                      type="number"
+                      value={auctionForm.durationDays}
+                      onChange={(e) => setAuctionForm({ ...auctionForm, durationDays: Number(e.target.value) })}
+                      min="0"
+                      placeholder="Días"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+                  <div style={{ flex: 1, minWidth: '100px' }}>
+                    <input
+                      type="number"
+                      value={auctionForm.durationHours}
+                      onChange={(e) => setAuctionForm({ ...auctionForm, durationHours: Number(e.target.value) })}
+                      min="0"
+                      max="23"
+                      placeholder="Horas"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+                  <div style={{ flex: 1, minWidth: '100px' }}>
+                    <input
+                      type="number"
+                      value={auctionForm.durationMinutes}
+                      onChange={(e) => setAuctionForm({ ...auctionForm, durationMinutes: Number(e.target.value) })}
+                      min="5"
+                      placeholder="Minutos"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Categoría y Condición */}
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Categoría *
+                  </label>
+                  <select
+                    value={auctionForm.categoryId}
+                    onChange={(e) => setAuctionForm({ ...auctionForm, categoryId: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '1rem'
+                    }}
+                  >
+                    {mockCategories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Condición *
+                  </label>
+                  <select
+                    value={auctionForm.condition}
+                    onChange={(e) => setAuctionForm({ ...auctionForm, condition: e.target.value as any })}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '1rem'
+                    }}
+                  >
+                    <option value="new">Nuevo</option>
+                    <option value="like-new">Como Nuevo</option>
+                    <option value="excellent">Excelente</option>
+                    <option value="good">Bueno</option>
+                    <option value="fair">Regular</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Imágenes */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Imágenes * (mín. 1, máx. 3)
+                </label>
+                <ImageUploader
+                  images={auctionForm.images}
+                  onChange={(images) => setAuctionForm({ ...auctionForm, images })}
+                  maxImages={3}
+                />
+              </div>
+
+              {/* Stickers */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Stickers (opcional)
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {availableStickers.map(sticker => {
+                    const stickerId = sticker.id;
+                    return (
+                      <label
+                        key={stickerId}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          borderRadius: '0.5rem',
+                          border: `2px solid ${auctionForm.stickers.includes(stickerId) ? 'var(--primary)' : 'var(--border)'}`,
+                          background: auctionForm.stickers.includes(stickerId) ? 'var(--primary)' : 'var(--bg-primary)',
+                          color: auctionForm.stickers.includes(stickerId) ? 'white' : 'var(--text-primary)',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          fontWeight: 500
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={auctionForm.stickers.includes(stickerId)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setAuctionForm({ ...auctionForm, stickers: [...auctionForm.stickers, stickerId] });
+                            } else {
+                              setAuctionForm({ ...auctionForm, stickers: auctionForm.stickers.filter(s => s !== stickerId) });
+                            }
+                          }}
+                          style={{ display: 'none' }}
+                        />
+                        {sticker.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Opciones */}
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={auctionForm.featured}
+                    onChange={(e) => setAuctionForm({ ...auctionForm, featured: e.target.checked })}
+                  />
+                  <span style={{ color: 'var(--text-primary)' }}>Destacada</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={auctionForm.scheduled}
+                    onChange={(e) => setAuctionForm({ ...auctionForm, scheduled: e.target.checked })}
+                  />
+                  <span style={{ color: 'var(--text-primary)' }}>Programada</span>
+                </label>
+              </div>
+
+              {/* Fecha programada */}
+              {auctionForm.scheduled && (
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      Fecha de Inicio
+                    </label>
+                    <input
+                      type="date"
+                      value={auctionForm.scheduledDate}
+                      onChange={(e) => setAuctionForm({ ...auctionForm, scheduledDate: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      Hora de Inicio
+                    </label>
+                    <input
+                      type="time"
+                      value={auctionForm.scheduledTime}
+                      onChange={(e) => setAuctionForm({ ...auctionForm, scheduledTime: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Botones */}
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button
+                  onClick={editingAuction ? handleSaveAuction : handleCreateAuction}
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                >
+                  <Save size={20} style={{ marginRight: '0.5rem' }} />
+                  {editingAuction ? 'Guardar Cambios' : 'Crear Subasta'}
+                </button>
+                <button
+                  onClick={() => setActiveTab('auctions')}
+                  className="btn btn-secondary"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Productos Tab */}
+      {activeTab === 'products' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>Gestión de Productos</h2>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+              <select
+                value={inventoryFilter}
+                onChange={(e) => setInventoryFilter(e.target.value)}
+                style={{
+                  padding: '0.75rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.875rem'
+                }}
+              >
+                <option value="all">Todos</option>
+                <option value="active">Activos</option>
+                <option value="lowStock">Stock Bajo</option>
+                <option value="outOfStock">Sin Stock</option>
+                <option value="featured">Destacados</option>
+              </select>
+              <button
+                onClick={handleCreateProduct}
+                className="btn btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Plus size={20} />
+                Nuevo Producto
+              </button>
+            </div>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))',
+            gap: '1.5rem'
+          }}>
+            {products
+              .filter((p: Product) => {
+                if (inventoryFilter === 'active') return p.active !== false;
+                if (inventoryFilter === 'lowStock') return p.stock > 0 && p.stock < 5;
+                if (inventoryFilter === 'outOfStock') return p.stock === 0;
+                if (inventoryFilter === 'featured') return p.featured === true;
+                return true;
+              })
+              .map((product: Product) => (
+                <div key={product.id} style={{
+                  background: 'var(--bg-secondary)',
+                  padding: '1.5rem',
+                  borderRadius: '1rem',
+                  border: '1px solid var(--border)'
+                }}>
+                  <div style={{ marginBottom: '1rem' }}>
+                    {product.images && product.images.length > 0 && (
+                      <img
+                        src={product.images[0]}
+                        alt={product.name}
+                        style={{
+                          width: '100%',
+                          height: '200px',
+                          objectFit: 'cover',
+                          borderRadius: '0.5rem',
+                          marginBottom: '1rem'
+                        }}
+                      />
+                    )}
+                    <h3 style={{ margin: 0, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+                      {product.name}
+                    </h3>
+                    <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                      Precio: {formatCurrency(product.price)}
+                    </p>
+                    <p style={{ margin: '0.25rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                      Stock: <span style={{
+                        color: product.stock === 0 ? 'var(--error)' : product.stock < 5 ? 'var(--warning)' : 'var(--success)',
+                        fontWeight: 600
+                      }}>
+                        {product.stock} unidades
+                      </span>
+                    </p>
+                    <p style={{ margin: '0.25rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                      Estado: <span style={{
+                        color: product.active !== false ? 'var(--success)' : 'var(--text-secondary)',
+                        fontWeight: 600
+                      }}>
+                        {product.active !== false ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => handleEditProduct(product)}
+                      className="btn btn-secondary"
+                      style={{ flex: 1, minWidth: '100px' }}
+                    >
+                      <Edit size={16} style={{ marginRight: '0.25rem' }} />
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => handleDeleteProduct(product.id)}
+                      className="btn btn-danger"
+                      style={{ flex: 1, minWidth: '100px' }}
+                    >
+                      <Trash2 size={16} style={{ marginRight: '0.25rem' }} />
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* Create/Edit Product Tab */}
+      {(activeTab === 'create-product' || activeTab === 'edit-product') && (
+        <div>
+          <div style={{ marginBottom: '1.5rem' }}>
+            <button
+              onClick={() => setActiveTab('products')}
+              className="btn btn-secondary"
+              style={{ marginBottom: '1rem' }}
+            >
+              ← Volver a Productos
+            </button>
+            <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>
+              {editingProduct ? 'Editar Producto' : 'Crear Nuevo Producto'}
+            </h2>
+          </div>
+
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: '2rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            maxWidth: '800px'
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* Nombre */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Nombre *
+                </label>
+                <input
+                  type="text"
+                  value={productForm.name}
+                  onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                  placeholder="Ej: iPhone 13 Pro Max"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '1rem'
+                  }}
+                />
+              </div>
+
+              {/* Descripción */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Descripción *
+                </label>
+                <textarea
+                  value={productForm.description}
+                  onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                  placeholder="Describe el producto..."
+                  rows={6}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '1rem',
+                    fontFamily: 'inherit',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+
+              {/* Precio y Stock */}
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Precio * (mín. $100)
+                  </label>
+                  <input
+                    type="number"
+                    value={productForm.price}
+                    onChange={(e) => setProductForm({ ...productForm, price: Number(e.target.value) })}
+                    min="100"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Stock *
+                  </label>
+                  <input
+                    type="number"
+                    value={productForm.stock}
+                    onChange={(e) => setProductForm({ ...productForm, stock: Number(e.target.value) })}
+                    min="0"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Categoría */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Categoría *
+                </label>
+                <select
+                  value={productForm.categoryId}
+                  onChange={(e) => setProductForm({ ...productForm, categoryId: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '1rem'
+                  }}
+                >
+                  {mockCategories.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Imágenes */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Imágenes * (mín. 1, máx. 5)
+                </label>
+                <ImageUploader
+                  images={productForm.images}
+                  onChange={(images) => setProductForm({ ...productForm, images })}
+                  maxImages={5}
+                />
+              </div>
+
+              {/* Stickers */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Stickers (opcional)
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {availableStickers.map(sticker => {
+                    const stickerId = sticker.id;
+                    return (
+                      <label
+                        key={stickerId}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          borderRadius: '0.5rem',
+                          border: `2px solid ${productForm.stickers.includes(stickerId) ? 'var(--primary)' : 'var(--border)'}`,
+                          background: productForm.stickers.includes(stickerId) ? 'var(--primary)' : 'var(--bg-primary)',
+                          color: productForm.stickers.includes(stickerId) ? 'white' : 'var(--text-primary)',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          fontWeight: 500
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={productForm.stickers.includes(stickerId)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setProductForm({ ...productForm, stickers: [...productForm.stickers, stickerId] });
+                            } else {
+                              setProductForm({ ...productForm, stickers: productForm.stickers.filter(s => s !== stickerId) });
+                            }
+                          }}
+                          style={{ display: 'none' }}
+                        />
+                        {sticker.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Opciones */}
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={productForm.active}
+                    onChange={(e) => setProductForm({ ...productForm, active: e.target.checked })}
+                  />
+                  <span style={{ color: 'var(--text-primary)' }}>Activo</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={productForm.featured}
+                    onChange={(e) => setProductForm({ ...productForm, featured: e.target.checked })}
+                  />
+                  <span style={{ color: 'var(--text-primary)' }}>Destacado</span>
+                </label>
+              </div>
+
+              {/* Botones */}
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button
+                  onClick={handleSaveProduct}
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                >
+                  <Save size={20} style={{ marginRight: '0.5rem' }} />
+                  {editingProduct ? 'Guardar Cambios' : 'Crear Producto'}
+                </button>
+                <button
+                  onClick={() => setActiveTab('products')}
+                  className="btn btn-secondary"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Usuarios Tab */}
+      {activeTab === 'users' && (
+        <div>
+          <h2 style={{ margin: 0, marginBottom: '1.5rem', color: 'var(--text-primary)' }}>Gestión de Usuarios</h2>
+          {loadingUsers ? (
+            <div style={{ textAlign: 'center', padding: '3rem' }}>
+              <RefreshCw size={48} style={{ 
+                color: 'var(--primary)',
+                animation: 'spin 1s linear infinite'
+              }} />
+              <p style={{ color: 'var(--text-secondary)', marginTop: '1rem' }}>Cargando usuarios...</p>
+            </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))',
+              gap: '1.5rem'
+            }}>
+              {realUsers.map((userItem: any) => (
+                <div key={userItem.id} style={{
+                  background: 'var(--bg-secondary)',
+                  padding: '1.5rem',
+                  borderRadius: '1rem',
+                  border: '1px solid var(--border)',
+                  cursor: 'pointer'
+                }} onClick={() => setSelectedUser(userItem)}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      background: 'var(--primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontWeight: 700,
+                      fontSize: '1.25rem'
+                    }}>
+                      {userItem.username?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>
+                        {userItem.username || 'Sin nombre'}
+                      </h3>
+                      <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                        {userItem.email || 'Sin email'}
+                      </p>
+                    </div>
+                    {userItem.isAdmin && (
+                      <span style={{
+                        padding: '0.25rem 0.75rem',
+                        borderRadius: '0.25rem',
+                        background: 'var(--warning)',
+                        color: 'white',
+                        fontSize: '0.75rem',
+                        fontWeight: 600
+                      }}>
+                        Admin
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedUser(userItem);
+                      }}
+                      className="btn btn-secondary"
+                      style={{ flex: 1 }}
+                    >
+                      <Eye size={16} style={{ marginRight: '0.25rem' }} />
+                      Ver Detalles
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {selectedUser && (
+            <UserDetailsModal
+              user={selectedUser}
+              onClose={() => setSelectedUser(null)}
+              onUpdate={() => {
+                loadUsers();
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Pedidos Tab */}
+      {activeTab === 'orders' && (
+        <div>
+          <h2 style={{ margin: 0, marginBottom: '1.5rem', color: 'var(--text-primary)' }}>Gestión de Pedidos</h2>
+          
+          {/* Filtros */}
+          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              placeholder="Buscar por ID o usuario..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                flex: 1,
+                minWidth: '200px',
+                padding: '0.75rem',
+                borderRadius: '0.5rem',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
+                fontSize: '1rem'
+              }}
+            />
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as OrderStatus | 'all')}
+              style={{
+                padding: '0.75rem',
+                borderRadius: '0.5rem',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
+                fontSize: '1rem'
+              }}
+            >
+              <option value="all">Todos los estados</option>
+              <option value="pending_payment">Pago Pendiente</option>
+              <option value="payment_confirmed">Pago Confirmado</option>
+              <option value="processing">Procesando</option>
+              <option value="in_transit">En Tránsito</option>
+              <option value="delivered">Entregado</option>
+              <option value="cancelled">Cancelado</option>
+            </select>
+          </div>
+
+          {/* Lista de Pedidos */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {filteredOrders.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '3rem',
+                background: 'var(--bg-secondary)',
+                borderRadius: '1rem',
+                border: '1px solid var(--border)'
+              }}>
+                <ShoppingCart size={48} color="var(--text-secondary)" style={{ marginBottom: '1rem' }} />
+                <p style={{ color: 'var(--text-secondary)' }}>No se encontraron pedidos</p>
+              </div>
+            ) : (
+              filteredOrders.map((order: Order) => {
+                const statusBadge = getStatusBadge(order.status);
+                const deliveryBadge = getDeliveryMethodBadge(order.deliveryMethod || 'shipping');
+                return (
+                  <div key={order.id} style={{
+                    background: 'var(--bg-secondary)',
+                    padding: '1.5rem',
+                    borderRadius: '1rem',
+                    border: '1px solid var(--border)'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                      <div style={{ flex: 1 }}>
+                        <h3 style={{ margin: 0, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+                          Pedido #{order.id.slice(-8)}
+                        </h3>
+                        <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                          Cliente: {order.userName}
+                        </p>
+                        <p style={{ margin: '0.25rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                          Monto: {formatCurrency(order.amount)}
+                        </p>
+                        <p style={{ margin: '0.25rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                          {deliveryBadge.icon} {deliveryBadge.text}
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
+                        <span className={statusBadge.className} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}>
+                          {statusBadge.text}
+                        </span>
+                        <select
+                          value={order.status}
+                          onChange={(e) => {
+                            updateOrderStatus(order.id, e.target.value as OrderStatus);
+                            logOrderAction('Estado actualizado', order.id, user?.id, user?.username, { 
+                              oldStatus: order.status, 
+                              newStatus: e.target.value 
+                            });
+                          }}
+                          style={{
+                            padding: '0.5rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg-primary)',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.875rem'
+                          }}
+                        >
+                          <option value="pending_payment">Pago Pendiente</option>
+                          <option value="payment_confirmed">Pago Confirmado</option>
+                          <option value="processing">Procesando</option>
+                          <option value="in_transit">En Tránsito</option>
+                          <option value="delivered">Entregado</option>
+                          <option value="cancelled">Cancelado</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        onClick={() => setSelectedOrder(order)}
+                        className="btn btn-secondary"
+                        style={{ flex: 1 }}
+                      >
+                        <Eye size={16} style={{ marginRight: '0.25rem' }} />
+                        Ver Detalles
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Bots Tab */}
+      {activeTab === 'bots' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>Gestión de Bots</h2>
+            <button
+              onClick={() => {
+                setBotForm({
+                  name: '',
+                  balance: 10000,
+                  intervalMin: 5,
+                  intervalMax: 15,
+                  maxBidAmount: 5000,
+                  targetAuctions: []
+                });
+              }}
+              className="btn btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <Plus size={20} />
+              Nuevo Bot
+            </button>
+          </div>
+
+          {/* Formulario de Bot */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: '2rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            marginBottom: '2rem',
+            maxWidth: '600px'
+          }}>
+            <h3 style={{ margin: 0, marginBottom: '1.5rem', color: 'var(--text-primary)' }}>Crear Nuevo Bot</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Nombre del Bot
+                </label>
+                <input
+                  type="text"
+                  value={botForm.name}
+                  onChange={(e) => setBotForm({ ...botForm, name: e.target.value })}
+                  placeholder="Ej: Bot Agresivo"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '1rem'
+                  }}
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Balance Inicial
+                  </label>
+                  <input
+                    type="number"
+                    value={botForm.balance}
+                    onChange={(e) => setBotForm({ ...botForm, balance: Number(e.target.value) })}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Oferta Máxima
+                  </label>
+                  <input
+                    type="number"
+                    value={botForm.maxBidAmount}
+                    onChange={(e) => setBotForm({ ...botForm, maxBidAmount: Number(e.target.value) })}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Intervalo Mín (seg)
+                  </label>
+                  <input
+                    type="number"
+                    value={botForm.intervalMin}
+                    onChange={(e) => setBotForm({ ...botForm, intervalMin: Number(e.target.value) })}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Intervalo Máx (seg)
+                  </label>
+                  <input
+                    type="number"
+                    value={botForm.intervalMax}
+                    onChange={(e) => setBotForm({ ...botForm, intervalMax: Number(e.target.value) })}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+              </div>
+              <button
+                onClick={handleAddBot}
+                className="btn btn-primary"
+              >
+                <Plus size={20} style={{ marginRight: '0.5rem' }} />
+                Crear Bot
+              </button>
+            </div>
+          </div>
+
+          {/* Lista de Bots */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))',
+            gap: '1.5rem'
+          }}>
+            {bots.map((bot: any) => (
+              <div key={bot.id} style={{
+                background: 'var(--bg-secondary)',
+                padding: '1.5rem',
+                borderRadius: '1rem',
+                border: '1px solid var(--border)'
+              }}>
+                <div style={{ marginBottom: '1rem' }}>
+                  <h3 style={{ margin: 0, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+                    {bot.name}
+                  </h3>
+                  <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    Balance: {formatCurrency(bot.balance)}
+                  </p>
+                  <p style={{ margin: '0.25rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    Estado: <span style={{
+                      color: bot.isActive ? 'var(--success)' : 'var(--text-secondary)',
+                      fontWeight: 600
+                    }}>
+                      {bot.isActive ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </p>
+                  <p style={{ margin: '0.25rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    Intervalo: {bot.intervalMin}s - {bot.intervalMax}s
+                  </p>
+                  <p style={{ margin: '0.25rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    Oferta Máx: {formatCurrency(bot.maxBidAmount)}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    onClick={() => updateBot(bot.id, { isActive: !bot.isActive })}
+                    className={bot.isActive ? "btn btn-secondary" : "btn btn-primary"}
+                    style={{ flex: 1 }}
+                  >
+                    {bot.isActive ? 'Desactivar' : 'Activar'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`¿Eliminar bot "${bot.name}"?`)) {
+                        deleteBot(bot.id);
+                        alert('✅ Bot eliminado');
+                      }
+                    }}
+                    className="btn btn-danger"
+                    style={{ flex: 1 }}
+                  >
+                    <Trash2 size={16} style={{ marginRight: '0.25rem' }} />
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Mensajería Tab */}
+      {activeTab === 'messages' && (
+        <div style={{ display: 'flex', gap: '1rem', height: 'calc(100vh - 300px)', minHeight: '500px' }}>
+          {/* Lista de Conversaciones */}
+          <div style={{
+            width: isMobile ? '100%' : '300px',
+            background: 'var(--bg-secondary)',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            padding: '1rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem',
+            overflowY: 'auto'
+          }}>
+            <h3 style={{ margin: 0, marginBottom: '1rem', color: 'var(--text-primary)' }}>
+              Conversaciones {adminUnreadCount > 0 && (
+                <span style={{
+                  background: 'var(--error)',
+                  color: 'white',
+                  borderRadius: '50%',
+                  padding: '0.25rem 0.5rem',
+                  fontSize: '0.75rem',
+                  marginLeft: '0.5rem'
+                }}>
+                  {adminUnreadCount}
+                </span>
+              )}
+            </h3>
+            {conversations.length === 0 ? (
+              <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>
+                No hay conversaciones
+              </p>
+            ) : (
+              conversations.map(conv => (
+                <div
+                  key={conv.id}
+                  onClick={() => setSelectedConversation(conv.id)}
+                  style={{
+                    padding: '1rem',
+                    background: selectedConversation === conv.id ? 'var(--primary)' : 'var(--bg-primary)',
+                    color: selectedConversation === conv.id ? 'white' : 'var(--text-primary)',
+                    borderRadius: '0.5rem',
+                    cursor: 'pointer',
+                    border: `1px solid ${selectedConversation === conv.id ? 'var(--primary)' : 'var(--border)'}`
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: 600 }}>
+                        {conv.username}
+                      </p>
+                      <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', opacity: 0.8 }}>
+                        {conv.lastMessage?.content?.substring(0, 30) || 'Sin mensajes'}...
+                      </p>
+                    </div>
+                    {conv.unreadCount > 0 && (
+                      <span style={{
+                        background: selectedConversation === conv.id ? 'white' : 'var(--error)',
+                        color: selectedConversation === conv.id ? 'var(--primary)' : 'white',
+                        borderRadius: '50%',
+                        width: '24px',
+                        height: '24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '0.75rem',
+                        fontWeight: 700
+                      }}>
+                        {conv.unreadCount}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Panel de Mensajes */}
+          {!isMobile && (
+            <div style={{
+              flex: 1,
+              background: 'var(--bg-secondary)',
+              borderRadius: '1rem',
+              border: '1px solid var(--border)',
+              display: 'flex',
+              flexDirection: 'column'
+            }}>
+              {selectedConversation ? (
+                <>
+                  <div style={{
+                    padding: '1rem',
+                    borderBottom: '1px solid var(--border)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>
+                      {conversations.find(c => c.id === selectedConversation)?.username || 'Usuario'}
+                    </h3>
+                    <button
+                      onClick={() => {
+                        if (window.confirm('¿Eliminar esta conversación?')) {
+                          deleteConversation(selectedConversation);
+                          setSelectedConversation(null);
+                          setConversations(getAllConversations());
+                        }
+                      }}
+                      className="btn btn-danger"
+                      style={{ padding: '0.5rem' }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                  <div style={{
+                    flex: 1,
+                    padding: '1rem',
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem'
+                  }}>
+                    {conversationMessages.length === 0 ? (
+                      <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>
+                        No hay mensajes en esta conversación
+                      </p>
+                    ) : (
+                      conversationMessages.map(msg => {
+                        const isAdmin = msg.fromUserId === 'admin';
+                        return (
+                          <div
+                            key={msg.id}
+                            style={{
+                              alignSelf: isAdmin ? 'flex-start' : 'flex-end',
+                              maxWidth: '70%'
+                            }}
+                          >
+                            <div style={{
+                              padding: '0.75rem 1rem',
+                              background: isAdmin ? 'var(--primary)' : 'var(--bg-primary)',
+                              color: isAdmin ? 'white' : 'var(--text-primary)',
+                              borderRadius: '1rem',
+                              border: `1px solid ${isAdmin ? 'var(--primary)' : 'var(--border)'}`
+                            }}>
+                              <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600 }}>
+                                {isAdmin ? 'Administrador' : msg.fromUsername}
+                              </p>
+                              <p style={{ margin: '0.5rem 0 0 0' }}>
+                                {msg.content}
+                              </p>
+                              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', opacity: 0.7 }}>
+                                {formatTimeAgo(msg.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                  <div style={{
+                    padding: '1rem',
+                    borderTop: '1px solid var(--border)',
+                    display: 'flex',
+                    gap: '0.5rem'
+                  }}>
+                    <input
+                      type="text"
+                      value={newMessageContent}
+                      onChange={(e) => setNewMessageContent(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          handleSendMessage();
+                        }
+                      }}
+                      placeholder="Escribí un mensaje..."
+                      style={{
+                        flex: 1,
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '1rem'
+                      }}
+                    />
+                    <button
+                      onClick={handleSendMessage}
+                      className="btn btn-primary"
+                      disabled={!newMessageContent.trim()}
+                    >
+                      <Send size={20} />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--text-secondary)'
+                }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Mail size={64} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+                    <p>Seleccioná una conversación para ver los mensajes</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Editor de Home Tab */}
+      {activeTab === 'home-config' && (
+        <div>
+          <h2 style={{ margin: 0, marginBottom: '1.5rem', color: 'var(--text-primary)' }}>Editor de Página de Inicio</h2>
+          
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: '2rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            maxWidth: '800px'
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Título Principal
+                </label>
+                <input
+                  type="text"
+                  value={homeConfig.heroTitle}
+                  onChange={(e) => setHomeConfig({ ...homeConfig, heroTitle: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '1rem'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Subtítulo
+                </label>
+                <textarea
+                  value={homeConfig.heroSubtitle}
+                  onChange={(e) => setHomeConfig({ ...homeConfig, heroSubtitle: e.target.value })}
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '1rem',
+                    fontFamily: 'inherit',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  URL de Imagen Principal
+                </label>
+                <input
+                  type="text"
+                  value={homeConfig.heroImageUrl}
+                  onChange={(e) => setHomeConfig({ ...homeConfig, heroImageUrl: e.target.value })}
+                  placeholder="https://..."
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '1rem'
+                  }}
+                />
+              </div>
+              <button
+                onClick={handleSaveHomeConfig}
+                className="btn btn-primary"
+                style={{ alignSelf: 'flex-start' }}
+              >
+                <Save size={20} style={{ marginRight: '0.5rem' }} />
+                Guardar Configuración
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Configuración Tab */}
+      {activeTab === 'settings' && (
+        <div>
+          <h2 style={{ margin: 0, marginBottom: '1.5rem', color: 'var(--text-primary)' }}>Configuración del Sistema</h2>
+          
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: '2rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            maxWidth: '600px'
+          }}>
+            <div style={{ marginBottom: '2rem' }}>
+              <h3 style={{ margin: 0, marginBottom: '1rem', color: 'var(--text-primary)' }}>
+                Estadísticas Avanzadas
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{
+                  padding: '1rem',
+                  background: 'var(--bg-primary)',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border)'
+                }}>
+                  <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Ingresos por Subastas
+                  </p>
+                  <p style={{ margin: '0.5rem 0 0 0', fontSize: '1.5rem', color: 'var(--primary)' }}>
+                    {formatCurrency(enhancedStats.auctionRevenue)}
+                  </p>
+                </div>
+                <div style={{
+                  padding: '1rem',
+                  background: 'var(--bg-primary)',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border)'
+                }}>
+                  <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Ingresos por Tienda
+                  </p>
+                  <p style={{ margin: '0.5rem 0 0 0', fontSize: '1.5rem', color: 'var(--success)' }}>
+                    {formatCurrency(enhancedStats.storeRevenue)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              padding: '1.5rem',
+              background: 'var(--error)',
+              borderRadius: '0.5rem',
+              border: '1px solid var(--error)'
+            }}>
+              <h3 style={{ margin: 0, marginBottom: '1rem', color: 'white' }}>
+                ⚠️ Zona Peligrosa
+              </h3>
+              <p style={{ margin: 0, marginBottom: '1rem', color: 'white', fontSize: '0.875rem' }}>
+                El reseteo eliminará todos los datos excepto usuarios registrados y logs de ventas.
+              </p>
+              <button
+                onClick={handleResetData}
+                className="btn"
+                style={{
+                  background: 'white',
+                  color: 'var(--error)',
+                  border: 'none'
+                }}
+              >
+                Resetear Sistema
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
