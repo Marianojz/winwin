@@ -15,9 +15,12 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
   const { user } = useStore();
   const lastThreeBids = auction.bids.slice(-3).reverse();
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     // Registrar click en el tracking system
     trackAuctionClick(auction.id, auction.title, user?.id, user?.username);
+    if (!isActive) {
+      e.preventDefault();
+    }
   };
 
   // Función para determinar si la subasta debe mostrarse después de finalizada
@@ -63,11 +66,6 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
           opacity: 0.8,
           filter: 'grayscale(0.3)',
         })
-      }}
-      onClick={(e) => {
-        if (!isActive) {
-          e.preventDefault();
-        }
       }}
     >
       <div className="auction-card-image">

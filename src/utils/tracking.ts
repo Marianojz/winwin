@@ -151,7 +151,7 @@ class TrackingSystem {
    * Obtiene los productos/subastas más cliqueados
    */
   getMostClicked(limit: number = 10): Array<{ id: string; name: string; type: 'product' | 'auction'; clicks: number }> {
-    const counts: Record<string, { name: string; type: 'product' | 'auction'; clicks: number }> = {};
+    const counts: Record<string, { id: string; name: string; type: 'product' | 'auction'; clicks: number }> = {};
 
     this.clicks.forEach(click => {
       const key = `${click.entityType}_${click.entityId}`;

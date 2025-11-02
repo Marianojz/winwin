@@ -22,21 +22,21 @@ const Tienda = () => {
   // Trackear búsquedas con debounce
   useEffect(() => {
     if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
+      window.clearTimeout(searchTimeoutRef.current);
     }
 
     if (searchTerm.trim() && searchTerm.trim() !== lastSearchedRef.current) {
-      searchTimeoutRef.current = setTimeout(() => {
+      searchTimeoutRef.current = window.setTimeout(() => {
         if (searchTerm.trim().length >= 3) { // Solo trackear búsquedas de 3+ caracteres
           trackSearch(searchTerm.trim(), filteredProducts.length, user?.id, user?.username);
           lastSearchedRef.current = searchTerm.trim();
         }
-      }, 1000); // Esperar 1 segundo después del último cambio
+      }, 1000) as unknown as number; // Esperar 1 segundo después del último cambio
     }
 
     return () => {
       if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
+        window.clearTimeout(searchTimeoutRef.current);
       }
     };
   }, [searchTerm, filteredProducts.length, user?.id, user?.username]);
