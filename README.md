@@ -33,11 +33,14 @@ Aplicación web moderna de subastas y tienda online desarrollada con React + Typ
 - **Opción de compra directa** (Buy Now) cuando está disponible
 - **Visualización de últimas ofertas** (top 3)
 - **Filtros avanzados:** Categoría, búsqueda, estado
+- **Tracking de clicks:** Cada click en una subasta se registra automáticamente
+- **Tracking de búsquedas:** Las búsquedas se registran con debounce (1 segundo)
 - **Gestión automática** de finalización de subastas
 - **Notificaciones automáticas** al ganar o ser superado
 - **Stickers visuales** para destacar subastas (✨ Nuevo, 🔥 Hot Sale, etc.)
 - **Republicación de subastas** desde el panel admin
 - **Sincronización con Firebase Realtime Database**
+- **Filtrado automático** de subastas corruptas o antiguas (>3 días finalizadas)
 
 #### ✅ Tienda Online Completa
 - **Catálogo de productos** con stock en tiempo real
@@ -45,6 +48,8 @@ Aplicación web moderna de subastas y tienda online desarrollada con React + Typ
 - **Carrito de compras** persistente
 - **Filtros y ordenamiento** por precio, categoría, relevancia
 - **Productos destacados** y categorías
+- **Tracking de clicks:** Cada click en un producto se registra automáticamente
+- **Tracking de búsquedas:** Las búsquedas se registran con debounce (1 segundo)
 - **Gestión de stock** automática
 - **Stickers visuales** para productos
 - **Badges:** Nuevo, Oferta, 50% OFF, Destacado, etc.
@@ -58,28 +63,42 @@ Aplicación web moderna de subastas y tienda online desarrollada con React + Typ
   - Compras realizadas
   - Mensajes nuevos
 - **Marcar como leído** individual o todas
-- **Limpieza automática** después de 7 días (notificaciones leídas)
+- **Limpieza automática inteligente:**
+  - Notificaciones leídas: eliminadas después de 2 días
+  - Notificaciones no leídas: eliminadas después de 7 días
+- **Persistencia correcta** del estado de lectura (problema de reaparición solucionado)
 - **Contador de no leídas** en navbar
-- **Persistencia** correcta del estado de lectura
+- **Normalización estricta** de estados (boolean estricto)
 
 #### ✅ Sistema de Mensajería Admin-Usuario
 - **Chat entre admin y usuarios** en tiempo real
 - **Mensajes automáticos** generados al:
   - Ganar una subasta
   - Completar una compra
+  - Requerir pago (recordatorios)
+  - Enviar pedido
+  - Entregar pedido
+  - Ser superado en subasta
+- **Templates personalizables:** Los mensajes automáticos usan templates editables desde el panel admin
 - **Notificaciones** cuando hay mensajes nuevos
 - **Interfaz de chat** moderna y responsive
-- **Gestión de conversaciones** en panel admin
+- **Gestión de conversaciones** en panel admin:
+  - Selector de usuario para enviar mensaje nuevo
+  - Eliminar mensajes individuales
+  - Eliminar conversaciones completas
 - **Limpieza de conversaciones** individual o masiva
 
 #### ✅ Panel de Administración Avanzado
 - **Dashboard completo** con estadísticas en tiempo real:
-  - Ingresos por subastas y tienda
+  - Ingresos por subastas y tienda (separados)
+  - Ganancia neta calculada
   - Subastas activas, finalizadas, programadas
   - Productos en stock, sin stock, destacados
   - Usuarios activos, bots, pedidos pendientes
-  - Items más buscados y más cliqueados
+  - **Items más buscados** (top 10 con promedio de resultados)
+  - **Items más cliqueados** (top 10 productos y subastas)
   - Alertas de pedidos pendientes, subastas finalizando, stock bajo
+  - Actividad reciente con botón de limpieza
 - **Gestión de Usuarios:**
   - Listado completo con filtros
   - Edición de datos de usuario
@@ -97,26 +116,77 @@ Aplicación web moderna de subastas y tienda online desarrollada con React + Typ
   - Control de stock
   - Productos destacados
   - Badges y stickers
-- **Gestión de Pedidos:**
-  - Seguimiento de estados
-  - Actualización de estado (pendiente → confirmado → en tránsito → entregado)
-  - Historial completo
-- **Sistema de Bots:**
-  - Crear bots con saldo asignado
-  - Ofertas automáticas en subastas
-  - Activar/desactivar bots
-  - Configuración avanzada
-- **Editor de Página de Inicio:**
-  - Personalizar título, subtítulo, imagen hero
-  - Agregar banners publicitarios
-  - Configurar promociones destacadas
+- **Gestión de Pedidos (Mejorada):**
+  - Dashboard con estadísticas rápidas (Pendientes, Confirmados, En Tránsito, Entregados)
+  - Botón de limpieza de pedidos antiguos (entregados/cancelados >30 días)
+  - Tabla profesional con columnas: Pedido, Cliente, Monto, Estado, Fecha, Acciones
+  - Filtros avanzados (búsqueda por ID, cliente, monto, estado)
+  - Sistema de avance de estado con confirmaciones
+  - Botón "Siguiente" para avanzar estado automáticamente
+  - Resumen de totales (cantidad y valor total)
+- **Sistema de Bots (Completamente Profesionalizado):**
+  - Dashboard con estadísticas rápidas (Activos, Balance Total, Ofertas Máx, En Subastas)
+  - Botón "Desactivar Todos" para acción masiva
+  - Formulario colapsable para crear bots con validaciones:
+    - Nombre del bot
+    - Balance inicial (mínimo $100)
+    - Oferta máxima (mínimo $100)
+    - Intervalo mínimo y máximo (1-300 segundos)
+  - Tabla profesional con: Nombre, Balance, Oferta Máx, Intervalo, Estado, Ofertas, Acciones
+  - Filtros (búsqueda por nombre, filtro por estado)
+  - Acciones individuales por bot:
+    - Recargar balance
+    - Activar/Desactivar
+    - Editar oferta máxima
+    - Eliminar bot
+  - Resumen de totales (cantidad de bots y balance total)
+- **Editor de Página de Inicio (Completamente Renovado):**
+  - **Sección Hero:**
+    - Edición de título principal
+    - Edición de subtítulo
+    - **Imagen con drag & drop:** arrastrá y soltá imágenes o seleccioná archivos
+    - Conversión automática a Base64
+    - Preview en tiempo real
+    - Alternativa de URL manual
+  - **Sistema de Banners:**
+    - Crear, editar, eliminar banners
+    - Título, descripción, imagen (drag & drop), link, texto del botón
+    - Control de orden de visualización
+    - Activar/desactivar individualmente
+    - Preview de imágenes
+  - **Sistema de Promociones:**
+    - Crear, editar, eliminar promociones
+    - Título, descripción, imagen (drag & drop), link
+    - Fechas de inicio y fin
+    - Activar/desactivar
+    - Preview de imágenes
+- **Templates de Mensajes Automáticos (NUEVO):**
+  - Editor completo para personalizar mensajes automáticos
+  - 6 tipos de templates editables:
+    - Ganador de Subasta (`auction_won`)
+    - Compra Confirmada (`purchase`)
+    - Recordatorio de Pago (`payment_reminder`)
+    - Pedido Enviado (`order_shipped`)
+    - Pedido Entregado (`order_delivered`)
+    - Superado en Subasta (`auction_outbid`)
+  - Variables dinámicas clicables para copiar (`{username}`, `{amount}`, `{orderId}`, etc.)
+  - Vista previa en tiempo real con datos de ejemplo
+  - Activar/desactivar templates individualmente
+  - Los templates personalizados se usan automáticamente cuando están activos
+- **Sistema de Tracking (NUEVO):**
+  - Seguimiento de clicks en productos y subastas
+  - Seguimiento de búsquedas con debounce (1 segundo)
+  - Estadísticas de más buscado y más cliqueado en Dashboard
+  - Integración con sistema de logs
 - **Sistema de Logs:**
   - Registro de todas las acciones admin
   - Logs de subastas, productos, pedidos, usuarios
   - Historial completo con timestamps
-- **Actividad Reciente:**
-  - Visualización de últimas acciones
-  - Botón de limpieza (sin recargar página)
+- **Sección de Configuración (Mejorada):**
+  - Templates de mensajes editables
+  - Estadísticas del sistema con cards con gradientes
+  - Limpieza de datos (con reglas claras)
+  - Reset del sistema (zona peligrosa)
 - **Reset del Sistema:**
   - Limpieza completa preservando usuarios y logs
 
@@ -286,7 +356,9 @@ winwin/
 │   │   ├── helpers.ts          # Funciones auxiliares
 │   │   ├── mockData.ts         # Datos mock (categorías, etc.)
 │   │   ├── actionLogger.ts     # Sistema de logs
-│   │   ├── messages.ts         # Sistema de mensajería
+│   │   ├── messages.ts          # Sistema de mensajería
+│   │   ├── messageTemplates.ts # Templates de mensajes automáticos (NUEVO)
+│   │   ├── tracking.ts         # Sistema de tracking (NUEVO)
 │   │   ├── stickers.ts         # Stickers disponibles
 │   │   ├── dataCleaner.ts      # Limpieza automática
 │   │   ├── AuctionManager.tsx  # Gestor de subastas
@@ -370,12 +442,14 @@ winwin/
 
 ## 📊 Estadísticas del Proyecto
 
-- **Archivos de código:** 50+
+- **Archivos de código:** 55+
 - **Componentes React:** 15+
 - **Páginas:** 12
-- **Utilidades:** 15+
-- **Tipos TypeScript:** 20+
+- **Utilidades:** 17+
+- **Tipos TypeScript:** 25+
 - **Categorías de productos:** 15
+- **Templates de mensajes:** 6 tipos editables
+- **Sistema de tracking:** Completo (clicks y búsquedas)
 
 ## 🔒 Seguridad
 
@@ -547,6 +621,31 @@ Para consultas o soporte técnico, contacta a través de los canales oficiales d
 
 ---
 
-**Versión:** 1.0.0  
-**Última actualización:** Noviembre 2025  
+**Versión:** 2.0.0  
+**Última actualización:** Diciembre 2024  
 **Estado:** ✅ En desarrollo activo - Funcional
+
+## 🆕 Últimas Actualizaciones (v2.0.0)
+
+### ✨ Nuevas Funcionalidades
+- **Sistema de Templates de Mensajes Automáticos:** Editor completo para personalizar mensajes automáticos con variables dinámicas
+- **Editor de Página de Inicio Renovado:** Drag & drop de imágenes, gestión completa de banners y promociones
+- **Sistema de Tracking:** Seguimiento de clicks y búsquedas con estadísticas en Dashboard
+- **Sección de Bots Profesionalizada:** Dashboard, tabla profesional, gestión avanzada
+- **Sección de Pedidos Mejorada:** Dashboard con estadísticas, tabla profesional, acciones rápidas
+- **Mejoras en Configuración:** Templates editables, estadísticas mejoradas, limpieza profesionalizada
+
+### 🐛 Correcciones Importantes
+- ✅ Sistema de notificaciones: Persistencia correcta del estado de lectura
+- ✅ Eliminación de duplicados en pedidos
+- ✅ Filtrado automático de subastas corruptas
+- ✅ Mejoras en proceso de login (especialmente móvil)
+- ✅ Optimización responsive en todo el panel admin
+
+### 📈 Mejoras de UX/UI
+- ✅ Drag & drop de imágenes en Editor Home
+- ✅ Preview en tiempo real de todas las imágenes
+- ✅ Variables clicables para copiar en templates
+- ✅ Vista previa de templates con datos de ejemplo
+- ✅ Cards con gradientes en estadísticas
+- ✅ Tablas profesionales en todas las secciones
