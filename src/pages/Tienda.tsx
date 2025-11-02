@@ -1,13 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, Filter, SlidersHorizontal } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import ProductCard from '../components/ProductCard';
+import { trackSearch } from '../utils/tracking';
 
 const Tienda = () => {
-  const { products } = useStore();
+  const { products, user } = useStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
+  const searchTimeoutRef = useRef<number | null>(null);
+  const lastSearchedRef = useRef<string>('');
 
   let filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -15,6 +18,28 @@ const Tienda = () => {
     const matchesCategory = categoryFilter === 'all' || product.categoryId === categoryFilter;
     return matchesSearch && matchesCategory && product.stock > 0;
   });
+
+  // Trackear búsquedas con debounce
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (searchTerm.trim() && searchTerm.trim() !== lastSearchedRef.current) {
+      searchTimeoutRef.current = setTimeout(() => {
+        if (searchTerm.trim().length >= 3) { // Solo trackear búsquedas de 3+ caracteres
+          trackSearch(searchTerm.trim(), filteredProducts.length, user?.id, user?.username);
+          lastSearchedRef.current = searchTerm.trim();
+        }
+      }, 1000); // Esperar 1 segundo después del último cambio
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchTerm, filteredProducts.length, user?.id, user?.username]);
 
   // Sort products
   filteredProducts = [...filteredProducts].sort((a, b) => {

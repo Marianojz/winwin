@@ -29,17 +29,32 @@ const Login = () => {
       return;
     }
 
+    // Prevenir múltiples submits simultáneos
+    if (loading) return;
+
     setLoading(true);
 
     try {
-      // Limpiar estado previo antes de intentar login
+      // Limpiar estado previo completamente antes de intentar login
+      // Asegurar que el usuario anterior esté completamente deslogueado
+      try {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          await auth.signOut();
+        }
+      } catch (signOutErr) {
+        // Ignorar errores de signOut si no hay usuario
+        console.warn('Error al hacer signOut previo:', signOutErr);
+      }
+
       setUser(null);
       localStorage.removeItem('user');
       
-      // Pequeño delay para evitar múltiples clicks rápidos
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Esperar un momento para asegurar que Firebase limpia el estado
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      // Intentar login con Firebase
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password.trim());
       const user = userCredential.user;
 
       if (!user.emailVerified) {
@@ -50,7 +65,7 @@ const Login = () => {
       }
 
       // Esperar un momento para asegurar que Firebase está listo
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       
@@ -96,28 +111,45 @@ const Login = () => {
       localStorage.setItem('user', JSON.stringify(fullUser));
       
       // Esperar un momento antes de navegar para asegurar que todo está sincronizado
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
       
       // Recargar notificaciones si existe el método
       try {
         const { loadUserNotifications } = useStore.getState();
         if (loadUserNotifications) {
-          loadUserNotifications();
+          setTimeout(() => {
+            loadUserNotifications();
+          }, 500);
         }
       } catch (err) {
         console.warn('No se pudo cargar notificaciones:', err);
       }
 
-      // Navegar según rol
-      if (fullUser.isAdmin) {
-        navigate('/admin', { replace: true });
-      } else {
-        navigate('/', { replace: true });
-      }
+      // Navegar según rol - con replace para evitar problemas de navegación en móvil
+      setTimeout(() => {
+        if (fullUser.isAdmin) {
+          navigate('/admin', { replace: true });
+        } else {
+          navigate('/', { replace: true });
+        }
+        // Forzar recarga del estado del usuario después de navegar
+        setTimeout(() => {
+          const finalUser = useStore.getState().user;
+          if (!finalUser || finalUser.id !== fullUser.id) {
+            setUser(fullUser);
+            localStorage.setItem('user', JSON.stringify(fullUser));
+          }
+        }, 300);
+      }, 100);
     } catch (err: any) {
       console.error('Error en login:', err);
       
       // Limpiar estado en caso de error
+      try {
+        await auth.signOut();
+      } catch (signOutErr) {
+        // Ignorar errores de signOut
+      }
       setUser(null);
       localStorage.removeItem('user');
       

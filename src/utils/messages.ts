@@ -236,6 +236,23 @@ export const deleteConversation = (conversationId: string) => {
   }
 };
 
+// Eliminar un mensaje específico
+export const deleteMessage = (messageId: string) => {
+  try {
+    const saved = localStorage.getItem(MESSAGES_STORAGE_KEY);
+    if (!saved) return false;
+    
+    const messages: Message[] = JSON.parse(saved);
+    const filtered = messages.filter(m => m.id !== messageId);
+    
+    localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(filtered));
+    return true;
+  } catch (error) {
+    console.error('Error eliminando mensaje:', error);
+    return false;
+  }
+};
+
 // Eliminar todas las conversaciones
 export const deleteAllConversations = () => {
   try {
@@ -251,7 +268,7 @@ export const deleteAllConversations = () => {
 export const createAutoMessage = (
   userId: string,
   username: string,
-  type: 'auction_won' | 'purchase',
+  type: 'auction_won' | 'purchase' | 'payment_reminder' | 'order_shipped' | 'order_delivered' | 'auction_outbid',
   details: {
     auctionTitle?: string;
     auctionId?: string;
@@ -259,14 +276,53 @@ export const createAutoMessage = (
     productId?: string;
     orderId?: string;
     amount?: number;
+    deadline?: string;
+    trackingNumber?: string;
+    currentBid?: number;
+    minBid?: number;
+    paymentDeadline?: string;
   }
 ): Message => {
+  // Importar funciones de templates dinámicamente para evitar circular dependencies
+  const { getTemplateByType, renderTemplate } = require('./messageTemplates');
+  
+  // Intentar obtener template personalizado
+  const template = getTemplateByType(type);
+  
   let content = '';
   
-  if (type === 'auction_won' && details.auctionTitle) {
-    content = `¡Felicitaciones ${username}! Has ganado la subasta "${details.auctionTitle}". Por favor, contactanos para coordinar el pago y entrega.`;
-  } else if (type === 'purchase' && details.productName) {
-    content = `Hola ${username}, tu compra de "${details.productName}" ha sido confirmada. Te contactaremos pronto para coordinar el envío.`;
+  if (template && template.active) {
+    // Usar template personalizado
+    const variables: Record<string, string | number> = {
+      username,
+      ...(details.auctionTitle && { auctionTitle: details.auctionTitle }),
+      ...(details.productName && { productName: details.productName }),
+      ...(details.orderId && { orderId: details.orderId }),
+      ...(details.auctionId && { auctionId: details.auctionId }),
+      ...(details.amount !== undefined && { amount: details.amount }),
+      ...(details.deadline && { deadline: details.deadline }),
+      ...(details.trackingNumber && { trackingNumber: details.trackingNumber }),
+      ...(details.currentBid !== undefined && { currentBid: details.currentBid }),
+      ...(details.minBid !== undefined && { minBid: details.minBid }),
+      ...(details.paymentDeadline && { paymentDeadline: details.paymentDeadline })
+    };
+    
+    content = renderTemplate(template, variables);
+  } else {
+    // Fallback a mensajes por defecto si no hay template activo
+    if (type === 'auction_won' && details.auctionTitle) {
+      content = `¡Felicitaciones ${username}! Has ganado la subasta "${details.auctionTitle}" por $${details.amount?.toLocaleString('es-AR') || '0'}. Por favor, contactanos para coordinar el pago y entrega.`;
+    } else if (type === 'purchase' && details.productName) {
+      content = `Hola ${username}, tu compra de "${details.productName}" ha sido confirmada. Te contactaremos pronto para coordinar el envío.`;
+    } else if (type === 'payment_reminder' && details.orderId) {
+      content = `Hola ${username}, tenés un pago pendiente para el pedido ${details.orderId} por $${details.amount?.toLocaleString('es-AR') || '0'}. Por favor, realizá el pago antes de la fecha límite.`;
+    } else if (type === 'order_shipped' && details.orderId) {
+      content = `¡Buenas noticias ${username}! Tu pedido ${details.orderId} ha sido enviado.${details.trackingNumber ? ` Código de seguimiento: ${details.trackingNumber}` : ''}`;
+    } else if (type === 'order_delivered' && details.orderId) {
+      content = `¡Tu pedido llegó ${username}! Tu pedido ${details.orderId} ha sido entregado exitosamente. ¡Esperamos que disfrutes tu compra!`;
+    } else if (type === 'auction_outbid' && details.auctionTitle) {
+      content = `Hola ${username}, has sido superado en la subasta "${details.auctionTitle}". Oferta actual: $${details.currentBid?.toLocaleString('es-AR') || '0'}. ¿Querés hacer una nueva oferta?`;
+    }
   }
   
   return createMessage(

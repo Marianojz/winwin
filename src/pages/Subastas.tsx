@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, Filter } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import AuctionCard from '../components/AuctionCard';
+import { trackSearch } from '../utils/tracking';
 
 const Subastas = () => {
-  const { auctions } = useStore();
+  const { auctions, user } = useStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
+  const searchTimeoutRef = useRef<number | null>(null);
+  const lastSearchedRef = useRef<string>('');
+
   // Actualizar estado de subastas al montar el componente
   useEffect(() => {
     const updateAuctionStatuses = () => {
@@ -28,6 +32,28 @@ const Subastas = () => {
     const isActive = auction.status === 'active';
     return matchesSearch && matchesFilter && isActive;
   });
+
+  // Trackear búsquedas con debounce
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (searchTerm.trim() && searchTerm.trim() !== lastSearchedRef.current) {
+      searchTimeoutRef.current = setTimeout(() => {
+        if (searchTerm.trim().length >= 3) { // Solo trackear búsquedas de 3+ caracteres
+          trackSearch(searchTerm.trim(), filteredAuctions.length, user?.id, user?.username);
+          lastSearchedRef.current = searchTerm.trim();
+        }
+      }, 1000); // Esperar 1 segundo después del último cambio
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchTerm, filteredAuctions.length, user?.id, user?.username]);
 
   return (
     <div className="subastas-page">

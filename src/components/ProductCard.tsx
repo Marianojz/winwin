@@ -3,13 +3,19 @@ import { ShoppingCart, Star } from 'lucide-react';
 import { Product } from '../types';
 import { formatCurrency } from '../utils/helpers';
 import { useStore } from '../store/useStore';
+import { trackProductClick } from '../utils/tracking';
 
 interface ProductCardProps {
   product: Product;
 }
 
 const ProductCard = ({ product }: ProductCardProps) => {
-  const { addToCart, addNotification } = useStore();
+  const { addToCart, addNotification, user } = useStore();
+
+  const handleClick = () => {
+    // Registrar click en el tracking system
+    trackProductClick(product.id, product.name, user?.id, user?.username);
+  };
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -27,6 +33,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
     <Link 
       to={`/producto/${product.id}`} 
       className="product-card hover-lift fade-in"
+      onClick={handleClick}
     >
       <div className="product-card-image">
         <img src={product.images[0]} alt={product.name} loading="lazy" />

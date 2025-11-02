@@ -5,9 +5,21 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    historyApiFallback: true
+    port: 5173,
+    host: true,
+    open: false,
+    strictPort: false,
+    hmr: {
+      overlay: true
+    }
   },
   preview: {
-    historyApiFallback: true
+    port: 4173,
+    host: true
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    chunkSizeWarningLimit: 1000
   }
 })

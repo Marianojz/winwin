@@ -4,13 +4,21 @@ import { Auction } from '../types';
 import { formatCurrency } from '../utils/helpers';
 import Countdown from './Countdown';
 import './AuctionCard.css';
+import { trackAuctionClick } from '../utils/tracking';
+import { useStore } from '../store/useStore';
 
 interface AuctionCardProps {
   auction: Auction;
 }
 
 const AuctionCard = ({ auction }: AuctionCardProps) => {
+  const { user } = useStore();
   const lastThreeBids = auction.bids.slice(-3).reverse();
+
+  const handleClick = () => {
+    // Registrar click en el tracking system
+    trackAuctionClick(auction.id, auction.title, user?.id, user?.username);
+  };
 
   // Función para determinar si la subasta debe mostrarse después de finalizada
   const shouldShowAfterEnd = () => {
@@ -41,6 +49,7 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
     <Link 
       to={isActive ? `/subastas/${auction.id}` : '#'} 
       className={`auction-card hover-lift fade-in ${auction.featured ? 'featured-auction' : ''} ${auction.isFlash ? 'flash-auction' : ''}`}
+      onClick={handleClick}
       style={{
         animationDelay: `${Math.random() * 0.2}s`,
         ...(auction.featured && {

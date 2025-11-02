@@ -321,41 +321,58 @@ isAuthenticated: (() => {
       
       const parsed = JSON.parse(saved);
       const now = Date.now();
-      // Filtrar notificaciones leídas que tienen más de 7 días
-      const filtered = parsed.filter((n: any) => {
-        if (!n.read) return true;
-        if (n.readAt) {
-          const readTime = new Date(n.readAt).getTime();
-          return (now - readTime) < (7 * 24 * 60 * 60 * 1000); // 7 días
-        }
-        return true;
-      });
       
-      // Actualizar localStorage si se filtraron notificaciones
-      if (filtered.length !== parsed.length) {
-        localStorage.setItem(storageKey, JSON.stringify(filtered));
-      }
-      
-      const notifications = filtered.map((n: any) => {
+      // Primero normalizar TODAS las notificaciones ANTES de filtrar
+      const normalized = parsed.map((n: any) => {
         // Normalizar read a boolean estricto - verificar múltiples formatos
         let readValue = false;
-        if (n.read === true) {
+        if (n.read === true || n.read === 'true' || n.read === 1) {
           readValue = true;
-        } else if (n.read === 'true') {
-          readValue = true;
-        } else if (n.read === 1) {
-          readValue = true;
-        } else if (String(n.read).toLowerCase() === 'true') {
+        } else if (n.readAt) {
+          // Si tiene readAt pero read no está definido, asumir que está leída
           readValue = true;
         }
         
         return {
           ...n,
-          createdAt: new Date(n.createdAt),
           read: Boolean(readValue), // Forzar boolean estricto
-          readAt: n.readAt ? new Date(n.readAt) : undefined
+          readAt: n.readAt ? (typeof n.readAt === 'string' ? n.readAt : new Date(n.readAt).toISOString()) : undefined
         };
       });
+      
+      // Filtrar notificaciones leídas que tienen más de 2 días (según dataCleaner)
+      // Y notificaciones no leídas que tienen más de 7 días
+      const filtered = normalized.filter((n: any) => {
+        const createdAt = new Date(n.createdAt).getTime();
+        const isRead = n.read === true;
+        
+        // Si está leída, verificar si fue leída hace más de 2 días
+        if (isRead && n.readAt) {
+          const readTime = new Date(n.readAt).getTime();
+          if (readTime < (now - (2 * 24 * 60 * 60 * 1000))) { // 2 días
+            return false; // Eliminar notificación leída hace más de 2 días
+          }
+          return true; // Mantener notificación leída recientemente
+        }
+        
+        // Si no está leída, verificar si es muy antigua (más de 7 días)
+        if (!isRead && createdAt < (now - (7 * 24 * 60 * 60 * 1000))) {
+          return false; // Eliminar notificación no leída muy antigua
+        }
+        
+        return true; // Mantener notificaciones recientes
+      });
+      
+      // SIEMPRE actualizar localStorage con las notificaciones normalizadas y filtradas
+      // Esto asegura que el estado guardado sea consistente con booleanos estrictos
+      localStorage.setItem(storageKey, JSON.stringify(filtered));
+      
+      const notifications = filtered.map((n: any) => ({
+        ...n,
+        createdAt: new Date(n.createdAt),
+        read: Boolean(n.read), // Asegurar boolean estricto
+        readAt: n.readAt ? new Date(n.readAt) : undefined
+      }));
       
       const unreadCount = notifications.filter((n: any) => !n.read).length;
       
@@ -449,13 +466,21 @@ isAuthenticated: (() => {
     const storageKey = `notifications_${user.id}`;
     const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
     const updated = saved.map((n: any) => {
-      // Normalizar read para asegurar que sea boolean
-      const isRead = n.read === true || n.read === 'true';
-      if (n.id === notificationId && !isRead) {
-        return { ...n, read: true, readAt: new Date().toISOString() };
+      if (n.id === notificationId) {
+        // SIEMPRE actualizar con boolean true y timestamp ISO
+        return { 
+          ...n, 
+          read: true, // Boolean estricto
+          readAt: new Date().toISOString() 
+        };
       }
-      return n;
+      // Asegurar que las demás también tengan read como boolean
+      return { 
+        ...n, 
+        read: n.read === true || n.read === 'true' || n.read === 1 ? true : false 
+      };
     });
+    // Guardar inmediatamente para persistir cambios
     localStorage.setItem(storageKey, JSON.stringify(updated));
     
     // Recargar desde localStorage para garantizar sincronización
@@ -516,13 +541,21 @@ isAuthenticated: (() => {
     const storageKey = `notifications_${user.id}`;
     const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
     const updated = saved.map((n: any) => {
-      const isRead = n.read === true || n.read === 'true';
+      const isRead = n.read === true || n.read === 'true' || n.read === 1;
       if (!isRead) {
         // Asegurar que read se guarde como boolean true, no string
-        return { ...n, read: true, readAt: new Date().toISOString() };
+        return { 
+          ...n, 
+          read: true, // Boolean estricto
+          readAt: new Date().toISOString() 
+        };
       }
-      // Asegurar que read se guarde como boolean, no string
-      return { ...n, read: n.read === true || n.read === 'true' ? true : false };
+      // Asegurar que read se guarde como boolean estricto
+      return { 
+        ...n, 
+        read: true, // Siempre boolean true si está leída
+        readAt: n.readAt || new Date().toISOString() // Asegurar que tenga readAt
+      };
     });
     // Guardar con read como boolean estricto
     localStorage.setItem(storageKey, JSON.stringify(updated));
@@ -574,23 +607,56 @@ isAuthenticated: (() => {
     get().setBots(newBots);
   },
 
-  // Orders
-  orders: JSON.parse(localStorage.getItem('orders') || '[]').map((o: any) => ({
-    ...o,
-    createdAt: new Date(o.createdAt),
-    expiresAt: o.expiresAt ? new Date(o.expiresAt) : undefined,
-    paidAt: o.paidAt ? new Date(o.paidAt) : undefined,
-    shippedAt: o.shippedAt ? new Date(o.shippedAt) : undefined,
-    deliveredAt: o.deliveredAt ? new Date(o.deliveredAt) : undefined
-  })),
+  // Orders - Eliminar duplicados al cargar
+  orders: (() => {
+    const loaded = JSON.parse(localStorage.getItem('orders') || '[]');
+    // Eliminar duplicados por ID
+    const unique = loaded.filter((order: any, index: number, self: any[]) => 
+      index === self.findIndex((o: any) => o.id === order.id)
+    );
+    
+    if (unique.length < loaded.length) {
+      console.log(`🧹 Eliminados ${loaded.length - unique.length} pedidos duplicados al cargar`);
+      // Guardar la versión sin duplicados
+      localStorage.setItem('orders', JSON.stringify(unique));
+    }
+    
+    return unique.map((o: any) => ({
+      ...o,
+      createdAt: new Date(o.createdAt),
+      expiresAt: o.expiresAt ? new Date(o.expiresAt) : undefined,
+      paidAt: o.paidAt ? new Date(o.paidAt) : undefined,
+      shippedAt: o.shippedAt ? new Date(o.shippedAt) : undefined,
+      deliveredAt: o.deliveredAt ? new Date(o.deliveredAt) : undefined
+    }));
+  })(),
   setOrders: (orders) => {
-    localStorage.setItem('orders', JSON.stringify(orders));
-    set({ orders });
+    // Eliminar duplicados antes de guardar
+    const uniqueOrders = orders.filter((order: Order, index: number, self: Order[]) => 
+      index === self.findIndex((o: Order) => o.id === order.id)
+    );
+    
+    if (uniqueOrders.length < orders.length) {
+      console.log(`🧹 Eliminados ${orders.length - uniqueOrders.length} pedidos duplicados del store`);
+    }
+    
+    localStorage.setItem('orders', JSON.stringify(uniqueOrders));
+    set({ orders: uniqueOrders });
   },
   addOrder: (order) => {
-    const newOrders = [...get().orders, order];
-    localStorage.setItem('orders', JSON.stringify(newOrders));
-    set({ orders: newOrders });
+    const currentOrders = get().orders;
+    // Verificar si ya existe un pedido con el mismo ID
+    if (currentOrders.some((o: Order) => o.id === order.id)) {
+      console.warn(`⚠️ Pedido con ID ${order.id} ya existe, no se agregará duplicado`);
+      return;
+    }
+    const newOrders = [...currentOrders, order];
+    // Eliminar duplicados antes de guardar
+    const uniqueOrders = newOrders.filter((o: Order, index: number, self: Order[]) => 
+      index === self.findIndex((orderItem: Order) => orderItem.id === o.id)
+    );
+    localStorage.setItem('orders', JSON.stringify(uniqueOrders));
+    set({ orders: uniqueOrders });
   },
   updateOrderStatus: (orderId, status, updates = {}) => {
     const now = new Date();
@@ -617,7 +683,12 @@ isAuthenticated: (() => {
       return order;
     });
     
-    localStorage.setItem('orders', JSON.stringify(newOrders));
-    set({ orders: newOrders });
+    // Eliminar duplicados antes de guardar
+    const uniqueOrders = newOrders.filter((o: Order, index: number, self: Order[]) => 
+      index === self.findIndex((orderItem: Order) => orderItem.id === o.id)
+    );
+    
+    localStorage.setItem('orders', JSON.stringify(uniqueOrders));
+    set({ orders: uniqueOrders });
   }
 }));

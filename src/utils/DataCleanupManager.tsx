@@ -43,9 +43,11 @@ const DataCleanupManager = () => {
             }
             if (auction.status === 'ended') {
               const now = Date.now();
-              const cutoffDate = now - (90 * 24 * 60 * 60 * 1000); // 90 días
+              const cutoffDate = now - (3 * 24 * 60 * 60 * 1000); // 3 días (más agresivo)
               const endTime = auction.endTime ? new Date(auction.endTime).getTime() : 0;
-              return endTime >= cutoffDate;
+              const createdAt = auction.createdAt ? new Date(auction.createdAt).getTime() : 0;
+              const checkDate = endTime > 0 ? endTime : createdAt;
+              return checkDate >= cutoffDate;
             }
             return true;
           });
@@ -64,7 +66,7 @@ const DataCleanupManager = () => {
             // Para pedidos finalizados, verificar antigüedad
             if (['delivered', 'canceled', 'payment_expired'].includes(order.status)) {
               const now = Date.now();
-              const cutoffDate = now - (180 * 24 * 60 * 60 * 1000); // 180 días
+              const cutoffDate = now - (7 * 24 * 60 * 60 * 1000); // 7 días (más agresivo)
               const orderDate = order.createdAt ? new Date(order.createdAt).getTime() : 0;
               return orderDate >= cutoffDate;
             }

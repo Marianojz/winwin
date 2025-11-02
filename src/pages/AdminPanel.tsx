@@ -1,5 +1,5 @@
 // Firebase Realtime Database imports
-import { ref, update } from 'firebase/database';
+import { ref, update, remove } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
 
 // Otras importaciones de Lucide, React, etc.
@@ -9,7 +9,9 @@ import {
   Gavel, Package, Bot, DollarSign, Plus, XCircle,
   TrendingUp, ShoppingCart, Bell, AlertTriangle,
   Search, Filter, ShoppingBag, MapPin, BarChart3,
-  MousePointerClick, Image as ImageIcon, Save, Store, Mail, Send
+  MousePointerClick, Image as ImageIcon, Save, Store, Mail, Send,
+  CheckCircle, Truck, FileText, Calendar, User, CreditCard,
+  ArrowRight, ArrowDown, ArrowUp, Download, Trash
 } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -32,15 +34,27 @@ import {
   createMessage,
   createAutoMessage,
   deleteConversation,
-  deleteAllConversations
+  deleteAllConversations,
+  deleteMessage
 } from '../utils/messages';
 import { Message, Conversation } from '../types';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { trackingSystem } from '../utils/tracking';
+import { actionLogger } from '../utils/actionLogger';
+import { runCleanup } from '../utils/dataCleaner';
+import { 
+  loadMessageTemplates, 
+  saveMessageTemplates, 
+  updateMessageTemplate,
+  getVariablesForType,
+  renderTemplate,
+  type MessageTemplate 
+} from '../utils/messageTemplates';
 
 const AdminPanel = (): React.ReactElement => {
   const { 
     user, auctions, products, bots, orders,
-    addBot, updateBot, deleteBot, setProducts, setAuctions, setBots, updateOrderStatus 
+    addBot, updateBot, deleteBot, setProducts, setAuctions, setBots, setOrders, updateOrderStatus 
   } = useStore();
   
   // Estados principales
@@ -49,15 +63,52 @@ const AdminPanel = (): React.ReactElement => {
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [refreshKey, setRefreshKey] = useState(0); // Para forzar re-render sin recargar
   
+  // Limpiar duplicados de pedidos al montar el componente
+  useEffect(() => {
+    const currentOrders = orders;
+    const uniqueOrders = currentOrders.filter((order: Order, index: number, self: Order[]) => 
+      index === self.findIndex((o: Order) => o.id === order.id)
+    );
+    
+    if (uniqueOrders.length < currentOrders.length) {
+      console.log(`🧹 AdminPanel: Eliminando ${currentOrders.length - uniqueOrders.length} pedidos duplicados`);
+      setOrders(uniqueOrders);
+    }
+  }, []); // Solo al montar
+  
   // Estado para configuración del inicio
   const [homeConfig, setHomeConfig] = useState<HomeConfig>(() => {
     try {
       const saved = localStorage.getItem('homeConfig');
-      return saved ? JSON.parse(saved) : defaultHomeConfig;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Asegurar que banners y promotions tengan las fechas correctas
+        return {
+          ...parsed,
+          banners: parsed.banners?.map((b: any) => ({
+            ...b,
+            createdAt: b.createdAt ? new Date(b.createdAt) : new Date(),
+            updatedAt: b.updatedAt ? new Date(b.updatedAt) : undefined
+          })) || [],
+          promotions: parsed.promotions?.map((p: any) => ({
+            ...p,
+            createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
+            startDate: p.startDate ? new Date(p.startDate) : undefined,
+            endDate: p.endDate ? new Date(p.endDate) : undefined
+          })) || [],
+          updatedAt: parsed.updatedAt ? new Date(parsed.updatedAt) : new Date()
+        };
+      }
+      return defaultHomeConfig;
     } catch {
       return defaultHomeConfig;
     }
   });
+
+  // Estados para templates de mensajes
+  const [messageTemplates, setMessageTemplates] = useState<MessageTemplate[]>(() => loadMessageTemplates());
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [templatePreview, setTemplatePreview] = useState<string>('');
   
   // Estados para mensajería
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -65,6 +116,8 @@ const AdminPanel = (): React.ReactElement => {
   const [conversationMessages, setConversationMessages] = useState<Message[]>([]);
   const [newMessageContent, setNewMessageContent] = useState('');
   const [adminUnreadCount, setAdminUnreadCount] = useState(0);
+  const [showUserSelector, setShowUserSelector] = useState(false);
+  const [selectedUserForMessage, setSelectedUserForMessage] = useState<string | null>(null);
   const isMobile = useIsMobile();
   
   // Cargar conversaciones y contador
@@ -86,8 +139,13 @@ const AdminPanel = (): React.ReactElement => {
       // Marcar como leídos cuando se abre la conversación
       markMessagesAsRead(selectedConversation, 'admin');
       setAdminUnreadCount(getAdminUnreadCount());
+    } else if (selectedUserForMessage) {
+      // Si hay usuario seleccionado para mensaje nuevo, cargar sus mensajes
+      const convId = `admin_${selectedUserForMessage}`;
+      setConversationMessages(getMessages(convId));
+      setSelectedConversation(convId);
     }
-  }, [selectedConversation]);
+  }, [selectedConversation, selectedUserForMessage]);
   // ============================================
   // FUNCIONES PARA CREAR SUBASTA
   // ============================================
@@ -328,13 +386,14 @@ const [auctionForm, setAuctionForm] = useState({
     maxBidAmount: 5000,
     targetAuctions: [] as string[]
   });
+  const [showBotForm, setShowBotForm] = useState(false);
 
   // Estados para inventario
   const [inventoryFilter, setInventoryFilter] = useState('all');
 
   // Estados para pedidos
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<OrderStatus | 'all'>('all');
+  const [filterStatus, setFilterStatus] = useState<OrderStatus | 'all' | 'active' | 'inactive'>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   
   // ============================================
@@ -480,7 +539,7 @@ const [auctionForm, setAuctionForm] = useState({
     }
   }, [activeTab]);
 
-  // Protección de acceso
+  // Protección de acceso - DEBE IR DESPUÉS DE TODOS LOS HOOKS
   if (!user?.isAdmin) {
     return (
       <div style={{ minHeight: 'calc(100vh - 80px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem' }}>
@@ -788,33 +847,65 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
 
   // Funciones para Bots
   const handleAddBot = () => {
-    if (!botForm.name) {
+    if (!botForm.name || !botForm.name.trim()) {
       alert('⚠️ Por favor ingresa un nombre para el bot');
       return;
     }
-    addBot({
-      id: Date.now().toString(),
-      ...botForm,
-      isActive: true
-    });
-    setBotForm({
-      name: '',
-      balance: 10000,
-      intervalMin: 5,
-      intervalMax: 15,
-      maxBidAmount: 5000,
-      targetAuctions: []
-    });
-    alert('✅ Bot creado correctamente');
+    if (botForm.balance < 100) {
+      alert('⚠️ El balance debe ser al menos $100');
+      return;
+    }
+    if (botForm.maxBidAmount < 100) {
+      alert('⚠️ La oferta máxima debe ser al menos $100');
+      return;
+    }
+    if (botForm.intervalMin >= botForm.intervalMax) {
+      alert('⚠️ El intervalo mínimo debe ser menor que el máximo');
+      return;
+    }
+    if (botForm.intervalMin < 1 || botForm.intervalMax > 300) {
+      alert('⚠️ Los intervalos deben estar entre 1 y 300 segundos');
+      return;
+    }
+    
+    try {
+      const newBot = {
+        id: `bot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        name: botForm.name.trim(),
+        balance: Number(botForm.balance),
+        intervalMin: Number(botForm.intervalMin),
+        intervalMax: Number(botForm.intervalMax),
+        maxBidAmount: Number(botForm.maxBidAmount),
+        isActive: true,
+        targetAuctions: botForm.targetAuctions || []
+      };
+      
+      addBot(newBot);
+      logAdminAction(`Bot creado: ${newBot.name}`, user?.id, user?.username);
+      
+      setBotForm({
+        name: '',
+        balance: 10000,
+        intervalMin: 5,
+        intervalMax: 15,
+        maxBidAmount: 5000,
+        targetAuctions: []
+      });
+      
+      alert(`✅ Bot "${newBot.name}" creado correctamente`);
+    } catch (error) {
+      console.error('Error creando bot:', error);
+      alert('❌ Error al crear el bot. Por favor intenta nuevamente.');
+    }
   };
 
   // Función de Reset mejorada - preserva usuarios y logs de ventas
-  const handleResetData = () => {
+  const handleResetData = async () => {
     if (!window.confirm('⚠️ ADVERTENCIA: Esto reiniciará todos los datos EXCEPTO usuarios registrados y logs de ventas.\n\n¿Estás seguro de continuar?')) {
       return;
     }
     
-    if (!window.confirm('⚠️ ÚLTIMA CONFIRMACIÓN:\n\nSe resetearán:\n- Subastas\n- Productos\n- Bots\n- Notificaciones\n\nSe PRESERVARÁN:\n- ✅ Usuarios registrados\n- ✅ Logs de acciones\n- ✅ Historial de pedidos/ventas\n\n¿Proceder?')) {
+    if (!window.confirm('⚠️ ÚLTIMA CONFIRMACIÓN:\n\nSe resetearán:\n- Subastas (también de Firebase)\n- Productos\n- Bots\n- Notificaciones\n\nSe PRESERVARÁN:\n- ✅ Usuarios registrados\n- ✅ Logs de acciones\n- ✅ Historial de pedidos/ventas\n\n¿Proceder?')) {
       return;
     }
 
@@ -824,7 +915,18 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       const actionLogsBackup = localStorage.getItem('action_logs') || '[]';
       const ordersBackup = localStorage.getItem('orders') || '[]';
       
-      // Limpiar todo
+      // 🔥 ELIMINAR TODAS LAS SUBASTAS DE FIREBASE
+      console.log('🔥 Eliminando todas las subastas de Firebase...');
+      try {
+        const auctionsRef = ref(realtimeDb, 'auctions');
+        await remove(auctionsRef);
+        console.log('✅ Todas las subastas eliminadas de Firebase');
+      } catch (firebaseError) {
+        console.error('❌ Error eliminando subastas de Firebase:', firebaseError);
+        // Continuar aunque falle Firebase
+      }
+      
+      // Limpiar todo de localStorage
       localStorage.removeItem('auctions');
       localStorage.removeItem('products');
       localStorage.removeItem('bots');
@@ -852,11 +954,13 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       setBots([]);
       
       // Registrar acción en log
-      logAdminAction('Sistema reseteado (preservando usuarios y logs)', user?.id, user?.username);
+      logAdminAction('Sistema reseteado (preservando usuarios y logs, eliminando subastas de Firebase)', user?.id, user?.username);
       
-      alert('✅ Datos reiniciados correctamente.\n\n✅ Usuarios registrados preservados\n✅ Logs de acciones preservados\n✅ Historial de pedidos preservado');
+      alert('✅ Datos reiniciados correctamente.\n\n✅ Usuarios registrados preservados\n✅ Logs de acciones preservados\n✅ Historial de pedidos preservado\n✅ Subastas eliminadas de Firebase');
       
-      // Recargar para aplicar cambios
+      // Recargar para aplicar cambios SIN perder sesión
+      // NO hacer logout, solo recargar la página
+      // El usuario ya está autenticado en Firebase, así que seguirá logueado
       setTimeout(() => {
         window.location.reload();
       }, 1000);
@@ -866,12 +970,25 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     }
   };
 
-  // Filtrar pedidos
-  const filteredOrders = orders.filter((order: Order) => {
-    const matchesSearch = order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.userId.toLowerCase().includes(searchTerm.toLowerCase());
+  // Filtrar pedidos y eliminar duplicados
+  const uniqueOrders = orders.filter((order: Order, index: number, self: Order[]) => 
+    index === self.findIndex((o: Order) => o.id === order.id)
+  );
+  
+  const filteredOrders = uniqueOrders.filter((order: Order) => {
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm || 
+                         order.id.toLowerCase().includes(searchLower) ||
+                         order.userId.toLowerCase().includes(searchLower) ||
+                         (order.userName && order.userName.toLowerCase().includes(searchLower)) ||
+                         formatCurrency(order.amount).toLowerCase().includes(searchLower);
     const matchesStatus = filterStatus === 'all' || order.status === filterStatus;
     return matchesSearch && matchesStatus;
+  }).sort((a: Order, b: Order) => {
+    // Ordenar por fecha más reciente primero
+    const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return dateB - dateA;
   });
 
   const getStatusBadge = (status: OrderStatus) => {
@@ -926,66 +1043,85 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       .filter((o: { status: string; }) => o.status === 'delivered')
       .reduce((sum: number, o: { amount: number }) => sum + (o.amount || 0), 0);
 
-    // Más buscado (simulado por título más común en subastas y productos)
-    const allTitles = [
-      ...auctions.map((a: { title: string }) => a.title),
-      ...products.map((p: { name: string }) => p.name)
-    ];
-    const titleCounts: Record<string, number> = {};
-    allTitles.forEach(title => {
-      const words = title.toLowerCase().split(/\s+/);
-      words.forEach(word => {
-        if (word.length > 3) {
-          titleCounts[word] = (titleCounts[word] || 0) + 1;
-        }
-      });
-    });
-    const mostSearched = Object.entries(titleCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([word, count]) => ({ word, count }));
+    // Egresos (gastos) - por ahora 0, pero se puede expandir
+    const expenses = 0;
 
-    // Más cliqueado (simulado por productos/subastas con más vistas)
-    const mostClicked = [
-      ...products
-        .map((p: { id: string; name: string; views?: number }) => ({
-          id: p.id,
-          name: p.name,
-          type: 'product' as const,
-          clicks: p.views || 0
-        })),
-      ...auctions
-        .map((a: { id: string; title: string; bids?: any[] }) => ({
-          id: a.id,
-          name: a.title,
-          type: 'auction' as const,
-          clicks: a.bids?.length || 0
-        }))
-    ]
-      .sort((a, b) => b.clicks - a.clicks)
-      .slice(0, 5);
+    // Más buscado usando tracking system
+    const mostSearched = trackingSystem.getMostSearched(10);
+
+    // Más cliqueado usando tracking system
+    const mostClicked = trackingSystem.getMostClicked(10);
+
+    // Estadísticas de tracking
+    const trackingStats = trackingSystem.getStats();
+
+    // Logs recientes de acciones
+    const recentLogs = actionLogger.getLogs().slice(0, 20);
 
     return {
       auctionRevenue,
       storeRevenue,
+      expenses,
       totalRevenue: auctionRevenue + storeRevenue,
+      netProfit: auctionRevenue + storeRevenue - expenses,
       mostSearched,
-      mostClicked
+      mostClicked,
+      trackingStats,
+      recentLogs
     };
   };
 
+  // Calcular estadísticas (después de definir las funciones)
   const enhancedStats = getEnhancedStats();
   const orderStats = getTotalStats();
 
+  // Debug: verificar que las estadísticas se calculan
+  useEffect(() => {
+    if (activeTab === 'dashboard') {
+      console.log('🎯 Dashboard activo - Estadísticas calculadas:', {
+        auctionRevenue: enhancedStats.auctionRevenue,
+        storeRevenue: enhancedStats.storeRevenue,
+        netProfit: enhancedStats.netProfit,
+        mostSearched: enhancedStats.mostSearched.length,
+        mostClicked: enhancedStats.mostClicked.length
+      });
+    }
+  }, [activeTab, enhancedStats]);
+
   // Función para enviar mensaje
   const handleSendMessage = () => {
-    if (!selectedConversation || !newMessageContent.trim()) return;
+    let userId: string;
     
-    const userId = selectedConversation.split('_')[1];
-    createMessage('admin', 'Administrador', userId, newMessageContent.trim());
+    if (selectedUserForMessage) {
+      // Nuevo mensaje a usuario seleccionado
+      userId = selectedUserForMessage;
+      const message = createMessage('admin', 'Administrador', userId, newMessageContent.trim());
+      saveMessage(message);
+      
+      // Si no existe conversación, crearla seleccionándola
+      if (!conversations.find(c => c.id === `admin_${userId}`)) {
+        setConversations(getAllConversations());
+        setSelectedConversation(`admin_${userId}`);
+      }
+      setSelectedUserForMessage(null);
+      setShowUserSelector(false);
+    } else if (selectedConversation) {
+      // Mensaje a conversación existente
+      userId = selectedConversation.split('_')[1];
+      const message = createMessage('admin', 'Administrador', userId, newMessageContent.trim());
+      saveMessage(message);
+    } else {
+      return;
+    }
+    
+    if (!newMessageContent.trim()) return;
+    
     setNewMessageContent('');
-    setConversationMessages(getMessages(selectedConversation));
+    if (selectedConversation) {
+      setConversationMessages(getMessages(selectedConversation));
+    }
     setAdminUnreadCount(getAdminUnreadCount());
+    setConversations(getAllConversations());
   };
 
   // Función para guardar configuración de home
@@ -993,7 +1129,254 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     const updatedConfig = { ...homeConfig, updatedAt: new Date() };
     localStorage.setItem('homeConfig', JSON.stringify(updatedConfig));
     setHomeConfig(updatedConfig);
+    logAdminAction('Configuración de home guardada', user?.id, user?.username);
     alert('✅ Configuración del inicio guardada correctamente');
+  };
+
+  // Funciones para gestión de banners
+  const handleAddBanner = () => {
+    const newBanner = {
+      id: `banner-${Date.now()}`,
+      title: 'Nuevo Banner',
+      description: '',
+      imageUrl: '',
+      link: '',
+      linkText: 'Ver más',
+      active: true,
+      order: homeConfig.banners.length,
+      createdAt: new Date()
+    };
+    setHomeConfig({
+      ...homeConfig,
+      banners: [...homeConfig.banners, newBanner]
+    });
+  };
+
+  const handleUpdateBanner = (bannerId: string, updates: any) => {
+    setHomeConfig({
+      ...homeConfig,
+      banners: homeConfig.banners.map(b => 
+        b.id === bannerId ? { ...b, ...updates, updatedAt: new Date() } : b
+      )
+    });
+  };
+
+  const handleDeleteBanner = (bannerId: string) => {
+    if (window.confirm('¿Eliminar este banner?')) {
+      setHomeConfig({
+        ...homeConfig,
+        banners: homeConfig.banners.filter(b => b.id !== bannerId)
+      });
+    }
+  };
+
+  // Funciones para gestión de promociones
+  const handleAddPromotion = () => {
+    const newPromotion = {
+      id: `promo-${Date.now()}`,
+      title: 'Nueva Promoción',
+      description: '',
+      imageUrl: '',
+      link: '',
+      active: true,
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días desde hoy
+      order: homeConfig.promotions.length,
+      createdAt: new Date()
+    };
+    setHomeConfig({
+      ...homeConfig,
+      promotions: [...homeConfig.promotions, newPromotion]
+    });
+  };
+
+  const handleUpdatePromotion = (promoId: string, updates: any) => {
+    setHomeConfig({
+      ...homeConfig,
+      promotions: homeConfig.promotions.map(p => 
+        p.id === promoId ? { ...p, ...updates } : p
+      )
+    });
+  };
+
+  const handleDeletePromotion = (promoId: string) => {
+    if (window.confirm('¿Eliminar esta promoción?')) {
+      setHomeConfig({
+        ...homeConfig,
+        promotions: homeConfig.promotions.filter(p => p.id !== promoId)
+      });
+    }
+  };
+
+  // Funciones para manejo de imágenes (drag & drop y file input)
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error('Error al convertir archivo a base64'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Error al leer archivo'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImageDrop = async (e: React.DragEvent<HTMLDivElement>, setImageUrl: (url: string) => void) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+
+    // Validar que sea una imagen
+    if (!file.type.startsWith('image/')) {
+      alert('⚠️ Solo se permiten archivos de imagen');
+      return;
+    }
+
+    // Validar tamaño (máximo 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('⚠️ La imagen no puede superar los 5MB');
+      return;
+    }
+
+    try {
+      const base64 = await convertFileToBase64(file);
+      setImageUrl(base64);
+    } catch (error) {
+      console.error('Error convirtiendo imagen:', error);
+      alert('❌ Error al procesar la imagen');
+    }
+  };
+
+  const handleImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, setImageUrl: (url: string) => void) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar que sea una imagen
+    if (!file.type.startsWith('image/')) {
+      alert('⚠️ Solo se permiten archivos de imagen');
+      e.target.value = '';
+      return;
+    }
+
+    // Validar tamaño (máximo 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('⚠️ La imagen no puede superar los 5MB');
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      const base64 = await convertFileToBase64(file);
+      setImageUrl(base64);
+      e.target.value = '';
+    } catch (error) {
+      console.error('Error convirtiendo imagen:', error);
+      alert('❌ Error al procesar la imagen');
+    }
+  };
+
+  // Funciones para templates de mensajes
+  const handleSaveTemplate = (templateId: string, template: Partial<MessageTemplate>) => {
+    if (updateMessageTemplate(templateId, template)) {
+      const updated = loadMessageTemplates();
+      setMessageTemplates(updated);
+      logAdminAction(`Template de mensaje actualizado: ${template.title || templateId}`, user?.id, user?.username);
+      alert('✅ Template guardado correctamente');
+    } else {
+      alert('❌ Error al guardar el template');
+    }
+  };
+
+  const handlePreviewTemplate = (template: MessageTemplate) => {
+    // Variables de ejemplo para el preview
+    const exampleVars: Record<string, string | number> = {
+      username: 'Ejemplo Usuario',
+      auctionTitle: 'Subasta de Ejemplo',
+      productName: 'Producto de Ejemplo',
+      amount: 50000,
+      orderId: 'ORD-12345678',
+      auctionId: 'AUC-123456',
+      paymentDeadline: '48 horas',
+      deadline: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toLocaleDateString('es-AR'),
+      trackingNumber: 'TRACK-123456789',
+      currentBid: 45000,
+      minBid: 46000
+    };
+    const preview = renderTemplate(template, exampleVars);
+    setTemplatePreview(preview);
+  };
+
+  // Recargar templates cuando cambia el tab
+  useEffect(() => {
+    if (activeTab === 'settings') {
+      setMessageTemplates(loadMessageTemplates());
+    }
+  }, [activeTab]);
+
+  // Función para limpieza manual de datos antiguos
+  const handleManualCleanup = async () => {
+    if (!user) return;
+    
+    if (!window.confirm('¿Limpiar datos antiguos ahora?\n\nEsto eliminará:\n- Notificaciones leídas de más de 1 día\n- Notificaciones no leídas de más de 2 días\n- Subastas finalizadas de más de 3 días\n- Pedidos completados de más de 7 días')) {
+      return;
+    }
+
+    try {
+      const result = runCleanup(user.id, auctions, orders);
+      
+      if (result) {
+        // Actualizar subastas y pedidos si se limpiaron
+        if (result.auctionsCleanup.cleaned > 0) {
+          const cleanedAuctions = auctions.filter((auction: any) => {
+            if (auction.status === 'active' || auction.status === 'scheduled') return true;
+            if (auction.status === 'ended') {
+              const now = Date.now();
+              const cutoffDate = now - (3 * 24 * 60 * 60 * 1000);
+              const endTime = auction.endTime ? new Date(auction.endTime).getTime() : 0;
+              const createdAt = auction.createdAt ? new Date(auction.createdAt).getTime() : 0;
+              const checkDate = endTime > 0 ? endTime : createdAt;
+              return checkDate >= cutoffDate;
+            }
+            return true;
+          });
+          setAuctions(cleanedAuctions);
+        }
+        
+        if (result.ordersCleanup.cleaned > 0) {
+          const cleanedOrders = orders.filter((order: any) => {
+            if (['pending_payment', 'payment_confirmed', 'in_transit'].includes(order.status)) return true;
+            if (['delivered', 'canceled', 'payment_expired'].includes(order.status)) {
+              const now = Date.now();
+              const cutoffDate = now - (7 * 24 * 60 * 60 * 1000);
+              const orderDate = order.createdAt ? new Date(order.createdAt).getTime() : 0;
+              return orderDate >= cutoffDate;
+            }
+            return true;
+          });
+          setOrders(cleanedOrders);
+        }
+
+        // Recargar notificaciones
+        const { loadUserNotifications } = useStore.getState();
+        if (loadUserNotifications) {
+          setTimeout(() => {
+            loadUserNotifications();
+          }, 500);
+        }
+
+        const total = result.notificationsCleaned + result.auctionsCleanup.cleaned + result.ordersCleanup.cleaned;
+        alert(`✅ Limpieza completada:\n- ${result.notificationsCleaned} notificaciones eliminadas\n- ${result.auctionsCleanup.cleaned} subastas eliminadas\n- ${result.ordersCleanup.cleaned} pedidos eliminados\n\nTotal: ${total} elementos eliminados`);
+        logAdminAction('Limpieza manual de datos ejecutada', user.id, user.username, { total });
+      }
+    } catch (error) {
+      console.error('Error en limpieza manual:', error);
+      alert('❌ Error al ejecutar limpieza');
+    }
   };
 
   const tabs = [
@@ -1016,23 +1399,33 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       paddingTop: '1rem'
     }}>
       {/* Header */}
-      <div style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+      <div style={{ marginBottom: isMobile ? '1rem' : '2rem' }}>
+        <h1 style={{ 
+          fontSize: isMobile ? '1.5rem' : '2rem', 
+          fontWeight: 700, 
+          marginBottom: '0.5rem', 
+          color: 'var(--text-primary)' 
+        }}>
           Panel de Administración
         </h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>
+        <p style={{ 
+          color: 'var(--text-secondary)', 
+          fontSize: isMobile ? '0.875rem' : '1rem' 
+        }}>
           Gestioná subastas, productos, usuarios y más
         </p>
       </div>
 
-      {/* Tabs Navigation */}
+      {/* Tabs Navigation - Optimizado para móvil */}
       <div style={{
         display: 'flex',
-        gap: '0.5rem',
-        marginBottom: '2rem',
+        gap: isMobile ? '0.25rem' : '0.5rem',
+        marginBottom: isMobile ? '1rem' : '2rem',
         overflowX: 'auto',
         paddingBottom: '0.5rem',
-        borderBottom: '2px solid var(--border)'
+        borderBottom: '2px solid var(--border)',
+        scrollbarWidth: 'thin',
+        WebkitOverflowScrolling: 'touch'
       }}>
         {tabs.map(tab => {
           const Icon = tab.icon;
@@ -1042,24 +1435,25 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               style={{
-                padding: '0.75rem 1.5rem',
+                padding: isMobile ? '0.625rem 0.875rem' : '0.75rem 1.5rem',
                 background: isActive ? 'var(--primary)' : 'transparent',
                 color: isActive ? 'white' : 'var(--text-secondary)',
                 border: `1px solid ${isActive ? 'var(--primary)' : 'var(--border)'}`,
                 borderRadius: '0.5rem',
                 cursor: 'pointer',
-                fontSize: '0.875rem',
+                fontSize: isMobile ? '0.8125rem' : '0.875rem',
                 fontWeight: 600,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.5rem',
+                gap: isMobile ? '0.375rem' : '0.5rem',
                 whiteSpace: 'nowrap',
                 transition: 'all 0.2s',
-                position: 'relative'
+                position: 'relative',
+                flexShrink: 0
               }}
             >
-              <Icon size={18} />
-              {tab.label}
+              <Icon size={isMobile ? 16 : 18} />
+              {isMobile ? (tab.label.length > 8 ? tab.label.substring(0, 8) + '...' : tab.label) : tab.label}
               {tab.badge && (
                 <span style={{
                   background: 'var(--error)',
@@ -1232,16 +1626,222 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
             )}
           </div>
 
-          {/* Actividad Reciente */}
+          {/* Estadísticas Financieras Detalladas */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: '1.5rem',
+            marginBottom: '2rem'
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, var(--primary), #d65a00)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              color: 'white'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                <Store size={24} />
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Ingresos por Subastas</h3>
+              </div>
+              <p style={{ margin: 0, fontSize: '2rem', fontWeight: 700 }}>
+                {formatCurrency(enhancedStats.auctionRevenue)}
+              </p>
+              <p style={{ margin: '0.5rem 0 0 0', opacity: 0.9, fontSize: '0.875rem' }}>
+                {getAuctionsWithWinner(auctions).length} subastas vendidas
+              </p>
+            </div>
+
+            <div style={{
+              background: 'linear-gradient(135deg, var(--success), #10b981)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              color: 'white'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                <ShoppingBag size={24} />
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Ingresos por Tienda</h3>
+              </div>
+              <p style={{ margin: 0, fontSize: '2rem', fontWeight: 700 }}>
+                {formatCurrency(enhancedStats.storeRevenue)}
+              </p>
+              <p style={{ margin: '0.5rem 0 0 0', opacity: 0.9, fontSize: '0.875rem' }}>
+                {orders.filter((o: { status: string; }) => o.status === 'delivered').length} pedidos entregados
+              </p>
+            </div>
+
+            <div style={{
+              background: 'linear-gradient(135deg, var(--info), #0891b2)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              color: 'white'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                <TrendingUp size={24} />
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Ganancia Neta</h3>
+              </div>
+              <p style={{ margin: 0, fontSize: '2rem', fontWeight: 700 }}>
+                {formatCurrency(enhancedStats.netProfit)}
+              </p>
+              <p style={{ margin: '0.5rem 0 0 0', opacity: 0.9, fontSize: '0.875rem' }}>
+                Total: {formatCurrency(enhancedStats.totalRevenue)}
+              </p>
+            </div>
+          </div>
+
+          {/* Más Buscado y Más Cliqueado */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
+            gap: '1.5rem',
+            marginBottom: '2rem'
+          }}>
+            <div style={{
+              background: 'var(--bg-secondary)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              border: '1px solid var(--border)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                <Search size={20} />
+                <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Más Buscado
+                </h3>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {enhancedStats.mostSearched.length === 0 ? (
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', textAlign: 'center', padding: '1rem' }}>
+                    Aún no hay búsquedas registradas
+                  </p>
+                ) : (
+                  enhancedStats.mostSearched.slice(0, 5).map((item, idx) => (
+                    <div key={idx} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '0.75rem',
+                      background: 'var(--bg-primary)',
+                      borderRadius: '0.5rem'
+                    }}>
+                      <div>
+                        <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                          "{item.query}"
+                        </p>
+                        <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                          {item.avgResults} resultados promedio
+                        </p>
+                      </div>
+                      <span style={{
+                        padding: '0.25rem 0.5rem',
+                        background: 'var(--primary)',
+                        color: 'white',
+                        borderRadius: '0.25rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 600
+                      }}>
+                        {item.count}x
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div style={{
+              background: 'var(--bg-secondary)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              border: '1px solid var(--border)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                <MousePointerClick size={20} />
+                <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Más Cliqueado
+                </h3>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {enhancedStats.mostClicked.length === 0 ? (
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', textAlign: 'center', padding: '1rem' }}>
+                    Aún no hay clicks registrados
+                  </p>
+                ) : (
+                  enhancedStats.mostClicked.slice(0, 5).map((item, idx) => (
+                    <div key={idx} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '0.75rem',
+                      background: 'var(--bg-primary)',
+                      borderRadius: '0.5rem'
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ 
+                          margin: 0, 
+                          fontSize: '0.875rem', 
+                          fontWeight: 500, 
+                          color: 'var(--text-primary)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {item.name}
+                        </p>
+                        <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                          {item.type === 'product' ? 'Producto' : 'Subasta'}
+                        </p>
+                      </div>
+                      <span style={{
+                        padding: '0.25rem 0.5rem',
+                        background: item.type === 'product' ? 'var(--warning)' : 'var(--primary)',
+                        color: 'white',
+                        borderRadius: '0.25rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        marginLeft: '0.5rem'
+                      }}>
+                        {item.clicks}x
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Actividad Reciente con Botón de Limpiar */}
           <div style={{
             background: 'var(--bg-secondary)',
             padding: '1.5rem',
             borderRadius: '1rem',
             border: '1px solid var(--border)'
           }}>
-            <h2 style={{ margin: 0, marginBottom: '1.5rem', color: 'var(--text-primary)' }}>
-              Actividad Reciente
-            </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>
+                Actividad Reciente
+              </h2>
+              {getRecentActivity().length > 0 && (
+                <button
+                  onClick={() => {
+                    localStorage.setItem('clearedActivityTimestamp', Date.now().toString());
+                    setRefreshKey(prev => prev + 1);
+                    logAdminAction('Actividad reciente limpiada', user?.id, user?.username);
+                  }}
+                  className="btn"
+                  style={{
+                    padding: '0.5rem 1rem',
+                    fontSize: '0.875rem',
+                    background: 'var(--bg-tertiary)',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <RefreshCw size={16} />
+                  Limpiar
+                </button>
+              )}
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {getRecentActivity().length === 0 ? (
                 <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>
@@ -1365,11 +1965,21 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                     Ofertas: {auction.bids?.length || 0}
                   </p>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div style={{ 
+                  display: 'flex', 
+                  gap: '0.5rem', 
+                  flexWrap: isMobile ? 'wrap' : 'nowrap',
+                  flexDirection: isMobile ? 'column' : 'row'
+                }}>
                   <button
                     onClick={() => handleEditAuction(auction)}
                     className="btn btn-secondary"
-                    style={{ flex: 1, minWidth: '100px' }}
+                    style={{ 
+                      flex: isMobile ? 'none' : 1, 
+                      width: isMobile ? '100%' : 'auto',
+                      minWidth: isMobile ? 'auto' : '100px',
+                      padding: isMobile ? '0.75rem 1rem' : '0.625rem 1rem'
+                    }}
                   >
                     <Edit size={16} style={{ marginRight: '0.25rem' }} />
                     Editar
@@ -1377,7 +1987,12 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   <button
                     onClick={() => handleDeleteAuction(auction.id)}
                     className="btn btn-danger"
-                    style={{ flex: 1, minWidth: '100px' }}
+                    style={{ 
+                      flex: isMobile ? 'none' : 1, 
+                      width: isMobile ? '100%' : 'auto',
+                      minWidth: isMobile ? 'auto' : '100px',
+                      padding: isMobile ? '0.75rem 1rem' : '0.625rem 1rem'
+                    }}
                   >
                     <Trash2 size={16} style={{ marginRight: '0.25rem' }} />
                     Eliminar
@@ -1386,7 +2001,12 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                     <button
                       onClick={() => handleRepublishAuction(auction)}
                       className="btn btn-primary"
-                      style={{ flex: 1, minWidth: '100px' }}
+                      style={{ 
+                        flex: isMobile ? 'none' : 1, 
+                        width: isMobile ? '100%' : 'auto',
+                        minWidth: isMobile ? 'auto' : '100px',
+                        padding: isMobile ? '0.75rem 1rem' : '0.625rem 1rem'
+                      }}
                     >
                       Republicar
                     </button>
@@ -1748,18 +2368,31 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               )}
 
               {/* Botones */}
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              <div style={{ 
+                display: 'flex', 
+                gap: '1rem', 
+                marginTop: '1rem',
+                flexDirection: isMobile ? 'column' : 'row'
+              }}>
                 <button
                   onClick={editingAuction ? handleSaveAuction : handleCreateAuction}
                   className="btn btn-primary"
-                  style={{ flex: 1 }}
+                  style={{ 
+                    flex: isMobile ? 'none' : 1,
+                    width: isMobile ? '100%' : 'auto',
+                    padding: isMobile ? '0.875rem 1.25rem' : '0.75rem 1.5rem'
+                  }}
                 >
-                  <Save size={20} style={{ marginRight: '0.5rem' }} />
+                  <Save size={isMobile ? 18 : 20} style={{ marginRight: '0.5rem' }} />
                   {editingAuction ? 'Guardar Cambios' : 'Crear Subasta'}
                 </button>
                 <button
                   onClick={() => setActiveTab('auctions')}
                   className="btn btn-secondary"
+                  style={{ 
+                    width: isMobile ? '100%' : 'auto',
+                    padding: isMobile ? '0.875rem 1.25rem' : '0.75rem 1.5rem'
+                  }}
                 >
                   Cancelar
                 </button>
@@ -1861,11 +2494,21 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                       </span>
                     </p>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '0.5rem', 
+                    flexWrap: isMobile ? 'wrap' : 'nowrap',
+                    flexDirection: isMobile ? 'column' : 'row'
+                  }}>
                     <button
                       onClick={() => handleEditProduct(product)}
                       className="btn btn-secondary"
-                      style={{ flex: 1, minWidth: '100px' }}
+                      style={{ 
+                        flex: isMobile ? 'none' : 1, 
+                        width: isMobile ? '100%' : 'auto',
+                        minWidth: isMobile ? 'auto' : '100px',
+                        padding: isMobile ? '0.75rem 1rem' : '0.625rem 1rem'
+                      }}
                     >
                       <Edit size={16} style={{ marginRight: '0.25rem' }} />
                       Editar
@@ -1873,7 +2516,12 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                     <button
                       onClick={() => handleDeleteProduct(product.id)}
                       className="btn btn-danger"
-                      style={{ flex: 1, minWidth: '100px' }}
+                      style={{ 
+                        flex: isMobile ? 'none' : 1, 
+                        width: isMobile ? '100%' : 'auto',
+                        minWidth: isMobile ? 'auto' : '100px',
+                        padding: isMobile ? '0.75rem 1rem' : '0.625rem 1rem'
+                      }}
                     >
                       <Trash2 size={16} style={{ marginRight: '0.25rem' }} />
                       Eliminar
@@ -2097,18 +2745,31 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               </div>
 
               {/* Botones */}
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              <div style={{ 
+                display: 'flex', 
+                gap: '1rem', 
+                marginTop: '1rem',
+                flexDirection: isMobile ? 'column' : 'row'
+              }}>
                 <button
                   onClick={handleSaveProduct}
                   className="btn btn-primary"
-                  style={{ flex: 1 }}
+                  style={{ 
+                    flex: isMobile ? 'none' : 1,
+                    width: isMobile ? '100%' : 'auto',
+                    padding: isMobile ? '0.875rem 1.25rem' : '0.75rem 1.5rem'
+                  }}
                 >
-                  <Save size={20} style={{ marginRight: '0.5rem' }} />
+                  <Save size={isMobile ? 18 : 20} style={{ marginRight: '0.5rem' }} />
                   {editingProduct ? 'Guardar Cambios' : 'Crear Producto'}
                 </button>
                 <button
                   onClick={() => setActiveTab('products')}
                   className="btn btn-secondary"
+                  style={{ 
+                    width: isMobile ? '100%' : 'auto',
+                    padding: isMobile ? '0.875rem 1.25rem' : '0.75rem 1.5rem'
+                  }}
                 >
                   Cancelar
                 </button>
@@ -2180,14 +2841,23 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                       </span>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '0.5rem', 
+                    flexWrap: 'wrap',
+                    flexDirection: isMobile ? 'column' : 'row'
+                  }}>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedUser(userItem);
                       }}
                       className="btn btn-secondary"
-                      style={{ flex: 1 }}
+                      style={{ 
+                        flex: isMobile ? 'none' : 1,
+                        width: isMobile ? '100%' : 'auto',
+                        padding: isMobile ? '0.75rem 1rem' : '0.625rem 1rem'
+                      }}
                     >
                       <Eye size={16} style={{ marginRight: '0.25rem' }} />
                       Ver Detalles
@@ -2209,401 +2879,1289 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         </div>
       )}
 
-      {/* Pedidos Tab */}
+      {/* Pedidos Tab - Versión Mejorada y Profesional */}
       {activeTab === 'orders' && (
         <div>
-          <h2 style={{ margin: 0, marginBottom: '1.5rem', color: 'var(--text-primary)' }}>Gestión de Pedidos</h2>
-          
-          {/* Filtros */}
-          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-            <input
-              type="text"
-              placeholder="Buscar por ID o usuario..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                flex: 1,
-                minWidth: '200px',
-                padding: '0.75rem',
-                borderRadius: '0.5rem',
-                border: '1px solid var(--border)',
-                background: 'var(--bg-secondary)',
-                color: 'var(--text-primary)',
-                fontSize: '1rem'
-              }}
-            />
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as OrderStatus | 'all')}
-              style={{
-                padding: '0.75rem',
-                borderRadius: '0.5rem',
-                border: '1px solid var(--border)',
-                background: 'var(--bg-secondary)',
-                color: 'var(--text-primary)',
-                fontSize: '1rem'
-              }}
-            >
-              <option value="all">Todos los estados</option>
-              <option value="pending_payment">Pago Pendiente</option>
-              <option value="payment_confirmed">Pago Confirmado</option>
-              <option value="processing">Procesando</option>
-              <option value="in_transit">En Tránsito</option>
-              <option value="delivered">Entregado</option>
-              <option value="cancelled">Cancelado</option>
-            </select>
-          </div>
-
-          {/* Lista de Pedidos */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {filteredOrders.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '3rem',
-                background: 'var(--bg-secondary)',
-                borderRadius: '1rem',
-                border: '1px solid var(--border)'
-              }}>
-                <ShoppingCart size={48} color="var(--text-secondary)" style={{ marginBottom: '1rem' }} />
-                <p style={{ color: 'var(--text-secondary)' }}>No se encontraron pedidos</p>
-              </div>
-            ) : (
-              filteredOrders.map((order: Order) => {
-                const statusBadge = getStatusBadge(order.status);
-                const deliveryBadge = getDeliveryMethodBadge(order.deliveryMethod || 'shipping');
-                return (
-                  <div key={order.id} style={{
-                    background: 'var(--bg-secondary)',
-                    padding: '1.5rem',
-                    borderRadius: '1rem',
-                    border: '1px solid var(--border)'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
-                      <div style={{ flex: 1 }}>
-                        <h3 style={{ margin: 0, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
-                          Pedido #{order.id.slice(-8)}
-                        </h3>
-                        <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                          Cliente: {order.userName}
-                        </p>
-                        <p style={{ margin: '0.25rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                          Monto: {formatCurrency(order.amount)}
-                        </p>
-                        <p style={{ margin: '0.25rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                          {deliveryBadge.icon} {deliveryBadge.text}
-                        </p>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
-                        <span className={statusBadge.className} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}>
-                          {statusBadge.text}
-                        </span>
-                        <select
-                          value={order.status}
-                          onChange={(e) => {
-                            updateOrderStatus(order.id, e.target.value as OrderStatus);
-                            logOrderAction('Estado actualizado', order.id, user?.id, user?.username, { 
-                              oldStatus: order.status, 
-                              newStatus: e.target.value 
-                            });
-                          }}
-                          style={{
-                            padding: '0.5rem',
-                            borderRadius: '0.5rem',
-                            border: '1px solid var(--border)',
-                            background: 'var(--bg-primary)',
-                            color: 'var(--text-primary)',
-                            fontSize: '0.875rem'
-                          }}
-                        >
-                          <option value="pending_payment">Pago Pendiente</option>
-                          <option value="payment_confirmed">Pago Confirmado</option>
-                          <option value="processing">Procesando</option>
-                          <option value="in_transit">En Tránsito</option>
-                          <option value="delivered">Entregado</option>
-                          <option value="cancelled">Cancelado</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button
-                        onClick={() => setSelectedOrder(order)}
-                        className="btn btn-secondary"
-                        style={{ flex: 1 }}
-                      >
-                        <Eye size={16} style={{ marginRight: '0.25rem' }} />
-                        Ver Detalles
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Bots Tab */}
-      {activeTab === 'bots' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-            <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>Gestión de Bots</h2>
+          {/* Header con título y botón limpiar */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: '2rem',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div>
+              <h2 style={{ margin: 0, marginBottom: '0.5rem', color: 'var(--text-primary)', fontSize: isMobile ? '1.5rem' : '2rem' }}>
+                Gestión de Pedidos
+              </h2>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: isMobile ? '0.875rem' : '1rem' }}>
+                Administrá y seguí el estado de todos los pedidos
+              </p>
+            </div>
             <button
               onClick={() => {
-                setBotForm({
-                  name: '',
-                  balance: 10000,
-                  intervalMin: 5,
-                  intervalMax: 15,
-                  maxBidAmount: 5000,
-                  targetAuctions: []
-                });
+                if (window.confirm('¿Eliminar pedidos finalizados (entregados/cancelados) de más de 30 días?\n\nEsta acción no se puede deshacer.')) {
+                  const now = Date.now();
+                  const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+                  const cleanedOrders = orders.filter((o: Order) => {
+                    if (['delivered', 'cancelled', 'expired'].includes(o.status)) {
+                      const orderDate = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+                      return orderDate > thirtyDaysAgo;
+                    }
+                    return true;
+                  });
+                  setOrders(cleanedOrders);
+                  logAdminAction(`Limpieza de pedidos: ${orders.length - cleanedOrders.length} eliminados`, user?.id, user?.username);
+                  alert(`✅ ${orders.length - cleanedOrders.length} pedidos antiguos eliminados`);
+                }
               }}
-              className="btn btn-primary"
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              className="btn btn-secondary"
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem',
+                padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
+                fontSize: isMobile ? '0.875rem' : '0.9375rem'
+              }}
             >
-              <Plus size={20} />
-              Nuevo Bot
+              <Trash size={18} />
+              {!isMobile && 'Limpiar Antiguos'}
             </button>
           </div>
 
-          {/* Formulario de Bot */}
+          {/* Estadísticas rápidas */}
           <div style={{
-            background: 'var(--bg-secondary)',
-            padding: '2rem',
-            borderRadius: '1rem',
-            border: '1px solid var(--border)',
-            marginBottom: '2rem',
-            maxWidth: '600px'
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '1rem',
+            marginBottom: '2rem'
           }}>
-            <h3 style={{ margin: 0, marginBottom: '1.5rem', color: 'var(--text-primary)' }}>Crear Nuevo Bot</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                  Nombre del Bot
-                </label>
+            <div style={{
+              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              color: 'white'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <Clock size={24} />
+                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Pendientes</span>
+              </div>
+              <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+                {orders.filter((o: Order) => o.status === 'pending_payment').length}
+              </div>
+            </div>
+            <div style={{
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              color: 'white'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <CheckCircle size={24} />
+                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Confirmados</span>
+              </div>
+              <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+                {orders.filter((o: Order) => o.status === 'payment_confirmed').length}
+              </div>
+            </div>
+            <div style={{
+              background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              color: 'white'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <Truck size={24} />
+                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>En Tránsito</span>
+              </div>
+              <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+                {orders.filter((o: Order) => ['in_transit', 'shipped'].includes(o.status)).length}
+              </div>
+            </div>
+            <div style={{
+              background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              color: 'white'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <ShoppingBag size={24} />
+                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Entregados</span>
+              </div>
+              <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+                {orders.filter((o: Order) => o.status === 'delivered').length}
+              </div>
+            </div>
+          </div>
+
+          {/* Filtros mejorados */}
+          <div style={{ 
+            background: 'var(--bg-secondary)', 
+            padding: isMobile ? '1rem' : '1.5rem', 
+            borderRadius: '1rem', 
+            border: '1px solid var(--border)',
+            marginBottom: '1.5rem'
+          }}>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
+                <Search size={20} style={{ 
+                  position: 'absolute', 
+                  left: '0.75rem', 
+                  top: '50%', 
+                  transform: 'translateY(-50%)',
+                  color: 'var(--text-secondary)'
+                }} />
                 <input
                   type="text"
-                  value={botForm.name}
-                  onChange={(e) => setBotForm({ ...botForm, name: e.target.value })}
-                  placeholder="Ej: Bot Agresivo"
+                  placeholder="Buscar por ID, cliente o monto..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '0.75rem',
+                    padding: '0.875rem 0.875rem 0.875rem 2.75rem',
                     borderRadius: '0.5rem',
                     border: '1px solid var(--border)',
                     background: 'var(--bg-primary)',
                     color: 'var(--text-primary)',
-                    fontSize: '1rem'
+                    fontSize: isMobile ? '16px' : '1rem'
                   }}
                 />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                    Balance Inicial
-                  </label>
-                  <input
-                    type="number"
-                    value={botForm.balance}
-                    onChange={(e) => setBotForm({ ...botForm, balance: Number(e.target.value) })}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-primary)',
-                      color: 'var(--text-primary)',
-                      fontSize: '1rem'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                    Oferta Máxima
-                  </label>
-                  <input
-                    type="number"
-                    value={botForm.maxBidAmount}
-                    onChange={(e) => setBotForm({ ...botForm, maxBidAmount: Number(e.target.value) })}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-primary)',
-                      color: 'var(--text-primary)',
-                      fontSize: '1rem'
-                    }}
-                  />
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                    Intervalo Mín (seg)
-                  </label>
-                  <input
-                    type="number"
-                    value={botForm.intervalMin}
-                    onChange={(e) => setBotForm({ ...botForm, intervalMin: Number(e.target.value) })}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-primary)',
-                      color: 'var(--text-primary)',
-                      fontSize: '1rem'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                    Intervalo Máx (seg)
-                  </label>
-                  <input
-                    type="number"
-                    value={botForm.intervalMax}
-                    onChange={(e) => setBotForm({ ...botForm, intervalMax: Number(e.target.value) })}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-primary)',
-                      color: 'var(--text-primary)',
-                      fontSize: '1rem'
-                    }}
-                  />
-                </div>
-              </div>
-              <button
-                onClick={handleAddBot}
-                className="btn btn-primary"
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as OrderStatus | 'all')}
+                style={{
+                  padding: '0.875rem 1rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-primary)',
+                  fontSize: isMobile ? '16px' : '1rem',
+                  cursor: 'pointer',
+                  minWidth: isMobile ? '100%' : '200px'
+                }}
               >
-                <Plus size={20} style={{ marginRight: '0.5rem' }} />
-                Crear Bot
+                <option value="all">📋 Todos los estados</option>
+                <option value="pending_payment">⏳ Pago Pendiente</option>
+                <option value="payment_confirmed">✅ Pago Confirmado</option>
+                <option value="processing">🔄 Procesando</option>
+                <option value="in_transit">🚚 En Tránsito</option>
+                <option value="delivered">📦 Entregado</option>
+                <option value="cancelled">❌ Cancelado</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Lista de Pedidos - Tabla Profesional */}
+          <div style={{ 
+            background: 'var(--bg-secondary)', 
+            borderRadius: '1rem', 
+            border: '1px solid var(--border)',
+            overflow: isMobile ? 'auto' : 'hidden'
+          }}>
+            {filteredOrders.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '4rem 2rem',
+                color: 'var(--text-secondary)'
+              }}>
+                <ShoppingCart size={64} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+                <h3 style={{ margin: '0 0 0.5rem', color: 'var(--text-primary)' }}>No se encontraron pedidos</h3>
+                <p>Intenta ajustar los filtros de búsqueda</p>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ 
+                      background: 'var(--bg-primary)', 
+                      borderBottom: '2px solid var(--border)'
+                    }}>
+                      <th style={{ 
+                        padding: '1rem', 
+                        textAlign: 'left', 
+                        color: 'var(--text-primary)',
+                        fontWeight: 600,
+                        fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                      }}>Pedido</th>
+                      <th style={{ 
+                        padding: '1rem', 
+                        textAlign: 'left', 
+                        color: 'var(--text-primary)',
+                        fontWeight: 600,
+                        fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                      }}>Cliente</th>
+                      <th style={{ 
+                        padding: '1rem', 
+                        textAlign: 'right', 
+                        color: 'var(--text-primary)',
+                        fontWeight: 600,
+                        fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                      }}>Monto</th>
+                      <th style={{ 
+                        padding: '1rem', 
+                        textAlign: 'center', 
+                        color: 'var(--text-primary)',
+                        fontWeight: 600,
+                        fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                      }}>Estado</th>
+                      <th style={{ 
+                        padding: '1rem', 
+                        textAlign: 'center', 
+                        color: 'var(--text-primary)',
+                        fontWeight: 600,
+                        fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                      }}>Fecha</th>
+                      <th style={{ 
+                        padding: '1rem', 
+                        textAlign: 'center', 
+                        color: 'var(--text-primary)',
+                        fontWeight: 600,
+                        fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                      }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredOrders.map((order: Order, index: number) => {
+                      const statusBadge = getStatusBadge(order.status);
+                      const deliveryBadge = getDeliveryMethodBadge(order.deliveryMethod || 'shipping');
+                      const orderDate = order.createdAt ? new Date(order.createdAt).toLocaleDateString('es-AR', { 
+                        day: '2-digit', 
+                        month: 'short',
+                        year: isMobile ? '2-digit' : 'numeric'
+                      }) : 'N/A';
+                      
+                      // Determinar siguiente estado lógico
+                      const getNextStatus = (current: OrderStatus): OrderStatus | null => {
+                        const flow: Record<OrderStatus, OrderStatus | null> = {
+                          pending_payment: 'payment_confirmed',
+                          payment_confirmed: 'processing',
+                          processing: 'in_transit',
+                          in_transit: 'delivered',
+                          delivered: null,
+                          cancelled: null,
+                          payment_expired: null,
+                          expired: null,
+                          preparing: 'shipped',
+                          shipped: 'delivered'
+                        };
+                        return flow[current] || null;
+                      };
+                      
+                      const nextStatus = getNextStatus(order.status);
+                      
+                      return (
+                        <tr 
+                          key={`order-${order.id}-${index}`}
+                          style={{ 
+                            borderBottom: '1px solid var(--border)',
+                            transition: 'background 0.2s',
+                            cursor: 'pointer'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-tertiary)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                          onClick={() => setSelectedOrder(order)}
+                        >
+                          <td style={{ padding: '1rem' }}>
+                            <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: isMobile ? '0.875rem' : '0.9375rem' }}>
+                              #{order.id.slice(-8).toUpperCase()}
+                            </div>
+                          </td>
+                          <td style={{ padding: '1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <User size={16} style={{ color: 'var(--text-secondary)' }} />
+                              <span style={{ color: 'var(--text-primary)', fontSize: isMobile ? '0.875rem' : '0.9375rem' }}>
+                                {order.userName || 'Sin nombre'}
+                              </span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'right' }}>
+                            <span style={{ 
+                              fontWeight: 700, 
+                              color: 'var(--text-primary)',
+                              fontSize: isMobile ? '0.875rem' : '1rem'
+                            }}>
+                              {formatCurrency(order.amount)}
+                            </span>
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'center' }}>
+                            <span 
+                              className={statusBadge.className} 
+                              style={{ 
+                                padding: '0.5rem 0.75rem', 
+                                borderRadius: '0.5rem', 
+                                fontSize: isMobile ? '0.75rem' : '0.8125rem',
+                                display: 'inline-block',
+                                fontWeight: 600
+                              }}
+                            >
+                              {statusBadge.text}
+                            </span>
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center', fontSize: isMobile ? '0.75rem' : '0.8125rem', color: 'var(--text-secondary)' }}>
+                              <Calendar size={14} />
+                              {orderDate}
+                            </div>
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'center' }}>
+                            <div 
+                              style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                onClick={() => setSelectedOrder(order)}
+                                className="btn btn-secondary"
+                                style={{ 
+                                  padding: '0.5rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                  fontSize: isMobile ? '0.75rem' : '0.8125rem'
+                                }}
+                                title="Ver detalles"
+                              >
+                                <Eye size={14} />
+                                {!isMobile && 'Ver'}
+                              </button>
+                              {nextStatus && (
+                                <button
+                                  onClick={() => {
+                                    const statusLabels: Record<OrderStatus, string> = {
+                                      pending_payment: 'Confirmar Pago',
+                                      payment_confirmed: 'Iniciar Procesamiento',
+                                      processing: 'Marcar como En Tránsito',
+                                      in_transit: 'Marcar como Entregado',
+                                      delivered: '',
+                                      cancelled: '',
+                                      payment_expired: '',
+                                      expired: '',
+                                      preparing: 'Marcar como Enviado',
+                                      shipped: 'Marcar como Entregado'
+                                    };
+                                    
+                                    const confirmMessage = `¿${statusLabels[nextStatus] || 'Actualizar estado'} del pedido #${order.id.slice(-8)}?\n\nEstado actual: ${statusBadge.text}\nNuevo estado: ${getStatusBadge(nextStatus).text}`;
+                                    
+                                    if (window.confirm(confirmMessage)) {
+                                      updateOrderStatus(order.id, nextStatus);
+                                      logOrderAction('Estado actualizado', order.id, user?.id, user?.username, { 
+                                        oldStatus: order.status, 
+                                        newStatus: nextStatus,
+                                        actionType: 'manual'
+                                      });
+                                    }
+                                  }}
+                                  className="btn btn-primary"
+                                  style={{ 
+                                    padding: '0.5rem 0.75rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem',
+                                    fontSize: isMobile ? '0.75rem' : '0.8125rem',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                  title={`Avanzar a: ${getStatusBadge(nextStatus).text}`}
+                                >
+                                  <ArrowRight size={14} />
+                                  {!isMobile && 'Siguiente'}
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Resumen de totales */}
+          {filteredOrders.length > 0 && (
+            <div style={{
+              marginTop: '1.5rem',
+              padding: '1.5rem',
+              background: 'var(--bg-secondary)',
+              borderRadius: '1rem',
+              border: '1px solid var(--border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '1rem'
+            }}>
+              <div>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                  Total de pedidos mostrados: 
+                </span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)', marginLeft: '0.5rem' }}>
+                  {filteredOrders.length}
+                </span>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                  Valor total: 
+                </span>
+                <span style={{ fontWeight: 700, color: 'var(--primary)', marginLeft: '0.5rem', fontSize: '1.125rem' }}>
+                  {formatCurrency(filteredOrders.reduce((sum, o: Order) => sum + o.amount, 0))}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Bots Tab - Versión Mejorada y Profesional */}
+      {activeTab === 'bots' && (
+        <div>
+          {/* Header con título y acciones rápidas */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: '2rem',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div>
+              <h2 style={{ 
+                margin: 0, 
+                marginBottom: '0.5rem', 
+                color: 'var(--text-primary)', 
+                fontSize: isMobile ? '1.5rem' : '2rem'
+              }}>
+                Gestión de Bots
+              </h2>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: isMobile ? '0.875rem' : '1rem' }}>
+                Administrá y controlá los bots de subastas automáticos
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => {
+                  const activeBots = bots.filter((b: any) => b.isActive);
+                  if (activeBots.length === 0) {
+                    alert('⚠️ No hay bots activos para desactivar');
+                    return;
+                  }
+                  if (window.confirm(`¿Desactivar todos los ${activeBots.length} bots activos?`)) {
+                    activeBots.forEach((bot: any) => {
+                      updateBot(bot.id, { isActive: false });
+                    });
+                    logAdminAction(`Desactivados todos los bots (${activeBots.length})`, user?.id, user?.username);
+                  }
+                }}
+                className="btn btn-secondary"
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem',
+                  padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
+                  fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                }}
+              >
+                <XCircle size={18} />
+                {!isMobile && 'Desactivar Todos'}
+              </button>
+              <button
+                onClick={() => {
+                  setBotForm({
+                    name: '',
+                    balance: 10000,
+                    intervalMin: 5,
+                    intervalMax: 15,
+                    maxBidAmount: 5000,
+                    targetAuctions: []
+                  });
+                  setShowBotForm(true);
+                }}
+                className="btn btn-primary"
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem',
+                  padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
+                  fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                }}
+              >
+                <Plus size={18} />
+                {!isMobile && 'Nuevo Bot'}
               </button>
             </div>
           </div>
 
-          {/* Lista de Bots */}
+          {/* Estadísticas de Bots */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))',
-            gap: '1.5rem'
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '1rem',
+            marginBottom: '2rem'
           }}>
-            {bots.map((bot: any) => (
-              <div key={bot.id} style={{
-                background: 'var(--bg-secondary)',
-                padding: '1.5rem',
-                borderRadius: '1rem',
-                border: '1px solid var(--border)'
-              }}>
-                <div style={{ marginBottom: '1rem' }}>
-                  <h3 style={{ margin: 0, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
-                    {bot.name}
-                  </h3>
-                  <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                    Balance: {formatCurrency(bot.balance)}
-                  </p>
-                  <p style={{ margin: '0.25rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                    Estado: <span style={{
-                      color: bot.isActive ? 'var(--success)' : 'var(--text-secondary)',
-                      fontWeight: 600
-                    }}>
-                      {bot.isActive ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </p>
-                  <p style={{ margin: '0.25rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                    Intervalo: {bot.intervalMin}s - {bot.intervalMax}s
-                  </p>
-                  <p style={{ margin: '0.25rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                    Oferta Máx: {formatCurrency(bot.maxBidAmount)}
-                  </p>
+            <div style={{
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              color: 'white'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <Bot size={24} />
+                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Activos</span>
+              </div>
+              <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+                {bots.filter((b: any) => b.isActive).length}
+              </div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>
+                de {bots.length} total
+              </div>
+            </div>
+            <div style={{
+              background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              color: 'white'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <DollarSign size={24} />
+                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Balance Total</span>
+              </div>
+              <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+                {formatCurrency(bots.reduce((sum: number, b: any) => sum + b.balance, 0))}
+              </div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>
+                Promedio: {formatCurrency(bots.length > 0 ? bots.reduce((sum: number, b: any) => sum + b.balance, 0) / bots.length : 0)}
+              </div>
+            </div>
+            <div style={{
+              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              color: 'white'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <TrendingUp size={24} />
+                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Ofertas Máx</span>
+              </div>
+              <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+                {formatCurrency(bots.reduce((sum: number, b: any) => sum + b.maxBidAmount, 0))}
+              </div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>
+                Capacidad total
+              </div>
+            </div>
+            <div style={{
+              background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              color: 'white'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <Activity size={24} />
+                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>En Subastas</span>
+              </div>
+              <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+                {auctions.filter((a: any) => a.status === 'active').length}
+              </div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>
+                Subastas activas
+              </div>
+            </div>
+          </div>
+
+          {/* Filtros y búsqueda */}
+          <div style={{ 
+            background: 'var(--bg-secondary)', 
+            padding: isMobile ? '1rem' : '1.5rem', 
+            borderRadius: '1rem', 
+            border: '1px solid var(--border)',
+            marginBottom: '1.5rem'
+          }}>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
+                <Search size={20} style={{ 
+                  position: 'absolute', 
+                  left: '0.75rem', 
+                  top: '50%', 
+                  transform: 'translateY(-50%)',
+                  color: 'var(--text-secondary)'
+                }} />
+                <input
+                  type="text"
+                  placeholder="Buscar bot por nombre..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem 0.875rem 0.875rem 2.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '1rem'
+                  }}
+                />
+              </div>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'inactive')}
+                style={{
+                  padding: '0.875rem 1rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-primary)',
+                  fontSize: isMobile ? '16px' : '1rem',
+                  cursor: 'pointer',
+                  minWidth: isMobile ? '100%' : '200px'
+                }}
+              >
+                <option value="all">🤖 Todos los bots</option>
+                <option value="active">✅ Activos</option>
+                <option value="inactive">⏸️ Inactivos</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Formulario de Bot - Colapsable */}
+          {showBotForm && (
+            <div style={{
+              background: 'var(--bg-secondary)',
+              padding: isMobile ? '1.5rem' : '2rem',
+              borderRadius: '1rem',
+              border: '1px solid var(--border)',
+              marginBottom: '2rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Crear Nuevo Bot</h3>
+                <button
+                  onClick={() => {
+                    setShowBotForm(false);
+                    setBotForm({
+                      name: '',
+                      balance: 10000,
+                      intervalMin: 5,
+                      intervalMax: 15,
+                      maxBidAmount: 5000,
+                      targetAuctions: []
+                    });
+                  }}
+                  className="btn btn-secondary"
+                  style={{ padding: '0.5rem' }}
+                  title="Cerrar formulario"
+                >
+                  <XCircle size={18} />
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: isMobile ? 'block' : 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      Nombre del Bot *
+                    </label>
+                    <input
+                      type="text"
+                      value={botForm.name}
+                      onChange={(e) => setBotForm({ ...botForm, name: e.target.value })}
+                      placeholder="Ej: Bot Agresivo, Bot Conservador"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '1rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      Balance Inicial *
+                    </label>
+                    <input
+                      type="number"
+                      min="100"
+                      step="100"
+                      value={botForm.balance}
+                      onChange={(e) => setBotForm({ ...botForm, balance: Number(e.target.value) })}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '1rem'
+                      }}
+                    />
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: isMobile ? 'block' : 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      Oferta Máxima *
+                    </label>
+                    <input
+                      type="number"
+                      min="100"
+                      step="100"
+                      value={botForm.maxBidAmount}
+                      onChange={(e) => setBotForm({ ...botForm, maxBidAmount: Number(e.target.value) })}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '1rem'
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: isMobile ? 'block' : 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                        Intervalo Mín (seg) *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="60"
+                        value={botForm.intervalMin}
+                        onChange={(e) => setBotForm({ ...botForm, intervalMin: Number(e.target.value) })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          borderRadius: '0.5rem',
+                          border: '1px solid var(--border)',
+                          background: 'var(--bg-primary)',
+                          color: 'var(--text-primary)',
+                          fontSize: isMobile ? '16px' : '1rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                        Intervalo Máx (seg) *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="300"
+                        value={botForm.intervalMax}
+                        onChange={(e) => setBotForm({ ...botForm, intervalMax: Number(e.target.value) })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          borderRadius: '0.5rem',
+                          border: '1px solid var(--border)',
+                          background: 'var(--bg-primary)',
+                          color: 'var(--text-primary)',
+                          fontSize: isMobile ? '16px' : '1rem'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div style={{ 
+                  display: 'flex', 
+                  gap: '1rem', 
+                  marginTop: '0.5rem',
+                  flexDirection: isMobile ? 'column' : 'row'
+                }}>
                   <button
-                    onClick={() => updateBot(bot.id, { isActive: !bot.isActive })}
-                    className={bot.isActive ? "btn btn-secondary" : "btn btn-primary"}
-                    style={{ flex: 1 }}
+                    onClick={() => {
+                      if (!botForm.name.trim()) {
+                        alert('⚠️ Por favor ingresa un nombre para el bot');
+                        return;
+                      }
+                      if (botForm.balance < 100) {
+                        alert('⚠️ El balance debe ser al menos $100');
+                        return;
+                      }
+                      if (botForm.maxBidAmount < 100) {
+                        alert('⚠️ La oferta máxima debe ser al menos $100');
+                        return;
+                      }
+                      if (botForm.intervalMin >= botForm.intervalMax) {
+                        alert('⚠️ El intervalo mínimo debe ser menor que el máximo');
+                        return;
+                      }
+                      if (botForm.intervalMin < 1 || botForm.intervalMax > 300) {
+                        alert('⚠️ Los intervalos deben estar entre 1 y 300 segundos');
+                        return;
+                      }
+                      handleAddBot();
+                      setShowBotForm(false);
+                    }}
+                    className="btn btn-primary"
+                    style={{ 
+                      flex: isMobile ? 'none' : 1,
+                      width: isMobile ? '100%' : 'auto',
+                      padding: isMobile ? '0.875rem 1.25rem' : '0.75rem 1.5rem'
+                    }}
                   >
-                    {bot.isActive ? 'Desactivar' : 'Activar'}
+                    <Plus size={18} style={{ marginRight: '0.5rem' }} />
+                    Crear Bot
                   </button>
                   <button
                     onClick={() => {
-                      if (window.confirm(`¿Eliminar bot "${bot.name}"?`)) {
-                        deleteBot(bot.id);
-                        alert('✅ Bot eliminado');
-                      }
+                      setShowBotForm(false);
+                      setBotForm({
+                        name: '',
+                        balance: 10000,
+                        intervalMin: 5,
+                        intervalMax: 15,
+                        maxBidAmount: 5000,
+                        targetAuctions: []
+                      });
                     }}
-                    className="btn btn-danger"
-                    style={{ flex: 1 }}
+                    className="btn btn-secondary"
+                    style={{ 
+                      width: isMobile ? '100%' : 'auto',
+                      padding: isMobile ? '0.875rem 1.25rem' : '0.75rem 1.5rem'
+                    }}
                   >
-                    <Trash2 size={16} style={{ marginRight: '0.25rem' }} />
-                    Eliminar
+                    Cancelar
                   </button>
                 </div>
               </div>
-            ))}
+            </div>
+          )}
+
+          {/* Tabla de Bots Profesional */}
+          <div style={{ 
+            background: 'var(--bg-secondary)', 
+            borderRadius: '1rem', 
+            border: '1px solid var(--border)',
+            overflow: isMobile ? 'auto' : 'hidden'
+          }}>
+            {(() => {
+              const filteredBots = bots.filter((bot: any) => {
+                const matchesSearch = !searchTerm || bot.name.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesFilter = filterStatus === 'all' || 
+                  (filterStatus === 'active' && bot.isActive) ||
+                  (filterStatus === 'inactive' && !bot.isActive);
+                return matchesSearch && matchesFilter;
+              });
+
+              // Contar ofertas de cada bot
+              const getBotBidCount = (botId: string) => {
+                return auctions.reduce((count: number, auction: any) => {
+                  if (auction.bids) {
+                    return count + auction.bids.filter((bid: any) => bid.userId === botId && bid.isBot).length;
+                  }
+                  return count;
+                }, 0);
+              };
+
+              return filteredBots.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '4rem 2rem',
+                  color: 'var(--text-secondary)'
+                }}>
+                  <Bot size={64} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+                  <h3 style={{ margin: '0 0 0.5rem', color: 'var(--text-primary)' }}>No se encontraron bots</h3>
+                  <p>Crea tu primer bot o ajusta los filtros de búsqueda</p>
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ 
+                        background: 'var(--bg-primary)', 
+                        borderBottom: '2px solid var(--border)'
+                      }}>
+                        <th style={{ 
+                          padding: '1rem', 
+                          textAlign: 'left', 
+                          color: 'var(--text-primary)',
+                          fontWeight: 600,
+                          fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                        }}>Nombre</th>
+                        <th style={{ 
+                          padding: '1rem', 
+                          textAlign: 'right', 
+                          color: 'var(--text-primary)',
+                          fontWeight: 600,
+                          fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                        }}>Balance</th>
+                        <th style={{ 
+                          padding: '1rem', 
+                          textAlign: 'right', 
+                          color: 'var(--text-primary)',
+                          fontWeight: 600,
+                          fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                        }}>Oferta Máx</th>
+                        <th style={{ 
+                          padding: '1rem', 
+                          textAlign: 'center', 
+                          color: 'var(--text-primary)',
+                          fontWeight: 600,
+                          fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                        }}>Intervalo</th>
+                        <th style={{ 
+                          padding: '1rem', 
+                          textAlign: 'center', 
+                          color: 'var(--text-primary)',
+                          fontWeight: 600,
+                          fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                        }}>Estado</th>
+                        <th style={{ 
+                          padding: '1rem', 
+                          textAlign: 'center', 
+                          color: 'var(--text-primary)',
+                          fontWeight: 600,
+                          fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                        }}>Ofertas</th>
+                        <th style={{ 
+                          padding: '1rem', 
+                          textAlign: 'center', 
+                          color: 'var(--text-primary)',
+                          fontWeight: 600,
+                          fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                        }}>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredBots.map((bot: any) => {
+                        const bidCount = getBotBidCount(bot.id);
+                        return (
+                          <tr 
+                            key={bot.id}
+                            style={{ 
+                              borderBottom: '1px solid var(--border)',
+                              transition: 'background 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-tertiary)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                          >
+                            <td style={{ padding: '1rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <Bot size={20} style={{ color: bot.isActive ? 'var(--success)' : 'var(--text-secondary)' }} />
+                                <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: isMobile ? '0.875rem' : '0.9375rem' }}>
+                                  {bot.name}
+                                </span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '1rem', textAlign: 'right' }}>
+                              <span style={{ 
+                                fontWeight: 700, 
+                                color: 'var(--text-primary)',
+                                fontSize: isMobile ? '0.875rem' : '1rem'
+                              }}>
+                                {formatCurrency(bot.balance)}
+                              </span>
+                            </td>
+                            <td style={{ padding: '1rem', textAlign: 'right' }}>
+                              <span style={{ 
+                                color: 'var(--text-secondary)',
+                                fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                              }}>
+                                {formatCurrency(bot.maxBidAmount)}
+                              </span>
+                            </td>
+                            <td style={{ padding: '1rem', textAlign: 'center' }}>
+                              <span style={{ 
+                                color: 'var(--text-secondary)',
+                                fontSize: isMobile ? '0.75rem' : '0.8125rem',
+                                fontFamily: 'monospace'
+                              }}>
+                                {bot.intervalMin}s-{bot.intervalMax}s
+                              </span>
+                            </td>
+                            <td style={{ padding: '1rem', textAlign: 'center' }}>
+                              <span style={{
+                                padding: '0.375rem 0.75rem',
+                                borderRadius: '0.5rem',
+                                fontSize: isMobile ? '0.75rem' : '0.8125rem',
+                                fontWeight: 600,
+                                display: 'inline-block',
+                                background: bot.isActive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(107, 114, 128, 0.1)',
+                                color: bot.isActive ? 'var(--success)' : 'var(--text-secondary)'
+                              }}>
+                                {bot.isActive ? '✅ Activo' : '⏸️ Inactivo'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '1rem', textAlign: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
+                                <TrendingUp size={14} style={{ color: 'var(--text-secondary)' }} />
+                                <span style={{ 
+                                  color: 'var(--text-primary)',
+                                  fontWeight: 600,
+                                  fontSize: isMobile ? '0.75rem' : '0.8125rem'
+                                }}>
+                                  {bidCount}
+                                </span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '1rem', textAlign: 'center' }}>
+                              <div 
+                                style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}
+                              >
+                                <button
+                                  onClick={() => {
+                                    const newBalance = prompt(`Recargar balance para "${bot.name}"\n\nBalance actual: ${formatCurrency(bot.balance)}\n\nIngresá el nuevo balance:`, bot.balance.toString());
+                                    if (newBalance && !isNaN(Number(newBalance)) && Number(newBalance) >= 0) {
+                                      updateBot(bot.id, { balance: Number(newBalance) });
+                                      logAdminAction(`Balance recargado: ${bot.name} - ${formatCurrency(bot.balance)} → ${formatCurrency(Number(newBalance))}`, user?.id, user?.username);
+                                    }
+                                  }}
+                                  className="btn btn-secondary"
+                                  style={{ 
+                                    padding: '0.5rem',
+                                    fontSize: isMobile ? '0.75rem' : '0.8125rem'
+                                  }}
+                                  title="Recargar balance"
+                                >
+                                  <DollarSign size={14} />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`¿${bot.isActive ? 'Desactivar' : 'Activar'} el bot "${bot.name}"?`)) {
+                                      updateBot(bot.id, { isActive: !bot.isActive });
+                                      logAdminAction(`Bot ${bot.isActive ? 'desactivado' : 'activado'}: ${bot.name}`, user?.id, user?.username);
+                                    }
+                                  }}
+                                  className={bot.isActive ? "btn btn-secondary" : "btn btn-primary"}
+                                  style={{ 
+                                    padding: '0.5rem',
+                                    fontSize: isMobile ? '0.75rem' : '0.8125rem'
+                                  }}
+                                  title={bot.isActive ? 'Desactivar' : 'Activar'}
+                                >
+                                  {bot.isActive ? <XCircle size={14} /> : <CheckCircle size={14} />}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const newMaxBid = prompt(`Cambiar oferta máxima para "${bot.name}"\n\nOferta máxima actual: ${formatCurrency(bot.maxBidAmount)}\n\nIngresá el nuevo monto máximo:`, bot.maxBidAmount.toString());
+                                    if (newMaxBid && !isNaN(Number(newMaxBid)) && Number(newMaxBid) >= 100) {
+                                      updateBot(bot.id, { maxBidAmount: Number(newMaxBid) });
+                                      logAdminAction(`Oferta máxima actualizada: ${bot.name} - ${formatCurrency(bot.maxBidAmount)} → ${formatCurrency(Number(newMaxBid))}`, user?.id, user?.username);
+                                    }
+                                  }}
+                                  className="btn btn-secondary"
+                                  style={{ 
+                                    padding: '0.5rem',
+                                    fontSize: isMobile ? '0.75rem' : '0.8125rem'
+                                  }}
+                                  title="Editar oferta máxima"
+                                >
+                                  <Edit size={14} />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`¿Eliminar bot "${bot.name}"?\n\nEsta acción no se puede deshacer.`)) {
+                                      deleteBot(bot.id);
+                                      logAdminAction(`Bot eliminado: ${bot.name}`, user?.id, user?.username);
+                                    }
+                                  }}
+                                  className="btn btn-danger"
+                                  style={{ 
+                                    padding: '0.5rem',
+                                    fontSize: isMobile ? '0.75rem' : '0.8125rem'
+                                  }}
+                                  title="Eliminar bot"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
           </div>
+
+          {/* Resumen */}
+          {bots.length > 0 && (
+            <div style={{
+              marginTop: '1.5rem',
+              padding: '1.5rem',
+              background: 'var(--bg-secondary)',
+              borderRadius: '1rem',
+              border: '1px solid var(--border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '1rem'
+            }}>
+              <div>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                  Total de bots: 
+                </span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)', marginLeft: '0.5rem' }}>
+                  {bots.length} ({bots.filter((b: any) => b.isActive).length} activos)
+                </span>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                  Balance total: 
+                </span>
+                <span style={{ fontWeight: 700, color: 'var(--primary)', marginLeft: '0.5rem', fontSize: '1.125rem' }}>
+                  {formatCurrency(bots.reduce((sum: number, b: any) => sum + b.balance, 0))}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Mensajería Tab */}
+      {/* Mensajería Tab - Mejorado */}
       {activeTab === 'messages' && (
-        <div style={{ display: 'flex', gap: '1rem', height: 'calc(100vh - 300px)', minHeight: '500px' }}>
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: isMobile ? 'column' : 'row',
+          gap: '1rem', 
+          height: isMobile ? 'auto' : 'calc(100vh - 300px)', 
+          minHeight: isMobile ? 'auto' : '500px' 
+        }}>
           {/* Lista de Conversaciones */}
           <div style={{
             width: isMobile ? '100%' : '300px',
             background: 'var(--bg-secondary)',
             borderRadius: '1rem',
             border: '1px solid var(--border)',
-            padding: '1rem',
+            padding: isMobile ? '0.75rem' : '1rem',
             display: 'flex',
             flexDirection: 'column',
             gap: '0.5rem',
-            overflowY: 'auto'
+            overflowY: 'auto',
+            maxHeight: isMobile ? '300px' : 'none'
           }}>
-            <h3 style={{ margin: 0, marginBottom: '1rem', color: 'var(--text-primary)' }}>
-              Conversaciones {adminUnreadCount > 0 && (
-                <span style={{
-                  background: 'var(--error)',
-                  color: 'white',
-                  borderRadius: '50%',
-                  padding: '0.25rem 0.5rem',
-                  fontSize: '0.75rem',
-                  marginLeft: '0.5rem'
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginBottom: '1rem',
+              flexWrap: 'wrap',
+              gap: '0.5rem'
+            }}>
+              <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: isMobile ? '1rem' : '1.125rem' }}>
+                Conversaciones {adminUnreadCount > 0 && (
+                  <span style={{
+                    background: 'var(--error)',
+                    color: 'white',
+                    borderRadius: '50%',
+                    padding: '0.25rem 0.5rem',
+                    fontSize: '0.75rem',
+                    marginLeft: '0.5rem'
+                  }}>
+                    {adminUnreadCount}
+                  </span>
+                )}
+              </h3>
+              <button
+                onClick={() => setShowUserSelector(!showUserSelector)}
+                className="btn btn-primary"
+                style={{ 
+                  padding: isMobile ? '0.5rem 0.75rem' : '0.5rem 1rem',
+                  fontSize: isMobile ? '0.875rem' : '0.9375rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Plus size={16} />
+                {isMobile ? 'Nuevo' : 'Nuevo Mensaje'}
+              </button>
+            </div>
+
+            {/* Selector de Usuario para Nuevo Mensaje */}
+            {showUserSelector && (
+              <div style={{
+                padding: '1rem',
+                background: 'var(--bg-primary)',
+                borderRadius: '0.5rem',
+                border: '1px solid var(--border)',
+                marginBottom: '1rem'
+              }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '0.5rem', 
+                  fontWeight: 600,
+                  color: 'var(--text-primary)',
+                  fontSize: isMobile ? '0.875rem' : '0.9375rem'
                 }}>
-                  {adminUnreadCount}
-                </span>
-              )}
-            </h3>
+                  Seleccionar Usuario:
+                </label>
+                <select
+                  value={selectedUserForMessage || ''}
+                  onChange={(e) => setSelectedUserForMessage(e.target.value || null)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-secondary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '1rem',
+                    marginBottom: '0.5rem'
+                  }}
+                >
+                  <option value="">-- Seleccionar usuario --</option>
+                  {realUsers.map((u: any) => (
+                    <option key={u.id} value={u.id}>
+                      {u.username || u.displayName || u.email?.split('@')[0] || `Usuario ${u.id.slice(0, 8)}`}
+                    </option>
+                  ))}
+                </select>
+                {selectedUserForMessage && (
+                  <button
+                    onClick={() => {
+                      setShowUserSelector(false);
+                      setSelectedConversation(`admin_${selectedUserForMessage}`);
+                    }}
+                    className="btn btn-primary"
+                    style={{ width: '100%', marginTop: '0.5rem', padding: '0.75rem' }}
+                  >
+                    <Send size={16} style={{ marginRight: '0.5rem' }} />
+                    Abrir Conversación
+                  </button>
+                )}
+              </div>
+            )}
+
             {conversations.length === 0 ? (
-              <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>
+              <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem', fontSize: isMobile ? '0.875rem' : '1rem' }}>
                 No hay conversaciones
               </p>
             ) : (
               conversations.map(conv => (
                 <div
                   key={conv.id}
-                  onClick={() => setSelectedConversation(conv.id)}
+                  onClick={() => {
+                    setSelectedConversation(conv.id);
+                    if (isMobile) {
+                      // En móvil, mostrar mensajes debajo
+                      setShowUserSelector(false);
+                    }
+                  }}
                   style={{
-                    padding: '1rem',
+                    padding: isMobile ? '0.75rem' : '1rem',
                     background: selectedConversation === conv.id ? 'var(--primary)' : 'var(--bg-primary)',
                     color: selectedConversation === conv.id ? 'white' : 'var(--text-primary)',
                     borderRadius: '0.5rem',
                     cursor: 'pointer',
-                    border: `1px solid ${selectedConversation === conv.id ? 'var(--primary)' : 'var(--border)'}`
+                    border: `1px solid ${selectedConversation === conv.id ? 'var(--primary)' : 'var(--border)'}`,
+                    transition: 'all 0.2s'
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <p style={{ margin: 0, fontWeight: 600 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontWeight: 600, fontSize: isMobile ? '0.875rem' : '0.9375rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {conv.username}
                       </p>
-                      <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', opacity: 0.8 }}>
-                        {conv.lastMessage?.content?.substring(0, 30) || 'Sin mensajes'}...
+                      <p style={{ margin: '0.25rem 0 0 0', fontSize: isMobile ? '0.75rem' : '0.875rem', opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {conv.lastMessage?.content?.substring(0, isMobile ? 20 : 30) || 'Sin mensajes'}...
                       </p>
                     </div>
                     {conv.unreadCount > 0 && (
@@ -2611,13 +4169,14 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                         background: selectedConversation === conv.id ? 'white' : 'var(--error)',
                         color: selectedConversation === conv.id ? 'var(--primary)' : 'white',
                         borderRadius: '50%',
-                        width: '24px',
-                        height: '24px',
+                        width: isMobile ? '20px' : '24px',
+                        height: isMobile ? '20px' : '24px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: '0.75rem',
-                        fontWeight: 700
+                        fontSize: isMobile ? '0.7rem' : '0.75rem',
+                        fontWeight: 700,
+                        flexShrink: 0
                       }}>
                         {conv.unreadCount}
                       </span>
@@ -2628,189 +4187,314 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
             )}
           </div>
 
-          {/* Panel de Mensajes */}
-          {!isMobile && (
-            <div style={{
-              flex: 1,
-              background: 'var(--bg-secondary)',
-              borderRadius: '1rem',
-              border: '1px solid var(--border)',
-              display: 'flex',
-              flexDirection: 'column'
-            }}>
-              {selectedConversation ? (
-                <>
-                  <div style={{
-                    padding: '1rem',
-                    borderBottom: '1px solid var(--border)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
-                    <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>
-                      {conversations.find(c => c.id === selectedConversation)?.username || 'Usuario'}
-                    </h3>
-                    <button
-                      onClick={() => {
-                        if (window.confirm('¿Eliminar esta conversación?')) {
-                          deleteConversation(selectedConversation);
-                          setSelectedConversation(null);
-                          setConversations(getAllConversations());
-                        }
-                      }}
-                      className="btn btn-danger"
-                      style={{ padding: '0.5rem' }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                  <div style={{
-                    flex: 1,
-                    padding: '1rem',
-                    overflowY: 'auto',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '1rem'
-                  }}>
-                    {conversationMessages.length === 0 ? (
-                      <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>
-                        No hay mensajes en esta conversación
-                      </p>
-                    ) : (
-                      conversationMessages.map(msg => {
-                        const isAdmin = msg.fromUserId === 'admin';
-                        return (
-                          <div
-                            key={msg.id}
-                            style={{
-                              alignSelf: isAdmin ? 'flex-start' : 'flex-end',
-                              maxWidth: '70%'
-                            }}
-                          >
-                            <div style={{
-                              padding: '0.75rem 1rem',
-                              background: isAdmin ? 'var(--primary)' : 'var(--bg-primary)',
-                              color: isAdmin ? 'white' : 'var(--text-primary)',
-                              borderRadius: '1rem',
-                              border: `1px solid ${isAdmin ? 'var(--primary)' : 'var(--border)'}`
-                            }}>
-                              <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600 }}>
-                                {isAdmin ? 'Administrador' : msg.fromUsername}
-                              </p>
-                              <p style={{ margin: '0.5rem 0 0 0' }}>
-                                {msg.content}
-                              </p>
-                              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', opacity: 0.7 }}>
-                                {formatTimeAgo(msg.createdAt)}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })
+          {/* Panel de Mensajes - Responsive */}
+          <div style={{
+            flex: 1,
+            background: 'var(--bg-secondary)',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: isMobile ? '400px' : 'auto'
+          }}>
+            {selectedConversation || selectedUserForMessage ? (
+              <>
+                <div style={{
+                  padding: isMobile ? '0.75rem' : '1rem',
+                  borderBottom: '1px solid var(--border)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  flexWrap: 'wrap'
+                }}>
+                  <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: isMobile ? '1rem' : '1.125rem' }}>
+                    {selectedConversation 
+                      ? conversations.find(c => c.id === selectedConversation)?.username || 'Usuario'
+                      : realUsers.find((u: any) => u.id === selectedUserForMessage)?.username || 'Usuario'
+                    }
+                  </h3>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {selectedConversation && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm('¿Eliminar esta conversación completa?')) {
+                            deleteConversation(selectedConversation);
+                            setSelectedConversation(null);
+                            setConversations(getAllConversations());
+                          }
+                        }}
+                        className="btn btn-danger"
+                        style={{ 
+                          padding: isMobile ? '0.5rem' : '0.5rem 0.75rem',
+                          fontSize: isMobile ? '0.875rem' : '0.9375rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem'
+                        }}
+                        title="Eliminar conversación"
+                      >
+                        <Trash2 size={16} />
+                        {!isMobile && 'Eliminar'}
+                      </button>
                     )}
                   </div>
-                  <div style={{
-                    padding: '1rem',
-                    borderTop: '1px solid var(--border)',
-                    display: 'flex',
-                    gap: '0.5rem'
-                  }}>
-                    <input
-                      type="text"
-                      value={newMessageContent}
-                      onChange={(e) => setNewMessageContent(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          handleSendMessage();
-                        }
-                      }}
-                      placeholder="Escribí un mensaje..."
-                      style={{
-                        flex: 1,
-                        padding: '0.75rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid var(--border)',
-                        background: 'var(--bg-primary)',
-                        color: 'var(--text-primary)',
-                        fontSize: '1rem'
-                      }}
-                    />
-                    <button
-                      onClick={handleSendMessage}
-                      className="btn btn-primary"
-                      disabled={!newMessageContent.trim()}
-                    >
-                      <Send size={20} />
-                    </button>
-                  </div>
-                </>
-              ) : (
+                </div>
                 <div style={{
                   flex: 1,
+                  padding: isMobile ? '0.75rem' : '1rem',
+                  overflowY: 'auto',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--text-secondary)'
+                  flexDirection: 'column',
+                  gap: '1rem',
+                  minHeight: '200px'
                 }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <Mail size={64} style={{ marginBottom: '1rem', opacity: 0.5 }} />
-                    <p>Seleccioná una conversación para ver los mensajes</p>
-                  </div>
+                  {conversationMessages.length === 0 ? (
+                    <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem', fontSize: isMobile ? '0.875rem' : '1rem' }}>
+                      No hay mensajes en esta conversación
+                    </p>
+                  ) : (
+                    conversationMessages.map(msg => {
+                      const isAdmin = msg.fromUserId === 'admin';
+                      return (
+                        <div
+                          key={msg.id}
+                          style={{
+                            alignSelf: isAdmin ? 'flex-start' : 'flex-end',
+                            maxWidth: isMobile ? '85%' : '70%',
+                            position: 'relative'
+                          }}
+                        >
+                          <div style={{
+                            padding: isMobile ? '0.625rem 0.875rem' : '0.75rem 1rem',
+                            background: isAdmin ? 'var(--primary)' : 'var(--bg-primary)',
+                            color: isAdmin ? 'white' : 'var(--text-primary)',
+                            borderRadius: '1rem',
+                            border: `1px solid ${isAdmin ? 'var(--primary)' : 'var(--border)'}`,
+                            position: 'relative'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                              <div style={{ flex: 1 }}>
+                                <p style={{ margin: 0, fontSize: isMobile ? '0.8125rem' : '0.875rem', fontWeight: 600 }}>
+                                  {isAdmin ? 'Administrador' : msg.fromUsername}
+                                </p>
+                                <p style={{ margin: '0.5rem 0 0 0', fontSize: isMobile ? '0.875rem' : '0.9375rem', wordBreak: 'break-word' }}>
+                                  {msg.content}
+                                </p>
+                                <p style={{ margin: '0.5rem 0 0 0', fontSize: isMobile ? '0.7rem' : '0.75rem', opacity: 0.7 }}>
+                                  {formatTimeAgo(msg.createdAt)}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  if (window.confirm('¿Eliminar este mensaje?')) {
+                                    deleteMessage(msg.id);
+                                    setConversationMessages(getMessages(selectedConversation || `admin_${selectedUserForMessage}`));
+                                    setConversations(getAllConversations());
+                                  }
+                                }}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: isAdmin ? 'rgba(255,255,255,0.7)' : 'var(--text-secondary)',
+                                  cursor: 'pointer',
+                                  padding: '0.25rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  opacity: 0.6,
+                                  transition: 'opacity 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
+                                title="Eliminar mensaje"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
-              )}
-            </div>
-          )}
+                <div style={{
+                  padding: isMobile ? '0.75rem' : '1rem',
+                  borderTop: '1px solid var(--border)',
+                  display: 'flex',
+                  gap: '0.5rem',
+                  flexWrap: isMobile ? 'wrap' : 'nowrap'
+                }}>
+                  <input
+                    type="text"
+                    value={newMessageContent}
+                    onChange={(e) => setNewMessageContent(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                    placeholder="Escribí un mensaje..."
+                    style={{
+                      flex: 1,
+                      padding: isMobile ? '0.75rem' : '0.875rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: isMobile ? '16px' : '1rem', // 16px para evitar zoom en iOS
+                      minWidth: 0
+                    }}
+                  />
+                  <button
+                    onClick={handleSendMessage}
+                    className="btn btn-primary"
+                    disabled={!newMessageContent.trim() || (!selectedConversation && !selectedUserForMessage)}
+                    style={{ 
+                      padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
+                      fontSize: isMobile ? '0.875rem' : '0.9375rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <Send size={isMobile ? 18 : 20} />
+                    {!isMobile && 'Enviar'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--text-secondary)',
+                padding: '2rem',
+                textAlign: 'center'
+              }}>
+                <div>
+                  <Mail size={isMobile ? 48 : 64} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+                  <p style={{ fontSize: isMobile ? '0.875rem' : '1rem', margin: 0 }}>
+                    {isMobile ? 'Tocá una conversación' : 'Seleccioná una conversación'} para ver los mensajes
+                  </p>
+                  {!showUserSelector && (
+                    <button
+                      onClick={() => setShowUserSelector(true)}
+                      className="btn btn-primary"
+                      style={{ 
+                        marginTop: '1rem',
+                        padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
+                        fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                      }}
+                    >
+                      <Plus size={16} style={{ marginRight: '0.5rem' }} />
+                      Nuevo Mensaje
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {/* Editor de Home Tab */}
       {activeTab === 'home-config' && (
         <div>
-          <h2 style={{ margin: 0, marginBottom: '1.5rem', color: 'var(--text-primary)' }}>Editor de Página de Inicio</h2>
-          
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: '2rem',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div>
+              <h2 style={{ 
+                margin: 0, 
+                marginBottom: '0.5rem', 
+                color: 'var(--text-primary)',
+                fontSize: isMobile ? '1.5rem' : '2rem'
+              }}>
+                Editor de Página de Inicio
+              </h2>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: isMobile ? '0.875rem' : '1rem' }}>
+                Personalizá la sección principal, banners y promociones de tu sitio
+              </p>
+            </div>
+            <button
+              onClick={handleSaveHomeConfig}
+              className="btn btn-primary"
+              style={{ 
+                padding: isMobile ? '0.75rem 1.25rem' : '0.875rem 1.5rem',
+                fontSize: isMobile ? '0.875rem' : '0.9375rem'
+              }}
+            >
+              <Save size={18} style={{ marginRight: '0.5rem' }} />
+              Guardar Todo
+            </button>
+          </div>
+
+          {/* Sección Hero */}
           <div style={{
             background: 'var(--bg-secondary)',
-            padding: '2rem',
+            padding: isMobile ? '1.5rem' : '2rem',
             borderRadius: '1rem',
             border: '1px solid var(--border)',
-            maxWidth: '800px'
+            marginBottom: '2rem'
           }}>
+            <h3 style={{ 
+              margin: 0, 
+              marginBottom: '1.5rem', 
+              color: 'var(--text-primary)',
+              fontSize: isMobile ? '1.25rem' : '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <ImageIcon size={24} />
+              Sección Principal (Hero)
+            </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                  Título Principal
+                  Título Principal *
                 </label>
                 <input
                   type="text"
                   value={homeConfig.heroTitle}
                   onChange={(e) => setHomeConfig({ ...homeConfig, heroTitle: e.target.value })}
+                  placeholder="Ej: Bienvenido a Subasta Argenta"
                   style={{
                     width: '100%',
-                    padding: '0.75rem',
+                    padding: '0.875rem',
                     borderRadius: '0.5rem',
                     border: '1px solid var(--border)',
                     background: 'var(--bg-primary)',
                     color: 'var(--text-primary)',
-                    fontSize: '1rem'
+                    fontSize: isMobile ? '16px' : '1rem'
                   }}
                 />
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                  Subtítulo
+                  Subtítulo *
                 </label>
                 <textarea
                   value={homeConfig.heroSubtitle}
                   onChange={(e) => setHomeConfig({ ...homeConfig, heroSubtitle: e.target.value })}
-                  rows={3}
+                  rows={4}
+                  placeholder="Descripción breve de tu plataforma..."
                   style={{
                     width: '100%',
-                    padding: '0.75rem',
+                    padding: '0.875rem',
                     borderRadius: '0.5rem',
                     border: '1px solid var(--border)',
                     background: 'var(--bg-primary)',
                     color: 'var(--text-primary)',
-                    fontSize: '1rem',
+                    fontSize: isMobile ? '16px' : '1rem',
                     fontFamily: 'inherit',
                     resize: 'vertical'
                   }}
@@ -2818,33 +4502,616 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                  URL de Imagen Principal
+                  Imagen Principal
                 </label>
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.currentTarget.style.borderColor = 'var(--primary)';
+                    e.currentTarget.style.background = 'rgba(214, 90, 0, 0.05)';
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.currentTarget.style.borderColor = 'var(--border)';
+                    e.currentTarget.style.background = 'var(--bg-primary)';
+                  }}
+                  onDrop={(e) => handleImageDrop(e, (url) => setHomeConfig({ ...homeConfig, heroImageUrl: url }))}
+                  style={{
+                    border: '2px dashed var(--border)',
+                    borderRadius: '0.5rem',
+                    padding: '1rem',
+                    background: 'var(--bg-primary)',
+                    transition: 'all 0.2s',
+                    marginBottom: '0.75rem'
+                  }}
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleImageFileSelect(e, (url) => setHomeConfig({ ...homeConfig, heroImageUrl: url }))}
+                    style={{ display: 'none' }}
+                    id="hero-image-input"
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                      📸 Arrastrá una imagen aquí o hacé clic para seleccionar
+                    </div>
+                    <label
+                      htmlFor="hero-image-input"
+                      className="btn btn-secondary"
+                      style={{
+                        padding: '0.625rem 1.25rem',
+                        fontSize: isMobile ? '0.875rem' : '0.9375rem',
+                        cursor: 'pointer',
+                        display: 'inline-block'
+                      }}
+                    >
+                      Seleccionar Imagen
+                    </label>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      También podés pegar una URL abajo
+                    </div>
+                  </div>
+                </div>
                 <input
                   type="text"
                   value={homeConfig.heroImageUrl}
                   onChange={(e) => setHomeConfig({ ...homeConfig, heroImageUrl: e.target.value })}
-                  placeholder="https://..."
+                  placeholder="O ingresá una URL: https://ejemplo.com/imagen.jpg"
                   style={{
                     width: '100%',
-                    padding: '0.75rem',
+                    padding: '0.875rem',
                     borderRadius: '0.5rem',
                     border: '1px solid var(--border)',
                     background: 'var(--bg-primary)',
                     color: 'var(--text-primary)',
-                    fontSize: '1rem'
+                    fontSize: isMobile ? '16px' : '1rem',
+                    marginBottom: '0.75rem'
                   }}
                 />
+                {homeConfig.heroImageUrl && (
+                  <div style={{ marginTop: '0.75rem', borderRadius: '0.5rem', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                    <img 
+                      src={homeConfig.heroImageUrl} 
+                      alt="Preview" 
+                      style={{ width: '100%', maxHeight: '300px', objectFit: 'cover' }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
               </div>
+            </div>
+          </div>
+
+          {/* Sección Banners */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: isMobile ? '1.5rem' : '2rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            marginBottom: '2rem'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginBottom: '1.5rem',
+              flexWrap: 'wrap',
+              gap: '1rem'
+            }}>
+              <h3 style={{ 
+                margin: 0, 
+                color: 'var(--text-primary)',
+                fontSize: isMobile ? '1.25rem' : '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <ImageIcon size={24} />
+                Banners ({homeConfig.banners.length})
+              </h3>
               <button
-                onClick={handleSaveHomeConfig}
+                onClick={handleAddBanner}
                 className="btn btn-primary"
-                style={{ alignSelf: 'flex-start' }}
+                style={{ 
+                  padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.25rem',
+                  fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                }}
               >
-                <Save size={20} style={{ marginRight: '0.5rem' }} />
-                Guardar Configuración
+                <Plus size={18} style={{ marginRight: '0.5rem' }} />
+                Agregar Banner
               </button>
             </div>
+            
+            {homeConfig.banners.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '3rem 2rem',
+                color: 'var(--text-secondary)',
+                background: 'var(--bg-primary)',
+                borderRadius: '0.5rem',
+                border: '1px dashed var(--border)'
+              }}>
+                <ImageIcon size={48} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+                <p style={{ margin: 0 }}>No hay banners creados. Agregá uno para comenzar.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {homeConfig.banners.map((banner, index) => (
+                  <div 
+                    key={banner.id}
+                    style={{
+                      background: 'var(--bg-primary)',
+                      padding: '1.5rem',
+                      borderRadius: '0.75rem',
+                      border: '1px solid var(--border)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', gap: '1rem' }}>
+                      <div style={{ flex: 1 }}>
+                        <input
+                          type="text"
+                          value={banner.title}
+                          onChange={(e) => handleUpdateBanner(banner.id, { title: e.target.value })}
+                          placeholder="Título del banner"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg-secondary)',
+                            color: 'var(--text-primary)',
+                            fontSize: isMobile ? '16px' : '1rem',
+                            marginBottom: '0.75rem',
+                            fontWeight: 600
+                          }}
+                        />
+                        <textarea
+                          value={banner.description || ''}
+                          onChange={(e) => handleUpdateBanner(banner.id, { description: e.target.value })}
+                          placeholder="Descripción (opcional)"
+                          rows={2}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg-secondary)',
+                            color: 'var(--text-primary)',
+                            fontSize: isMobile ? '16px' : '0.9375rem',
+                            marginBottom: '0.75rem',
+                            fontFamily: 'inherit',
+                            resize: 'vertical'
+                          }}
+                        />
+                        <div style={{ marginBottom: '0.75rem' }}>
+                          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+                            Imagen del Banner
+                          </label>
+                          <div
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              e.currentTarget.style.borderColor = 'var(--primary)';
+                              e.currentTarget.style.background = 'rgba(214, 90, 0, 0.05)';
+                            }}
+                            onDragLeave={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              e.currentTarget.style.borderColor = 'var(--border)';
+                              e.currentTarget.style.background = 'var(--bg-primary)';
+                            }}
+                            onDrop={(e) => handleImageDrop(e, (url) => handleUpdateBanner(banner.id, { imageUrl: url }))}
+                            style={{
+                              border: '2px dashed var(--border)',
+                              borderRadius: '0.5rem',
+                              padding: '0.75rem',
+                              background: 'var(--bg-primary)',
+                              transition: 'all 0.2s',
+                              marginBottom: '0.5rem'
+                            }}
+                          >
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleImageFileSelect(e, (url) => handleUpdateBanner(banner.id, { imageUrl: url }))}
+                              style={{ display: 'none' }}
+                              id={`banner-image-input-${banner.id}`}
+                            />
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                              <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                                📸 Arrastrá imagen o seleccioná
+                              </div>
+                              <label
+                                htmlFor={`banner-image-input-${banner.id}`}
+                                className="btn btn-secondary"
+                                style={{
+                                  padding: '0.5rem 1rem',
+                                  fontSize: isMobile ? '0.8125rem' : '0.875rem',
+                                  cursor: 'pointer',
+                                  display: 'inline-block'
+                                }}
+                              >
+                                Seleccionar
+                              </label>
+                            </div>
+                          </div>
+                          <input
+                            type="text"
+                            value={banner.imageUrl}
+                            onChange={(e) => handleUpdateBanner(banner.id, { imageUrl: e.target.value })}
+                            placeholder="O ingresá una URL de imagen"
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem',
+                              borderRadius: '0.5rem',
+                              border: '1px solid var(--border)',
+                              background: 'var(--bg-secondary)',
+                              color: 'var(--text-primary)',
+                              fontSize: isMobile ? '16px' : '0.9375rem'
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: isMobile ? 'block' : 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                          <input
+                            type="text"
+                            value={banner.link || ''}
+                            onChange={(e) => handleUpdateBanner(banner.id, { link: e.target.value })}
+                            placeholder="Link (opcional)"
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem',
+                              borderRadius: '0.5rem',
+                              border: '1px solid var(--border)',
+                              background: 'var(--bg-secondary)',
+                              color: 'var(--text-primary)',
+                              fontSize: isMobile ? '16px' : '0.9375rem'
+                            }}
+                          />
+                          <input
+                            type="text"
+                            value={banner.linkText || 'Ver más'}
+                            onChange={(e) => handleUpdateBanner(banner.id, { linkText: e.target.value })}
+                            placeholder="Texto del botón"
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem',
+                              borderRadius: '0.5rem',
+                              border: '1px solid var(--border)',
+                              background: 'var(--bg-secondary)',
+                              color: 'var(--text-primary)',
+                              fontSize: isMobile ? '16px' : '0.9375rem'
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                            <input
+                              type="checkbox"
+                              checked={banner.active}
+                              onChange={(e) => handleUpdateBanner(banner.id, { active: e.target.checked })}
+                              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: isMobile ? '0.875rem' : '0.9375rem' }}>Activo</span>
+                          </label>
+                          <input
+                            type="number"
+                            value={banner.order}
+                            onChange={(e) => handleUpdateBanner(banner.id, { order: Number(e.target.value) })}
+                            placeholder="Orden"
+                            min="0"
+                            style={{
+                              width: '100px',
+                              padding: '0.5rem',
+                              borderRadius: '0.5rem',
+                              border: '1px solid var(--border)',
+                              background: 'var(--bg-secondary)',
+                              color: 'var(--text-primary)',
+                              fontSize: isMobile ? '16px' : '0.9375rem'
+                            }}
+                          />
+                          <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Orden de visualización</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteBanner(banner.id)}
+                        className="btn btn-danger"
+                        style={{ 
+                          padding: '0.5rem',
+                          alignSelf: 'flex-start'
+                        }}
+                        title="Eliminar banner"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                    {banner.imageUrl && (
+                      <div style={{ marginTop: '1rem', borderRadius: '0.5rem', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                        <img 
+                          src={banner.imageUrl} 
+                          alt={banner.title}
+                          style={{ width: '100%', maxHeight: '200px', objectFit: 'cover' }}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sección Promociones */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: isMobile ? '1.5rem' : '2rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginBottom: '1.5rem',
+              flexWrap: 'wrap',
+              gap: '1rem'
+            }}>
+              <h3 style={{ 
+                margin: 0, 
+                color: 'var(--text-primary)',
+                fontSize: isMobile ? '1.25rem' : '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <TrendingUp size={24} />
+                Promociones ({homeConfig.promotions.length})
+              </h3>
+              <button
+                onClick={handleAddPromotion}
+                className="btn btn-primary"
+                style={{ 
+                  padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.25rem',
+                  fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                }}
+              >
+                <Plus size={18} style={{ marginRight: '0.5rem' }} />
+                Agregar Promoción
+              </button>
+            </div>
+            
+            {homeConfig.promotions.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '3rem 2rem',
+                color: 'var(--text-secondary)',
+                background: 'var(--bg-primary)',
+                borderRadius: '0.5rem',
+                border: '1px dashed var(--border)'
+              }}>
+                <TrendingUp size={48} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+                <p style={{ margin: 0 }}>No hay promociones creadas. Agregá una para comenzar.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {homeConfig.promotions.map((promo) => (
+                  <div 
+                    key={promo.id}
+                    style={{
+                      background: 'var(--bg-primary)',
+                      padding: '1.5rem',
+                      borderRadius: '0.75rem',
+                      border: '1px solid var(--border)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', gap: '1rem' }}>
+                      <div style={{ flex: 1 }}>
+                        <input
+                          type="text"
+                          value={promo.title}
+                          onChange={(e) => handleUpdatePromotion(promo.id, { title: e.target.value })}
+                          placeholder="Título de la promoción"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg-secondary)',
+                            color: 'var(--text-primary)',
+                            fontSize: isMobile ? '16px' : '1rem',
+                            marginBottom: '0.75rem',
+                            fontWeight: 600
+                          }}
+                        />
+                        <textarea
+                          value={promo.description}
+                          onChange={(e) => handleUpdatePromotion(promo.id, { description: e.target.value })}
+                          placeholder="Descripción de la promoción"
+                          rows={3}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg-secondary)',
+                            color: 'var(--text-primary)',
+                            fontSize: isMobile ? '16px' : '0.9375rem',
+                            marginBottom: '0.75rem',
+                            fontFamily: 'inherit',
+                            resize: 'vertical'
+                          }}
+                        />
+                        <div style={{ marginBottom: '0.75rem' }}>
+                          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+                            Imagen de la Promoción
+                          </label>
+                          <div
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              e.currentTarget.style.borderColor = 'var(--primary)';
+                              e.currentTarget.style.background = 'rgba(214, 90, 0, 0.05)';
+                            }}
+                            onDragLeave={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              e.currentTarget.style.borderColor = 'var(--border)';
+                              e.currentTarget.style.background = 'var(--bg-primary)';
+                            }}
+                            onDrop={(e) => handleImageDrop(e, (url) => handleUpdatePromotion(promo.id, { imageUrl: url }))}
+                            style={{
+                              border: '2px dashed var(--border)',
+                              borderRadius: '0.5rem',
+                              padding: '0.75rem',
+                              background: 'var(--bg-primary)',
+                              transition: 'all 0.2s',
+                              marginBottom: '0.5rem'
+                            }}
+                          >
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleImageFileSelect(e, (url) => handleUpdatePromotion(promo.id, { imageUrl: url }))}
+                              style={{ display: 'none' }}
+                              id={`promo-image-input-${promo.id}`}
+                            />
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                              <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                                📸 Arrastrá imagen o seleccioná
+                              </div>
+                              <label
+                                htmlFor={`promo-image-input-${promo.id}`}
+                                className="btn btn-secondary"
+                                style={{
+                                  padding: '0.5rem 1rem',
+                                  fontSize: isMobile ? '0.8125rem' : '0.875rem',
+                                  cursor: 'pointer',
+                                  display: 'inline-block'
+                                }}
+                              >
+                                Seleccionar
+                              </label>
+                            </div>
+                          </div>
+                          <input
+                            type="text"
+                            value={promo.imageUrl}
+                            onChange={(e) => handleUpdatePromotion(promo.id, { imageUrl: e.target.value })}
+                            placeholder="O ingresá una URL de imagen"
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem',
+                              borderRadius: '0.5rem',
+                              border: '1px solid var(--border)',
+                              background: 'var(--bg-secondary)',
+                              color: 'var(--text-primary)',
+                              fontSize: isMobile ? '16px' : '0.9375rem'
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: isMobile ? 'block' : 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                          <input
+                            type="text"
+                            value={promo.link || ''}
+                            onChange={(e) => handleUpdatePromotion(promo.id, { link: e.target.value })}
+                            placeholder="Link (opcional)"
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem',
+                              borderRadius: '0.5rem',
+                              border: '1px solid var(--border)',
+                              background: 'var(--bg-secondary)',
+                              color: 'var(--text-primary)',
+                              fontSize: isMobile ? '16px' : '0.9375rem'
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: isMobile ? 'block' : 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                              Fecha de inicio
+                            </label>
+                            <input
+                              type="date"
+                              value={promo.startDate ? new Date(promo.startDate).toISOString().split('T')[0] : ''}
+                              onChange={(e) => handleUpdatePromotion(promo.id, { startDate: e.target.value ? new Date(e.target.value) : undefined })}
+                              style={{
+                                width: '100%',
+                                padding: '0.75rem',
+                                borderRadius: '0.5rem',
+                                border: '1px solid var(--border)',
+                                background: 'var(--bg-secondary)',
+                                color: 'var(--text-primary)',
+                                fontSize: isMobile ? '16px' : '0.9375rem'
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                              Fecha de fin
+                            </label>
+                            <input
+                              type="date"
+                              value={promo.endDate ? new Date(promo.endDate).toISOString().split('T')[0] : ''}
+                              onChange={(e) => handleUpdatePromotion(promo.id, { endDate: e.target.value ? new Date(e.target.value) : undefined })}
+                              style={{
+                                width: '100%',
+                                padding: '0.75rem',
+                                borderRadius: '0.5rem',
+                                border: '1px solid var(--border)',
+                                background: 'var(--bg-secondary)',
+                                color: 'var(--text-primary)',
+                                fontSize: isMobile ? '16px' : '0.9375rem'
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                            <input
+                              type="checkbox"
+                              checked={promo.active}
+                              onChange={(e) => handleUpdatePromotion(promo.id, { active: e.target.checked })}
+                              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: isMobile ? '0.875rem' : '0.9375rem' }}>Activa</span>
+                          </label>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeletePromotion(promo.id)}
+                        className="btn btn-danger"
+                        style={{ 
+                          padding: '0.5rem',
+                          alignSelf: 'flex-start'
+                        }}
+                        title="Eliminar promoción"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                    {promo.imageUrl && (
+                      <div style={{ marginTop: '1rem', borderRadius: '0.5rem', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                        <img 
+                          src={promo.imageUrl} 
+                          alt={promo.title}
+                          style={{ width: '100%', maxHeight: '200px', objectFit: 'cover' }}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2852,59 +5119,410 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       {/* Configuración Tab */}
       {activeTab === 'settings' && (
         <div>
-          <h2 style={{ margin: 0, marginBottom: '1.5rem', color: 'var(--text-primary)' }}>Configuración del Sistema</h2>
-          
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: '2rem',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div>
+              <h2 style={{ 
+                margin: 0, 
+                marginBottom: '0.5rem', 
+                color: 'var(--text-primary)',
+                fontSize: isMobile ? '1.5rem' : '2rem'
+              }}>
+                Configuración del Sistema
+              </h2>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: isMobile ? '0.875rem' : '1rem' }}>
+                Gestioná templates de mensajes, estadísticas y configuraciones avanzadas
+              </p>
+            </div>
+          </div>
+
+          {/* Templates de Mensajes Automáticos */}
           <div style={{
             background: 'var(--bg-secondary)',
-            padding: '2rem',
+            padding: isMobile ? '1.5rem' : '2rem',
             borderRadius: '1rem',
             border: '1px solid var(--border)',
-            maxWidth: '600px'
+            marginBottom: '2rem'
           }}>
-            <div style={{ marginBottom: '2rem' }}>
-              <h3 style={{ margin: 0, marginBottom: '1rem', color: 'var(--text-primary)' }}>
-                Estadísticas Avanzadas
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{
-                  padding: '1rem',
-                  background: 'var(--bg-primary)',
-                  borderRadius: '0.5rem',
-                  border: '1px solid var(--border)'
-                }}>
-                  <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>
-                    Ingresos por Subastas
-                  </p>
-                  <p style={{ margin: '0.5rem 0 0 0', fontSize: '1.5rem', color: 'var(--primary)' }}>
-                    {formatCurrency(enhancedStats.auctionRevenue)}
-                  </p>
+            <h3 style={{ 
+              margin: 0, 
+              marginBottom: '1.5rem', 
+              color: 'var(--text-primary)',
+              fontSize: isMobile ? '1.25rem' : '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <Mail size={24} />
+              Templates de Mensajes Automáticos
+            </h3>
+            <p style={{ margin: 0, marginBottom: '1.5rem', color: 'var(--text-secondary)', fontSize: isMobile ? '0.875rem' : '0.9375rem' }}>
+              Personalizá los mensajes que se envían automáticamente a los usuarios. Usá variables como {'{username}'}, {'{amount}'}, {'{orderId}'}, etc.
+            </p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {messageTemplates.map((template) => {
+                const isSelected = selectedTemplate === template.id;
+                const variables = getVariablesForType(template.type);
+                
+                return (
+                  <div 
+                    key={template.id}
+                    style={{
+                      background: 'var(--bg-primary)',
+                      padding: '1.5rem',
+                      borderRadius: '0.75rem',
+                      border: `2px solid ${isSelected ? 'var(--primary)' : 'var(--border)'}`,
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', gap: '1rem', flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                          <h4 style={{ margin: 0, color: 'var(--text-primary)', fontSize: isMobile ? '1rem' : '1.125rem' }}>
+                            {template.title}
+                          </h4>
+                          <span style={{
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '0.375rem',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            background: template.active ? 'rgba(16, 185, 129, 0.1)' : 'rgba(107, 114, 128, 0.1)',
+                            color: template.active ? 'var(--success)' : 'var(--text-secondary)'
+                          }}>
+                            {template.active ? '✅ Activo' : '⏸️ Inactivo'}
+                          </span>
+                        </div>
+                        <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.75rem' }}>
+                          Tipo: <strong>{template.type.replace('_', ' ')}</strong>
+                        </p>
+                        <div style={{ marginBottom: '0.75rem' }}>
+                          <p style={{ margin: '0 0 0.5rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem', fontWeight: 500 }}>
+                            Variables disponibles:
+                          </p>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            {variables.map((varName, idx) => (
+                              <code 
+                                key={idx}
+                                style={{
+                                  padding: '0.25rem 0.5rem',
+                                  background: 'var(--bg-secondary)',
+                                  borderRadius: '0.25rem',
+                                  fontSize: '0.8125rem',
+                                  color: 'var(--primary)',
+                                  fontFamily: 'monospace'
+                                }}
+                                title="Clic para copiar"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(varName);
+                                  alert(`✅ Variable ${varName} copiada`);
+                                }}
+                              >
+                                {varName}
+                              </code>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexDirection: isMobile ? 'column' : 'row' }}>
+                        <button
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedTemplate(null);
+                              setTemplatePreview('');
+                            } else {
+                              setSelectedTemplate(template.id);
+                              handlePreviewTemplate(template);
+                            }
+                          }}
+                          className={isSelected ? "btn btn-secondary" : "btn btn-primary"}
+                          style={{ 
+                            padding: '0.625rem 1rem',
+                            fontSize: isMobile ? '0.8125rem' : '0.875rem',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {isSelected ? 'Cerrar' : 'Editar'}
+                        </button>
+                        <label style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '0.5rem', 
+                          cursor: 'pointer',
+                          padding: '0.625rem 1rem',
+                          background: template.active ? 'var(--success)' : 'var(--bg-secondary)',
+                          color: template.active ? 'white' : 'var(--text-primary)',
+                          borderRadius: '0.5rem',
+                          border: '1px solid var(--border)',
+                          fontSize: isMobile ? '0.8125rem' : '0.875rem'
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={template.active}
+                            onChange={(e) => {
+                              handleSaveTemplate(template.id, { active: e.target.checked });
+                            }}
+                            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                          />
+                          <span>{template.active ? 'Activo' : 'Inactivo'}</span>
+                        </label>
+                      </div>
+                    </div>
+                    
+                    {isSelected && (
+                      <div style={{
+                        marginTop: '1rem',
+                        paddingTop: '1rem',
+                        borderTop: '1px solid var(--border)'
+                      }}>
+                        <div style={{ marginBottom: '1rem' }}>
+                          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                            Título del Template
+                          </label>
+                          <input
+                            type="text"
+                            value={template.title}
+                            onChange={(e) => {
+                              const updated = { ...template, title: e.target.value };
+                              setMessageTemplates(messageTemplates.map(t => t.id === template.id ? updated : t));
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem',
+                              borderRadius: '0.5rem',
+                              border: '1px solid var(--border)',
+                              background: 'var(--bg-secondary)',
+                              color: 'var(--text-primary)',
+                              fontSize: isMobile ? '16px' : '1rem'
+                            }}
+                          />
+                        </div>
+                        <div style={{ marginBottom: '1rem' }}>
+                          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                            Contenido del Mensaje
+                          </label>
+                          <textarea
+                            value={template.template}
+                            onChange={(e) => {
+                              const updated = { ...template, template: e.target.value };
+                              setMessageTemplates(messageTemplates.map(t => t.id === template.id ? updated : t));
+                              handlePreviewTemplate(updated);
+                            }}
+                            rows={8}
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem',
+                              borderRadius: '0.5rem',
+                              border: '1px solid var(--border)',
+                              background: 'var(--bg-secondary)',
+                              color: 'var(--text-primary)',
+                              fontSize: isMobile ? '16px' : '0.9375rem',
+                              fontFamily: 'monospace',
+                              resize: 'vertical',
+                              lineHeight: '1.6'
+                            }}
+                            placeholder="Ejemplo: ¡Felicitaciones {username}! Has ganado la subasta..."
+                          />
+                          <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                            💡 Tip: Usá las variables disponibles arriba para personalizar el mensaje
+                          </p>
+                        </div>
+                        
+                        {templatePreview && (
+                          <div style={{
+                            marginBottom: '1rem',
+                            padding: '1rem',
+                            background: 'var(--bg-secondary)',
+                            borderRadius: '0.5rem',
+                            border: '1px solid var(--border)'
+                          }}>
+                            <p style={{ margin: '0 0 0.75rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem', fontWeight: 500 }}>
+                              👁️ Vista Previa:
+                            </p>
+                            <div style={{
+                              padding: '1rem',
+                              background: 'var(--bg-primary)',
+                              borderRadius: '0.375rem',
+                              whiteSpace: 'pre-wrap',
+                              color: 'var(--text-primary)',
+                              fontSize: isMobile ? '0.875rem' : '0.9375rem',
+                              lineHeight: '1.6',
+                              border: '1px solid var(--border)'
+                            }}>
+                              {templatePreview}
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => {
+                              handleSaveTemplate(template.id, {
+                                title: template.title,
+                                template: template.template
+                              });
+                              setSelectedTemplate(null);
+                              setTemplatePreview('');
+                            }}
+                            className="btn btn-primary"
+                            style={{ 
+                              padding: '0.75rem 1.5rem',
+                              fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                            }}
+                          >
+                            <Save size={18} style={{ marginRight: '0.5rem' }} />
+                            Guardar Cambios
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedTemplate(null);
+                              setTemplatePreview('');
+                              setMessageTemplates(loadMessageTemplates());
+                            }}
+                            className="btn btn-secondary"
+                            style={{ 
+                              padding: '0.75rem 1.5rem',
+                              fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                            }}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Estadísticas y Configuración Avanzada */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: isMobile ? '1.5rem' : '2rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            marginBottom: '2rem'
+          }}>
+            <h3 style={{ 
+              margin: 0, 
+              marginBottom: '1.5rem', 
+              color: 'var(--text-primary)',
+              fontSize: isMobile ? '1.25rem' : '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <BarChart3 size={24} />
+              Estadísticas del Sistema
+            </h3>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '1rem'
+            }}>
+              <div style={{
+                padding: '1.5rem',
+                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                borderRadius: '0.75rem',
+                color: 'white'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                  <Gavel size={20} />
+                  <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Ingresos Subastas</span>
                 </div>
-                <div style={{
-                  padding: '1rem',
-                  background: 'var(--bg-primary)',
-                  borderRadius: '0.5rem',
-                  border: '1px solid var(--border)'
-                }}>
-                  <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>
-                    Ingresos por Tienda
-                  </p>
-                  <p style={{ margin: '0.5rem 0 0 0', fontSize: '1.5rem', color: 'var(--success)' }}>
-                    {formatCurrency(enhancedStats.storeRevenue)}
-                  </p>
+                <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+                  {formatCurrency(enhancedStats.auctionRevenue)}
                 </div>
               </div>
+              <div style={{
+                padding: '1.5rem',
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                borderRadius: '0.75rem',
+                color: 'white'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                  <Store size={20} />
+                  <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Ingresos Tienda</span>
+                </div>
+                <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+                  {formatCurrency(enhancedStats.storeRevenue)}
+                </div>
+              </div>
+              <div style={{
+                padding: '1.5rem',
+                background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                borderRadius: '0.75rem',
+                color: 'white'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                  <TrendingUp size={20} />
+                  <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Ganancia Neta</span>
+                </div>
+                <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+                  {formatCurrency(enhancedStats.netProfit)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Limpieza y Mantenimiento */}
+          <div style={{
+            display: isMobile ? 'block' : 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '1.5rem',
+            marginBottom: '2rem'
+          }}>
+            <div style={{
+              padding: '1.5rem',
+              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+              borderRadius: '0.75rem',
+              border: '1px solid var(--border)',
+              color: 'white'
+            }}>
+              <h3 style={{ margin: 0, marginBottom: '1rem', fontSize: isMobile ? '1.125rem' : '1.25rem' }}>
+                🧹 Limpieza de Datos
+              </h3>
+              <p style={{ margin: 0, marginBottom: '1rem', fontSize: '0.875rem', opacity: 0.9 }}>
+                Elimina datos antiguos según las reglas:
+                <br />• Notificaciones leídas: 2 días
+                <br />• Notificaciones no leídas: 7 días
+                <br />• Subastas finalizadas: 3 días
+                <br />• Pedidos completados: 7 días
+              </p>
+              <button
+                onClick={handleManualCleanup}
+                className="btn"
+                style={{
+                  background: 'white',
+                  color: '#f59e0b',
+                  border: 'none',
+                  padding: '0.75rem 1.5rem',
+                  fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                }}
+              >
+                <RefreshCw size={18} style={{ marginRight: '0.5rem' }} />
+                Ejecutar Limpieza
+              </button>
             </div>
 
             <div style={{
               padding: '1.5rem',
-              background: 'var(--error)',
-              borderRadius: '0.5rem',
-              border: '1px solid var(--error)'
+              background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+              borderRadius: '0.75rem',
+              border: '1px solid var(--border)',
+              color: 'white'
             }}>
-              <h3 style={{ margin: 0, marginBottom: '1rem', color: 'white' }}>
+              <h3 style={{ margin: 0, marginBottom: '1rem', fontSize: isMobile ? '1.125rem' : '1.25rem' }}>
                 ⚠️ Zona Peligrosa
               </h3>
-              <p style={{ margin: 0, marginBottom: '1rem', color: 'white', fontSize: '0.875rem' }}>
+              <p style={{ margin: 0, marginBottom: '1rem', fontSize: '0.875rem', opacity: 0.9 }}>
                 El reseteo eliminará todos los datos excepto usuarios registrados y logs de ventas.
               </p>
               <button
@@ -2912,10 +5530,13 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 className="btn"
                 style={{
                   background: 'white',
-                  color: 'var(--error)',
-                  border: 'none'
+                  color: '#ef4444',
+                  border: 'none',
+                  padding: '0.75rem 1.5rem',
+                  fontSize: isMobile ? '0.875rem' : '0.9375rem'
                 }}
               >
+                <AlertTriangle size={18} style={{ marginRight: '0.5rem' }} />
                 Resetear Sistema
               </button>
             </div>
