@@ -123,6 +123,7 @@ export interface Notification {
   message: string;
   read: boolean;
   createdAt: Date;
+  readAt?: Date | string;
   link?: string;
 }
 

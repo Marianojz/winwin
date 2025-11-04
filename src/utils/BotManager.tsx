@@ -92,7 +92,7 @@ const BotManager = () => {
 
         // Filtrar subastas donde el bot puede ofertar (precio actual < maxBidAmount y balance suficiente)
         const affordableAuctions = targetAuctions.filter(auction => {
-          const currentPrice = auction.currentPrice || auction.startPrice || 0;
+          const currentPrice = auction.currentPrice || auction.startingPrice || 0;
           const minRequired = currentPrice + 500;
           return currentPrice < bot.maxBidAmount && bot.balance >= minRequired;
         });
@@ -117,7 +117,7 @@ const BotManager = () => {
         }
 
         // Obtener el precio actual de la subasta
-        const currentPrice = randomAuction.currentPrice || randomAuction.startPrice || 0;
+        const currentPrice = randomAuction.currentPrice || randomAuction.startingPrice || 0;
 
         // Estas validaciones ya se hicieron en el filtro, pero las mantenemos por seguridad
         if (bot.balance < currentPrice + 500) {

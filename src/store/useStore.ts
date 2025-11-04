@@ -40,6 +40,7 @@ interface AppState {
   deleteNotification: (notificationId: string) => void;
   markAsRead: (notificationId: string) => void;
   markAllAsRead: () => void;
+  _normalizeNotification: (n: any) => Notification;
 
   // Bots (Admin only)
   bots: Bot[];
@@ -262,10 +263,12 @@ isAuthenticated: (() => {
       try {
         const updates: any = {};
         products.forEach(product => {
+          const createdAt = product.createdAt;
+          const updatedAt = product.updatedAt;
           updates[product.id] = {
             ...product,
-            createdAt: product.createdAt instanceof Date ? product.createdAt.toISOString() : product.createdAt,
-            updatedAt: product.updatedAt instanceof Date ? product.updatedAt.toISOString() : product.updatedAt
+            createdAt: typeof createdAt === 'string' ? createdAt : (createdAt && typeof createdAt === 'object' && 'toISOString' in createdAt ? (createdAt as Date).toISOString() : createdAt || new Date().toISOString()),
+            updatedAt: typeof updatedAt === 'string' ? updatedAt : (updatedAt && typeof updatedAt === 'object' && 'toISOString' in updatedAt ? (updatedAt as Date).toISOString() : updatedAt || new Date().toISOString())
           };
         });
         
@@ -507,8 +510,7 @@ isAuthenticated: (() => {
     // Verificar si ya está leída (múltiples verificaciones)
     const isAlreadyRead = notification && (
       notification.read === true || 
-      notification.read === 'true' || 
-      String(notification.read) === 'true' ||
+      (typeof notification.read === 'string' && (notification.read === 'true' || String(notification.read) === 'true')) ||
       notification.readAt !== undefined
     );
     
@@ -545,7 +547,7 @@ isAuthenticated: (() => {
     const updatedNotifications = state.notifications.map(n => 
       n.id === notificationId 
         ? { ...n, read: true, readAt: new Date(readAt) }
-        : { ...n, read: n.read === true || n.read === 'true' || String(n.read) === 'true' || n.readAt ? true : false }
+        : { ...n, read: n.read === true || (typeof n.read === 'string' && (n.read === 'true' || String(n.read) === 'true')) || n.readAt ? true : false }
     );
     
     // Recalcular contador basado en el estado actualizado
@@ -566,7 +568,7 @@ isAuthenticated: (() => {
     const state = get();
     // Filtrar notificaciones que realmente no están leídas (múltiples verificaciones)
     const unreadNotifications = state.notifications.filter(n => {
-      const isRead = n.read === true || n.read === 'true' || String(n.read) === 'true';
+      const isRead = n.read === true || (typeof n.read === 'string' && (n.read === 'true' || String(n.read) === 'true'));
       return !isRead;
     });
     
@@ -583,7 +585,7 @@ isAuthenticated: (() => {
     // Actualizar todas las notificaciones en localStorage
     const updated = saved.map((n: any) => {
       const normalized = normalizeFn(n);
-      const isCurrentlyRead = normalized.read === true || normalized.read === 'true' || String(normalized.read) === 'true';
+      const isCurrentlyRead = normalized.read === true || (typeof normalized.read === 'string' && (normalized.read === 'true' || String(normalized.read) === 'true'));
       
       // Si no está leída, marcarla como leída
       if (!isCurrentlyRead) {
