@@ -39,14 +39,14 @@ export const saveMessage = async (message: Message): Promise<Message> => {
       createdAt: message.createdAt instanceof Date ? message.createdAt : new Date(message.createdAt)
     };
     
-    // Guardar en Firebase Realtime Database
-    const messagesRef = ref(realtimeDb, `messages/${newMessage.conversationId}`);
-    await push(messagesRef, {
+    // Guardar en Firebase Realtime Database usando el ID del mensaje como clave
+    const messageRef = ref(realtimeDb, `messages/${newMessage.conversationId}/${newMessage.id}`);
+    await firebaseSet(messageRef, {
       ...newMessage,
       createdAt: newMessage.createdAt.toISOString()
     });
     
-    console.log(`✅ Mensaje guardado en Firebase: ${newMessage.id}`);
+    console.log(`✅ Mensaje guardado en Firebase: ${newMessage.id} en conversación ${newMessage.conversationId}`);
     return newMessage;
   } catch (error) {
     console.error('❌ Error guardando mensaje en Firebase:', error);

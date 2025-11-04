@@ -647,8 +647,12 @@ isAuthenticated: (() => {
           return;
         }
         
-        // Convertir objeto Firebase a array
-        const botsArray = Object.values(data) as Bot[];
+        // Convertir objeto Firebase a array y parsear fechas
+        const botsArray = Object.values(data).map((bot: any) => ({
+          ...bot,
+          createdAt: bot.createdAt ? new Date(bot.createdAt) : undefined,
+          updatedAt: bot.updatedAt ? new Date(bot.updatedAt) : undefined
+        })) as Bot[];
         
         set({ bots: botsArray });
         console.log(`✅ Cargados ${botsArray.length} bots desde Firebase`);
@@ -669,11 +673,16 @@ isAuthenticated: (() => {
       // Guardar en Firebase Realtime Database
       const updates: any = {};
       bots.forEach(bot => {
-        updates[bot.id] = {
-          ...bot,
-          createdAt: bot.createdAt instanceof Date ? bot.createdAt.toISOString() : bot.createdAt,
-          updatedAt: bot.updatedAt instanceof Date ? bot.updatedAt.toISOString() : bot.updatedAt
-        };
+        const botData: any = { ...bot };
+        // Manejar createdAt si existe
+        if (bot.createdAt) {
+          botData.createdAt = bot.createdAt instanceof Date ? bot.createdAt.toISOString() : bot.createdAt;
+        }
+        // Manejar updatedAt si existe
+        if (bot.updatedAt) {
+          botData.updatedAt = bot.updatedAt instanceof Date ? bot.updatedAt.toISOString() : bot.updatedAt;
+        }
+        updates[bot.id] = botData;
       });
       
       await update(ref(realtimeDb, 'bots'), updates);
@@ -690,23 +699,37 @@ isAuthenticated: (() => {
   },
   addBot: async (bot) => {
     try {
+      // Crear bot con fechas si no existen
+      const now = new Date().toISOString();
+      const botData: any = {
+        ...bot,
+        createdAt: bot.createdAt ? (bot.createdAt instanceof Date ? bot.createdAt.toISOString() : bot.createdAt) : now,
+        updatedAt: bot.updatedAt ? (bot.updatedAt instanceof Date ? bot.updatedAt.toISOString() : bot.updatedAt) : now
+      };
+      
       // Guardar en Firebase
       const botRef = ref(realtimeDb, `bots/${bot.id}`);
-      await firebaseSet(botRef, {
-        ...bot,
-        createdAt: bot.createdAt instanceof Date ? bot.createdAt.toISOString() : bot.createdAt,
-        updatedAt: bot.updatedAt instanceof Date ? bot.updatedAt.toISOString() : bot.updatedAt
-      });
+      await firebaseSet(botRef, botData);
       
-      // Actualización optimista local
-      const newBots = [...get().bots, bot];
+      // Actualización optimista local (crear bot con fechas como Date)
+      const botWithDates = {
+        ...bot,
+        createdAt: new Date(botData.createdAt),
+        updatedAt: new Date(botData.updatedAt)
+      };
+      const newBots = [...get().bots, botWithDates];
       set({ bots: newBots });
       
       console.log(`✅ Bot agregado en Firebase: ${bot.id}`);
     } catch (error) {
       console.error('❌ Error agregando bot en Firebase:', error);
       // Fallback: actualizar solo localmente si falla Firebase
-      const newBots = [...get().bots, bot];
+      const botWithDates = {
+        ...bot,
+        createdAt: bot.createdAt || new Date(),
+        updatedAt: bot.updatedAt || new Date()
+      };
+      const newBots = [...get().bots, botWithDates];
       set({ bots: newBots });
     }
   },
@@ -715,16 +738,37 @@ isAuthenticated: (() => {
       // Actualizar en Firebase
       const botRef = ref(realtimeDb, `bots/${botId}`);
       const updatesToSave: any = { ...updates };
+      
+      // Manejar updatedAt - siempre actualizar
       if (updates.updatedAt) {
         updatesToSave.updatedAt = updates.updatedAt instanceof Date ? updates.updatedAt.toISOString() : updates.updatedAt;
       } else {
         updatesToSave.updatedAt = new Date().toISOString();
       }
       
+      // Manejar createdAt si viene en updates
+      if (updates.createdAt) {
+        updatesToSave.createdAt = updates.createdAt instanceof Date ? updates.createdAt.toISOString() : updates.createdAt;
+      }
+      
       await update(botRef, updatesToSave);
       
       // Actualización optimista local
-      const newBots = get().bots.map(b => b.id === botId ? { ...b, ...updates, updatedAt: new Date(updatesToSave.updatedAt) } : b);
+      const newBots = get().bots.map(b => {
+        if (b.id === botId) {
+          const updatedBot = {
+            ...b,
+            ...updates,
+            updatedAt: new Date(updatesToSave.updatedAt)
+          };
+          // Mantener createdAt si no se actualiza
+          if (updates.createdAt) {
+            updatedBot.createdAt = updates.createdAt instanceof Date ? updates.createdAt : new Date(updates.createdAt);
+          }
+          return updatedBot;
+        }
+        return b;
+      });
       set({ bots: newBots });
       
       console.log(`✅ Bot actualizado en Firebase: ${botId}`);

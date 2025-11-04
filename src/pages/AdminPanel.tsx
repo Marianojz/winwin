@@ -34,7 +34,6 @@ import {
   createMessage,
   createAutoMessage,
   deleteConversation,
-  deleteAllConversations,
   deleteMessage
 } from '../utils/messages';
 import { Message, Conversation } from '../types';
@@ -54,7 +53,7 @@ import {
 const AdminPanel = (): React.ReactElement => {
   const { 
     user, auctions, products, bots, orders,
-    addBot, updateBot, deleteBot, setProducts, setAuctions, setBots, setOrders, updateOrderStatus 
+    addBot, updateBot, deleteBot, setProducts, setAuctions, setBots, setOrders, updateOrderStatus, loadBots
   } = useStore();
   
   // Estados principales
@@ -62,6 +61,14 @@ const AdminPanel = (): React.ReactElement => {
   const [realUsers, setRealUsers] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [refreshKey, setRefreshKey] = useState(0); // Para forzar re-render sin recargar
+  
+  // Cargar bots desde Firebase al montar el componente
+  useEffect(() => {
+    if (user?.isAdmin) {
+      loadBots();
+      console.log('✅ Cargando bots desde Firebase...');
+    }
+  }, [user?.isAdmin, loadBots]);
   
   // Limpiar duplicados de pedidos al montar el componente
   useEffect(() => {
@@ -91,6 +98,9 @@ const AdminPanel = (): React.ReactElement => {
           setHomeConfig({
             ...defaultHomeConfig,
             ...data,
+            siteSettings: data.siteSettings || defaultHomeConfig.siteSettings,
+            themeColors: data.themeColors || defaultHomeConfig.themeColors,
+            sectionTitles: data.sectionTitles || defaultHomeConfig.sectionTitles,
             banners: data.banners?.map((b: any) => ({
               ...b,
               createdAt: b.createdAt ? new Date(b.createdAt) : new Date(),
@@ -102,6 +112,8 @@ const AdminPanel = (): React.ReactElement => {
               startDate: p.startDate ? new Date(p.startDate) : undefined,
               endDate: p.endDate ? new Date(p.endDate) : undefined
             })) || [],
+            aboutSection: data.aboutSection || defaultHomeConfig.aboutSection,
+            contactSection: data.contactSection || defaultHomeConfig.contactSection,
             updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date()
           });
           console.log('✅ Configuración de home cargada desde Firebase');
@@ -135,32 +147,85 @@ const AdminPanel = (): React.ReactElement => {
   const [selectedUserForMessage, setSelectedUserForMessage] = useState<string | null>(null);
   const isMobile = useIsMobile();
   
-  // Cargar conversaciones y contador
+  // Cargar conversaciones y contador en tiempo real
   useEffect(() => {
-    const loadConversations = () => {
-      setConversations(getAllConversations());
-      setAdminUnreadCount(getAdminUnreadCount());
-    };
-    
-    loadConversations();
-    const interval = setInterval(loadConversations, 5000); // Actualizar cada 5 segundos
-    return () => clearInterval(interval);
+    if (activeTab === 'messages') {
+      // Escuchar conversaciones en tiempo real
+      const unsubscribeConversations = getAllConversations((conversations) => {
+        setConversations(conversations);
+      });
+      
+      // Escuchar contador de no leídos en tiempo real
+      const unsubscribeUnread = getAdminUnreadCount((count) => {
+        setAdminUnreadCount(count);
+      });
+      
+      return () => {
+        unsubscribeConversations();
+        unsubscribeUnread();
+      };
+    } else {
+      setConversations([]);
+      setAdminUnreadCount(0);
+    }
   }, [activeTab]);
   
-  // Cargar mensajes de conversación seleccionada
+  // Cargar mensajes de conversación seleccionada en tiempo real
   useEffect(() => {
+    let unsubscribeMessages: (() => void) | null = null;
+    
     if (selectedConversation) {
-      setConversationMessages(getMessages(selectedConversation));
-      // Marcar como leídos cuando se abre la conversación
-      markMessagesAsRead(selectedConversation, 'admin');
-      setAdminUnreadCount(getAdminUnreadCount());
+      // Escuchar mensajes en tiempo real
+      unsubscribeMessages = getMessages(selectedConversation, (messages) => {
+        setConversationMessages(messages);
+        // Marcar como leídos cuando se cargan
+        markMessagesAsRead(selectedConversation, 'admin');
+        
+        // Auto-scroll al final cuando hay nuevos mensajes
+        setTimeout(() => {
+          const container = document.getElementById('admin-messages-container');
+          if (container) {
+            container.scrollTop = container.scrollHeight;
+          }
+        }, 100);
+      });
     } else if (selectedUserForMessage) {
       // Si hay usuario seleccionado para mensaje nuevo, cargar sus mensajes
       const convId = `admin_${selectedUserForMessage}`;
-      setConversationMessages(getMessages(convId));
+      unsubscribeMessages = getMessages(convId, (messages) => {
+        setConversationMessages(messages);
+        
+        // Auto-scroll al final
+        setTimeout(() => {
+          const container = document.getElementById('admin-messages-container');
+          if (container) {
+            container.scrollTop = container.scrollHeight;
+          }
+        }, 100);
+      });
       setSelectedConversation(convId);
+    } else {
+      setConversationMessages([]);
     }
+    
+    return () => {
+      if (unsubscribeMessages) {
+        unsubscribeMessages();
+      }
+    };
   }, [selectedConversation, selectedUserForMessage]);
+  
+  // Auto-scroll cuando se envía un mensaje
+  useEffect(() => {
+    if (conversationMessages.length > 0) {
+      setTimeout(() => {
+        const container = document.getElementById('admin-messages-container');
+        if (container) {
+          container.scrollTop = container.scrollHeight;
+        }
+      }, 100);
+    }
+  }, [conversationMessages.length]);
   // ============================================
   // FUNCIONES PARA CREAR SUBASTA
   // ============================================
@@ -1211,39 +1276,42 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
   }, [activeTab, enhancedStats]);
 
   // Función para enviar mensaje
-  const handleSendMessage = () => {
-    let userId: string;
-    
-    if (selectedUserForMessage) {
-      // Nuevo mensaje a usuario seleccionado
-      userId = selectedUserForMessage;
-      const message = createMessage('admin', 'Administrador', userId, newMessageContent.trim());
-      saveMessage(message);
-      
-      // Si no existe conversación, crearla seleccionándola
-      if (!conversations.find(c => c.id === `admin_${userId}`)) {
-        setConversations(getAllConversations());
-        setSelectedConversation(`admin_${userId}`);
-      }
-      setSelectedUserForMessage(null);
-      setShowUserSelector(false);
-    } else if (selectedConversation) {
-      // Mensaje a conversación existente
-      userId = selectedConversation.split('_')[1];
-      const message = createMessage('admin', 'Administrador', userId, newMessageContent.trim());
-      saveMessage(message);
-    } else {
-      return;
-    }
-    
+  const handleSendMessage = async () => {
     if (!newMessageContent.trim()) return;
     
-    setNewMessageContent('');
-    if (selectedConversation) {
-      setConversationMessages(getMessages(selectedConversation));
+    try {
+      let userId: string;
+      
+      if (selectedUserForMessage) {
+        // Nuevo mensaje a usuario seleccionado
+        userId = selectedUserForMessage;
+        const message = createMessage('admin', 'Administrador', userId, newMessageContent.trim());
+        await saveMessage(message);
+        
+        // Seleccionar la conversación si no está seleccionada
+        const convId = `admin_${userId}`;
+        if (!selectedConversation) {
+          setSelectedConversation(convId);
+        }
+        setSelectedUserForMessage(null);
+        setShowUserSelector(false);
+      } else if (selectedConversation) {
+        // Responder a conversación existente
+        userId = selectedConversation.replace('admin_', '');
+        const message = createMessage('admin', 'Administrador', userId, newMessageContent.trim());
+        await saveMessage(message);
+      } else {
+        console.warn('No hay conversación o usuario seleccionado');
+        return;
+      }
+      
+      setNewMessageContent('');
+      // El mensaje aparecerá automáticamente gracias al listener en tiempo real
+      console.log('✅ Mensaje enviado correctamente');
+    } catch (error) {
+      console.error('❌ Error enviando mensaje:', error);
+      alert('❌ Error al enviar el mensaje. Por favor, intentá nuevamente.');
     }
-    setAdminUnreadCount(getAdminUnreadCount());
-    setConversations(getAllConversations());
   };
 
   // Función para guardar configuración de home
@@ -1252,6 +1320,9 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       const updatedConfig = { 
         ...homeConfig, 
         updatedAt: new Date().toISOString(),
+        siteSettings: homeConfig.siteSettings || defaultHomeConfig.siteSettings,
+        themeColors: homeConfig.themeColors || defaultHomeConfig.themeColors,
+        sectionTitles: homeConfig.sectionTitles || defaultHomeConfig.sectionTitles,
         banners: homeConfig.banners.map(b => ({
           ...b,
           createdAt: b.createdAt instanceof Date ? b.createdAt.toISOString() : b.createdAt,
@@ -1260,8 +1331,11 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         promotions: homeConfig.promotions.map(p => ({
           ...p,
           createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
-          updatedAt: p.updatedAt instanceof Date ? p.updatedAt.toISOString() : p.updatedAt
-        }))
+          startDate: p.startDate instanceof Date ? p.startDate.toISOString() : (p.startDate || undefined),
+          endDate: p.endDate instanceof Date ? p.endDate.toISOString() : (p.endDate || undefined)
+        })),
+        aboutSection: homeConfig.aboutSection || defaultHomeConfig.aboutSection,
+        contactSection: homeConfig.contactSection || defaultHomeConfig.contactSection
       };
       
       // Guardar en Firebase
@@ -4430,11 +4504,11 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     {selectedConversation && (
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           if (window.confirm('¿Eliminar esta conversación completa?')) {
-                            deleteConversation(selectedConversation);
+                            await deleteConversation(selectedConversation);
                             setSelectedConversation(null);
-                            setConversations(getAllConversations());
+                            // Las conversaciones se actualizarán automáticamente por el listener
                           }
                         }}
                         className="btn btn-danger"
@@ -4453,15 +4527,19 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                     )}
                   </div>
                 </div>
-                <div style={{
-                  flex: 1,
-                  padding: isMobile ? '0.75rem' : '1rem',
-                  overflowY: 'auto',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1rem',
-                  minHeight: '200px'
-                }}>
+                <div 
+                  id="admin-messages-container"
+                  style={{
+                    flex: 1,
+                    padding: isMobile ? '0.75rem' : '1rem',
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem',
+                    minHeight: '200px',
+                    scrollBehavior: 'smooth'
+                  }}
+                >
                   {conversationMessages.length === 0 ? (
                     <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem', fontSize: isMobile ? '0.875rem' : '1rem' }}>
                       No hay mensajes en esta conversación
@@ -4499,11 +4577,11 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                                 </p>
                               </div>
                               <button
-                                onClick={() => {
+                                onClick={async () => {
                                   if (window.confirm('¿Eliminar este mensaje?')) {
-                                    deleteMessage(msg.id);
-                                    setConversationMessages(getMessages(selectedConversation || `admin_${selectedUserForMessage}`));
-                                    setConversations(getAllConversations());
+                                    const convId = selectedConversation || `admin_${selectedUserForMessage}`;
+                                    await deleteMessage(convId, msg.id);
+                                    // Los mensajes se actualizarán automáticamente por el listener
                                   }
                                 }}
                                 style={{
@@ -4533,48 +4611,84 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 <div style={{
                   padding: isMobile ? '0.75rem' : '1rem',
                   borderTop: '1px solid var(--border)',
-                  display: 'flex',
-                  gap: '0.5rem',
-                  flexWrap: isMobile ? 'wrap' : 'nowrap'
+                  background: 'var(--bg-tertiary)'
                 }}>
-                  <input
-                    type="text"
-                    value={newMessageContent}
-                    onChange={(e) => setNewMessageContent(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage();
-                      }
-                    }}
-                    placeholder="Escribí un mensaje..."
-                    style={{
-                      flex: 1,
-                      padding: isMobile ? '0.75rem' : '0.875rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-primary)',
-                      color: 'var(--text-primary)',
-                      fontSize: isMobile ? '16px' : '1rem', // 16px para evitar zoom en iOS
-                      minWidth: 0
-                    }}
-                  />
-                  <button
-                    onClick={handleSendMessage}
-                    className="btn btn-primary"
-                    disabled={!newMessageContent.trim() || (!selectedConversation && !selectedUserForMessage)}
-                    style={{ 
-                      padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
-                      fontSize: isMobile ? '0.875rem' : '0.9375rem',
-                      display: 'flex',
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '0.5rem',
+                    marginBottom: '0.5rem'
+                  }}>
+                    <label style={{ 
+                      fontSize: '0.875rem', 
+                      color: 'var(--text-secondary)', 
+                      fontWeight: 600 
+                    }}>
+                      Escribí tu respuesta:
+                    </label>
+                    <textarea
+                      value={newMessageContent}
+                      onChange={(e) => setNewMessageContent(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && e.ctrlKey) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                      placeholder="Escribí tu mensaje aquí... (Ctrl+Enter para enviar)"
+                      rows={3}
+                      style={{
+                        width: '100%',
+                        padding: isMobile ? '0.75rem' : '0.875rem 1rem',
+                        borderRadius: '0.75rem',
+                        border: '2px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '0.9375rem',
+                        resize: 'vertical',
+                        minHeight: '80px',
+                        fontFamily: 'inherit',
+                        lineHeight: '1.5'
+                      }}
+                    />
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
                       alignItems: 'center',
-                      gap: '0.25rem',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    <Send size={isMobile ? 18 : 20} />
-                    {!isMobile && 'Enviar'}
-                  </button>
+                      fontSize: '0.75rem',
+                      color: 'var(--text-secondary)'
+                    }}>
+                      <span>
+                        {newMessageContent.length > 0 && `${newMessageContent.length} caracteres`}
+                      </span>
+                      <span>Ctrl+Enter para enviar</span>
+                    </div>
+                  </div>
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '0.5rem',
+                    justifyContent: 'flex-end'
+                  }}>
+                    <button
+                      onClick={handleSendMessage}
+                      className="btn btn-primary"
+                      disabled={!newMessageContent.trim() || (!selectedConversation && !selectedUserForMessage)}
+                      style={{ 
+                        padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.5rem',
+                        fontSize: isMobile ? '0.875rem' : '1rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        whiteSpace: 'nowrap',
+                        fontWeight: 600,
+                        minWidth: '120px',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <Send size={isMobile ? 18 : 20} />
+                      Enviar Mensaje
+                    </button>
+                  </div>
                 </div>
               </>
             ) : (
@@ -4634,7 +4748,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 Editor de Página de Inicio
               </h2>
               <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: isMobile ? '0.875rem' : '1rem' }}>
-                Personalizá la sección principal, banners y promociones de tu sitio
+                Personalizá completamente tu sitio: logo, colores, títulos, secciones y más
               </p>
             </div>
             <button
@@ -4648,6 +4762,336 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               <Save size={18} style={{ marginRight: '0.5rem' }} />
               Guardar Todo
             </button>
+          </div>
+
+          {/* Sección Logo y Configuración del Sitio */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: isMobile ? '1.5rem' : '2rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            marginBottom: '2rem'
+          }}>
+            <h3 style={{ 
+              margin: 0, 
+              marginBottom: '1.5rem', 
+              color: 'var(--text-primary)',
+              fontSize: isMobile ? '1.25rem' : '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <ImageIcon size={24} />
+              Logo y Configuración del Sitio
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Nombre del Sitio *
+                </label>
+                <input
+                  type="text"
+                  value={homeConfig.siteSettings?.siteName || ''}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    siteSettings: { 
+                      ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
+                      siteName: e.target.value 
+                    } 
+                  })}
+                  placeholder="Ej: Subasta Argenta"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '1rem'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Tagline (Eslogan)
+                </label>
+                <input
+                  type="text"
+                  value={homeConfig.siteSettings?.siteTagline || ''}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    siteSettings: { 
+                      ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
+                      siteTagline: e.target.value 
+                    } 
+                  })}
+                  placeholder="Ej: La plataforma líder de subastas online"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '1rem'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Logo del Sitio
+                </label>
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.currentTarget.style.borderColor = 'var(--primary)';
+                    e.currentTarget.style.background = 'rgba(214, 90, 0, 0.05)';
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.currentTarget.style.borderColor = 'var(--border)';
+                    e.currentTarget.style.background = 'var(--bg-primary)';
+                  }}
+                  onDrop={(e) => handleImageDrop(e, (url) => setHomeConfig({ 
+                    ...homeConfig, 
+                    siteSettings: { 
+                      ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
+                      logoUrl: url 
+                    } 
+                  }))}
+                  style={{
+                    border: '2px dashed var(--border)',
+                    borderRadius: '0.5rem',
+                    padding: '1rem',
+                    background: 'var(--bg-primary)',
+                    transition: 'all 0.2s',
+                    marginBottom: '0.75rem'
+                  }}
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleImageFileSelect(e, (url) => setHomeConfig({ 
+                      ...homeConfig, 
+                      siteSettings: { 
+                        ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
+                        logoUrl: url 
+                      } 
+                    }))}
+                    style={{ display: 'none' }}
+                    id="logo-image-input"
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                      📸 Arrastrá el logo aquí o hacé clic para seleccionar
+                    </div>
+                    <label
+                      htmlFor="logo-image-input"
+                      className="btn btn-secondary"
+                      style={{
+                        padding: '0.625rem 1.25rem',
+                        fontSize: isMobile ? '0.875rem' : '0.9375rem',
+                        cursor: 'pointer',
+                        display: 'inline-block'
+                      }}
+                    >
+                      Seleccionar Logo
+                    </label>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      También podés pegar una URL abajo
+                    </div>
+                  </div>
+                </div>
+                <input
+                  type="text"
+                  value={homeConfig.siteSettings?.logoUrl || ''}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    siteSettings: { 
+                      ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
+                      logoUrl: e.target.value 
+                    } 
+                  })}
+                  placeholder="O ingresá una URL: https://ejemplo.com/logo.png"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '1rem',
+                    marginBottom: '0.75rem'
+                  }}
+                />
+                {homeConfig.siteSettings?.logoUrl && (
+                  <div style={{ marginTop: '0.75rem', borderRadius: '0.5rem', overflow: 'hidden', border: '1px solid var(--border)', padding: '1rem', background: 'var(--bg-primary)' }}>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Vista previa del logo:</div>
+                    <img 
+                      src={homeConfig.siteSettings.logoUrl} 
+                      alt="Logo preview" 
+                      style={{ maxHeight: '100px', maxWidth: '100%', objectFit: 'contain' }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Texto del Footer
+                </label>
+                <input
+                  type="text"
+                  value={homeConfig.siteSettings?.footerText || ''}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    siteSettings: { 
+                      ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
+                      footerText: e.target.value 
+                    } 
+                  })}
+                  placeholder="Ej: © 2024 Subasta Argenta. Todos los derechos reservados."
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '1rem'
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Sección Colores del Tema */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: isMobile ? '1.5rem' : '2rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            marginBottom: '2rem'
+          }}>
+            <h3 style={{ 
+              margin: 0, 
+              marginBottom: '1.5rem', 
+              color: 'var(--text-primary)',
+              fontSize: isMobile ? '1.25rem' : '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <span style={{ fontSize: '1.5rem' }}>🎨</span>
+              Colores del Tema
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1.5rem' }}>
+              {Object.entries(homeConfig.themeColors || defaultHomeConfig.themeColors).map(([key, value]) => (
+                <div key={key}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, textTransform: 'capitalize' }}>
+                    {key.replace(/([A-Z])/g, ' $1').trim()}
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <input
+                      type="color"
+                      value={value}
+                      onChange={(e) => setHomeConfig({ 
+                        ...homeConfig, 
+                        themeColors: { 
+                          ...(homeConfig.themeColors || defaultHomeConfig.themeColors), 
+                          [key]: e.target.value 
+                        } 
+                      })}
+                      style={{
+                        width: '60px',
+                        height: '40px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '0.5rem',
+                        cursor: 'pointer'
+                      }}
+                    />
+                    <input
+                      type="text"
+                      value={value}
+                      onChange={(e) => setHomeConfig({ 
+                        ...homeConfig, 
+                        themeColors: { 
+                          ...(homeConfig.themeColors || defaultHomeConfig.themeColors), 
+                          [key]: e.target.value 
+                        } 
+                      })}
+                      placeholder="#000000"
+                      style={{
+                        flex: 1,
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '1rem',
+                        fontFamily: 'monospace'
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Sección Títulos de Secciones */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: isMobile ? '1.5rem' : '2rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            marginBottom: '2rem'
+          }}>
+            <h3 style={{ 
+              margin: 0, 
+              marginBottom: '1.5rem', 
+              color: 'var(--text-primary)',
+              fontSize: isMobile ? '1.25rem' : '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <span style={{ fontSize: '1.5rem' }}>📝</span>
+              Títulos de Secciones
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1.5rem' }}>
+              {Object.entries(homeConfig.sectionTitles || defaultHomeConfig.sectionTitles).map(([key, value]) => (
+                <div key={key}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, textTransform: 'capitalize' }}>
+                    {key.replace(/([A-Z])/g, ' $1').trim()}
+                  </label>
+                  <input
+                    type="text"
+                    value={value || ''}
+                    onChange={(e) => setHomeConfig({ 
+                      ...homeConfig, 
+                      sectionTitles: { 
+                        ...(homeConfig.sectionTitles || defaultHomeConfig.sectionTitles), 
+                        [key]: e.target.value 
+                      } 
+                    })}
+                    placeholder={`Título para ${key}`}
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: isMobile ? '16px' : '1rem'
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Sección Hero */}
@@ -5323,6 +5767,288 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sección Sobre Nosotros */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: isMobile ? '1.5rem' : '2rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            marginBottom: '2rem'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginBottom: '1.5rem',
+              flexWrap: 'wrap',
+              gap: '1rem'
+            }}>
+              <h3 style={{ 
+                margin: 0, 
+                color: 'var(--text-primary)',
+                fontSize: isMobile ? '1.25rem' : '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <span style={{ fontSize: '1.5rem' }}>ℹ️</span>
+                Sección Sobre Nosotros
+              </h3>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                <input
+                  type="checkbox"
+                  checked={homeConfig.aboutSection?.active || false}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    aboutSection: { 
+                      ...(homeConfig.aboutSection || defaultHomeConfig.aboutSection), 
+                      active: e.target.checked 
+                    } 
+                  })}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: isMobile ? '0.875rem' : '0.9375rem' }}>Activar sección</span>
+              </label>
+            </div>
+            {homeConfig.aboutSection?.active && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Título
+                  </label>
+                  <input
+                    type="text"
+                    value={homeConfig.aboutSection?.title || ''}
+                    onChange={(e) => setHomeConfig({ 
+                      ...homeConfig, 
+                      aboutSection: { 
+                        ...(homeConfig.aboutSection || defaultHomeConfig.aboutSection), 
+                        title: e.target.value 
+                      } 
+                    })}
+                    placeholder="Sobre Nosotros"
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: isMobile ? '16px' : '1rem'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Contenido
+                  </label>
+                  <textarea
+                    value={homeConfig.aboutSection?.content || ''}
+                    onChange={(e) => setHomeConfig({ 
+                      ...homeConfig, 
+                      aboutSection: { 
+                        ...(homeConfig.aboutSection || defaultHomeConfig.aboutSection), 
+                        content: e.target.value 
+                      } 
+                    })}
+                    rows={6}
+                    placeholder="Descripción de tu empresa o plataforma..."
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: isMobile ? '16px' : '1rem',
+                      fontFamily: 'inherit',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Imagen (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={homeConfig.aboutSection?.imageUrl || ''}
+                    onChange={(e) => setHomeConfig({ 
+                      ...homeConfig, 
+                      aboutSection: { 
+                        ...(homeConfig.aboutSection || defaultHomeConfig.aboutSection), 
+                        imageUrl: e.target.value 
+                      } 
+                    })}
+                    placeholder="URL de imagen (opcional)"
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: isMobile ? '16px' : '1rem'
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Sección Contacto */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: isMobile ? '1.5rem' : '2rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            marginBottom: '2rem'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginBottom: '1.5rem',
+              flexWrap: 'wrap',
+              gap: '1rem'
+            }}>
+              <h3 style={{ 
+                margin: 0, 
+                color: 'var(--text-primary)',
+                fontSize: isMobile ? '1.25rem' : '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <span style={{ fontSize: '1.5rem' }}>📧</span>
+                Sección Contacto
+              </h3>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                <input
+                  type="checkbox"
+                  checked={homeConfig.contactSection?.active || false}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    contactSection: { 
+                      ...(homeConfig.contactSection || defaultHomeConfig.contactSection), 
+                      active: e.target.checked 
+                    } 
+                  })}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: isMobile ? '0.875rem' : '0.9375rem' }}>Activar sección</span>
+              </label>
+            </div>
+            {homeConfig.contactSection?.active && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Título
+                  </label>
+                  <input
+                    type="text"
+                    value={homeConfig.contactSection?.title || ''}
+                    onChange={(e) => setHomeConfig({ 
+                      ...homeConfig, 
+                      contactSection: { 
+                        ...(homeConfig.contactSection || defaultHomeConfig.contactSection), 
+                        title: e.target.value 
+                      } 
+                    })}
+                    placeholder="Contacto"
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: isMobile ? '16px' : '1rem'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    value={homeConfig.contactSection?.email || ''}
+                    onChange={(e) => setHomeConfig({ 
+                      ...homeConfig, 
+                      contactSection: { 
+                        ...(homeConfig.contactSection || defaultHomeConfig.contactSection), 
+                        email: e.target.value 
+                      } 
+                    })}
+                    placeholder="contacto@ejemplo.com"
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: isMobile ? '16px' : '1rem'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Teléfono (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={homeConfig.contactSection?.phone || ''}
+                    onChange={(e) => setHomeConfig({ 
+                      ...homeConfig, 
+                      contactSection: { 
+                        ...(homeConfig.contactSection || defaultHomeConfig.contactSection), 
+                        phone: e.target.value 
+                      } 
+                    })}
+                    placeholder="+54 11 1234-5678"
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: isMobile ? '16px' : '1rem'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Dirección (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={homeConfig.contactSection?.address || ''}
+                    onChange={(e) => setHomeConfig({ 
+                      ...homeConfig, 
+                      contactSection: { 
+                        ...(homeConfig.contactSection || defaultHomeConfig.contactSection), 
+                        address: e.target.value 
+                      } 
+                    })}
+                    placeholder="Calle, Ciudad, País"
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: isMobile ? '16px' : '1rem'
+                    }}
+                  />
+                </div>
               </div>
             )}
           </div>

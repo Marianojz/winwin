@@ -16,23 +16,50 @@ const Perfil = () => {
   const isMobile = useIsMobile();
   
   useEffect(() => {
-    if (user) {
+    if (user && activeTab === 'messages') {
       const conversationId = `admin_${user.id}`;
-      const messages = getUserConversations(user.id);
-      setUserMessages(messages);
-      setUnreadCount(getUnreadCount(user.id));
-      markMessagesAsRead(conversationId, user.id);
       
-      // Actualizar cada 5 segundos
-      const interval = setInterval(() => {
-        const updated = getUserConversations(user.id);
-        setUserMessages(updated);
-        setUnreadCount(getUnreadCount(user.id));
-      }, 5000);
+      // Escuchar mensajes en tiempo real
+      const unsubscribeMessages = getUserConversations(user.id, (messages) => {
+        setUserMessages(messages);
+        // Marcar como leídos cuando se cargan
+        markMessagesAsRead(conversationId, user.id);
+        
+        // Auto-scroll al final cuando hay nuevos mensajes
+        setTimeout(() => {
+          const container = document.getElementById('messages-container');
+          if (container) {
+            container.scrollTop = container.scrollHeight;
+          }
+        }, 100);
+      });
       
-      return () => clearInterval(interval);
+      // Escuchar contador de no leídos en tiempo real
+      const unsubscribeUnread = getUnreadCount(user.id, (count) => {
+        setUnreadCount(count);
+      });
+      
+      return () => {
+        unsubscribeMessages();
+        unsubscribeUnread();
+      };
+    } else {
+      setUserMessages([]);
+      setUnreadCount(0);
     }
   }, [user, activeTab]);
+  
+  // Auto-scroll cuando se envía un mensaje
+  useEffect(() => {
+    if (userMessages.length > 0) {
+      setTimeout(() => {
+        const container = document.getElementById('messages-container');
+        if (container) {
+          container.scrollTop = container.scrollHeight;
+        }
+      }, 100);
+    }
+  }, [userMessages.length]);
 
   if (!user) {
     return <div style={{ padding: '3rem', textAlign: 'center' }}>Debes iniciar sesión</div>;
@@ -247,17 +274,21 @@ const Perfil = () => {
           </div>
 
           {/* Lista de mensajes */}
-          <div style={{ 
-            maxHeight: isMobile ? '400px' : '500px', 
-            overflowY: 'auto', 
-            marginBottom: '2rem',
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '1rem',
-            padding: '1rem',
-            background: 'var(--bg-tertiary)',
-            borderRadius: '0.75rem'
-          }}>
+          <div 
+            id="messages-container"
+            style={{ 
+              maxHeight: isMobile ? '400px' : '500px', 
+              overflowY: 'auto', 
+              marginBottom: '2rem',
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '1rem',
+              padding: '1rem',
+              background: 'var(--bg-tertiary)',
+              borderRadius: '0.75rem',
+              scrollBehavior: 'smooth'
+            }}
+          >
             {userMessages.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
                 <MessageSquare size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
@@ -314,46 +345,73 @@ const Perfil = () => {
 
           {/* Input para enviar mensaje */}
           <form
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
               if (!newMessageContent.trim() || !user) return;
 
-              const message = createMessage(
-                user.id,
-                user.username,
-                'admin',
-                newMessageContent.trim()
-              );
-              
-              saveMessage(message);
-              setUserMessages([...userMessages, message]);
-              setNewMessageContent('');
-              setUnreadCount(getUnreadCount(user.id));
+              try {
+                const message = createMessage(
+                  user.id,
+                  user.username,
+                  'admin',
+                  newMessageContent.trim()
+                );
+                
+                // Guardar mensaje en Firebase (se actualizará automáticamente por el listener)
+                await saveMessage(message);
+                setNewMessageContent('');
+                
+                // El mensaje aparecerá automáticamente gracias al listener en tiempo real
+                console.log('✅ Mensaje enviado correctamente');
+              } catch (error) {
+                console.error('❌ Error enviando mensaje:', error);
+                alert('❌ Error al enviar el mensaje. Por favor, intentá nuevamente.');
+              }
             }}
-            style={{ display: 'flex', gap: '0.75rem' }}
+            style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end' }}
           >
-            <input
-              type="text"
-              value={newMessageContent}
-              onChange={(e) => setNewMessageContent(e.target.value)}
-              placeholder="Escribí un mensaje al administrador..."
-              style={{ 
-                flex: 1, 
-                padding: '0.875rem 1.25rem', 
-                borderRadius: '0.75rem', 
-                border: '1px solid var(--border)',
-                fontSize: '0.9375rem',
-                background: 'var(--bg-tertiary)'
-              }}
-            />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                Escribí tu mensaje:
+              </label>
+              <textarea
+                value={newMessageContent}
+                onChange={(e) => setNewMessageContent(e.target.value)}
+                placeholder="Escribí tu mensaje al administrador aquí..."
+                rows={3}
+                style={{ 
+                  width: '100%',
+                  padding: '0.875rem 1.25rem', 
+                  borderRadius: '0.75rem', 
+                  border: '2px solid var(--border)',
+                  fontSize: '0.9375rem',
+                  background: 'var(--bg-tertiary)',
+                  color: 'var(--text-primary)',
+                  resize: 'vertical',
+                  minHeight: '80px',
+                  fontFamily: 'inherit'
+                }}
+              />
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                {newMessageContent.length > 0 && `${newMessageContent.length} caracteres`}
+              </div>
+            </div>
             <button
               type="submit"
               className="btn btn-primary"
-              style={{ padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              style={{ 
+                padding: '0.875rem 1.5rem', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem',
+                height: 'fit-content',
+                whiteSpace: 'nowrap',
+                fontWeight: 600
+              }}
               disabled={!newMessageContent.trim()}
             >
               <Send size={18} />
-              Enviar
+              Enviar Mensaje
             </button>
           </form>
 

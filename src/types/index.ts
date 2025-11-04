@@ -136,6 +136,8 @@ export interface Bot {
   maxBidAmount: number;
   isActive: boolean;
   targetAuctions: string[];
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
 }
 
 export type Theme = 'light' | 'dark';

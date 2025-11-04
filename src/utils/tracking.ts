@@ -274,8 +274,7 @@ class TrackingSystem {
     const searchesRemoved = oldSearchesCount - this.searches.length;
 
     if (clicksRemoved > 0 || searchesRemoved > 0) {
-      this.saveClicks();
-      this.saveSearches();
+      // Los datos se guardan automáticamente en Firebase a través de los listeners
       console.log(`🧹 Tracking: ${clicksRemoved} clicks y ${searchesRemoved} búsquedas antiguas eliminadas`);
     }
 
