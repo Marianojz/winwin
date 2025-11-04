@@ -3,6 +3,8 @@
  * Registra todas las acciones de usuario con fecha e ID único
  */
 
+import { ref, push, query, orderByKey, limitToLast, onValue, off } from 'firebase/database';
+import { realtimeDb } from '../config/firebase';
 import { actionLogger } from './actionLogger';
 
 export interface ClickTracking {
@@ -27,9 +29,9 @@ export interface SearchTracking {
 class TrackingSystem {
   private clicks: ClickTracking[] = [];
   private searches: SearchTracking[] = [];
-  private readonly CLICKS_KEY = 'tracking_clicks';
-  private readonly SEARCHES_KEY = 'tracking_searches';
   private readonly MAX_TRACKED = 5000; // Máximo de registros en memoria
+  private clicksUnsubscribe: (() => void) | null = null;
+  private searchesUnsubscribe: (() => void) | null = null;
 
   constructor() {
     this.loadClicks();
@@ -38,60 +40,68 @@ class TrackingSystem {
 
   private loadClicks() {
     try {
-      const saved = localStorage.getItem(this.CLICKS_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        this.clicks = parsed.map((c: any) => ({
+      const clicksRef = query(ref(realtimeDb, 'tracking_clicks'), orderByKey(), limitToLast(this.MAX_TRACKED));
+      
+      this.clicksUnsubscribe = onValue(clicksRef, (snapshot) => {
+        const data = snapshot.val();
+        
+        if (!data) {
+          this.clicks = [];
+          return;
+        }
+        
+        this.clicks = Object.values(data).map((c: any) => ({
           ...c,
           timestamp: new Date(c.timestamp)
         })).sort((a: ClickTracking, b: ClickTracking) => 
           b.timestamp.getTime() - a.timestamp.getTime()
         ).slice(0, this.MAX_TRACKED);
-      }
+        
+        console.log(`✅ Cargados ${this.clicks.length} clicks desde Firebase`);
+      }, (error) => {
+        console.error('Error cargando clicks desde Firebase:', error);
+        this.clicks = [];
+      });
     } catch (error) {
-      console.error('Error cargando clicks:', error);
+      console.error('Error configurando listener de clicks:', error);
       this.clicks = [];
     }
   }
 
   private loadSearches() {
     try {
-      const saved = localStorage.getItem(this.SEARCHES_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        this.searches = parsed.map((s: any) => ({
+      const searchesRef = query(ref(realtimeDb, 'tracking_searches'), orderByKey(), limitToLast(this.MAX_TRACKED));
+      
+      this.searchesUnsubscribe = onValue(searchesRef, (snapshot) => {
+        const data = snapshot.val();
+        
+        if (!data) {
+          this.searches = [];
+          return;
+        }
+        
+        this.searches = Object.values(data).map((s: any) => ({
           ...s,
           timestamp: new Date(s.timestamp)
         })).sort((a: SearchTracking, b: SearchTracking) => 
           b.timestamp.getTime() - a.timestamp.getTime()
         ).slice(0, this.MAX_TRACKED);
-      }
+        
+        console.log(`✅ Cargadas ${this.searches.length} búsquedas desde Firebase`);
+      }, (error) => {
+        console.error('Error cargando búsquedas desde Firebase:', error);
+        this.searches = [];
+      });
     } catch (error) {
-      console.error('Error cargando búsquedas:', error);
+      console.error('Error configurando listener de búsquedas:', error);
       this.searches = [];
-    }
-  }
-
-  private saveClicks() {
-    try {
-      localStorage.setItem(this.CLICKS_KEY, JSON.stringify(this.clicks.slice(0, this.MAX_TRACKED)));
-    } catch (error) {
-      console.error('Error guardando clicks:', error);
-    }
-  }
-
-  private saveSearches() {
-    try {
-      localStorage.setItem(this.SEARCHES_KEY, JSON.stringify(this.searches.slice(0, this.MAX_TRACKED)));
-    } catch (error) {
-      console.error('Error guardando búsquedas:', error);
     }
   }
 
   /**
    * Registra un click en un producto o subasta
    */
-  trackClick(entityType: 'product' | 'auction', entityId: string, entityName: string, userId?: string, userName?: string) {
+  async trackClick(entityType: 'product' | 'auction', entityId: string, entityName: string, userId?: string, userName?: string): Promise<string> {
     const click: ClickTracking = {
       id: `click-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       entityType,
@@ -102,18 +112,34 @@ class TrackingSystem {
       timestamp: new Date()
     };
 
-    this.clicks.unshift(click);
-    if (this.clicks.length > this.MAX_TRACKED) {
-      this.clicks = this.clicks.slice(0, this.MAX_TRACKED);
-    }
-    this.saveClicks();
+    try {
+      // Guardar en Firebase
+      const clicksRef = ref(realtimeDb, 'tracking_clicks');
+      await push(clicksRef, {
+        ...click,
+        timestamp: click.timestamp.toISOString()
+      });
+      
+      // Actualización optimista local
+      this.clicks.unshift(click);
+      if (this.clicks.length > this.MAX_TRACKED) {
+        this.clicks = this.clicks.slice(0, this.MAX_TRACKED);
+      }
 
-    // También registrar en actionLogger
-    actionLogger.log(
-      `Click en ${entityType === 'product' ? 'producto' : 'subasta'}: ${entityName}`,
-      entityType === 'product' ? 'product' : 'auction',
-      { userId, userName, entityId, details: { entityName } }
-    );
+      // También registrar en actionLogger
+      await actionLogger.log(
+        `Click en ${entityType === 'product' ? 'producto' : 'subasta'}: ${entityName}`,
+        entityType === 'product' ? 'product' : 'auction',
+        { userId, userName, entityId, details: { entityName } }
+      );
+    } catch (error) {
+      console.error('❌ Error guardando click en Firebase:', error);
+      // Fallback: guardar solo localmente si falla Firebase
+      this.clicks.unshift(click);
+      if (this.clicks.length > this.MAX_TRACKED) {
+        this.clicks = this.clicks.slice(0, this.MAX_TRACKED);
+      }
+    }
 
     return click.id;
   }
@@ -121,7 +147,7 @@ class TrackingSystem {
   /**
    * Registra una búsqueda
    */
-  trackSearch(query: string, results: number, userId?: string, userName?: string) {
+  async trackSearch(query: string, results: number, userId?: string, userName?: string): Promise<string> {
     const search: SearchTracking = {
       id: `search-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       query,
@@ -131,18 +157,34 @@ class TrackingSystem {
       timestamp: new Date()
     };
 
-    this.searches.unshift(search);
-    if (this.searches.length > this.MAX_TRACKED) {
-      this.searches = this.searches.slice(0, this.MAX_TRACKED);
-    }
-    this.saveSearches();
+    try {
+      // Guardar en Firebase
+      const searchesRef = ref(realtimeDb, 'tracking_searches');
+      await push(searchesRef, {
+        ...search,
+        timestamp: search.timestamp.toISOString()
+      });
+      
+      // Actualización optimista local
+      this.searches.unshift(search);
+      if (this.searches.length > this.MAX_TRACKED) {
+        this.searches = this.searches.slice(0, this.MAX_TRACKED);
+      }
 
-    // También registrar en actionLogger
-    actionLogger.log(
-      `Búsqueda: "${query}" (${results} resultados)`,
-      'system',
-      { userId, userName, details: { query, results } }
-    );
+      // También registrar en actionLogger
+      await actionLogger.log(
+        `Búsqueda: "${query}" (${results} resultados)`,
+        'system',
+        { userId, userName, details: { query, results } }
+      );
+    } catch (error) {
+      console.error('❌ Error guardando búsqueda en Firebase:', error);
+      // Fallback: guardar solo localmente si falla Firebase
+      this.searches.unshift(search);
+      if (this.searches.length > this.MAX_TRACKED) {
+        this.searches = this.searches.slice(0, this.MAX_TRACKED);
+      }
+    }
 
     return search.id;
   }
@@ -244,25 +286,34 @@ class TrackingSystem {
    * Limpia todos los registros
    */
   clearAll() {
+    // Desconectar listeners
+    if (this.clicksUnsubscribe) {
+      const clicksRef = ref(realtimeDb, 'tracking_clicks');
+      off(clicksRef);
+      this.clicksUnsubscribe = null;
+    }
+    if (this.searchesUnsubscribe) {
+      const searchesRef = ref(realtimeDb, 'tracking_searches');
+      off(searchesRef);
+      this.searchesUnsubscribe = null;
+    }
     this.clicks = [];
     this.searches = [];
-    localStorage.removeItem(this.CLICKS_KEY);
-    localStorage.removeItem(this.SEARCHES_KEY);
   }
 }
 
 export const trackingSystem = new TrackingSystem();
 
 // Helper functions para uso fácil
-export const trackProductClick = (productId: string, productName: string, userId?: string, userName?: string) => {
-  return trackingSystem.trackClick('product', productId, productName, userId, userName);
+export const trackProductClick = async (productId: string, productName: string, userId?: string, userName?: string) => {
+  return await trackingSystem.trackClick('product', productId, productName, userId, userName);
 };
 
-export const trackAuctionClick = (auctionId: string, auctionTitle: string, userId?: string, userName?: string) => {
-  return trackingSystem.trackClick('auction', auctionId, auctionTitle, userId, userName);
+export const trackAuctionClick = async (auctionId: string, auctionTitle: string, userId?: string, userName?: string) => {
+  return await trackingSystem.trackClick('auction', auctionId, auctionTitle, userId, userName);
 };
 
-export const trackSearch = (query: string, results: number, userId?: string, userName?: string) => {
-  return trackingSystem.trackSearch(query, results, userId, userName);
+export const trackSearch = async (query: string, results: number, userId?: string, userName?: string) => {
+  return await trackingSystem.trackSearch(query, results, userId, userName);
 };
 

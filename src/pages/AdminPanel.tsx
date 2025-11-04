@@ -1,5 +1,5 @@
 // Firebase Realtime Database imports
-import { ref, update, remove } from 'firebase/database';
+import { ref, update, remove, onValue, set as firebaseSet } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
 
 // Otras importaciones de Lucide, React, etc.
@@ -77,33 +77,48 @@ const AdminPanel = (): React.ReactElement => {
   }, []); // Solo al montar
   
   // Estado para configuración del inicio
-  const [homeConfig, setHomeConfig] = useState<HomeConfig>(() => {
+  const [homeConfig, setHomeConfig] = useState<HomeConfig>(defaultHomeConfig);
+  
+  // Cargar homeConfig desde Firebase
+  useEffect(() => {
     try {
-      const saved = localStorage.getItem('homeConfig');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Asegurar que banners y promotions tengan las fechas correctas
-        return {
-          ...parsed,
-          banners: parsed.banners?.map((b: any) => ({
-            ...b,
-            createdAt: b.createdAt ? new Date(b.createdAt) : new Date(),
-            updatedAt: b.updatedAt ? new Date(b.updatedAt) : undefined
-          })) || [],
-          promotions: parsed.promotions?.map((p: any) => ({
-            ...p,
-            createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
-            startDate: p.startDate ? new Date(p.startDate) : undefined,
-            endDate: p.endDate ? new Date(p.endDate) : undefined
-          })) || [],
-          updatedAt: parsed.updatedAt ? new Date(parsed.updatedAt) : new Date()
-        };
-      }
-      return defaultHomeConfig;
-    } catch {
-      return defaultHomeConfig;
+      const homeConfigRef = ref(realtimeDb, 'homeConfig');
+      
+      const unsubscribe = onValue(homeConfigRef, (snapshot) => {
+        const data = snapshot.val();
+        
+        if (data) {
+          setHomeConfig({
+            ...defaultHomeConfig,
+            ...data,
+            banners: data.banners?.map((b: any) => ({
+              ...b,
+              createdAt: b.createdAt ? new Date(b.createdAt) : new Date(),
+              updatedAt: b.updatedAt ? new Date(b.updatedAt) : undefined
+            })) || [],
+            promotions: data.promotions?.map((p: any) => ({
+              ...p,
+              createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
+              startDate: p.startDate ? new Date(p.startDate) : undefined,
+              endDate: p.endDate ? new Date(p.endDate) : undefined
+            })) || [],
+            updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date()
+          });
+          console.log('✅ Configuración de home cargada desde Firebase');
+        } else {
+          setHomeConfig(defaultHomeConfig);
+        }
+      }, (error) => {
+        console.error('Error cargando configuración del inicio desde Firebase:', error);
+        setHomeConfig(defaultHomeConfig);
+      });
+      
+      return () => unsubscribe();
+    } catch (error) {
+      console.error('Error configurando listener de homeConfig:', error);
+      setHomeConfig(defaultHomeConfig);
     }
-  });
+  }, []);
 
   // Estados para templates de mensajes
   const [messageTemplates, setMessageTemplates] = useState<MessageTemplate[]>(() => loadMessageTemplates());
@@ -1232,12 +1247,34 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
   };
 
   // Función para guardar configuración de home
-  const handleSaveHomeConfig = () => {
-    const updatedConfig = { ...homeConfig, updatedAt: new Date() };
-    localStorage.setItem('homeConfig', JSON.stringify(updatedConfig));
-    setHomeConfig(updatedConfig);
-    logAdminAction('Configuración de home guardada', user?.id, user?.username);
-    alert('✅ Configuración del inicio guardada correctamente');
+  const handleSaveHomeConfig = async () => {
+    try {
+      const updatedConfig = { 
+        ...homeConfig, 
+        updatedAt: new Date().toISOString(),
+        banners: homeConfig.banners.map(b => ({
+          ...b,
+          createdAt: b.createdAt instanceof Date ? b.createdAt.toISOString() : b.createdAt,
+          updatedAt: b.updatedAt instanceof Date ? b.updatedAt.toISOString() : b.updatedAt
+        })),
+        promotions: homeConfig.promotions.map(p => ({
+          ...p,
+          createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
+          updatedAt: p.updatedAt instanceof Date ? p.updatedAt.toISOString() : p.updatedAt
+        }))
+      };
+      
+      // Guardar en Firebase
+      const homeConfigRef = ref(realtimeDb, 'homeConfig');
+      await firebaseSet(homeConfigRef, updatedConfig);
+      
+      setHomeConfig(homeConfig); // Actualizar estado local
+      await logAdminAction('Configuración de home guardada', user?.id, user?.username);
+      alert('✅ Configuración del inicio guardada correctamente en Firebase');
+    } catch (error) {
+      console.error('❌ Error guardando configuración de home en Firebase:', error);
+      alert('❌ Error al guardar la configuración. Por favor, intenta nuevamente.');
+    }
   };
 
   // Funciones para gestión de banners

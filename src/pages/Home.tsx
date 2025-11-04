@@ -6,6 +6,8 @@ import ProductCard from '../components/ProductCard';
 import { Product } from '../types';
 import { HomeConfig, defaultHomeConfig } from '../types/homeConfig';
 import { useEffect, useState } from 'react';
+import { ref, onValue } from 'firebase/database';
+import { realtimeDb } from '../config/firebase';
 
 const Home = () => {
   const { auctions, products } = useStore();
@@ -13,24 +15,41 @@ const Home = () => {
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('homeConfig');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setHomeConfig({
-          ...defaultHomeConfig,
-          ...parsed,
-          banners: parsed.banners?.map((b: any) => ({
-            ...b,
-            createdAt: b.createdAt ? new Date(b.createdAt) : new Date()
-          })) || [],
-          promotions: parsed.promotions?.map((p: any) => ({
-            ...p,
-            createdAt: p.createdAt ? new Date(p.createdAt) : new Date()
-          })) || []
-        });
-      }
+      const homeConfigRef = ref(realtimeDb, 'homeConfig');
+      
+      // Escuchar cambios en tiempo real
+      const unsubscribe = onValue(homeConfigRef, (snapshot) => {
+        const data = snapshot.val();
+        
+        if (data) {
+          setHomeConfig({
+            ...defaultHomeConfig,
+            ...data,
+            banners: data.banners?.map((b: any) => ({
+              ...b,
+              createdAt: b.createdAt ? new Date(b.createdAt) : new Date()
+            })) || [],
+            promotions: data.promotions?.map((p: any) => ({
+              ...p,
+              createdAt: p.createdAt ? new Date(p.createdAt) : new Date()
+            })) || []
+          });
+          console.log('✅ Configuración de home cargada desde Firebase');
+        } else {
+          // Si no hay configuración en Firebase, usar la por defecto
+          setHomeConfig(defaultHomeConfig);
+        }
+      }, (error) => {
+        console.error('Error cargando configuración del inicio desde Firebase:', error);
+        setHomeConfig(defaultHomeConfig);
+      });
+      
+      return () => {
+        unsubscribe();
+      };
     } catch (error) {
-      console.error('Error cargando configuración del inicio:', error);
+      console.error('Error configurando listener de homeConfig:', error);
+      setHomeConfig(defaultHomeConfig);
     }
   }, []);
   

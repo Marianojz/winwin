@@ -1,4 +1,7 @@
 // Sistema de log de acciones con fecha, acción, ID único
+import { ref, push, get as firebaseGet, query, orderByKey, limitToLast, onValue, off } from 'firebase/database';
+import { realtimeDb } from '../config/firebase';
+
 export interface ActionLog {
   id: string;
   action: string;
@@ -13,8 +16,8 @@ export interface ActionLog {
 
 class ActionLogger {
   private logs: ActionLog[] = [];
-  private readonly STORAGE_KEY = 'action_logs';
   private readonly MAX_LOGS = 1000; // Mantener últimos 1000 logs
+  private unsubscribe: (() => void) | null = null;
 
   constructor() {
     this.loadLogs();
@@ -22,40 +25,42 @@ class ActionLogger {
 
   private loadLogs() {
     try {
-      const saved = localStorage.getItem(this.STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        this.logs = parsed.map((log: any) => ({
+      const logsRef = query(ref(realtimeDb, 'action_logs'), orderByKey(), limitToLast(this.MAX_LOGS));
+      
+      // Escuchar cambios en tiempo real
+      this.unsubscribe = onValue(logsRef, (snapshot) => {
+        const data = snapshot.val();
+        
+        if (!data) {
+          this.logs = [];
+          return;
+        }
+        
+        // Convertir objeto Firebase a array y ordenar por timestamp
+        this.logs = Object.values(data).map((log: any) => ({
           ...log,
           timestamp: new Date(log.timestamp)
         })).sort((a: ActionLog, b: ActionLog) => 
           b.timestamp.getTime() - a.timestamp.getTime()
         );
-      }
+        
+        console.log(`✅ Cargados ${this.logs.length} logs de acciones desde Firebase`);
+      }, (error) => {
+        console.error('Error cargando logs desde Firebase:', error);
+        this.logs = [];
+      });
     } catch (error) {
-      console.error('Error cargando logs:', error);
+      console.error('Error configurando listener de logs:', error);
       this.logs = [];
     }
   }
 
-  private saveLogs() {
-    try {
-      // Mantener solo los últimos MAX_LOGS
-      if (this.logs.length > this.MAX_LOGS) {
-        this.logs = this.logs.slice(0, this.MAX_LOGS);
-      }
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.logs));
-    } catch (error) {
-      console.error('Error guardando logs:', error);
-    }
-  }
-
-  log(action: string, entityType: ActionLog['entityType'], options: {
+  async log(action: string, entityType: ActionLog['entityType'], options: {
     userId?: string;
     userName?: string;
     entityId?: string;
     details?: Record<string, any>;
-  } = {}): string {
+  } = {}): Promise<string> {
     const logId = `LOG-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     const log: ActionLog = {
@@ -66,10 +71,29 @@ class ActionLogger {
       ...options
     };
 
-    this.logs.unshift(log); // Agregar al inicio
-    this.saveLogs();
-
-    console.log(`📝 [${entityType.toUpperCase()}] ${action}`, log);
+    try {
+      // Guardar en Firebase Realtime Database
+      const logsRef = ref(realtimeDb, 'action_logs');
+      await push(logsRef, {
+        ...log,
+        timestamp: log.timestamp.toISOString()
+      });
+      
+      // Actualización optimista local
+      this.logs.unshift(log);
+      if (this.logs.length > this.MAX_LOGS) {
+        this.logs = this.logs.slice(0, this.MAX_LOGS);
+      }
+      
+      console.log(`📝 [${entityType.toUpperCase()}] ${action}`, log);
+    } catch (error) {
+      console.error('❌ Error guardando log en Firebase:', error);
+      // Fallback: guardar solo localmente si falla Firebase
+      this.logs.unshift(log);
+      if (this.logs.length > this.MAX_LOGS) {
+        this.logs = this.logs.slice(0, this.MAX_LOGS);
+      }
+    }
     
     return logId;
   }
@@ -109,16 +133,13 @@ class ActionLogger {
   }
 
   clearLogs() {
+    // Desconectar listener
+    if (this.unsubscribe) {
+      const logsRef = ref(realtimeDb, 'action_logs');
+      off(logsRef);
+      this.unsubscribe = null;
+    }
     this.logs = [];
-    localStorage.removeItem(this.STORAGE_KEY);
-  }
-
-  clearOldLogs(daysToKeep: number = 30) {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
-    
-    this.logs = this.logs.filter(log => log.timestamp >= cutoffDate);
-    this.saveLogs();
   }
 
   getStats() {
@@ -142,27 +163,27 @@ class ActionLogger {
 export const actionLogger = new ActionLogger();
 
 // Helper functions
-export const logAuctionAction = (action: string, auctionId: string, userId?: string, userName?: string, details?: Record<string, any>) => {
-  return actionLogger.log(action, 'auction', { userId, userName, entityId: auctionId, details });
+export const logAuctionAction = async (action: string, auctionId: string, userId?: string, userName?: string, details?: Record<string, any>) => {
+  return await actionLogger.log(action, 'auction', { userId, userName, entityId: auctionId, details });
 };
 
-export const logProductAction = (action: string, productId: string, userId?: string, userName?: string, details?: Record<string, any>) => {
-  return actionLogger.log(action, 'product', { userId, userName, entityId: productId, details });
+export const logProductAction = async (action: string, productId: string, userId?: string, userName?: string, details?: Record<string, any>) => {
+  return await actionLogger.log(action, 'product', { userId, userName, entityId: productId, details });
 };
 
-export const logOrderAction = (action: string, orderId: string, userId?: string, userName?: string, details?: Record<string, any>) => {
-  return actionLogger.log(action, 'order', { userId, userName, entityId: orderId, details });
+export const logOrderAction = async (action: string, orderId: string, userId?: string, userName?: string, details?: Record<string, any>) => {
+  return await actionLogger.log(action, 'order', { userId, userName, entityId: orderId, details });
 };
 
-export const logUserAction = (action: string, userId: string, userName?: string, details?: Record<string, any>) => {
-  return actionLogger.log(action, 'user', { userId, userName, entityId: userId, details });
+export const logUserAction = async (action: string, userId: string, userName?: string, details?: Record<string, any>) => {
+  return await actionLogger.log(action, 'user', { userId, userName, entityId: userId, details });
 };
 
-export const logSystemAction = (action: string, details?: Record<string, any>) => {
-  return actionLogger.log(action, 'system', { details });
+export const logSystemAction = async (action: string, details?: Record<string, any>) => {
+  return await actionLogger.log(action, 'system', { details });
 };
 
-export const logAdminAction = (action: string, userId?: string, userName?: string, details?: Record<string, any>) => {
-  return actionLogger.log(action, 'admin', { userId, userName, details });
+export const logAdminAction = async (action: string, userId?: string, userName?: string, details?: Record<string, any>) => {
+  return await actionLogger.log(action, 'admin', { userId, userName, details });
 };
 

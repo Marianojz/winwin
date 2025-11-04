@@ -1,9 +1,8 @@
 // Sistema de mensajería entre admin y usuarios
+import { ref, push, set as firebaseSet, get as firebaseGet, update, onValue, off, remove } from 'firebase/database';
+import { realtimeDb } from '../config/firebase';
 import { Message, Conversation } from '../types';
 import { getTemplateByType, renderTemplate } from './messageTemplates';
-
-const MESSAGES_STORAGE_KEY = 'messages';
-const CONVERSATIONS_STORAGE_KEY = 'conversations';
 
 export const createMessage = (
   fromUserId: string,
@@ -32,235 +31,252 @@ export const createMessage = (
   };
 };
 
-export const saveMessage = (message: Message) => {
+export const saveMessage = async (message: Message): Promise<Message> => {
   try {
-    const saved = localStorage.getItem(MESSAGES_STORAGE_KEY);
-    const messages: Message[] = saved ? JSON.parse(saved) : [];
-    
     // Convertir createdAt a Date
     const newMessage = {
       ...message,
       createdAt: message.createdAt instanceof Date ? message.createdAt : new Date(message.createdAt)
     };
     
-    messages.push(newMessage);
-    localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(messages));
+    // Guardar en Firebase Realtime Database
+    const messagesRef = ref(realtimeDb, `messages/${newMessage.conversationId}`);
+    await push(messagesRef, {
+      ...newMessage,
+      createdAt: newMessage.createdAt.toISOString()
+    });
     
-    // Actualizar conversación
-    updateConversation(newMessage);
-    
+    console.log(`✅ Mensaje guardado en Firebase: ${newMessage.id}`);
     return newMessage;
   } catch (error) {
-    console.error('Error guardando mensaje:', error);
+    console.error('❌ Error guardando mensaje en Firebase:', error);
     throw error;
   }
 };
 
-export const getMessages = (conversationId: string): Message[] => {
+export const getMessages = (conversationId: string, callback: (messages: Message[]) => void): (() => void) => {
   try {
-    const saved = localStorage.getItem(MESSAGES_STORAGE_KEY);
-    if (!saved) return [];
+    const messagesRef = ref(realtimeDb, `messages/${conversationId}`);
     
-    const messages: Message[] = JSON.parse(saved);
-    return messages
-      .filter(m => m.conversationId === conversationId)
-      .map(m => ({
-        ...m,
-        createdAt: new Date(m.createdAt)
-      }))
-      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    // Escuchar cambios en tiempo real
+    const unsubscribe = onValue(messagesRef, (snapshot) => {
+      const data = snapshot.val();
+      
+      if (!data) {
+        callback([]);
+        return;
+      }
+      
+      const messages: Message[] = Object.values(data)
+        .map((m: any) => ({
+          ...m,
+          createdAt: new Date(m.createdAt)
+        }))
+        .sort((a: Message, b: Message) => a.createdAt.getTime() - b.createdAt.getTime());
+      
+      callback(messages);
+    }, (error) => {
+      console.error('Error obteniendo mensajes desde Firebase:', error);
+      callback([]);
+    });
+    
+    return unsubscribe;
   } catch (error) {
-    console.error('Error obteniendo mensajes:', error);
-    return [];
+    console.error('Error configurando listener de mensajes:', error);
+    callback([]);
+    return () => {}; // Retornar función vacía si hay error
   }
 };
 
-export const getUserConversations = (userId: string): Message[] => {
-  try {
-    const saved = localStorage.getItem(MESSAGES_STORAGE_KEY);
-    if (!saved) return [];
-    
-    const messages: Message[] = JSON.parse(saved);
-    const conversationId = `admin_${userId}`;
-    
-    return messages
-      .filter(m => m.conversationId === conversationId)
-      .map(m => ({
-        ...m,
-        createdAt: new Date(m.createdAt)
-      }))
-      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-  } catch (error) {
-    console.error('Error obteniendo conversaciones del usuario:', error);
-    return [];
-  }
+export const getUserConversations = (userId: string, callback: (messages: Message[]) => void): (() => void) => {
+  const conversationId = `admin_${userId}`;
+  return getMessages(conversationId, callback);
 };
 
-export const getAllConversations = (): Conversation[] => {
+export const getAllConversations = (callback: (conversations: Conversation[]) => void): (() => void) => {
   try {
-    const saved = localStorage.getItem(MESSAGES_STORAGE_KEY);
-    if (!saved) return [];
+    const messagesRef = ref(realtimeDb, 'messages');
     
-    const messages: Message[] = JSON.parse(saved);
-    const conversationMap = new Map<string, {
-      userId: string;
-      username: string;
-      userAvatar?: string;
-      lastMessage?: Message;
-      unreadCount: number;
-      updatedAt: Date;
-    }>();
-    
-    messages.forEach(msg => {
-      // Solo conversaciones con admin
-      if (msg.toUserId === 'admin' || msg.fromUserId === 'admin') {
-        const userId = msg.toUserId === 'admin' ? msg.fromUserId : msg.toUserId;
-        const conversationId = `admin_${userId}`;
+    // Escuchar cambios en tiempo real
+    const unsubscribe = onValue(messagesRef, (snapshot) => {
+      const data = snapshot.val();
+      
+      if (!data) {
+        callback([]);
+        return;
+      }
+      
+      const conversationMap = new Map<string, {
+        userId: string;
+        username: string;
+        userAvatar?: string;
+        lastMessage?: Message;
+        unreadCount: number;
+        updatedAt: Date;
+      }>();
+      
+      // Iterar sobre todas las conversaciones
+      Object.keys(data).forEach(conversationId => {
+        const messages = data[conversationId];
+        if (!messages) return;
         
-        if (!conversationMap.has(conversationId)) {
-          conversationMap.set(conversationId, {
-            userId,
-            username: msg.toUserId === 'admin' ? msg.fromUsername : '',
-            userAvatar: undefined,
-            lastMessage: msg,
-            unreadCount: 0,
-            updatedAt: new Date(msg.createdAt)
+        // Solo procesar conversaciones admin_usuario
+        if (conversationId.startsWith('admin_')) {
+          const userId = conversationId.replace('admin_', '');
+          const messagesArray = Object.values(messages) as any[];
+          
+          messagesArray.forEach(msg => {
+            if (!conversationMap.has(conversationId)) {
+              conversationMap.set(conversationId, {
+                userId,
+                username: msg.fromUsername || '',
+                userAvatar: undefined,
+                lastMessage: msg,
+                unreadCount: 0,
+                updatedAt: new Date(msg.createdAt)
+              });
+            }
+            
+            const conv = conversationMap.get(conversationId)!;
+            
+            // Actualizar último mensaje si es más reciente
+            const msgDate = new Date(msg.createdAt);
+            if (msgDate > conv.updatedAt) {
+              conv.lastMessage = msg;
+              conv.updatedAt = msgDate;
+            }
+            
+            // Contar no leídos (solo mensajes para admin)
+            if (msg.toUserId === 'admin' && !msg.read) {
+              conv.unreadCount++;
+            }
+            
+            // Actualizar username si es necesario
+            if (msg.toUserId === 'admin') {
+              conv.username = msg.fromUsername || '';
+            }
           });
         }
-        
-        const conv = conversationMap.get(conversationId)!;
-        
-        // Actualizar último mensaje si es más reciente
-        const msgDate = new Date(msg.createdAt);
-        if (msgDate > conv.updatedAt) {
-          conv.lastMessage = msg;
-          conv.updatedAt = msgDate;
-        }
-        
-        // Contar no leídos (solo mensajes para admin)
-        if (msg.toUserId === 'admin' && !msg.read) {
-          conv.unreadCount++;
-        }
-        
-        // Actualizar username si es necesario
-        if (msg.toUserId === 'admin') {
-          conv.username = msg.fromUsername;
-        }
+      });
+      
+      const conversations = Array.from(conversationMap.values())
+        .map(conv => ({
+          id: `admin_${conv.userId}`,
+          ...conv,
+          lastMessage: conv.lastMessage ? {
+            ...conv.lastMessage,
+            createdAt: new Date(conv.lastMessage.createdAt)
+          } : undefined,
+          updatedAt: conv.updatedAt
+        }))
+        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+      
+      callback(conversations);
+    }, (error) => {
+      console.error('Error obteniendo conversaciones desde Firebase:', error);
+      callback([]);
+    });
+    
+    return unsubscribe;
+  } catch (error) {
+    console.error('Error configurando listener de conversaciones:', error);
+    callback([]);
+    return () => {}; // Retornar función vacía si hay error
+  }
+};
+
+export const markMessagesAsRead = async (conversationId: string, userId: string) => {
+  try {
+    const messagesRef = ref(realtimeDb, `messages/${conversationId}`);
+    
+    // Obtener todos los mensajes de la conversación
+    const snapshot = await firebaseGet(messagesRef);
+    if (!snapshot.exists()) return;
+    
+    const messages = snapshot.val();
+    const updates: any = {};
+    
+    // Marcar como leídos los mensajes no leídos destinados al usuario
+    Object.keys(messages).forEach(key => {
+      const msg = messages[key];
+      if (msg.toUserId === userId && !msg.read) {
+        updates[`messages/${conversationId}/${key}/read`] = true;
       }
     });
     
-    return Array.from(conversationMap.values())
-      .map(conv => ({
-        id: `admin_${conv.userId}`,
-        ...conv,
-        lastMessage: conv.lastMessage ? {
-          ...conv.lastMessage,
-          createdAt: new Date(conv.lastMessage.createdAt)
-        } : undefined,
-        updatedAt: conv.updatedAt
-      }))
-      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+    if (Object.keys(updates).length > 0) {
+      await update(ref(realtimeDb), updates);
+      console.log(`✅ Mensajes marcados como leídos en Firebase: ${conversationId}`);
+    }
   } catch (error) {
-    console.error('Error obteniendo conversaciones:', error);
-    return [];
+    console.error('❌ Error marcando mensajes como leídos en Firebase:', error);
   }
 };
 
-export const markMessagesAsRead = (conversationId: string, userId: string) => {
+export const getUnreadCount = (userId: string, callback: (count: number) => void): (() => void) => {
+  const conversationId = `admin_${userId}`;
+  return getMessages(conversationId, (messages) => {
+    const count = messages.filter(m => m.toUserId === userId && !m.read).length;
+    callback(count);
+  });
+};
+
+export const getAdminUnreadCount = (callback: (count: number) => void): (() => void) => {
   try {
-    const saved = localStorage.getItem(MESSAGES_STORAGE_KEY);
-    if (!saved) return;
+    const messagesRef = ref(realtimeDb, 'messages');
     
-    const messages: Message[] = JSON.parse(saved);
-    const updated = messages.map(msg => {
-      if (msg.conversationId === conversationId && msg.toUserId === userId && !msg.read) {
-        return { ...msg, read: true };
+    const unsubscribe = onValue(messagesRef, (snapshot) => {
+      const data = snapshot.val();
+      if (!data) {
+        callback(0);
+        return;
       }
-      return msg;
+      
+      let count = 0;
+      Object.values(data).forEach((conversation: any) => {
+        Object.values(conversation).forEach((msg: any) => {
+          if (msg.toUserId === 'admin' && !msg.read) {
+            count++;
+          }
+        });
+      });
+      
+      callback(count);
+    }, (error) => {
+      console.error('Error obteniendo conteo no leídos del admin:', error);
+      callback(0);
     });
     
-    localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(updated));
+    return unsubscribe;
   } catch (error) {
-    console.error('Error marcando mensajes como leídos:', error);
+    console.error('Error configurando listener de conteo admin:', error);
+    callback(0);
+    return () => {};
   }
-};
-
-export const getUnreadCount = (userId: string): number => {
-  try {
-    const saved = localStorage.getItem(MESSAGES_STORAGE_KEY);
-    if (!saved) return 0;
-    
-    const messages: Message[] = JSON.parse(saved);
-    const conversationId = `admin_${userId}`;
-    
-    return messages.filter(
-      m => m.conversationId === conversationId && m.toUserId === userId && !m.read
-    ).length;
-  } catch (error) {
-    console.error('Error obteniendo conteo no leídos:', error);
-    return 0;
-  }
-};
-
-export const getAdminUnreadCount = (): number => {
-  try {
-    const saved = localStorage.getItem(MESSAGES_STORAGE_KEY);
-    if (!saved) return 0;
-    
-    const messages: Message[] = JSON.parse(saved);
-    return messages.filter(m => m.toUserId === 'admin' && !m.read).length;
-  } catch (error) {
-    console.error('Error obteniendo conteo no leídos del admin:', error);
-    return 0;
-  }
-};
-
-const updateConversation = (message: Message) => {
-  // Esto se usa internamente para mantener actualizadas las conversaciones
-  // Las conversaciones se calculan dinámicamente desde los mensajes
 };
 
 // Eliminar conversación (todos los mensajes de una conversación)
-export const deleteConversation = (conversationId: string) => {
+export const deleteConversation = async (conversationId: string): Promise<boolean> => {
   try {
-    const saved = localStorage.getItem(MESSAGES_STORAGE_KEY);
-    if (!saved) return;
-    
-    const messages: Message[] = JSON.parse(saved);
-    const filtered = messages.filter(m => m.conversationId !== conversationId);
-    
-    localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(filtered));
+    const messagesRef = ref(realtimeDb, `messages/${conversationId}`);
+    await remove(messagesRef);
+    console.log(`✅ Conversación eliminada de Firebase: ${conversationId}`);
     return true;
   } catch (error) {
-    console.error('Error eliminando conversación:', error);
+    console.error('❌ Error eliminando conversación de Firebase:', error);
     return false;
   }
 };
 
 // Eliminar un mensaje específico
-export const deleteMessage = (messageId: string) => {
+export const deleteMessage = async (conversationId: string, messageId: string): Promise<boolean> => {
   try {
-    const saved = localStorage.getItem(MESSAGES_STORAGE_KEY);
-    if (!saved) return false;
-    
-    const messages: Message[] = JSON.parse(saved);
-    const filtered = messages.filter(m => m.id !== messageId);
-    
-    localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(filtered));
+    const messageRef = ref(realtimeDb, `messages/${conversationId}/${messageId}`);
+    await remove(messageRef);
+    console.log(`✅ Mensaje eliminado de Firebase: ${messageId}`);
     return true;
   } catch (error) {
-    console.error('Error eliminando mensaje:', error);
-    return false;
-  }
-};
-
-// Eliminar todas las conversaciones
-export const deleteAllConversations = () => {
-  try {
-    localStorage.removeItem(MESSAGES_STORAGE_KEY);
-    return true;
-  } catch (error) {
-    console.error('Error eliminando todas las conversaciones:', error);
+    console.error('❌ Error eliminando mensaje de Firebase:', error);
     return false;
   }
 };
