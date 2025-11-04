@@ -7,6 +7,7 @@ import Navbar from './components/Navbar';
 import AuctionManager from './utils/AuctionManager';
 import OrderManager from './utils/OrderManager';
 import DataCleanupManager from './utils/DataCleanupManager';
+import BotManager from './utils/BotManager';
 import ScrollToTop from './components/ScrollToTop';
 import Home from './pages/Home';
 import Subastas from './pages/Subastas';
@@ -28,17 +29,18 @@ function App() {
   const { user, loadUserNotifications } = useStore();
   
   // Cargar notificaciones cuando la app inicia y hay un usuario logueado
+  // NOTA: Se carga una sola vez al iniciar, las páginas individuales pueden recargar si es necesario
   useEffect(() => {
     if (user && loadUserNotifications) {
       // Pequeño delay para asegurar que el store esté inicializado
       const timer = setTimeout(() => {
         console.log('🔄 Cargando notificaciones al iniciar app para usuario:', user.username);
         loadUserNotifications();
-      }, 500);
+      }, 1000); // Aumentado para evitar conflictos con otros componentes
       
       return () => clearTimeout(timer);
     }
-  }, [user?.id]); // Ejecutar cuando el usuario cambie o esté disponible
+  }, [user?.id]); // Ejecutar solo cuando el usuario cambie
   
   return (
     <Router>
@@ -47,6 +49,7 @@ function App() {
         <AuctionManager />
         <OrderManager />
         <DataCleanupManager />
+        <BotManager />
         <ScrollToTop />
         <ToastContainer />
         <main className="main-content">

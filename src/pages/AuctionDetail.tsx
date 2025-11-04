@@ -123,6 +123,19 @@ const AuctionDetail = () => {
     return;
   }
 
+  // Si la oferta es mayor o igual al precio de compra directa, sugerir usar "Comprar Ahora"
+  if (auction.buyNowPrice && amount >= auction.buyNowPrice) {
+    const useBuyNow = window.confirm(
+      `Tu oferta de ${formatCurrency(amount)} es igual o mayor al precio de compra directa (${formatCurrency(auction.buyNowPrice)}).\n\n¿Querés usar "Comprar Ahora" en su lugar? Esto garantizará que obtengas el producto inmediatamente.`
+    );
+    
+    if (useBuyNow) {
+      // Cancelar esta oferta y usar compra directa
+      handleBuyNow();
+      return;
+    }
+  }
+
   addBid(auction.id, amount, user!.id, user!.username);
   // Ajustar el próximo valor sugerido inmediatamente
   setBidAmount((amount + 500).toString());
@@ -130,33 +143,18 @@ const AuctionDetail = () => {
   if (navigator.vibrate) { try { navigator.vibrate(20); } catch {} }
   soundManager.playBid();
 
-    
-    // Verificar si es la oferta ganadora
-    const isWinningBid = auction.buyNowPrice && amount >= auction.buyNowPrice;
+  // Notificación de oferta realizada (sin confeti - eso solo aparece al ganar)
+  addNotification({
+    userId: user!.id,
+    type: 'auction_outbid',
+    title: 'Oferta realizada',
+    message: `Ofertaste ${formatCurrency(amount)} en "${auction.title}"`,
+    read: false
+  });
+  
+  alert(`✅ Oferta realizada con éxito!\n\nMonto: ${formatCurrency(amount)}\n\nSos el mejor postor actual.`);
 
-    if (isWinningBid) {
-      addNotification({
-        userId: user!.id,
-        type: 'auction_won',
-        title: '¡Ganaste la subasta!',
-        message: `Ganaste "${auction.title}" por ${formatCurrency(amount)}. Tenés 48hs para pagar.`,
-        read: false,
-        link: '/notificaciones'
-      });
-      launchConfettiFromTop(3500);
-      alert(`🎉 ¡GANASTE LA SUBASTA!\n\nProducto: ${auction.title}\nMonto final: ${formatCurrency(amount)}\n\nTenés 48 horas para completar el pago.\nRevisá tus notificaciones para ver el ticket de pago.`);
-    } else {
-      addNotification({
-        userId: user!.id,
-        type: 'auction_outbid',
-        title: 'Oferta realizada',
-        message: `Ofertaste ${formatCurrency(amount)} en "${auction.title}"`,
-        read: false
-      });
-      alert(`✅ Oferta realizada con éxito!\n\nMonto: ${formatCurrency(amount)}\n\nSos el mejor postor actual.`);
-    }
-
-    setShowBidError('');
+  setShowBidError('');
   };
 
   const handleBuyNow = () => {
@@ -264,17 +262,18 @@ const AuctionDetail = () => {
             
             <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', marginBottom: '1.5rem' }}>
               <div style={{ marginBottom: '1rem' }}>
-  <div style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: 600 }}>💰 Precio Actual de la Subasta</div>
-  <div style={{ 
-    fontSize: '3.5rem', 
-    fontWeight: 800, 
-    color: 'var(--primary)',
-    textShadow: '0 2px 4px rgba(255, 107, 0, 0.2)',
-    letterSpacing: '-1px'
-  }}>
-    {formatCurrency(auction.currentPrice)}
-  </div>
-</div>
+                <div style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: 600 }}>💰 Precio Actual de la Subasta</div>
+                <div style={{ 
+                  fontSize: '5rem', 
+                  fontWeight: 900, 
+                  color: 'var(--primary)',
+                  textShadow: '0 4px 12px rgba(255, 107, 0, 0.4), 0 0 20px rgba(255, 107, 0, 0.2)',
+                  letterSpacing: '-2px',
+                  lineHeight: 1
+                }}>
+                  {formatCurrency(auction.currentPrice)}
+                </div>
+              </div>
 
               {auction.buyNowPrice && isActive && (
                 <div style={{ marginBottom: '1rem' }}>
@@ -283,51 +282,22 @@ const AuctionDetail = () => {
                 </div>
               )}
 
-              {/* RECUADRO EXPLICATIVO - MEJORA 2 */}
-{isActive && (
-  <div style={{ 
-    marginTop: '1rem',
-    padding: '1rem', 
-    background: 'var(--bg-tertiary)',
-    border: '2px solid var(--primary)',
-    borderRadius: '0.75rem',
-    fontSize: '0.875rem'
-  }}>
-    <h4 style={{ 
-      fontSize: '1rem', 
-      marginBottom: '0.5rem',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.5rem'
-    }}>
-      📖 ¿Cómo funciona?
-    </h4>
-    
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-      <div>• Ofertá en múltiplos de $500</div>
-      <div>• Debe superar: {formatCurrency(auction.currentPrice)}</div>
-      <div>• Ganá ofertando más que otros</div>
-      {auction.buyNowPrice && (
-        <div>• O comprá directo por {formatCurrency(auction.buyNowPrice)}</div>
-      )}
-    </div>
-  </div>
-)}
-                {/* Mejorar panel de estado según ACTIVA o FINALIZADA */}
+              {/* Mejorar panel de estado según ACTIVA o FINALIZADA */}
 {isActive ? (
   <div
     style={{
-      padding: '1.5rem 1rem',
+      padding: '1rem 0.75rem',
       background: lessThanOneMinute ? '#ffa726' : 'var(--bg-tertiary)',
       borderRadius: '0.75rem',
       boxShadow: lessThanOneMinute
-        ? '0 0 25px 3px #FFA50080, 0 0 8px #ff5722' : '0 2px 8px #0001',
-      border: lessThanOneMinute ? '2px solid #e65100' : '2px solid var(--primary)',
+        ? '0 0 35px 5px #FFA50080, 0 0 15px #ff5722, inset 0 0 20px rgba(255, 87, 34, 0.3)' : '0 2px 8px #0001',
+      border: lessThanOneMinute ? '3px solid #e65100' : '2px solid var(--primary)',
       color: lessThanOneMinute ? '#fff' : 'var(--text-primary)',
       marginBottom: '1.25rem',
       position: 'relative',
       textAlign: 'center',
-      transition: 'all .33s cubic-bezier(.6,-0.01,0,1.01)'
+      transition: 'all .33s cubic-bezier(.6,-0.01,0,1.01)',
+      animation: lessThanTenSeconds ? 'container-panic 0.5s infinite' : (lessThanOneMinute ? 'container-pulse 1.5s ease-in-out infinite' : undefined)
     }}
   >
     <div
@@ -336,33 +306,97 @@ const AuctionDetail = () => {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: '0.5rem',
-        animation: lessThanTenSeconds ? 'shake 0.5s infinite alternate' : undefined
+        gap: '1.5rem',
+        animation: lessThanTenSeconds ? 'shake-intense 0.25s infinite' : (lessThanOneMinute ? 'pulse-urgent-intense 0.8s ease-in-out infinite' : undefined)
       }}
     >
-      <Clock size={28} style={{ color: lessThanOneMinute ? '#fff7a7' : 'var(--primary)', transition: 'color .33s' }} />
+      <Clock 
+        size={lessThanOneMinute ? 64 : 56} 
+        style={{ 
+          color: lessThanOneMinute ? '#fff7a7' : 'var(--primary)', 
+          transition: 'all .33s',
+          filter: lessThanOneMinute ? 'drop-shadow(0 0 15px rgba(255, 247, 167, 1)) drop-shadow(0 0 30px rgba(255, 247, 167, 0.6))' : undefined,
+          animation: lessThanTenSeconds ? 'clock-panic-intense 0.3s infinite' : (lessThanOneMinute ? 'clock-wobble 0.6s ease-in-out infinite' : undefined)
+        }} 
+      />
       <span
         style={{
-          fontWeight: 'bold',
-          fontSize: lessThanOneMinute ? '2.2rem' : '1.6rem',
+          fontWeight: '900',
+          fontSize: lessThanOneMinute ? '6.5rem' : '5.5rem',
           color: lessThanOneMinute ? '#fff' : 'var(--primary)',
-          letterSpacing: '1.5px',
-          transition: 'color .3s',
-          animation: lessThanOneMinute ? 'blinker 1s steps(2) infinite' : undefined
+          letterSpacing: '4px',
+          transition: 'all .3s',
+          animation: lessThanOneMinute ? 'blinker-intense 0.6s steps(2) infinite' : undefined,
+          textShadow: lessThanOneMinute ? '0 0 30px rgba(255, 255, 255, 1), 0 0 60px rgba(255, 247, 167, 0.8), 0 0 90px rgba(255, 247, 167, 0.4)' : '0 4px 12px rgba(255, 107, 0, 0.4)',
+          fontFamily: 'monospace',
+          lineHeight: 1
         }}
       >
         <Countdown endTime={auction.endTime} />
       </span>
     </div>
-    <div style={{fontSize: '1.05rem', fontWeight: 500}}>{lessThanOneMinute ? '¡Poco tiempo! ¡No te quedes afuera!' : 'Subasta Activa'}</div>
+    <div style={{
+      fontSize: '1rem', 
+      fontWeight: 600,
+      animation: lessThanOneMinute ? 'text-pulse 1s ease-in-out infinite' : undefined
+    }}>
+      {lessThanOneMinute ? '¡Poco tiempo! ¡No te quedes afuera!' : 'Subasta Activa'}
+    </div>
     <style>
       {`
-        @keyframes blinker { 50% { opacity: 0.5; }}
-        @keyframes shake {
-          0% { transform: translateX(0); }
-          40% { transform: translateX(-3px); }
-          60% { transform: translateX(3px); }
-          100% { transform: translateX(0); }
+        @keyframes blinker-intense { 
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.2; transform: scale(1.02); }
+        }
+        @keyframes shake-intense {
+          0%, 100% { transform: translateX(0) rotate(0deg); }
+          5% { transform: translateX(-8px) rotate(-3deg); }
+          10% { transform: translateX(8px) rotate(3deg); }
+          15% { transform: translateX(-8px) rotate(-3deg); }
+          20% { transform: translateX(8px) rotate(3deg); }
+          25% { transform: translateX(-6px) rotate(-2deg); }
+          30% { transform: translateX(6px) rotate(2deg); }
+          35% { transform: translateX(-6px) rotate(-2deg); }
+          40% { transform: translateX(6px) rotate(2deg); }
+          45% { transform: translateX(-4px) rotate(-1deg); }
+          50% { transform: translateX(4px) rotate(1deg); }
+          55% { transform: translateX(-4px) rotate(-1deg); }
+          60% { transform: translateX(4px) rotate(1deg); }
+          65% { transform: translateX(-2px) rotate(0deg); }
+          70% { transform: translateX(2px) rotate(0deg); }
+          75% { transform: translateX(-2px) rotate(0deg); }
+          80% { transform: translateX(2px) rotate(0deg); }
+          85% { transform: translateX(-1px) rotate(0deg); }
+          90% { transform: translateX(1px) rotate(0deg); }
+          95% { transform: translateX(0) rotate(0deg); }
+        }
+        @keyframes pulse-urgent-intense {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.08); }
+        }
+        @keyframes clock-panic-intense {
+          0%, 100% { transform: rotate(0deg) scale(1); }
+          20% { transform: rotate(-8deg) scale(1.15); }
+          40% { transform: rotate(8deg) scale(1.15); }
+          60% { transform: rotate(-6deg) scale(1.1); }
+          80% { transform: rotate(6deg) scale(1.1); }
+        }
+        @keyframes clock-wobble {
+          0%, 100% { transform: rotate(0deg); }
+          25% { transform: rotate(-3deg); }
+          75% { transform: rotate(3deg); }
+        }
+        @keyframes container-panic {
+          0%, 100% { transform: scale(1); box-shadow: 0 0 35px 5px #FFA50080, 0 0 15px #ff5722, inset 0 0 20px rgba(255, 87, 34, 0.3); }
+          50% { transform: scale(1.02); box-shadow: 0 0 45px 8px #FFA50080, 0 0 20px #ff5722, inset 0 0 25px rgba(255, 87, 34, 0.5); }
+        }
+        @keyframes container-pulse {
+          0%, 100% { box-shadow: 0 0 35px 5px #FFA50080, 0 0 15px #ff5722, inset 0 0 20px rgba(255, 87, 34, 0.3); }
+          50% { box-shadow: 0 0 40px 7px #FFA50080, 0 0 18px #ff5722, inset 0 0 22px rgba(255, 87, 34, 0.4); }
+        }
+        @keyframes text-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.7; }
         }
       `}
     </style>
@@ -386,9 +420,32 @@ const AuctionDetail = () => {
 
             {/* SOLO mostrar controles de oferta si la subasta está ACTIVA */}
             {(auction.status === 'active' && auction.endTime && new Date(auction.endTime) > new Date()) ? (
-              <>
-                <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', marginBottom: '1.5rem' }}>
-                  <h3 style={{ marginBottom: '1rem' }}>Realizar Oferta</h3>
+              <div style={{ 
+                background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%)', 
+                padding: '2rem', 
+                borderRadius: '1rem', 
+                marginBottom: '1.5rem',
+                border: '2px solid var(--primary)',
+                boxShadow: '0 0 20px rgba(255, 107, 0, 0.3)',
+                position: 'relative',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  top: '-50%',
+                  left: '-50%',
+                  width: '200%',
+                  height: '200%',
+                  background: 'radial-gradient(circle, rgba(255, 107, 0, 0.1) 0%, transparent 70%)',
+                  animation: 'pulse-glow 3s ease-in-out infinite',
+                  pointerEvents: 'none',
+                  zIndex: 0
+                }} />
+                <div style={{ position: 'relative', zIndex: 1 }}>
+                  <h3 style={{ marginBottom: '1.5rem', fontSize: '1.5rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Gavel size={24} />
+                    Realizar Oferta
+                  </h3>
                   
                   <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
                     <input
@@ -398,12 +455,13 @@ const AuctionDetail = () => {
                       placeholder="Ingresa tu oferta"
                       style={{
                         flex: 1,
-                        padding: '0.75rem',
+                        padding: '1rem',
                         borderRadius: '0.5rem',
-                        border: '2px solid var(--border)',
+                        border: '2px solid var(--primary)',
                         background: 'var(--bg-tertiary)',
                         color: 'var(--text-primary)',
-                        fontSize: '1rem'
+                        fontSize: '1.125rem',
+                        fontWeight: 600
                       }}
                     />
                   </div>
@@ -415,25 +473,94 @@ const AuctionDetail = () => {
                   </div>
 
                   {showBidError && (
-                    <div style={{ color: 'var(--error)', marginBottom: '1rem', fontSize: '0.875rem' }}>
+                    <div style={{ color: 'var(--error)', marginBottom: '1rem', fontSize: '0.875rem', padding: '0.75rem', background: 'rgba(255, 0, 0, 0.1)', borderRadius: '0.5rem' }}>
                       {showBidError}
                     </div>
                   )}
 
-                  <button onClick={handleBid} className="btn btn-primary" style={{ width: '100%', marginBottom: '0.75rem' }}>
-                    <Gavel size={20} />
+                  <button 
+                    onClick={handleBid} 
+                    className="btn btn-primary" 
+                    style={{ 
+                      width: '100%', 
+                      padding: '1.25rem',
+                      fontSize: '1.25rem',
+                      fontWeight: 700,
+                      background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+                      border: 'none',
+                      boxShadow: '0 0 25px rgba(255, 107, 0, 0.5), 0 8px 16px rgba(255, 107, 0, 0.3)',
+                      transition: 'all 0.3s ease',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.boxShadow = '0 0 35px rgba(255, 107, 0, 0.7), 0 12px 24px rgba(255, 107, 0, 0.4)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.boxShadow = '0 0 25px rgba(255, 107, 0, 0.5), 0 8px 16px rgba(255, 107, 0, 0.3)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <Gavel size={24} style={{ marginRight: '0.5rem' }} />
                     Realizar Oferta
                   </button>
-
-                  {auction.buyNowPrice && (
-                    <button onClick={handleBuyNow} className="btn btn-success" style={{ width: '100%' }}>
-                      <ShoppingCart size={20} />
-                      Comprar Ahora por {formatCurrency(auction.buyNowPrice)}
-                    </button>
-                  )}
                 </div>
-              </>
-            ) : (
+                <style>{`
+                  @keyframes pulse-glow {
+                    0%, 100% { opacity: 0.3; transform: scale(1); }
+                    50% { opacity: 0.6; transform: scale(1.1); }
+                  }
+                `}</style>
+              </div>
+            ) : null}
+
+            {/* COMPRAR AHORA - Separado visualmente de las ofertas */}
+            {auction.buyNowPrice && isActive && (
+              <div style={{ 
+                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%)', 
+                padding: '1.5rem', 
+                borderRadius: '1rem', 
+                marginBottom: '1.5rem',
+                border: '2px solid var(--success)',
+                boxShadow: '0 4px 16px rgba(34, 197, 94, 0.2)'
+              }}>
+                <div style={{ marginBottom: '1rem' }}>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: 600 }}>
+                    🛒 Compra Directa Disponible
+                  </div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--success)', marginBottom: '1rem' }}>
+                    {formatCurrency(auction.buyNowPrice)}
+                  </div>
+                </div>
+                <button 
+                  onClick={handleBuyNow} 
+                  className="btn btn-success" 
+                  style={{ 
+                    width: '100%',
+                    padding: '1rem',
+                    fontSize: '1.125rem',
+                    fontWeight: 600,
+                    boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(34, 197, 94, 0.5)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(34, 197, 94, 0.3)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  <ShoppingCart size={22} style={{ marginRight: '0.5rem' }} />
+                  Comprar Ahora
+                </button>
+              </div>
+            )}
+
+            {/* Subasta Finalizada */}
+            {!(auction.status === 'active' && auction.endTime && new Date(auction.endTime) > new Date()) && (
               <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', marginBottom: '1.5rem', textAlign: 'center' }}>
                 <AlertCircle size={48} color="var(--error)" style={{ marginBottom: '1rem' }} />
                 <h3 style={{ color: 'var(--error)', marginBottom: '0.5rem' }}>Subasta Finalizada</h3>
@@ -479,12 +606,28 @@ const AuctionDetail = () => {
           </p>
 
           <div style={{ marginTop: '2rem', padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
-            <h3 style={{ marginBottom: '1rem' }}>Información Importante</h3>
+            <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              📖 ¿Cómo funciona?
+            </h3>
             <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
                 <span style={{ color: 'var(--primary)', fontWeight: 700 }}>✓</span>
-                <span>Las ofertas deben ser múltiplos de $500</span>
+                <span>Ofertá en múltiplos de $500</span>
               </li>
+              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                <span style={{ color: 'var(--primary)', fontWeight: 700 }}>✓</span>
+                <span>Debe superar el precio actual: {formatCurrency(auction.currentPrice)}</span>
+              </li>
+              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                <span style={{ color: 'var(--primary)', fontWeight: 700 }}>✓</span>
+                <span>Ganá ofertando más que otros</span>
+              </li>
+              {auction.buyNowPrice && (
+                <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  <span style={{ color: 'var(--primary)', fontWeight: 700 }}>✓</span>
+                  <span>O comprá directo por {formatCurrency(auction.buyNowPrice)}</span>
+                </li>
+              )}
               <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
                 <span style={{ color: 'var(--primary)', fontWeight: 700 }}>✓</span>
                 <span>El ganador tiene 48 horas para realizar el pago</span>

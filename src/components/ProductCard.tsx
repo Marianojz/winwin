@@ -4,6 +4,7 @@ import { Product } from '../types';
 import { formatCurrency } from '../utils/helpers';
 import { useStore } from '../store/useStore';
 import { trackProductClick } from '../utils/tracking';
+import { getStickerById } from '../utils/stickers';
 
 interface ProductCardProps {
   product: Product;
@@ -37,6 +38,45 @@ const ProductCard = ({ product }: ProductCardProps) => {
     >
       <div className="product-card-image">
         <img src={product.images[0]} alt={product.name} loading="lazy" />
+        
+        {/* Stickers/Emojis */}
+        {product.stickers && product.stickers.length > 0 && (
+          <div style={{
+            position: 'absolute',
+            top: '0.75rem',
+            left: '0.75rem',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+            zIndex: 10
+          }}>
+            {product.stickers.map((stickerId) => {
+              const sticker = getStickerById(stickerId);
+              if (!sticker) return null;
+              return (
+                <div
+                  key={stickerId}
+                  style={{
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    color: '#fff',
+                    padding: '0.375rem 0.625rem',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    backdropFilter: 'blur(4px)'
+                  }}
+                >
+                  <span style={{ fontSize: '1rem' }}>{sticker.icon}</span>
+                  <span>{sticker.label.split(' ')[1] || sticker.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        
         {product.stock < 5 && product.stock > 0 && (
           <div className="product-badge badge-warning">
             ¡Últimas unidades!
@@ -107,7 +147,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
         .product-card-image {
           position: relative;
           width: 100%;
-          padding-top: 75%;
+          padding-top: 66.67%;
           overflow: hidden;
           background: var(--bg-tertiary);
         }

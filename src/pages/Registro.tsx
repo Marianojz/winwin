@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, User, MapPin, FileText, Loader, Phone } from 'lucide-react';
+import { Mail, Lock, User, MapPin, FileText, Loader, Phone, Eye, EyeOff } from 'lucide-react';
 import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
@@ -12,6 +12,8 @@ const Registro = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [formData, setFormData] = useState({
     email: '',
@@ -280,29 +282,75 @@ const Registro = () => {
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
                   <Lock size={18} /> Contraseña
                 </label>
-                <input 
-                  name="password" 
-                  type="password" 
-                  placeholder="••••••••" 
-                  value={formData.password} 
-                  onChange={handleChange} 
-                  required 
-                  style={{ width: '100%', padding: '0.875rem 1.25rem', borderRadius: '0.75rem' }} 
-                />
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <input 
+                    name="password" 
+                    type={showPassword ? 'text' : 'password'} 
+                    placeholder="••••••••" 
+                    value={formData.password} 
+                    onChange={handleChange} 
+                    required 
+                    style={{ width: '100%', padding: '0.875rem 3rem 0.875rem 1.25rem', borderRadius: '0.75rem' }} 
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '0.25rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--text-secondary)'
+                    }}
+                    title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
                   <Lock size={18} /> Confirmar
                 </label>
-                <input 
-                  name="confirmPassword" 
-                  type="password" 
-                  placeholder="••••••••" 
-                  value={formData.confirmPassword} 
-                  onChange={handleChange} 
-                  required 
-                  style={{ width: '100%', padding: '0.875rem 1.25rem', borderRadius: '0.75rem' }} 
-                />
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <input 
+                    name="confirmPassword" 
+                    type={showConfirmPassword ? 'text' : 'password'} 
+                    placeholder="••••••••" 
+                    value={formData.confirmPassword} 
+                    onChange={handleChange} 
+                    required 
+                    style={{ width: '100%', padding: '0.875rem 3rem 0.875rem 1.25rem', borderRadius: '0.75rem' }} 
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '0.25rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--text-secondary)'
+                    }}
+                    title={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  >
+                    {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
               </div>
             </div>
 

@@ -1,13 +1,15 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Bell, Home, Store, Gavel, LogOut, LayoutDashboard } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { auth } from '../config/firebase';
 import ThemeToggle from './ThemeToggle';
+import SoundToggle from './SoundToggle';
 import './Navbar.css';
 
 const Navbar = () => {
   const { user, isAuthenticated, cart, unreadCount, setUser } = useStore();
   const location = useLocation();
+  const navigate = useNavigate();
   const cartItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
 
   const handleLogout = async () => {
@@ -18,6 +20,8 @@ const Navbar = () => {
       setUser(null);
       localStorage.removeItem('user');
       console.log('✅ Sesión cerrada correctamente');
+      // Redirigir al inicio después de cerrar sesión
+      navigate('/', { replace: true });
     } catch (error) {
       console.error('❌ Error al cerrar sesión:', error);
       // Limpiar igualmente aunque falle Firebase
@@ -25,6 +29,8 @@ const Navbar = () => {
       clearNotifications(); // Limpiar notificaciones
       setUser(null);
       localStorage.removeItem('user');
+      // Redirigir al inicio incluso si hay error
+      navigate('/', { replace: true });
     }
   };
 
@@ -62,6 +68,7 @@ const Navbar = () => {
 
           <div className="navbar-actions">
             <ThemeToggle />
+            <SoundToggle />
             
             {isAuthenticated ? (
               <>

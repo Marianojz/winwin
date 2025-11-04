@@ -6,6 +6,7 @@ import Countdown from './Countdown';
 import './AuctionCard.css';
 import { trackAuctionClick } from '../utils/tracking';
 import { useStore } from '../store/useStore';
+import { getStickerById } from '../utils/stickers';
 
 interface AuctionCardProps {
   auction: Auction;
@@ -80,6 +81,40 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
           gap: '0.5rem',
           zIndex: 10
         }}>
+          {/* Stickers/Emojis */}
+          {auction.stickers && auction.stickers.length > 0 && (
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '0.5rem'
+            }}>
+              {auction.stickers.map((stickerId) => {
+                const sticker = getStickerById(stickerId);
+                if (!sticker) return null;
+                return (
+                  <div
+                    key={stickerId}
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.7)',
+                      color: '#fff',
+                      padding: '0.375rem 0.625rem',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      backdropFilter: 'blur(4px)'
+                    }}
+                  >
+                    <span style={{ fontSize: '1rem' }}>{sticker.icon}</span>
+                    <span>{sticker.label.split(' ')[1] || sticker.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          
           {/* Mostrar si está finalizada recientemente */}
           {isRecentlyEnded && (
             <div style={{

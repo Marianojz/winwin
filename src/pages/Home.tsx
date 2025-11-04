@@ -128,19 +128,130 @@ const Home = () => {
         </section>
       )}
 
-      {/* Featured Auction */}
-      {featuredAuction && (
-        <section className="featured-auction">
+      {/* Featured Section - Subasta y Productos Destacados Juntos */}
+      {(featuredAuction || featuredProducts.length > 0) && (
+        <section className="featured-section">
           <div className="container">
             <div className="section-header">
               <h2>
-                <Gavel size={32} />
-                Subasta Destacada
+                <Gavel size={28} />
+                Destacados
               </h2>
-              <p>No te pierdas esta increíble oportunidad</p>
+              <p>Lo mejor de subastas y tienda</p>
             </div>
-            <div className="featured-auction-content">
-              <AuctionCard auction={featuredAuction} />
+            <div className="featured-content" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', alignItems: 'stretch', maxWidth: '1200px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+              {featuredAuction && (
+                <div 
+                  className="featured-auction-wrapper featured-section-auction"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem',
+                    padding: '1.5rem 1rem',
+                    background: 'var(--bg-secondary)',
+                    borderRadius: '0.75rem',
+                    transition: 'all 0.3s ease',
+                    border: '2px solid transparent',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    height: '100%'
+                  }}
+                >
+                  <div 
+                    className="featured-badge featured-badge-auction"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.5rem 0.875rem',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      marginBottom: '0.75rem',
+                      width: 'fit-content',
+                      position: 'relative',
+                      zIndex: 1,
+                      background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+                      color: 'white',
+                      boxShadow: '0 4px 12px rgba(255, 107, 0, 0.3)',
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    <Gavel size={18} />
+                    Subasta Destacada
+                  </div>
+                  <div className="featured-card-content" style={{ flex: 1, display: 'flex', alignItems: 'stretch', position: 'relative', zIndex: 1, minHeight: 0 }}>
+                    <AuctionCard auction={featuredAuction} />
+                  </div>
+                </div>
+              )}
+              {featuredProducts.length > 0 && (
+                <div 
+                  className="featured-products-wrapper featured-section-store"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem',
+                    padding: '1.5rem 1rem',
+                    background: 'var(--bg-secondary)',
+                    borderRadius: '0.75rem',
+                    transition: 'all 0.3s ease',
+                    border: '2px solid transparent',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    height: '100%'
+                  }}
+                >
+                  <div className="featured-products-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', position: 'relative', zIndex: 1 }}>
+                    <div 
+                      className="featured-badge featured-badge-store"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.5rem 0.875rem',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        width: 'fit-content',
+                        position: 'relative',
+                        zIndex: 1,
+                        background: 'linear-gradient(135deg, #3b82f6, #60a5fa)',
+                        color: 'white',
+                        boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      <Store size={18} />
+                      Productos Destacados
+                    </div>
+                    <Link to="/tienda" className="section-link-small" style={{ color: 'var(--primary)', fontWeight: 600, fontSize: '0.875rem', transition: 'color 0.2s ease' }}>
+                      Ver todos →
+                    </Link>
+                  </div>
+                  <div 
+                    className="featured-products-grid"
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: (() => {
+                        const count = Math.min(featuredProducts.length, 3);
+                        if (count === 1) return '1fr';
+                        if (count === 2) return 'repeat(2, 1fr)';
+                        return 'repeat(3, 1fr)';
+                      })(),
+                      gap: '0.875rem',
+                      flex: 1,
+                      position: 'relative',
+                      zIndex: 1,
+                      minHeight: 0
+                    }}
+                  >
+                    {featuredProducts.slice(0, 3).map((product: Product) => (
+                      <ProductCard key={product.id} product={product} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -168,59 +279,39 @@ const Home = () => {
         </section>
       )}
 
-      {/* Features */}
-      <section className="features">
+      {/* Features - Compacto y Discreto con Efectos Neon */}
+      <section className="features-compact">
         <div className="container">
-          <h2 className="section-title">¿Por qué elegir Subasta Argenta?</h2>
-          <div className="features-grid">
-            <div className="feature-card">
-              <div className="feature-icon">
-                <Shield size={32} />
+          <h2 className="features-compact-title">¿Por qué elegirnos?</h2>
+          <div className="features-compact-grid">
+            <div className="feature-compact-card">
+              <div className="feature-compact-icon">
+                <Shield size={24} />
               </div>
-              <h3>Seguro y Confiable</h3>
-              <p>Todas las transacciones están protegidas y verificadas</p>
+              <h3>Seguro</h3>
+              <p>Transacciones protegidas</p>
             </div>
-            <div className="feature-card">
-              <div className="feature-icon">
-                <Clock size={32} />
+            <div className="feature-compact-card">
+              <div className="feature-compact-icon">
+                <Clock size={24} />
               </div>
-              <h3>Subastas en Tiempo Real</h3>
-              <p>Ofertá en tiempo real y seguí las subastas minuto a minuto</p>
+              <h3>Tiempo Real</h3>
+              <p>Subastas en vivo</p>
             </div>
-            <div className="feature-card">
-              <div className="feature-icon">
-                <TrendingUp size={32} />
+            <div className="feature-compact-card">
+              <div className="feature-compact-icon">
+                <TrendingUp size={24} />
               </div>
               <h3>Mejores Precios</h3>
-              <p>Conseguí productos de calidad a precios increíbles</p>
+              <p>Ofertas increíbles</p>
             </div>
-            <div className="feature-card">
-              <div className="feature-icon">
-                <Award size={32} />
+            <div className="feature-compact-card">
+              <div className="feature-compact-icon">
+                <Award size={24} />
               </div>
-              <h3>Productos Verificados</h3>
-              <p>Todos los productos son verificados por nuestro equipo</p>
+              <h3>Verificado</h3>
+              <p>Productos garantizados</p>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Products Section */}
-      <section className="home-products">
-        <div className="container">
-          <div className="section-header">
-            <h2>
-              <Store size={32} />
-              Productos Destacados de la Tienda
-            </h2>
-            <Link to="/tienda" className="section-link">
-              Ver todos →
-            </Link>
-          </div>
-          <div className="products-grid">
-            {featuredProducts.map((product: Product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
           </div>
         </div>
       </section>
@@ -338,28 +429,253 @@ const Home = () => {
           display: block;
         }
 
-        .featured-auction {
-          padding: 4rem 0;
-          background: var(--bg-secondary);
+        /* Featured Section - Compacto y Elegante como otras secciones */
+        .featured-section {
+          padding: 2.5rem 0;
+          background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .featured-section::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -50%;
+          width: 200%;
+          height: 100%;
+          background: radial-gradient(circle, rgba(255, 107, 0, 0.03) 0%, transparent 70%);
+          animation: pulse-glow 4s ease-in-out infinite;
         }
 
         .section-header {
           text-align: center;
-          margin-bottom: 3rem;
+          margin-bottom: 2rem;
+          position: relative;
+          z-index: 1;
         }
 
         .section-header h2 {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 1rem;
-          font-size: 2.5rem;
+          gap: 0.75rem;
+          font-size: clamp(1.5rem, 3vw, 1.875rem);
           margin-bottom: 0.5rem;
+          font-weight: 600;
         }
 
         .section-header p {
-          font-size: 1.125rem;
+          font-size: clamp(0.875rem, 2vw, 1rem);
           color: var(--text-secondary);
+        }
+
+        .featured-content {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1.25rem;
+          align-items: stretch;
+          max-width: 1200px;
+          margin: 0 auto;
+          position: relative;
+          z-index: 1;
+        }
+
+        .featured-auction-wrapper {
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 1rem !important;
+          padding: 1.5rem 1rem !important;
+          background: var(--bg-secondary) !important;
+          border-radius: 0.75rem !important;
+          transition: all 0.3s ease !important;
+          border: 2px solid transparent !important;
+          position: relative !important;
+          overflow: hidden !important;
+          height: 100% !important;
+        }
+
+        .featured-auction-wrapper::before {
+          content: '';
+          position: absolute;
+          top: -50%;
+          left: -50%;
+          width: 200%;
+          height: 200%;
+          background: radial-gradient(circle, rgba(255, 107, 0, 0.15) 0%, transparent 70%);
+          opacity: 0;
+          transition: opacity 0.3s ease;
+          pointer-events: none;
+          z-index: 0;
+        }
+
+        .featured-auction-wrapper:hover {
+          transform: translateY(-4px) !important;
+          border-color: var(--primary) !important;
+          box-shadow: 0 8px 24px rgba(255, 107, 0, 0.4),
+                      0 0 40px rgba(255, 107, 0, 0.3) !important;
+        }
+
+        .featured-auction-wrapper:hover::before {
+          opacity: 1 !important;
+        }
+
+        .featured-products-wrapper {
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 1rem !important;
+          padding: 1.5rem 1rem !important;
+          background: var(--bg-secondary) !important;
+          border-radius: 0.75rem !important;
+          transition: all 0.3s ease !important;
+          border: 2px solid transparent !important;
+          position: relative !important;
+          overflow: hidden !important;
+          height: 100% !important;
+        }
+
+        .featured-products-wrapper::before {
+          content: '';
+          position: absolute;
+          top: -50%;
+          left: -50%;
+          width: 200%;
+          height: 200%;
+          background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
+          opacity: 0;
+          transition: opacity 0.3s ease;
+          pointer-events: none;
+          z-index: 0;
+        }
+
+        .featured-products-wrapper:hover {
+          transform: translateY(-4px) !important;
+          border-color: #3b82f6 !important;
+          box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4),
+                      0 0 40px rgba(59, 130, 246, 0.3) !important;
+        }
+
+        .featured-products-wrapper:hover::before {
+          opacity: 1 !important;
+        }
+
+        .featured-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.5rem 0.875rem;
+          border-radius: 0.5rem;
+          font-size: 0.875rem;
+          font-weight: 600;
+          margin-bottom: 0.75rem;
+          width: fit-content;
+          position: relative;
+          z-index: 1;
+        }
+
+        .featured-badge-auction {
+          background: linear-gradient(135deg, var(--primary), var(--secondary));
+          color: white;
+          box-shadow: 0 4px 12px rgba(255, 107, 0, 0.3);
+          transition: all 0.3s ease;
+        }
+
+        .featured-auction-wrapper:hover .featured-badge-auction {
+          box-shadow: 0 6px 20px rgba(255, 107, 0, 0.6),
+                      0 0 20px rgba(255, 107, 0, 0.4) !important;
+          transform: scale(1.05) !important;
+        }
+
+        .featured-badge-store {
+          background: linear-gradient(135deg, #3b82f6, #60a5fa);
+          color: white;
+          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+          transition: all 0.3s ease;
+        }
+
+        .featured-products-wrapper:hover .featured-badge-store {
+          box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6),
+                      0 0 20px rgba(59, 130, 246, 0.4) !important;
+          transform: scale(1.05) !important;
+        }
+
+        .featured-card-content {
+          flex: 1;
+          display: flex;
+          align-items: stretch;
+          position: relative;
+          z-index: 1;
+          min-height: 0;
+        }
+
+        .featured-card-content > * {
+          flex: 1;
+          min-height: 0;
+          width: 100%;
+        }
+
+        /* Forzar estilos de las cards dentro de featured */
+        .featured-auction-wrapper .auction-card,
+        .featured-auction-wrapper .auction-card * {
+          border-radius: 0.5rem !important;
+          box-shadow: none !important;
+        }
+
+        .featured-auction-wrapper .auction-card:hover {
+          transform: none !important;
+          box-shadow: none !important;
+        }
+
+        .featured-products-wrapper .product-card,
+        .featured-products-wrapper .product-card * {
+          border-radius: 0.5rem !important;
+          box-shadow: none !important;
+        }
+
+        .featured-products-wrapper .product-card:hover {
+          transform: none !important;
+          box-shadow: none !important;
+        }
+
+        .featured-products-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 0.5rem;
+          position: relative;
+          z-index: 1;
+        }
+
+        .section-link-small {
+          color: var(--primary);
+          font-weight: 600;
+          font-size: 0.875rem;
+          transition: color 0.2s ease;
+        }
+
+        .section-link-small:hover {
+          color: var(--secondary);
+        }
+
+        .featured-products-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 0.875rem;
+          flex: 1;
+          position: relative;
+          z-index: 1;
+          min-height: 0;
+        }
+
+        .featured-products-grid > * {
+          min-height: 0;
+          height: 100%;
+          max-width: 100%;
+        }
+
+        .featured-products-grid .product-card {
+          height: 100% !important;
+          width: 100% !important;
         }
 
         .section-link {
@@ -372,68 +688,121 @@ const Home = () => {
           color: var(--secondary);
         }
 
-        .featured-auction-content {
-          max-width: 500px;
+        /* Features Compacto con Efectos Neon */
+        .features-compact {
+          padding: 2.5rem 0;
+          background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .features-compact::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -50%;
+          width: 200%;
+          height: 100%;
+          background: radial-gradient(circle, rgba(255, 107, 0, 0.03) 0%, transparent 70%);
+          animation: pulse-glow 4s ease-in-out infinite;
+        }
+
+        @keyframes pulse-glow {
+          0%, 100% { opacity: 0.3; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(1.1); }
+        }
+
+        .features-compact-title {
+          text-align: center;
+          font-size: clamp(1.5rem, 3vw, 1.875rem);
+          margin-bottom: 2rem;
+          color: var(--text-primary);
+          font-weight: 600;
+        }
+
+        .features-compact-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 1.25rem;
+          max-width: 900px;
           margin: 0 auto;
         }
 
-        .features {
-          padding: 4rem 0;
+        .feature-compact-card {
+          text-align: center;
+          padding: 1.5rem 1rem;
+          background: var(--bg-secondary);
+          border-radius: 0.75rem;
+          transition: all 0.3s ease;
+          border: 2px solid transparent;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .feature-compact-card::before {
+          content: '';
+          position: absolute;
+          top: -50%;
+          left: -50%;
+          width: 200%;
+          height: 200%;
+          background: radial-gradient(circle, rgba(255, 107, 0, 0.1) 0%, transparent 70%);
+          opacity: 0;
+          transition: opacity 0.3s ease;
+        }
+
+        .feature-compact-card:hover {
+          transform: translateY(-4px);
+          border-color: var(--primary);
+          box-shadow: 0 8px 24px rgba(255, 107, 0, 0.2),
+                      0 0 20px rgba(255, 107, 0, 0.1);
+        }
+
+        .feature-compact-card:hover::before {
+          opacity: 1;
+        }
+
+        .feature-compact-icon {
+          display: inline-flex;
+          padding: 0.75rem;
+          background: linear-gradient(135deg, var(--primary), var(--secondary));
+          border-radius: 0.5rem;
+          color: white;
+          margin-bottom: 0.75rem;
+          position: relative;
+          z-index: 1;
+          box-shadow: 0 4px 12px rgba(255, 107, 0, 0.3);
+          transition: all 0.3s ease;
+        }
+
+        .feature-compact-card:hover .feature-compact-icon {
+          box-shadow: 0 6px 20px rgba(255, 107, 0, 0.5),
+                      0 0 15px rgba(255, 107, 0, 0.3);
+          transform: scale(1.1);
+        }
+
+        .feature-compact-card h3 {
+          font-size: 1rem;
+          margin-bottom: 0.5rem;
+          position: relative;
+          z-index: 1;
+        }
+
+        .feature-compact-card p {
+          color: var(--text-secondary);
+          font-size: 0.875rem;
+          line-height: 1.5;
+          position: relative;
+          z-index: 1;
         }
 
         .section-title {
           text-align: center;
-          font-size: 2.5rem;
-          margin-bottom: 3rem;
-        }
-
-        .features-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-          gap: 2rem;
-        }
-
-        .feature-card {
-          text-align: center;
-          padding: 2rem;
-          background: var(--bg-secondary);
-          border-radius: 1rem;
-          transition: all 0.3s ease;
-        }
-
-        .feature-card:hover {
-          transform: translateY(-8px);
-          box-shadow: 0 12px 32px var(--shadow-lg);
-        }
-
-        .feature-icon {
-          display: inline-flex;
-          padding: 1rem;
-          background: linear-gradient(135deg, var(--primary), var(--secondary));
-          border-radius: 1rem;
-          color: white;
-          margin-bottom: 1.5rem;
-        }
-
-        .feature-card h3 {
-          font-size: 1.25rem;
-          margin-bottom: 0.75rem;
-        }
-
-        .feature-card p {
-          color: var(--text-secondary);
-          line-height: 1.6;
-        }
-
-        .home-products {
-          padding: 4rem 0;
-          background: var(--bg-secondary);
-        }
-
-        .section-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
+          font-size: clamp(1.5rem, 3vw, 1.875rem);
+          margin-bottom: 2rem;
+          font-weight: 600;
+          position: relative;
+          z-index: 1;
         }
 
         .products-grid {
@@ -443,44 +812,110 @@ const Home = () => {
         }
 
         .how-it-works {
-          padding: 4rem 0;
+          padding: 2.5rem 0;
+          background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .how-it-works::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -50%;
+          width: 200%;
+          height: 100%;
+          background: radial-gradient(circle, rgba(255, 107, 0, 0.03) 0%, transparent 70%);
+          animation: pulse-glow 4s ease-in-out infinite;
+          pointer-events: none;
         }
 
         .steps {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-          gap: 2rem;
-          margin-top: 3rem;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 1.25rem;
+          margin-top: 2rem;
+          max-width: 900px;
+          margin-left: auto;
+          margin-right: auto;
+          position: relative;
+          z-index: 1;
         }
 
         .step {
           text-align: center;
-          padding: 2rem 1rem;
+          padding: 1.5rem 1rem;
+          background: var(--bg-secondary);
+          border-radius: 0.75rem;
+          transition: all 0.3s ease;
+          border: 2px solid transparent;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .step::before {
+          content: '';
+          position: absolute;
+          top: -50%;
+          left: -50%;
+          width: 200%;
+          height: 200%;
+          background: radial-gradient(circle, rgba(255, 107, 0, 0.1) 0%, transparent 70%);
+          opacity: 0;
+          transition: opacity 0.3s ease;
+          pointer-events: none;
+          z-index: 0;
+        }
+
+        .step:hover {
+          transform: translateY(-4px);
+          border-color: var(--primary);
+          box-shadow: 0 8px 24px rgba(255, 107, 0, 0.2),
+                      0 0 20px rgba(255, 107, 0, 0.1);
+        }
+
+        .step:hover::before {
+          opacity: 1;
         }
 
         .step-number {
           display: inline-flex;
-          width: 60px;
-          height: 60px;
+          width: 50px;
+          height: 50px;
           align-items: center;
           justify-content: center;
           background: linear-gradient(135deg, var(--primary), var(--secondary));
           color: white;
           border-radius: 50%;
-          font-size: 1.5rem;
+          font-size: 1.25rem;
           font-weight: 700;
           margin-bottom: 1rem;
           font-family: 'Poppins', sans-serif;
+          box-shadow: 0 4px 12px rgba(255, 107, 0, 0.3);
+          transition: all 0.3s ease;
+          position: relative;
+          z-index: 1;
+        }
+
+        .step:hover .step-number {
+          box-shadow: 0 6px 20px rgba(255, 107, 0, 0.5),
+                      0 0 15px rgba(255, 107, 0, 0.3);
+          transform: scale(1.1);
         }
 
         .step h3 {
-          font-size: 1.25rem;
-          margin-bottom: 0.75rem;
+          font-size: clamp(1rem, 2vw, 1.125rem);
+          margin-bottom: 0.5rem;
+          position: relative;
+          z-index: 1;
         }
 
         .step p {
           color: var(--text-secondary);
           line-height: 1.6;
+          font-size: clamp(0.875rem, 1.5vw, 0.9375rem);
+          position: relative;
+          z-index: 1;
         }
 
         @media (max-width: 768px) {
@@ -520,14 +955,28 @@ const Home = () => {
             width: 100%;
           }
 
-          .section-header {
-            flex-direction: column;
+          .featured-content {
+            grid-template-columns: 1fr;
+            gap: 1.25rem;
+          }
+
+          .featured-auction-wrapper,
+          .featured-products-wrapper {
+            padding: 1.25rem 0.875rem;
+          }
+
+          .featured-products-grid {
+            grid-template-columns: 1fr;
+            gap: 0.875rem;
+          }
+
+          .features-compact-grid {
+            grid-template-columns: repeat(2, 1fr);
             gap: 1rem;
           }
 
-          .features-grid {
-            grid-template-columns: 1fr;
-            gap: 1.5rem;
+          .feature-compact-card {
+            padding: 1.25rem 0.75rem;
           }
 
           .products-grid {
@@ -537,11 +986,11 @@ const Home = () => {
 
           .steps {
             grid-template-columns: 1fr;
-            gap: 1.5rem;
+            gap: 1.25rem;
           }
 
-          .featured-auction-content {
-            max-width: 100%;
+          .step {
+            padding: 1.25rem;
           }
         }
 
@@ -560,6 +1009,40 @@ const Home = () => {
 
           .stat-number {
             font-size: 1.5rem;
+          }
+
+          .features-compact-grid {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+          }
+
+          .feature-compact-card {
+            padding: 1rem 0.75rem;
+          }
+
+          .featured-content {
+            gap: 1rem;
+          }
+
+          .featured-auction-wrapper,
+          .featured-products-wrapper {
+            padding: 1rem 0.75rem;
+          }
+
+          .featured-products-grid {
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+          }
+
+          .featured-badge {
+            font-size: 0.8125rem;
+            padding: 0.4375rem 0.75rem;
+          }
+
+          .step-number {
+            width: 45px;
+            height: 45px;
+            font-size: 1.125rem;
           }
         }
       `}</style>

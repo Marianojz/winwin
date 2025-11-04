@@ -11,6 +11,21 @@ import { createAutoMessage, saveMessage } from './messages';
 const AuctionManager = () => {
   const { auctions, setAuctions, addNotification, addOrder, user } = useStore();
   const previousBidsRef = useRef<Map<string, number>>(new Map());
+  const celebratedWinsRef = useRef<Set<string>>(new Set()); // Rastrear victorias ya celebradas
+
+  useEffect(() => {
+    // Cargar victorias ya celebradas desde localStorage
+    if (user) {
+      try {
+        const savedCelebrations = JSON.parse(localStorage.getItem('celebratedWins') || '[]');
+        savedCelebrations.forEach((winKey: string) => {
+          celebratedWinsRef.current.add(winKey);
+        });
+      } catch (error) {
+        console.error('Error cargando celebraciones guardadas:', error);
+      }
+    }
+  }, [user]);
 
   useEffect(() => {
     // Inicializar el mapa de ofertas anteriores
@@ -185,9 +200,20 @@ if (endTime <= now) {
 
     // Reproducir sonido de victoria
     soundManager.playWon();
-    // Efecto visual: papel picado para el usuario ganador
+    // Efecto visual: papel picado para el usuario ganador (solo si no se celebró antes)
     if (user && user.id === winnerId) {
-      launchConfettiFromTop(3500);
+      const winKey = `${auction.id}_${winnerId}`;
+      // Solo mostrar confeti si es una victoria nueva (no se celebró antes)
+      if (!celebratedWinsRef.current.has(winKey)) {
+        launchConfettiFromTop(3500);
+        celebratedWinsRef.current.add(winKey);
+        // Guardar en localStorage para persistir entre sesiones
+        const savedCelebrations = JSON.parse(localStorage.getItem('celebratedWins') || '[]');
+        if (!savedCelebrations.includes(winKey)) {
+          savedCelebrations.push(winKey);
+          localStorage.setItem('celebratedWins', JSON.stringify(savedCelebrations));
+        }
+      }
     }
 
     // Notificar al admin

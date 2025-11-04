@@ -7,17 +7,17 @@ import { Navigate } from 'react-router-dom';
 const Notificaciones = () => {
   const { user, notifications, markAsRead, markAllAsRead, loadUserNotifications, unreadCount } = useStore();
 
-  // Si no hay usuario logueado, redirigir al login
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  // Cargar notificaciones cuando se monta el componente
+  // Cargar notificaciones cuando se monta el componente (SIEMPRE antes de cualquier return)
   React.useEffect(() => {
     if (user && loadUserNotifications) {
       loadUserNotifications();
     }
-  }, [user, loadUserNotifications]);
+  }, [user?.id]); // Solo dependencia del user.id para evitar llamadas múltiples
+
+  // Si no hay usuario logueado, redirigir al login (DESPUÉS de los hooks)
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
   const getIcon = (type: string) => {
     switch (type) {

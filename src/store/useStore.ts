@@ -20,7 +20,7 @@ interface AppState {
 
   // Products
   products: Product[];
-  setProducts: (products: Product[]) => void;
+  setProducts: (products: Product[], skipFirebaseSync?: boolean) => Promise<void>;
 
   // Cart
   cart: CartItem[];
@@ -51,8 +51,8 @@ interface AppState {
   // Orders (Admin)
   orders: Order[];
   setOrders: (orders: Order[]) => void;
-  addOrder: (order: Order) => void;
-  updateOrderStatus: (orderId: string, status: OrderStatus, updates?: Partial<Order>) => void;
+  addOrder: (order: Order) => Promise<void>;
+  updateOrderStatus: (orderId: string, status: OrderStatus, updates?: Partial<Order>) => Promise<void>;
 }
 
 // Función auxiliar para guardar en localStorage de forma segura
@@ -115,7 +115,17 @@ export const useStore = create<AppState>((set, get) => ({
 user: (() => {
   try {
     const saved = localStorage.getItem('user');
-    return saved ? JSON.parse(saved) : null;
+    if (!saved) return null;
+    const parsed = JSON.parse(saved);
+    // Asegurar que las fechas se parseen correctamente
+    if (parsed.createdAt) {
+      parsed.createdAt = new Date(parsed.createdAt);
+    }
+    // Asegurar que isAdmin sea boolean
+    if (parsed.isAdmin !== undefined) {
+      parsed.isAdmin = Boolean(parsed.isAdmin);
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -138,32 +148,18 @@ isAuthenticated: (() => {
   }
 })(),
 
-  // Auctions
-  auctions: (() => {
-    try {
-      const saved = localStorage.getItem('auctions');
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
-      return parsed.map((a: any) => ({
-        ...a,
-        endTime: new Date(a.endTime),
-        bids: a.bids?.map((b: any) => ({
-          ...b,
-          createdAt: new Date(b.createdAt)
-        })) || []
-      }));
-    } catch (error) {
-      console.error('Error cargando subastas:', error);
-      return [];
-    }
-  })(),
+  // Auctions - TODO desde Firebase, no localStorage
+  auctions: [],
   setAuctions: (auctions) => {
-    safeLocalStorageSet('auctions', auctions);
+    // NO guardar en localStorage - TODO debe venir de Firebase
     set({ auctions });
   },
   addBid: async (auctionId, amount, userId, username) => {
   try {
     console.log('🔥 Intentando guardar oferta en Firebase...');
+    
+    // VERIFICAR SI ES UN BOT (los bots tienen IDs que empiezan con "bot-")
+    const isBot = userId.startsWith('bot-');
     
     // VERIFICAR QUE EL USUARIO NO SEA EL CREADOR DE LA SUBASTA
     const state = get();
@@ -171,22 +167,30 @@ isAuthenticated: (() => {
     
     if (auction && auction.createdBy === userId) {
       console.error('❌ ERROR: No puedes hacer ofertas en tu propia subasta');
-      alert('No puedes hacer ofertas en tu propia subasta');
+      if (!isBot) {
+        alert('No puedes hacer ofertas en tu propia subasta');
+      }
       return; // Detener la función aquí
     }
     
     // VALIDACIONES DE MÍNIMO Y MÚLTIPLO
     if (!auction) {
-      alert('Subasta no encontrada');
+      if (!isBot) {
+        alert('Subasta no encontrada');
+      }
       return;
     }
     const currentPrice = auction.currentPrice || 0;
     if (amount <= currentPrice) {
-      alert(`Tu oferta debe ser mayor a ${currentPrice.toLocaleString()}`);
+      if (!isBot) {
+        alert(`Tu oferta debe ser mayor a ${currentPrice.toLocaleString()}`);
+      }
       return;
     }
     if (amount % 500 !== 0) {
-      alert('La oferta debe ser múltiplo de $500');
+      if (!isBot) {
+        alert('La oferta debe ser múltiplo de $500');
+      }
       return;
     }
 
@@ -196,7 +200,8 @@ isAuthenticated: (() => {
       userId,
       username,
       amount,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      isBot: isBot // Marcar si es una oferta de bot
     };
 
     // AGREGÁ ESTE LOG PARA VER LA URL
@@ -245,18 +250,35 @@ isAuthenticated: (() => {
   }
 },
 
-  // Products
-  products: (() => {
-    try {
-      return JSON.parse(localStorage.getItem('products') || '[]');
-    } catch (error) {
-      console.error('Error cargando productos:', error);
-      return [];
-    }
-  })(),
-  setProducts: (products) => {
-    safeLocalStorageSet('products', products);
+  // Products - TODO desde Firebase, no localStorage
+  products: [],
+  setProducts: async (products, skipFirebaseSync = false) => {
+    // NO guardar en localStorage - TODO debe venir de Firebase
     set({ products });
+    
+    // Sincronizar productos actualizados en Firebase solo si no viene de la sincronización
+    // Esto evita bucles infinitos cuando Firebase notifica cambios
+    if (!skipFirebaseSync) {
+      try {
+        const updates: any = {};
+        products.forEach(product => {
+          updates[product.id] = {
+            ...product,
+            createdAt: product.createdAt instanceof Date ? product.createdAt.toISOString() : product.createdAt,
+            updatedAt: product.updatedAt instanceof Date ? product.updatedAt.toISOString() : product.updatedAt
+          };
+        });
+        
+        // Solo actualizar si hay productos (no hacer update completo si está vacío)
+        if (products.length > 0) {
+          await update(ref(realtimeDb, 'products'), updates);
+          console.log('✅ Productos sincronizados en Firebase (stock actualizado)');
+        }
+      } catch (error) {
+        console.error('❌ Error sincronizando productos en Firebase:', error);
+        throw error; // Lanzar error para que el llamador sepa que falló
+      }
+    }
   },
 
   // Cart
@@ -302,6 +324,24 @@ isAuthenticated: (() => {
   notifications: [],
   unreadCount: 0,
   
+  // Función auxiliar para normalizar notificaciones
+  _normalizeNotification: (n: any) => {
+    // Normalizar read a boolean estricto
+    let readValue = false;
+    if (n.read === true || n.read === 'true' || String(n.read) === 'true' || n.read === 1) {
+      readValue = true;
+    } else if (n.readAt) {
+      // Si tiene readAt pero read no está definido correctamente, asumir que está leída
+      readValue = true;
+    }
+    
+    return {
+      ...n,
+      read: Boolean(readValue), // Siempre boolean estricto
+      readAt: n.readAt ? (typeof n.readAt === 'string' ? n.readAt : new Date(n.readAt).toISOString()) : undefined
+    };
+  },
+  
   // Función para cargar notificaciones del usuario actual
   loadUserNotifications: () => {
     const user = get().user;
@@ -309,6 +349,21 @@ isAuthenticated: (() => {
       set({ notifications: [], unreadCount: 0 });
       return;
     }
+
+    // Evitar cargas múltiples muy cercanas (debounce)
+    const lastLoadKey = `lastNotificationLoad_${user.id}`;
+    const lastLoadTime = parseInt(localStorage.getItem(lastLoadKey) || '0');
+    const now = Date.now();
+    const timeSinceLastLoad = now - lastLoadTime;
+    
+    // Si se cargó hace menos de 2 segundos, no cargar de nuevo
+    if (timeSinceLastLoad < 2000) {
+      console.log('⏭️ Saltando carga de notificaciones (cargada hace menos de 2 segundos)');
+      return;
+    }
+    
+    // Guardar timestamp de esta carga
+    localStorage.setItem(lastLoadKey, now.toString());
 
     try {
       const storageKey = `notifications_${user.id}`;
@@ -321,56 +376,54 @@ isAuthenticated: (() => {
       
       const parsed = JSON.parse(saved);
       const now = Date.now();
+      const normalizeFn = get()._normalizeNotification;
       
-      // Primero normalizar TODAS las notificaciones ANTES de filtrar
-      const normalized = parsed.map((n: any) => {
-        // Normalizar read a boolean estricto - verificar múltiples formatos
-        let readValue = false;
-        if (n.read === true || n.read === 'true' || n.read === 1) {
-          readValue = true;
-        } else if (n.readAt) {
-          // Si tiene readAt pero read no está definido, asumir que está leída
-          readValue = true;
-        }
-        
-        return {
-          ...n,
-          read: Boolean(readValue), // Forzar boolean estricto
-          readAt: n.readAt ? (typeof n.readAt === 'string' ? n.readAt : new Date(n.readAt).toISOString()) : undefined
-        };
-      });
+      // Normalizar TODAS las notificaciones
+      const normalized = parsed.map((n: any) => normalizeFn(n));
       
-      // Filtrar notificaciones leídas que tienen más de 2 días (según dataCleaner)
-      // Y notificaciones no leídas que tienen más de 7 días
+      // Filtrar notificaciones leídas antiguas (más de 2 días desde que fueron leídas)
+      // Y notificaciones no leídas muy antiguas (más de 7 días desde creación)
       const filtered = normalized.filter((n: any) => {
-        const createdAt = new Date(n.createdAt).getTime();
-        const isRead = n.read === true;
+        const isRead = n.read === true || n.read === 'true' || String(n.read) === 'true';
         
-        // Si está leída, verificar si fue leída hace más de 2 días
         if (isRead && n.readAt) {
+          // Si está leída, eliminar si fue leída hace más de 2 días
           const readTime = new Date(n.readAt).getTime();
-          if (readTime < (now - (2 * 24 * 60 * 60 * 1000))) { // 2 días
+          const daysSinceRead = (now - readTime) / (24 * 60 * 60 * 1000);
+          if (daysSinceRead > 2) {
             return false; // Eliminar notificación leída hace más de 2 días
           }
           return true; // Mantener notificación leída recientemente
         }
         
-        // Si no está leída, verificar si es muy antigua (más de 7 días)
-        if (!isRead && createdAt < (now - (7 * 24 * 60 * 60 * 1000))) {
-          return false; // Eliminar notificación no leída muy antigua
+        if (!isRead) {
+          // Si no está leída, eliminar si fue creada hace más de 7 días
+          const createdAt = new Date(n.createdAt).getTime();
+          const daysSinceCreation = (now - createdAt) / (24 * 60 * 60 * 1000);
+          if (daysSinceCreation > 7) {
+            return false; // Eliminar notificación no leída muy antigua
+          }
+          return true; // Mantener notificaciones no leídas recientes
         }
         
-        return true; // Mantener notificaciones recientes
+        return true;
       });
       
       // SIEMPRE actualizar localStorage con las notificaciones normalizadas y filtradas
-      // Esto asegura que el estado guardado sea consistente con booleanos estrictos
-      localStorage.setItem(storageKey, JSON.stringify(filtered));
+      // Asegurar que todas tengan read como boolean estricto
+      const finalNotifications = filtered.map((n: any) => ({
+        ...n,
+        read: Boolean(n.read === true || n.read === 'true' || String(n.read) === 'true' || n.readAt),
+        readAt: n.readAt || undefined
+      }));
       
-      const notifications = filtered.map((n: any) => ({
+      localStorage.setItem(storageKey, JSON.stringify(finalNotifications));
+      
+      // Convertir a objetos Date para el estado
+      const notifications = finalNotifications.map((n: any) => ({
         ...n,
         createdAt: new Date(n.createdAt),
-        read: Boolean(n.read), // Asegurar boolean estricto
+        read: Boolean(n.read === true || n.read === 'true' || String(n.read) === 'true' || n.readAt), // Asegurar boolean estricto
         readAt: n.readAt ? new Date(n.readAt) : undefined
       }));
       
@@ -378,7 +431,6 @@ isAuthenticated: (() => {
       
       set({ notifications, unreadCount });
       console.log(`✅ Cargadas ${notifications.length} notificaciones para ${user.username} (${unreadCount} no leídas)`);
-      console.log('📋 Detalle de notificaciones:', notifications.map(n => ({ id: n.id, read: n.read, readAt: n.readAt })));
     } catch (error) {
       console.error('Error cargando notificaciones:', error);
       set({ notifications: [], unreadCount: 0 });
@@ -386,138 +438,121 @@ isAuthenticated: (() => {
   },
   
   clearNotifications: () => {
+    const user = get().user;
+    if (user) {
+      const storageKey = `notifications_${user.id}`;
+      localStorage.removeItem(storageKey);
+    }
     set({ notifications: [], unreadCount: 0 });
   },
   
   addNotification: (notification) => {
+    const user = get().user;
+    if (!user) return;
+    
     const newNotification = {
       ...notification,
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // ID único
-      createdAt: new Date(),
+      id: `NOTIF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      createdAt: new Date().toISOString(),
       read: false
     };
-    const user = get().user;
-    if (user) {
-      const storageKey = `notifications_${user.id}`;
-      const currentNotifications = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      currentNotifications.push(newNotification);
-      localStorage.setItem(storageKey, JSON.stringify(currentNotifications));
-    }
+    
+    const storageKey = `notifications_${user.id}`;
+    const currentNotifications = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    currentNotifications.push(newNotification);
+    localStorage.setItem(storageKey, JSON.stringify(currentNotifications));
+    
     set(state => ({
-      notifications: [newNotification, ...state.notifications],
+      notifications: [{
+        ...newNotification,
+        createdAt: new Date(newNotification.createdAt)
+      }, ...state.notifications],
       unreadCount: state.unreadCount + 1
     }));
   },
+  
   markNotificationAsRead: (notificationId) => {
-    const user = get().user;
-    const state = get();
-    const updatedNotifications = state.notifications.map(n => {
-      if (n.id === notificationId) {
-        const updated = { ...n, read: true, readAt: new Date() };
-        // Programar eliminación después de 7 días
-        // La eliminación automática se hace en loadUserNotifications
-        return updated;
-      }
-      return n;
-    });
-    
-    if (user) {
-      const storageKey = `notifications_${user.id}`;
-      const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      const updated = saved.map((n: any) => 
-        n.id === notificationId ? { ...n, read: true, readAt: new Date().toISOString() } : n
-      );
-      localStorage.setItem(storageKey, JSON.stringify(updated));
-    }
-    
-    set({
-      notifications: updatedNotifications,
-      unreadCount: Math.max(0, state.unreadCount - 1)
-    });
+    // Delegar a markAsRead para mantener consistencia
+    get().markAsRead(notificationId);
   },
+  
   deleteNotification: (notificationId) => {
-    set(state => {
-      const notificationToDelete = state.notifications.find(n => n.id === notificationId);
-      const wasUnread = notificationToDelete && !notificationToDelete.read;
-      
-      return {
-        notifications: state.notifications.filter(n => n.id !== notificationId),
-        unreadCount: wasUnread ? Math.max(0, state.unreadCount - 1) : state.unreadCount
-      };
-    });
-  },
-  markAsRead: (notificationId) => {
     const user = get().user;
-    const state = get();
-    
     if (!user) return;
     
-    // Buscar la notificación para verificar si ya estaba leída
-    const notification = state.notifications.find(n => n.id === notificationId);
-    const wasAlreadyRead = notification?.read === true || String(notification?.read) === 'true';
+    const state = get();
+    const notificationToDelete = state.notifications.find(n => n.id === notificationId);
+    const wasUnread = notificationToDelete && notificationToDelete.read === false;
     
-    // Si ya estaba leída, no hacer nada
-    if (wasAlreadyRead) {
-      console.log(`⚠️ Notificación ${notificationId} ya estaba leída`);
+    // Actualizar localStorage
+    const storageKey = `notifications_${user.id}`;
+    const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    const filtered = saved.filter((n: any) => n.id !== notificationId);
+    localStorage.setItem(storageKey, JSON.stringify(filtered));
+    
+    // Actualizar estado
+    set({
+      notifications: state.notifications.filter(n => n.id !== notificationId),
+      unreadCount: wasUnread ? Math.max(0, state.unreadCount - 1) : state.unreadCount
+    });
+  },
+  
+  markAsRead: (notificationId) => {
+    const user = get().user;
+    if (!user) return;
+    
+    const state = get();
+    const notification = state.notifications.find(n => n.id === notificationId);
+    
+    // Verificar si ya está leída (múltiples verificaciones)
+    const isAlreadyRead = notification && (
+      notification.read === true || 
+      notification.read === 'true' || 
+      String(notification.read) === 'true' ||
+      notification.readAt !== undefined
+    );
+    
+    // Si no existe o ya está leída, no hacer nada
+    if (!notification || isAlreadyRead) {
+      if (isAlreadyRead) {
+        console.log(`ℹ️ Notificación ${notificationId} ya está marcada como leída`);
+      }
       return;
     }
     
-    // Actualizar en localStorage PRIMERO
     const storageKey = `notifications_${user.id}`;
     const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    const readAt = new Date().toISOString();
+    const normalizeFn = get()._normalizeNotification;
+    
+    // Actualizar en localStorage
     const updated = saved.map((n: any) => {
       if (n.id === notificationId) {
-        // SIEMPRE actualizar con boolean true y timestamp ISO
+        const normalized = normalizeFn(n);
         return { 
-          ...n, 
+          ...normalized, 
           read: true, // Boolean estricto
-          readAt: new Date().toISOString() 
+          readAt: readAt // Siempre actualizar readAt
         };
       }
-      // Asegurar que las demás también tengan read como boolean
-      return { 
-        ...n, 
-        read: n.read === true || n.read === 'true' || n.read === 1 ? true : false 
-      };
+      // Normalizar las demás también
+      return normalizeFn(n);
     });
-    // Guardar inmediatamente para persistir cambios
+    
     localStorage.setItem(storageKey, JSON.stringify(updated));
     
-    // Recargar desde localStorage para garantizar sincronización
-    const reloaded = JSON.parse(localStorage.getItem(storageKey) || '[]');
-    const now = Date.now();
-    const filtered = reloaded.filter((n: any) => {
-      if (!n.read) return true;
-      if (n.readAt) {
-        const readTime = new Date(n.readAt).getTime();
-        return (now - readTime) < (7 * 24 * 60 * 60 * 1000); // 7 días
-      }
-      return true;
-    });
+    // Actualizar estado inmediatamente - forzar read a true
+    const updatedNotifications = state.notifications.map(n => 
+      n.id === notificationId 
+        ? { ...n, read: true, readAt: new Date(readAt) }
+        : { ...n, read: n.read === true || n.read === 'true' || String(n.read) === 'true' || n.readAt ? true : false }
+    );
     
-    const notifications = filtered.map((n: any) => {
-      // Normalizar read a boolean estricto
-      let readValue = false;
-      if (n.read === true) {
-        readValue = true;
-      } else if (n.read === 'true') {
-        readValue = true;
-      } else if (n.read === 1) {
-        readValue = true;
-      }
-      
-      return {
-        ...n,
-        createdAt: new Date(n.createdAt),
-        read: Boolean(readValue), // Forzar boolean estricto
-        readAt: n.readAt ? new Date(n.readAt) : undefined
-      };
-    });
-    
-    const newUnreadCount = notifications.filter((n: any) => !n.read).length;
+    // Recalcular contador basado en el estado actualizado
+    const newUnreadCount = updatedNotifications.filter(n => !n.read).length;
     
     set({
-      notifications,
+      notifications: updatedNotifications,
       unreadCount: newUnreadCount
     });
     
@@ -526,66 +561,62 @@ isAuthenticated: (() => {
   
   markAllAsRead: () => {
     const user = get().user;
-    const state = get();
-    
     if (!user) return;
     
-    const unreadNotifications = state.notifications.filter(n => !n.read);
+    const state = get();
+    // Filtrar notificaciones que realmente no están leídas (múltiples verificaciones)
+    const unreadNotifications = state.notifications.filter(n => {
+      const isRead = n.read === true || n.read === 'true' || String(n.read) === 'true';
+      return !isRead;
+    });
     
     if (unreadNotifications.length === 0) {
-      console.log('⚠️ No hay notificaciones sin leer');
+      console.log('✅ Todas las notificaciones ya están leídas');
       return;
     }
     
-    // Actualizar en localStorage
     const storageKey = `notifications_${user.id}`;
     const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    const readAt = new Date().toISOString();
+    const normalizeFn = get()._normalizeNotification;
+    
+    // Actualizar todas las notificaciones en localStorage
     const updated = saved.map((n: any) => {
-      const isRead = n.read === true || n.read === 'true' || n.read === 1;
-      if (!isRead) {
-        // Asegurar que read se guarde como boolean true, no string
+      const normalized = normalizeFn(n);
+      const isCurrentlyRead = normalized.read === true || normalized.read === 'true' || String(normalized.read) === 'true';
+      
+      // Si no está leída, marcarla como leída
+      if (!isCurrentlyRead) {
         return { 
-          ...n, 
+          ...normalized, 
           read: true, // Boolean estricto
-          readAt: new Date().toISOString() 
+          readAt: readAt // Siempre actualizar readAt
         };
       }
-      // Asegurar que read se guarde como boolean estricto
-      return { 
-        ...n, 
-        read: true, // Siempre boolean true si está leída
-        readAt: n.readAt || new Date().toISOString() // Asegurar que tenga readAt
+      // Si ya está leída, mantenerla pero asegurar que read sea true
+      return {
+        ...normalized,
+        read: true,
+        readAt: normalized.readAt || readAt
       };
     });
-    // Guardar con read como boolean estricto
+    
+    // Guardar en localStorage
     localStorage.setItem(storageKey, JSON.stringify(updated));
-    console.log('💾 Guardadas notificaciones en localStorage:', updated.length, 'notificaciones');
     
-    // Recargar desde localStorage para garantizar sincronización
-    const reloaded = JSON.parse(localStorage.getItem(storageKey) || '[]');
-    const now = Date.now();
-    const filtered = reloaded.filter((n: any) => {
-      if (!n.read) return true;
-      if (n.readAt) {
-        const readTime = new Date(n.readAt).getTime();
-        return (now - readTime) < (7 * 24 * 60 * 60 * 1000); // 7 días
-      }
-      return true;
-    });
-    
-    const notifications = filtered.map((n: any) => ({
+    // Actualizar estado - marcar TODAS como leídas
+    const updatedNotifications = state.notifications.map(n => ({
       ...n,
-      createdAt: new Date(n.createdAt),
-      read: n.read === true || n.read === 'true',
-      readAt: n.readAt ? new Date(n.readAt) : undefined
+      read: true, // Forzar a true
+      readAt: n.readAt || new Date(readAt)
     }));
     
     set({
-      notifications,
+      notifications: updatedNotifications,
       unreadCount: 0
     });
     
-    console.log(`✅ ${unreadNotifications.length} notificaciones marcadas como leídas`);
+    console.log(`✅ ${unreadNotifications.length} notificaciones marcadas como leídas. Total: ${updatedNotifications.length}`);
   },
 
   // Bots
@@ -607,31 +638,11 @@ isAuthenticated: (() => {
     get().setBots(newBots);
   },
 
-  // Orders - Eliminar duplicados al cargar
-  orders: (() => {
-    const loaded = JSON.parse(localStorage.getItem('orders') || '[]');
-    // Eliminar duplicados por ID
-    const unique = loaded.filter((order: any, index: number, self: any[]) => 
-      index === self.findIndex((o: any) => o.id === order.id)
-    );
-    
-    if (unique.length < loaded.length) {
-      console.log(`🧹 Eliminados ${loaded.length - unique.length} pedidos duplicados al cargar`);
-      // Guardar la versión sin duplicados
-      localStorage.setItem('orders', JSON.stringify(unique));
-    }
-    
-    return unique.map((o: any) => ({
-      ...o,
-      createdAt: new Date(o.createdAt),
-      expiresAt: o.expiresAt ? new Date(o.expiresAt) : undefined,
-      paidAt: o.paidAt ? new Date(o.paidAt) : undefined,
-      shippedAt: o.shippedAt ? new Date(o.shippedAt) : undefined,
-      deliveredAt: o.deliveredAt ? new Date(o.deliveredAt) : undefined
-    }));
-  })(),
+  // Orders - TODO desde Firebase, no localStorage
+  orders: [],
   setOrders: (orders) => {
-    // Eliminar duplicados antes de guardar
+    // NO guardar en localStorage - TODO debe venir de Firebase
+    // Eliminar duplicados antes de actualizar
     const uniqueOrders = orders.filter((order: Order, index: number, self: Order[]) => 
       index === self.findIndex((o: Order) => o.id === order.id)
     );
@@ -640,25 +651,67 @@ isAuthenticated: (() => {
       console.log(`🧹 Eliminados ${orders.length - uniqueOrders.length} pedidos duplicados del store`);
     }
     
-    localStorage.setItem('orders', JSON.stringify(uniqueOrders));
     set({ orders: uniqueOrders });
   },
-  addOrder: (order) => {
+  addOrder: async (order) => {
     const currentOrders = get().orders;
     // Verificar si ya existe un pedido con el mismo ID
     if (currentOrders.some((o: Order) => o.id === order.id)) {
       console.warn(`⚠️ Pedido con ID ${order.id} ya existe, no se agregará duplicado`);
       return;
     }
+
+    // Guardar en Firebase Realtime Database
+    try {
+      console.log('🔥 Guardando pedido en Firebase...');
+      
+      // Construir objeto sin valores undefined (Firebase no los acepta)
+      const firebaseOrder: any = {
+        id: order.id,
+        userId: order.userId,
+        userName: order.userName,
+        productId: order.productId,
+        productName: order.productName,
+        productImage: order.productImage || '',
+        productType: order.productType,
+        type: order.type,
+        amount: order.amount,
+        status: order.status,
+        deliveryMethod: order.deliveryMethod,
+        createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : (order.createdAt || new Date().toISOString()),
+        address: order.address || { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } }
+      };
+      
+      // Solo agregar propiedades opcionales si tienen valor
+      if (order.expiresAt) {
+        firebaseOrder.expiresAt = order.expiresAt instanceof Date ? order.expiresAt.toISOString() : order.expiresAt;
+      }
+      if (order.paidAt) {
+        firebaseOrder.paidAt = order.paidAt instanceof Date ? order.paidAt.toISOString() : order.paidAt;
+      }
+      if (order.shippedAt) {
+        firebaseOrder.shippedAt = order.shippedAt instanceof Date ? order.shippedAt.toISOString() : order.shippedAt;
+      }
+      if (order.deliveredAt) {
+        firebaseOrder.deliveredAt = order.deliveredAt instanceof Date ? order.deliveredAt.toISOString() : order.deliveredAt;
+      }
+      
+      await update(ref(realtimeDb, `orders/${order.id}`), firebaseOrder);
+      console.log('✅ Pedido guardado en Firebase correctamente');
+    } catch (error) {
+      console.error('❌ Error guardando pedido en Firebase:', error);
+      throw error; // Lanzar error - NO guardar localmente si falla Firebase
+    }
+
     const newOrders = [...currentOrders, order];
-    // Eliminar duplicados antes de guardar
+    // Eliminar duplicados antes de actualizar
     const uniqueOrders = newOrders.filter((o: Order, index: number, self: Order[]) => 
       index === self.findIndex((orderItem: Order) => orderItem.id === o.id)
     );
-    localStorage.setItem('orders', JSON.stringify(uniqueOrders));
+    // NO guardar en localStorage - TODO debe venir de Firebase
     set({ orders: uniqueOrders });
   },
-  updateOrderStatus: (orderId, status, updates = {}) => {
+  updateOrderStatus: async (orderId, status, updates = {}) => {
     const now = new Date();
     const newOrders = get().orders.map(order => {
       if (order.id === orderId) {
@@ -687,8 +740,53 @@ isAuthenticated: (() => {
     const uniqueOrders = newOrders.filter((o: Order, index: number, self: Order[]) => 
       index === self.findIndex((orderItem: Order) => orderItem.id === o.id)
     );
+
+    // Guardar cambios en Firebase Realtime Database
+    const updatedOrder = uniqueOrders.find(o => o.id === orderId);
+    if (updatedOrder) {
+      try {
+        console.log('🔥 Actualizando pedido en Firebase...');
+        
+        // Construir objeto sin valores undefined (Firebase no los acepta)
+        const firebaseOrder: any = {
+          id: updatedOrder.id,
+          userId: updatedOrder.userId,
+          userName: updatedOrder.userName,
+          productId: updatedOrder.productId,
+          productName: updatedOrder.productName,
+          productImage: updatedOrder.productImage || '',
+          productType: updatedOrder.productType,
+          type: updatedOrder.type,
+          amount: updatedOrder.amount,
+          status: updatedOrder.status,
+          deliveryMethod: updatedOrder.deliveryMethod,
+          createdAt: updatedOrder.createdAt instanceof Date ? updatedOrder.createdAt.toISOString() : (updatedOrder.createdAt || new Date().toISOString()),
+          address: updatedOrder.address || { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } }
+        };
+        
+        // Solo agregar propiedades opcionales si tienen valor
+        if (updatedOrder.expiresAt) {
+          firebaseOrder.expiresAt = updatedOrder.expiresAt instanceof Date ? updatedOrder.expiresAt.toISOString() : updatedOrder.expiresAt;
+        }
+        if (updatedOrder.paidAt) {
+          firebaseOrder.paidAt = updatedOrder.paidAt instanceof Date ? updatedOrder.paidAt.toISOString() : updatedOrder.paidAt;
+        }
+        if (updatedOrder.shippedAt) {
+          firebaseOrder.shippedAt = updatedOrder.shippedAt instanceof Date ? updatedOrder.shippedAt.toISOString() : updatedOrder.shippedAt;
+        }
+        if (updatedOrder.deliveredAt) {
+          firebaseOrder.deliveredAt = updatedOrder.deliveredAt instanceof Date ? updatedOrder.deliveredAt.toISOString() : updatedOrder.deliveredAt;
+        }
+        
+        await update(ref(realtimeDb, `orders/${orderId}`), firebaseOrder);
+        console.log('✅ Pedido actualizado en Firebase correctamente');
+      } catch (error) {
+        console.error('❌ Error actualizando pedido en Firebase:', error);
+        throw error; // Lanzar error para que el llamador sepa que falló
+      }
+    }
     
-    localStorage.setItem('orders', JSON.stringify(uniqueOrders));
+    // NO guardar en localStorage - TODO debe venir de Firebase
     set({ orders: uniqueOrders });
   }
 }));

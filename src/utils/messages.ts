@@ -1,5 +1,6 @@
 // Sistema de mensajería entre admin y usuarios
 import { Message, Conversation } from '../types';
+import { getTemplateByType, renderTemplate } from './messageTemplates';
 
 const MESSAGES_STORAGE_KEY = 'messages';
 const CONVERSATIONS_STORAGE_KEY = 'conversations';
@@ -283,9 +284,6 @@ export const createAutoMessage = (
     paymentDeadline?: string;
   }
 ): Message => {
-  // Importar funciones de templates dinámicamente para evitar circular dependencies
-  const { getTemplateByType, renderTemplate } = require('./messageTemplates');
-  
   // Intentar obtener template personalizado
   const template = getTemplateByType(type);
   

@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react';
+import { ref, remove } from 'firebase/database';
+import { realtimeDb } from '../config/firebase';
 import { useStore } from '../store/useStore';
 import { runCleanup } from './dataCleaner';
 
@@ -18,7 +20,7 @@ const DataCleanupManager = () => {
 
     console.log('🧹 DataCleanupManager: Usuario detectado, preparando limpieza...');
 
-    const performCleanup = () => {
+    const performCleanup = async () => {
       try {
         console.log('🧹 DataCleanupManager: Ejecutando limpieza...');
         // Obtener datos actuales del store
@@ -51,6 +53,33 @@ const DataCleanupManager = () => {
             }
             return true;
           });
+          
+          // Eliminar subastas antiguas de Firebase también
+          const auctionsToRemove = currentAuctions.filter((auction: any) => {
+            if (auction.status === 'active' || auction.status === 'scheduled') {
+              return false; // No eliminar activas
+            }
+            if (auction.status === 'ended') {
+              const now = Date.now();
+              const cutoffDate = now - (3 * 24 * 60 * 60 * 1000);
+              const endTime = auction.endTime ? new Date(auction.endTime).getTime() : 0;
+              const createdAt = auction.createdAt ? new Date(auction.createdAt).getTime() : 0;
+              const checkDate = endTime > 0 ? endTime : createdAt;
+              return checkDate < cutoffDate; // Eliminar si es antigua
+            }
+            return false;
+          });
+          
+          // Eliminar de Firebase
+          for (const auction of auctionsToRemove) {
+            try {
+              await remove(ref(realtimeDb, `auctions/${auction.id}`));
+              console.log(`🗑️ Subasta ${auction.id} eliminada de Firebase`);
+            } catch (error) {
+              console.error(`❌ Error eliminando subasta ${auction.id} de Firebase:`, error);
+            }
+          }
+          
           setAuctions(cleanedAuctions);
           console.log(`✅ Subastas actualizadas: ${cleanedAuctions.length} restantes`);
         }
@@ -72,6 +101,33 @@ const DataCleanupManager = () => {
             }
             return true;
           });
+          
+          // Eliminar pedidos antiguos de Firebase también
+          const ordersToRemove = currentOrders.filter((order: any) => {
+            // Mantener pedidos activos siempre
+            if (['pending_payment', 'payment_confirmed', 'in_transit'].includes(order.status)) {
+              return false; // No eliminar activos
+            }
+            // Para pedidos finalizados, verificar antigüedad
+            if (['delivered', 'canceled', 'payment_expired'].includes(order.status)) {
+              const now = Date.now();
+              const cutoffDate = now - (7 * 24 * 60 * 60 * 1000);
+              const orderDate = order.createdAt ? new Date(order.createdAt).getTime() : 0;
+              return orderDate < cutoffDate; // Eliminar si es antiguo
+            }
+            return false;
+          });
+          
+          // Eliminar de Firebase
+          for (const order of ordersToRemove) {
+            try {
+              await remove(ref(realtimeDb, `orders/${order.id}`));
+              console.log(`🗑️ Pedido ${order.id} eliminado de Firebase`);
+            } catch (error) {
+              console.error(`❌ Error eliminando pedido ${order.id} de Firebase:`, error);
+            }
+          }
+          
           setOrders(cleanedOrders);
           console.log(`✅ Pedidos actualizados: ${cleanedOrders.length} restantes`);
         }

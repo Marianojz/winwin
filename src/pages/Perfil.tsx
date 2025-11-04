@@ -50,9 +50,14 @@ const Perfil = () => {
       clearNotifications(); // Limpiar notificaciones
       useStore.getState().setUser(null);
       localStorage.removeItem('user');
+      // Redirigir al inicio usando navigate
       window.location.href = '/';
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
+      // Limpiar igualmente aunque falle
+      useStore.getState().setUser(null);
+      localStorage.removeItem('user');
+      window.location.href = '/';
     }
   };
 

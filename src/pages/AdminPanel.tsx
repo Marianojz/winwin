@@ -3,7 +3,7 @@ import { ref, update, remove } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
 
 // Otras importaciones de Lucide, React, etc.
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Eye, Edit, Trash2, Users, Clock, AlertCircle, Activity, RefreshCw,
   Gavel, Package, Bot, DollarSign, Plus, XCircle,
@@ -453,19 +453,33 @@ const [auctionForm, setAuctionForm] = useState({
   };
   
   const getRecentActivity = () => {
-    const clearedTimestamp = localStorage.getItem('clearedActivityTimestamp');
+    // Intentar obtener timestamp específico del usuario admin, sino usar el global
+    const userSpecificKey = user?.id ? `clearedActivityTimestamp_${user.id}` : null;
+    const clearedTimestamp = userSpecificKey 
+      ? localStorage.getItem(userSpecificKey) || localStorage.getItem('clearedActivityTimestamp')
+      : localStorage.getItem('clearedActivityTimestamp');
     const clearedTime = clearedTimestamp ? parseInt(clearedTimestamp) : 0;
     const activities: any[] = [];
+    const seenOrderIds = new Set<string>(); // Para evitar duplicados de órdenes
     
-    // Últimas 5 órdenes
-    const recentOrders = [...orders]
+    // Eliminar duplicados de órdenes primero (por ID)
+    const uniqueOrders = orders.filter((order: Order, index: number, self: Order[]) => 
+      index === self.findIndex((o: Order) => o.id === order.id)
+    );
+    
+    // Últimas 5 órdenes (sin duplicados)
+    const recentOrders = [...uniqueOrders]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 5);
     
     recentOrders.forEach(order => {
       const orderTime = new Date(order.createdAt).getTime();
-      if (orderTime > clearedTime) {
+      // Filtrar órdenes automáticas de subastas finalizadas (no son acciones del usuario)
+      // Solo mostrar órdenes manuales de la tienda (type: 'store')
+      if (orderTime > clearedTime && !seenOrderIds.has(order.id) && order.type === 'store') {
+        seenOrderIds.add(order.id);
         activities.push({
+          id: order.id, // ID único para identificar duplicados
           type: 'order',
           message: `${order.userName} realizó un pedido de ${formatCurrency(order.amount)}`,
           time: order.createdAt,
@@ -475,15 +489,20 @@ const [auctionForm, setAuctionForm] = useState({
     });
     
     // Últimas 5 pujas
+    const seenBidKeys = new Set<string>(); // Para evitar duplicados de pujas
     const recentBids = auctions
       .flatMap((a: { bids: any[]; title: any; }) => a.bids?.map((b: any) => ({ ...b, auctionTitle: a.title })) || [])
       .sort((a: { createdAt: string | number | Date; }, b: { createdAt: string | number | Date; }) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 5);
     
-    recentBids.forEach((bid: { username: any; amount: number; auctionTitle: any; createdAt: any; }) => {
+    recentBids.forEach((bid: { username: any; amount: number; auctionTitle: any; createdAt: any; id?: string }) => {
       const bidTime = new Date(bid.createdAt).getTime();
-      if (bidTime > clearedTime) {
+      // Crear una clave única para la puja
+      const bidKey = bid.id || `${bid.username}-${bid.amount}-${bid.auctionTitle}-${bidTime}`;
+      if (bidTime > clearedTime && !seenBidKeys.has(bidKey)) {
+        seenBidKeys.add(bidKey);
         activities.push({
+          id: bid.id || bidKey,
           type: 'bid',
           message: `${bid.username} pujó ${formatCurrency(bid.amount)} en "${bid.auctionTitle}"`,
           time: bid.createdAt,
@@ -492,10 +511,18 @@ const [auctionForm, setAuctionForm] = useState({
       }
     });
     
-    return activities
+    // Eliminar duplicados finales por ID (por si acaso)
+    const uniqueActivities = activities.filter((activity, index, self) => 
+      index === self.findIndex((a) => a.id === activity.id)
+    );
+    
+    return uniqueActivities
       .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
       .slice(0, 10);
   };
+  
+  // Memoizar la actividad reciente para evitar recalcularla múltiples veces
+  const recentActivity = useMemo(() => getRecentActivity(), [orders, auctions, refreshKey]);
   
   const getAuctionsEndingSoon = () => {
     const now = new Date();
@@ -534,7 +561,8 @@ const [auctionForm, setAuctionForm] = useState({
   };
 
   useEffect(() => {
-    if (activeTab === 'users') {
+    // Cargar usuarios cuando se abre la pestaña de usuarios o mensajes
+    if (activeTab === 'users' || activeTab === 'messages') {
       loadUsers();
     }
   }, [activeTab]);
@@ -643,6 +671,11 @@ const [auctionForm, setAuctionForm] = useState({
     return;
   }
 
+  if (!user || !user.id) {
+    alert('Debes estar autenticado para crear/editar productos.');
+    return;
+  }
+
   try {
     if (editingProduct) {
       // EDITAR PRODUCTO EXISTENTE
@@ -661,10 +694,27 @@ const [auctionForm, setAuctionForm] = useState({
         updatedAt: new Date().toISOString()
       };
 
-      const updatedProducts: Product[] = products.map((p: Product) =>
-        p.id === editingProduct.id ? updatedProduct : p
-      );
-      setProducts(updatedProducts);
+      // Guardar en Firebase PRIMERO (requerido)
+      try {
+        console.log('🔥 Guardando producto actualizado en Firebase...');
+        await update(ref(realtimeDb, `products/${updatedProduct.id}`), updatedProduct);
+        console.log('✅ Producto actualizado en Firebase correctamente');
+        
+        // Solo actualizar estado local después de que Firebase confirme
+        // Firebase sincronizará automáticamente a todos los dispositivos
+        const updatedProducts: Product[] = products.map((p: Product) =>
+          p.id === editingProduct.id ? updatedProduct : p
+        );
+        setProducts(updatedProducts, true); // skipFirebaseSync = true porque ya se guardó
+      } catch (error) {
+        console.error('❌ Error guardando en Firebase:', error);
+        if (error instanceof Error) {
+          alert('❌ Error guardando en Firebase: ' + error.message + '\n\nLos cambios NO se guardaron. Verifica las reglas de Firebase Realtime Database.');
+        } else {
+          alert('❌ Error guardando en Firebase: Error desconocido\n\nLos cambios NO se guardaron.');
+        }
+        return; // No continuar si falla Firebase
+      }
       logProductAction('Producto actualizado', editingProduct.id, user?.id, user?.username, { name: productForm.name });
       alert('✅ Producto actualizado correctamente');
       setEditingProduct(null);
@@ -672,7 +722,7 @@ const [auctionForm, setAuctionForm] = useState({
 
     } else {
       // CREAR PRODUCTO NUEVO
-      const newProduct = {
+      const newProduct: Product = {
         ...productForm,
         id: `product_${Date.now()}`,
         createdAt: new Date().toISOString(),
@@ -682,9 +732,26 @@ const [auctionForm, setAuctionForm] = useState({
         stickers: productForm.stickers || []
       };
 
-      setProducts([...products, newProduct as Product]);
+      // Guardar en Firebase PRIMERO (requerido)
+      try {
+        console.log('🔥 Guardando producto nuevo en Firebase...');
+        await update(ref(realtimeDb, `products/${newProduct.id}`), newProduct);
+        console.log('✅ Producto guardado en Firebase correctamente');
+        
+        // Solo actualizar estado local después de que Firebase confirme
+        // Firebase sincronizará automáticamente a todos los dispositivos
+        setProducts([...products, newProduct], true); // skipFirebaseSync = true porque ya se guardó
+      } catch (error) {
+        console.error('❌ Error guardando en Firebase:', error);
+        if (error instanceof Error) {
+          alert('❌ Error guardando en Firebase: ' + error.message + '\n\nEl producto NO se guardó. Verifica las reglas de Firebase Realtime Database.');
+        } else {
+          alert('❌ Error guardando en Firebase: Error desconocido\n\nEl producto NO se guardó.');
+        }
+        return; // No continuar si falla Firebase
+      }
       logProductAction('Producto creado', newProduct.id, user?.id, user?.username, { name: productForm.name });
-      alert('✅ Producto creado correctamente');
+      alert('✅ Producto creado correctamente y disponible para todos los usuarios');
       
       // Resetear formulario
       setProductForm({
@@ -708,12 +775,30 @@ const [auctionForm, setAuctionForm] = useState({
   }
 };
 
-  const handleDeleteProduct = (productId: string) => {
+  const handleDeleteProduct = async (productId: string) => {
     const product = products.find((p: { id: string; }) => p.id === productId);
     if (window.confirm(`¿Estás seguro de eliminar "${product?.name}"?\n\nEsta acción no se puede deshacer.`)) {
-      const updatedProducts = products.filter((p: { id: string; }) => p.id !== productId);
-      setProducts(updatedProducts);
-      alert('🗑️ Producto eliminado correctamente');
+      // Eliminar de Firebase PRIMERO (requerido)
+      try {
+        console.log('🗑️ Eliminando producto de Firebase...');
+        await remove(ref(realtimeDb, `products/${productId}`));
+        console.log('✅ Producto eliminado de Firebase correctamente');
+        
+        // Solo eliminar del estado local después de que Firebase confirme
+        // Firebase sincronizará automáticamente a todos los dispositivos
+        const updatedProducts = products.filter((p: Product) => p.id !== productId);
+        setProducts(updatedProducts, true); // skipFirebaseSync = true porque ya se eliminó
+        logProductAction('Producto eliminado', productId, user?.id, user?.username, { name: product?.name || '' });
+        alert('🗑️ Producto eliminado correctamente');
+      } catch (error: any) {
+        console.error('❌ Error eliminando producto:', error);
+        if (error instanceof Error) {
+          alert('❌ Error eliminando de Firebase: ' + error.message + '\n\nEl producto NO se eliminó. Verifica las reglas de Firebase Realtime Database.');
+        } else {
+          alert('❌ Error eliminando de Firebase: Error desconocido\n\nEl producto NO se eliminó.');
+        }
+        // No continuar si falla Firebase
+      }
     }
   };
 
@@ -822,7 +907,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       // Editar antes de republicar
       handleEditAuction(auction);
     } else {
-      // Republicar tal como está
+      // Republicar tal como está - preservar todas las propiedades importantes
       const now = new Date();
       const endTime = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 días desde ahora
       
@@ -835,7 +920,15 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         bids: [], // Limpiar ofertas
         winnerId: undefined,
         currentPrice: auction.startingPrice,
-        createdAt: now
+        createdAt: now,
+        // Preservar explícitamente propiedades importantes
+        featured: auction.featured || false,
+        isFlash: auction.isFlash || false,
+        stickers: auction.stickers || [],
+        images: auction.images || [],
+        description: auction.description,
+        categoryId: auction.categoryId,
+        condition: auction.condition || 'new'
       };
 
       const updatedAuctions = [...auctions, republishedAuction];
@@ -915,18 +1008,32 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       const actionLogsBackup = localStorage.getItem('action_logs') || '[]';
       const ordersBackup = localStorage.getItem('orders') || '[]';
       
-      // 🔥 ELIMINAR TODAS LAS SUBASTAS DE FIREBASE
-      console.log('🔥 Eliminando todas las subastas de Firebase...');
+      // 🔥 ELIMINAR TODO DE FIREBASE REALTIME DATABASE
+      console.log('🔥 Eliminando todos los datos de Firebase...');
       try {
+        // Eliminar subastas
         const auctionsRef = ref(realtimeDb, 'auctions');
         await remove(auctionsRef);
         console.log('✅ Todas las subastas eliminadas de Firebase');
+        
+        // Eliminar productos
+        const productsRef = ref(realtimeDb, 'products');
+        await remove(productsRef);
+        console.log('✅ Todos los productos eliminados de Firebase');
+        
+        // Eliminar pedidos
+        const ordersRef = ref(realtimeDb, 'orders');
+        await remove(ordersRef);
+        console.log('✅ Todos los pedidos eliminados de Firebase');
       } catch (firebaseError) {
-        console.error('❌ Error eliminando subastas de Firebase:', firebaseError);
+        console.error('❌ Error eliminando datos de Firebase:', firebaseError);
+        if (firebaseError instanceof Error) {
+          alert('⚠️ Error eliminando de Firebase: ' + firebaseError.message + '\n\nAlgunos datos pueden no haberse eliminado correctamente.');
+        }
         // Continuar aunque falle Firebase
       }
       
-      // Limpiar todo de localStorage
+      // Limpiar todo de localStorage (ya no se usa, pero por si acaso)
       localStorage.removeItem('auctions');
       localStorage.removeItem('products');
       localStorage.removeItem('bots');
@@ -1818,12 +1925,71 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>
                 Actividad Reciente
               </h2>
-              {getRecentActivity().length > 0 && (
+              {recentActivity.length > 0 && (
                 <button
                   onClick={() => {
-                    localStorage.setItem('clearedActivityTimestamp', Date.now().toString());
-                    setRefreshKey(prev => prev + 1);
-                    logAdminAction('Actividad reciente limpiada', user?.id, user?.username);
+                    if (window.confirm('¿Estás seguro de que querés limpiar la actividad reciente?\n\nEsto eliminará permanentemente:\n- Órdenes completadas/canceladas antiguas\n- Pujas de subastas finalizadas\n\nLas órdenes activas y subastas en curso NO se eliminarán.')) {
+                      const now = Date.now();
+                      const clearedTimestamp = now.toString();
+                      
+                      // Guardar timestamp específico por usuario admin para persistencia
+                      if (user?.id) {
+                        localStorage.setItem(`clearedActivityTimestamp_${user.id}`, clearedTimestamp);
+                      }
+                      // También guardar en clave global para compatibilidad
+                      localStorage.setItem('clearedActivityTimestamp', clearedTimestamp);
+                      
+                      // Eliminar órdenes antiguas completadas/canceladas (más de 7 días)
+                      const cutoffDate = now - (7 * 24 * 60 * 60 * 1000); // 7 días
+                      const activeOrderStatuses = ['pending_payment', 'payment_confirmed', 'processing', 'preparing', 'in_transit', 'shipped'];
+                      
+                      const filteredOrders = orders.filter(order => {
+                        // Mantener órdenes activas siempre
+                        if (activeOrderStatuses.includes(order.status)) {
+                          return true;
+                        }
+                        // Mantener órdenes recientes (menos de 7 días)
+                        const orderDate = new Date(order.createdAt).getTime();
+                        if (orderDate >= cutoffDate) {
+                          return true;
+                        }
+                        // Eliminar órdenes antiguas completadas/canceladas
+                        return false;
+                      });
+                      
+                      if (filteredOrders.length < orders.length) {
+                        setOrders(filteredOrders);
+                        console.log(`🗑️ Eliminadas ${orders.length - filteredOrders.length} órdenes antiguas`);
+                      }
+                      
+                      // Limpiar pujas de subastas finalizadas antiguas (más de 7 días)
+                      const updatedAuctions = auctions.map(auction => {
+                        if (auction.status === 'ended') {
+                          const endTime = new Date(auction.endTime).getTime();
+                          const daysSinceEnd = (now - endTime) / (24 * 60 * 60 * 1000);
+                          
+                          // Si la subasta finalizó hace más de 7 días, limpiar pujas antiguas
+                          if (daysSinceEnd > 7 && auction.bids.length > 0) {
+                            // Mantener solo la puja ganadora si existe
+                            const winningBid = auction.bids.reduce((highest, current) => 
+                              current.amount > highest.amount ? current : highest
+                            );
+                            
+                            return {
+                              ...auction,
+                              bids: [winningBid]
+                            };
+                          }
+                        }
+                        return auction;
+                      });
+                      
+                      setAuctions(updatedAuctions);
+                      setRefreshKey(prev => prev + 1);
+                      logAdminAction('Actividad reciente limpiada permanentemente', user?.id, user?.username);
+                      
+                      alert(`✅ Actividad reciente limpiada\n\nEliminadas ${orders.length - filteredOrders.length} órdenes antiguas.`);
+                    }
                   }}
                   className="btn"
                   style={{
@@ -1843,13 +2009,13 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {getRecentActivity().length === 0 ? (
+              {recentActivity.length === 0 ? (
                 <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>
                   No hay actividad reciente
                 </p>
               ) : (
-                getRecentActivity().map((activity, idx) => (
-                  <div key={idx} style={{
+                recentActivity.map((activity) => (
+                  <div key={activity.id} style={{
                     padding: '1rem',
                     background: 'var(--bg-primary)',
                     borderRadius: '0.5rem',
@@ -4093,27 +4259,37 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 }}>
                   Seleccionar Usuario:
                 </label>
-                <select
-                  value={selectedUserForMessage || ''}
-                  onChange={(e) => setSelectedUserForMessage(e.target.value || null)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: '0.5rem',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-secondary)',
-                    color: 'var(--text-primary)',
-                    fontSize: '1rem',
-                    marginBottom: '0.5rem'
-                  }}
-                >
-                  <option value="">-- Seleccionar usuario --</option>
-                  {realUsers.map((u: any) => (
-                    <option key={u.id} value={u.id}>
-                      {u.username || u.displayName || u.email?.split('@')[0] || `Usuario ${u.id.slice(0, 8)}`}
-                    </option>
-                  ))}
-                </select>
+                {loadingUsers ? (
+                  <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    Cargando usuarios...
+                  </div>
+                ) : (
+                  <select
+                    value={selectedUserForMessage || ''}
+                    onChange={(e) => setSelectedUserForMessage(e.target.value || null)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-secondary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '1rem',
+                      marginBottom: '0.5rem'
+                    }}
+                  >
+                    <option value="">-- Seleccionar usuario --</option>
+                    {realUsers.length === 0 ? (
+                      <option value="" disabled>No hay usuarios disponibles</option>
+                    ) : (
+                      realUsers.map((u: any) => (
+                        <option key={u.id} value={u.id}>
+                          {u.username || u.displayName || u.email?.split('@')[0] || `Usuario ${u.id.slice(0, 8)}`}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                )}
                 {selectedUserForMessage && (
                   <button
                     onClick={() => {

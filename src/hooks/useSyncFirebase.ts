@@ -5,7 +5,7 @@ import { useStore } from '../store/useStore';
 import { Bid } from '../types';
 
 const useSyncFirebase = () => {
-  const { setAuctions, setProducts } = useStore();
+  const { setAuctions, setProducts, setOrders } = useStore();
 
   useEffect(() => {
     console.log('🔄 INICIANDO SINCRONIZACIÓN FIREBASE...');
@@ -84,17 +84,72 @@ const useSyncFirebase = () => {
       }
     });
 
-    // Sincronizar productos (opcional)
+    // Sincronizar productos desde Firebase
     const productsRef = ref(realtimeDb, 'products');
     const unsubscribeProducts = onValue(productsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        const productsArray = Object.keys(data).map(key => ({
-          id: key,
-          ...data[key]
-        }));
-        console.log('✅ Productos sincronizados:', productsArray.length);
-        setProducts(productsArray);
+        const productsArray = Object.keys(data).map(key => {
+          const productData = data[key];
+          return {
+            id: key,
+            name: productData?.name || '',
+            description: productData?.description || '',
+            images: productData?.images || [],
+            price: productData?.price || 0,
+            stock: productData?.stock || 0,
+            categoryId: productData?.categoryId || '1',
+            ratings: productData?.ratings || [],
+            averageRating: productData?.averageRating || 0,
+            badges: productData?.badges || [],
+            stickers: productData?.stickers || [],
+            active: productData?.active !== undefined ? productData.active : true,
+            featured: productData?.featured || false,
+            createdAt: productData?.createdAt || new Date().toISOString(),
+            updatedAt: productData?.updatedAt || productData?.createdAt || new Date().toISOString()
+          };
+        });
+        console.log('✅ Productos sincronizados desde Firebase:', productsArray.length);
+        setProducts(productsArray, true); // skipFirebaseSync = true para evitar bucle infinito
+      } else {
+        // Si no hay datos en Firebase, limpiar productos (no usar localStorage)
+        console.log('📭 Firebase - No hay productos');
+        setProducts([], true);
+      }
+    });
+
+    // Sincronizar pedidos desde Firebase
+    const ordersRef = ref(realtimeDb, 'orders');
+    const unsubscribeOrders = onValue(ordersRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const ordersArray = Object.keys(data).map(key => {
+          const orderData = data[key];
+          return {
+            id: key,
+            userId: orderData?.userId || '',
+            userName: orderData?.userName || '',
+            productId: orderData?.productId || '',
+            productName: orderData?.productName || '',
+            productImage: orderData?.productImage || '',
+            productType: orderData?.productType || 'store',
+            type: orderData?.type || 'store',
+            amount: orderData?.amount || 0,
+            status: orderData?.status || 'pending_payment',
+            deliveryMethod: orderData?.deliveryMethod || 'shipping',
+            createdAt: orderData?.createdAt ? new Date(orderData.createdAt) : new Date(),
+            expiresAt: orderData?.expiresAt ? new Date(orderData.expiresAt) : undefined,
+            paidAt: orderData?.paidAt ? new Date(orderData.paidAt) : undefined,
+            shippedAt: orderData?.shippedAt ? new Date(orderData.shippedAt) : undefined,
+            deliveredAt: orderData?.deliveredAt ? new Date(orderData.deliveredAt) : undefined,
+            address: orderData?.address || { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } }
+          };
+        });
+        console.log('✅ Pedidos sincronizados desde Firebase:', ordersArray.length);
+        setOrders(ordersArray);
+      } else {
+        console.log('📭 Firebase - No hay pedidos');
+        setOrders([]);
       }
     });
 
@@ -102,8 +157,9 @@ const useSyncFirebase = () => {
       console.log('🔴 Cerrando sincronización Firebase');
       unsubscribeAuctions();
       unsubscribeProducts();
+      unsubscribeOrders();
     };
-  }, [setAuctions, setProducts]);
+  }, [setAuctions, setProducts, setOrders]);
 
   return null;
 };

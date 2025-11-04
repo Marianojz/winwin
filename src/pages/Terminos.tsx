@@ -24,7 +24,7 @@ const Terminos = () => {
             Términos y Condiciones
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>
-            Última actualización: Octubre 2025
+            Última actualización: Noviembre 2025
           </p>
         </div>
 
@@ -66,7 +66,7 @@ const Terminos = () => {
               paddingBottom: '0.5rem',
               borderBottom: '2px solid var(--primary)'
             }}>
-              2. Registro de Usuario
+              2. Registro de Usuario y Publicación de Productos
             </h2>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
               Para participar en las subastas y realizar compras, deberás crear una cuenta proporcionando 
@@ -90,6 +90,15 @@ const Terminos = () => {
                 Proporcionar información veraz y actualizada, incluyendo DNI válido
               </li>
             </ul>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontWeight: 600 }}>
+              <strong>Publicación de Productos y Subastas:</strong>
+            </p>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+              Solo los administradores de la plataforma tienen la capacidad de publicar productos y crear 
+              subastas. Los usuarios regulares pueden participar ofertando en subastas existentes y realizar 
+              compras en la tienda, pero no pueden publicar contenido propio. Esta política asegura la calidad 
+              y verificación de todos los productos disponibles en la plataforma.
+            </p>
           </section>
 
           {/* Sección 3 */}
