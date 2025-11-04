@@ -43,7 +43,7 @@ function App() {
   }, [user?.id]); // Ejecutar solo cuando el usuario cambie
   
   return (
-    <Router>
+    <Router basename={import.meta.env.BASE_URL}>
       <div className="app">
         <Navbar />
         <AuctionManager />
