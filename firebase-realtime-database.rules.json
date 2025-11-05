@@ -14,8 +14,8 @@
     },
     "messages": {
       "$conversationId": {
-        ".read": "auth != null && (data.child('fromUserId').val() == auth.uid || data.child('toUserId').val() == auth.uid)",
-        ".write": "auth != null && (newData.child('fromUserId').val() == auth.uid || newData.child('toUserId').val() == auth.uid || auth.uid == 'admin')"
+        ".read": "auth != null && (data.child('fromUserId').val() == auth.uid || data.child('toUserId').val() == auth.uid || data.child('fromUserId').val() == 'admin' || data.child('toUserId').val() == 'admin')",
+        ".write": "auth != null"
       }
     },
     "homeConfig": {
@@ -39,15 +39,15 @@
       ".write": "auth != null && (auth.uid == 'admin' || root.child('users').child(auth.uid).child('isAdmin').val() == true)"
     },
     "action_logs": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": true,
+      ".write": true
     },
     "tracking_clicks": {
-      ".read": "auth != null",
+      ".read": true,
       ".write": true
     },
     "tracking_searches": {
-      ".read": "auth != null",
+      ".read": true,
       ".write": true
     }
   }

@@ -1,0 +1,63 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function para verificar si es admin (requiere Firestore)
+    function isAdmin() {
+      return request.auth != null && 
+             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    
+    // Imágenes de subastas - Lectura pública, escritura solo admins
+    match /auctions/{imageId} {
+      allow read: if true;
+      allow write: if request.auth != null && 
+                      isAdmin() &&
+                      request.resource.size < 5 * 1024 * 1024 && // 5MB máximo
+                      request.resource.contentType.matches('image/(jpeg|jpg|png|webp)');
+    }
+    
+    // Imágenes de productos - Lectura pública, escritura solo admins
+    match /products/{imageId} {
+      allow read: if true;
+      allow write: if request.auth != null && 
+                      isAdmin() &&
+                      request.resource.size < 5 * 1024 * 1024 && // 5MB máximo
+                      request.resource.contentType.matches('image/(jpeg|jpg|png|webp)');
+    }
+    
+    // Avatares de usuarios - Lectura pública, escritura solo el propio usuario
+    match /avatars/{userId}/{imageId} {
+      allow read: if true;
+      allow write: if request.auth != null && 
+                      request.auth.uid == userId &&
+                      request.resource.size < 2 * 1024 * 1024 && // 2MB máximo
+                      request.resource.contentType.matches('image/(jpeg|jpg|png|webp)');
+    }
+    
+    // Imágenes generales - Lectura pública, escritura solo admins
+    match /images/{imageId} {
+      allow read: if true;
+      allow write: if request.auth != null && 
+                      isAdmin() &&
+                      request.resource.size < 5 * 1024 * 1024 && // 5MB máximo
+                      request.resource.contentType.matches('image/(jpeg|jpg|png|webp)');
+    }
+    
+    // Banners y promociones - Lectura pública, escritura solo admins
+    match /banners/{imageId} {
+      allow read: if true;
+      allow write: if request.auth != null && 
+                      isAdmin() &&
+                      request.resource.size < 5 * 1024 * 1024 && // 5MB máximo
+                      request.resource.contentType.matches('image/(jpeg|jpg|png|webp)');
+    }
+    
+    // Denegar todo lo demás por defecto
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
