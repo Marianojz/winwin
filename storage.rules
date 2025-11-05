@@ -1,0 +1,53 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Imágenes de subastas - Lectura pública, escritura solo autenticados
+    match /auctions/{imageId} {
+      allow read: if true;
+      allow write: if request.auth != null && 
+                      request.resource.size < 5 * 1024 * 1024 && // 5MB máximo
+                      request.resource.contentType.matches('image/.*');
+    }
+    
+    // Imágenes de productos - Lectura pública, escritura solo autenticados
+    match /products/{imageId} {
+      allow read: if true;
+      allow write: if request.auth != null && 
+                      request.resource.size < 5 * 1024 * 1024 && // 5MB máximo
+                      request.resource.contentType.matches('image/.*');
+    }
+    
+    // Avatares de usuarios - Lectura pública, escritura solo el propio usuario
+    match /avatars/{userId}/{imageId} {
+      allow read: if true;
+      allow write: if request.auth != null && 
+                      request.auth.uid == userId &&
+                      request.resource.size < 2 * 1024 * 1024 && // 2MB máximo
+                      request.resource.contentType.matches('image/.*');
+    }
+    
+    // Imágenes generales - Lectura pública, escritura solo autenticados
+    match /images/{imageId} {
+      allow read: if true;
+      allow write: if request.auth != null && 
+                      request.resource.size < 5 * 1024 * 1024 && // 5MB máximo
+                      request.resource.contentType.matches('image/.*');
+    }
+    
+    // Banners y promociones - Lectura pública, escritura solo autenticados
+    match /banners/{imageId} {
+      allow read: if true;
+      allow write: if request.auth != null && 
+                      request.resource.size < 5 * 1024 * 1024 && // 5MB máximo
+                      request.resource.contentType.matches('image/.*');
+    }
+    
+    // Denegar todo lo demás por defecto
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

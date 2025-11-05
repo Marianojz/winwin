@@ -1,0 +1,55 @@
+{
+  "rules": {
+    "auctions": {
+      ".read": true,
+      ".write": true
+    },
+    "products": {
+      ".read": true,
+      ".write": true
+    },
+    "orders": {
+      ".read": true,
+      ".write": true
+    },
+    "messages": {
+      "$conversationId": {
+        ".read": "auth != null && (data.child('fromUserId').val() == auth.uid || data.child('toUserId').val() == auth.uid)",
+        ".write": "auth != null && (newData.child('fromUserId').val() == auth.uid || newData.child('toUserId').val() == auth.uid || auth.uid == 'admin')"
+      }
+    },
+    "homeConfig": {
+      ".read": true,
+      ".write": "auth != null && (auth.uid == 'admin' || root.child('users').child(auth.uid).child('isAdmin').val() == true)"
+    },
+    "notifications": {
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null"
+      }
+    },
+    "users": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+        ".write": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)"
+      }
+    },
+    "bots": {
+      ".read": true,
+      ".write": "auth != null && (auth.uid == 'admin' || root.child('users').child(auth.uid).child('isAdmin').val() == true)"
+    },
+    "action_logs": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "tracking_clicks": {
+      ".read": "auth != null",
+      ".write": true
+    },
+    "tracking_searches": {
+      ".read": "auth != null",
+      ".write": true
+    }
+  }
+}
+
