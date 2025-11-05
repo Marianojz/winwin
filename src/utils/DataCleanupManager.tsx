@@ -11,8 +11,11 @@ import { runCleanup } from './dataCleaner';
 const DataCleanupManager = () => {
   const { user, auctions, orders, setAuctions, setOrders } = useStore();
   const cleanupExecutedRef = useRef(false);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    
     if (!user) {
       console.log('🧹 DataCleanupManager: Esperando usuario...');
       return;
@@ -21,6 +24,8 @@ const DataCleanupManager = () => {
     console.log('🧹 DataCleanupManager: Usuario detectado, preparando limpieza...');
 
     const performCleanup = async () => {
+      // Verificar si el componente aún está montado
+      if (!isMountedRef.current) return;
       try {
         console.log('🧹 DataCleanupManager: Ejecutando limpieza...');
         // Obtener datos actuales del store
@@ -80,8 +85,10 @@ const DataCleanupManager = () => {
             }
           }
           
-          setAuctions(cleanedAuctions);
-          console.log(`✅ Subastas actualizadas: ${cleanedAuctions.length} restantes`);
+          if (isMountedRef.current) {
+            setAuctions(cleanedAuctions);
+            console.log(`✅ Subastas actualizadas: ${cleanedAuctions.length} restantes`);
+          }
         }
         
         // Actualizar pedidos si se limpiaron algunos
@@ -128,8 +135,10 @@ const DataCleanupManager = () => {
             }
           }
           
-          setOrders(cleanedOrders);
-          console.log(`✅ Pedidos actualizados: ${cleanedOrders.length} restantes`);
+          if (isMountedRef.current) {
+            setOrders(cleanedOrders);
+            console.log(`✅ Pedidos actualizados: ${cleanedOrders.length} restantes`);
+          }
         }
         
         // Recargar notificaciones para reflejar cambios
@@ -161,6 +170,7 @@ const DataCleanupManager = () => {
     }, 6 * 60 * 60 * 1000); // Cada 6 horas
 
     return () => {
+      isMountedRef.current = false;
       clearTimeout(initialTimer);
       clearInterval(interval);
       cleanupExecutedRef.current = false;
