@@ -1,9 +1,9 @@
 // Firebase Realtime Database imports
-import { ref, update, remove, onValue, set as firebaseSet } from 'firebase/database';
+import { ref, update, remove } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
 
 // Otras importaciones de Lucide, React, etc.
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Eye, Edit, Trash2, Users, Clock, AlertCircle, Activity, RefreshCw,
   Gavel, Package, Bot, DollarSign, Plus, XCircle,
@@ -34,6 +34,7 @@ import {
   createMessage,
   createAutoMessage,
   deleteConversation,
+  deleteAllConversations,
   deleteMessage
 } from '../utils/messages';
 import { Message, Conversation } from '../types';
@@ -53,7 +54,7 @@ import {
 const AdminPanel = (): React.ReactElement => {
   const { 
     user, auctions, products, bots, orders,
-    addBot, updateBot, deleteBot, setProducts, setAuctions, setBots, setOrders, updateOrderStatus, loadBots
+    addBot, updateBot, deleteBot, setProducts, setAuctions, setBots, setOrders, updateOrderStatus 
   } = useStore();
   
   // Estados principales
@@ -61,14 +62,6 @@ const AdminPanel = (): React.ReactElement => {
   const [realUsers, setRealUsers] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [refreshKey, setRefreshKey] = useState(0); // Para forzar re-render sin recargar
-  
-  // Cargar bots desde Firebase al montar el componente
-  useEffect(() => {
-    if (user?.isAdmin) {
-      loadBots();
-      console.log('✅ Cargando bots desde Firebase...');
-    }
-  }, [user?.isAdmin, loadBots]);
   
   // Limpiar duplicados de pedidos al montar el componente
   useEffect(() => {
@@ -84,53 +77,33 @@ const AdminPanel = (): React.ReactElement => {
   }, []); // Solo al montar
   
   // Estado para configuración del inicio
-  const [homeConfig, setHomeConfig] = useState<HomeConfig>(defaultHomeConfig);
-  
-  // Cargar homeConfig desde Firebase
-  useEffect(() => {
+  const [homeConfig, setHomeConfig] = useState<HomeConfig>(() => {
     try {
-      const homeConfigRef = ref(realtimeDb, 'homeConfig');
-      
-      const unsubscribe = onValue(homeConfigRef, (snapshot) => {
-        const data = snapshot.val();
-        
-        if (data) {
-          setHomeConfig({
-            ...defaultHomeConfig,
-            ...data,
-            siteSettings: data.siteSettings || defaultHomeConfig.siteSettings,
-            themeColors: data.themeColors || defaultHomeConfig.themeColors,
-            sectionTitles: data.sectionTitles || defaultHomeConfig.sectionTitles,
-            banners: data.banners?.map((b: any) => ({
-              ...b,
-              createdAt: b.createdAt ? new Date(b.createdAt) : new Date(),
-              updatedAt: b.updatedAt ? new Date(b.updatedAt) : undefined
-            })) || [],
-            promotions: data.promotions?.map((p: any) => ({
-              ...p,
-              createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
-              startDate: p.startDate ? new Date(p.startDate) : undefined,
-              endDate: p.endDate ? new Date(p.endDate) : undefined
-            })) || [],
-            aboutSection: data.aboutSection || defaultHomeConfig.aboutSection,
-            contactSection: data.contactSection || defaultHomeConfig.contactSection,
-            updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date()
-          });
-          console.log('✅ Configuración de home cargada desde Firebase');
-        } else {
-          setHomeConfig(defaultHomeConfig);
-        }
-      }, (error) => {
-        console.error('Error cargando configuración del inicio desde Firebase:', error);
-        setHomeConfig(defaultHomeConfig);
-      });
-      
-      return () => unsubscribe();
-    } catch (error) {
-      console.error('Error configurando listener de homeConfig:', error);
-      setHomeConfig(defaultHomeConfig);
+      const saved = localStorage.getItem('homeConfig');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Asegurar que banners y promotions tengan las fechas correctas
+        return {
+          ...parsed,
+          banners: parsed.banners?.map((b: any) => ({
+            ...b,
+            createdAt: b.createdAt ? new Date(b.createdAt) : new Date(),
+            updatedAt: b.updatedAt ? new Date(b.updatedAt) : undefined
+          })) || [],
+          promotions: parsed.promotions?.map((p: any) => ({
+            ...p,
+            createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
+            startDate: p.startDate ? new Date(p.startDate) : undefined,
+            endDate: p.endDate ? new Date(p.endDate) : undefined
+          })) || [],
+          updatedAt: parsed.updatedAt ? new Date(parsed.updatedAt) : new Date()
+        };
+      }
+      return defaultHomeConfig;
+    } catch {
+      return defaultHomeConfig;
     }
-  }, []);
+  });
 
   // Estados para templates de mensajes
   const [messageTemplates, setMessageTemplates] = useState<MessageTemplate[]>(() => loadMessageTemplates());
@@ -147,85 +120,55 @@ const AdminPanel = (): React.ReactElement => {
   const [selectedUserForMessage, setSelectedUserForMessage] = useState<string | null>(null);
   const isMobile = useIsMobile();
   
-  // Cargar conversaciones y contador en tiempo real
+  // Cargar conversaciones y contador
   useEffect(() => {
-    if (activeTab === 'messages') {
-      // Escuchar conversaciones en tiempo real
-      const unsubscribeConversations = getAllConversations((conversations) => {
-        setConversations(conversations);
-      });
-      
-      // Escuchar contador de no leídos en tiempo real
-      const unsubscribeUnread = getAdminUnreadCount((count) => {
-        setAdminUnreadCount(count);
-      });
-      
-      return () => {
-        unsubscribeConversations();
-        unsubscribeUnread();
-      };
-    } else {
-      setConversations([]);
-      setAdminUnreadCount(0);
-    }
+    let unsubscribeConversations: (() => void) | null = null;
+    let unsubscribeUnread: (() => void) | null = null;
+
+    // Configurar listeners en tiempo real
+    unsubscribeConversations = getAllConversations((conversations) => {
+      setConversations(conversations || []);
+    });
+
+    unsubscribeUnread = getAdminUnreadCount((count) => {
+      setAdminUnreadCount(typeof count === 'number' ? count : 0);
+    });
+
+    // Cleanup al desmontar o cambiar de tab
+    return () => {
+      if (unsubscribeConversations) unsubscribeConversations();
+      if (unsubscribeUnread) unsubscribeUnread();
+    };
   }, [activeTab]);
   
-  // Cargar mensajes de conversación seleccionada en tiempo real
+  // Cargar mensajes de conversación seleccionada
   useEffect(() => {
     let unsubscribeMessages: (() => void) | null = null;
-    
+    let unsubscribeUnread: (() => void) | null = null;
+
     if (selectedConversation) {
-      // Escuchar mensajes en tiempo real
       unsubscribeMessages = getMessages(selectedConversation, (messages) => {
-        setConversationMessages(messages);
-        // Marcar como leídos cuando se cargan
-        markMessagesAsRead(selectedConversation, 'admin');
-        
-        // Auto-scroll al final cuando hay nuevos mensajes
-        setTimeout(() => {
-          const container = document.getElementById('admin-messages-container');
-          if (container) {
-            container.scrollTop = container.scrollHeight;
-          }
-        }, 100);
+        setConversationMessages(messages || []);
+      });
+      // Marcar como leídos cuando se abre la conversación
+      markMessagesAsRead(selectedConversation, 'admin');
+      unsubscribeUnread = getAdminUnreadCount((count) => {
+        setAdminUnreadCount(typeof count === 'number' ? count : 0);
       });
     } else if (selectedUserForMessage) {
       // Si hay usuario seleccionado para mensaje nuevo, cargar sus mensajes
       const convId = `admin_${selectedUserForMessage}`;
       unsubscribeMessages = getMessages(convId, (messages) => {
-        setConversationMessages(messages);
-        
-        // Auto-scroll al final
-        setTimeout(() => {
-          const container = document.getElementById('admin-messages-container');
-          if (container) {
-            container.scrollTop = container.scrollHeight;
-          }
-        }, 100);
+        setConversationMessages(messages || []);
       });
       setSelectedConversation(convId);
-    } else {
-      setConversationMessages([]);
     }
-    
+
     return () => {
-      if (unsubscribeMessages) {
-        unsubscribeMessages();
-      }
+      if (unsubscribeMessages) unsubscribeMessages();
+      if (unsubscribeUnread) unsubscribeUnread();
     };
   }, [selectedConversation, selectedUserForMessage]);
-  
-  // Auto-scroll cuando se envía un mensaje
-  useEffect(() => {
-    if (conversationMessages.length > 0) {
-      setTimeout(() => {
-        const container = document.getElementById('admin-messages-container');
-        if (container) {
-          container.scrollTop = container.scrollHeight;
-        }
-      }, 100);
-    }
-  }, [conversationMessages.length]);
   // ============================================
   // FUNCIONES PARA CREAR SUBASTA
   // ============================================
@@ -533,33 +476,19 @@ const [auctionForm, setAuctionForm] = useState({
   };
   
   const getRecentActivity = () => {
-    // Intentar obtener timestamp específico del usuario admin, sino usar el global
-    const userSpecificKey = user?.id ? `clearedActivityTimestamp_${user.id}` : null;
-    const clearedTimestamp = userSpecificKey 
-      ? localStorage.getItem(userSpecificKey) || localStorage.getItem('clearedActivityTimestamp')
-      : localStorage.getItem('clearedActivityTimestamp');
+    const clearedTimestamp = localStorage.getItem('clearedActivityTimestamp');
     const clearedTime = clearedTimestamp ? parseInt(clearedTimestamp) : 0;
     const activities: any[] = [];
-    const seenOrderIds = new Set<string>(); // Para evitar duplicados de órdenes
     
-    // Eliminar duplicados de órdenes primero (por ID)
-    const uniqueOrders = orders.filter((order: Order, index: number, self: Order[]) => 
-      index === self.findIndex((o: Order) => o.id === order.id)
-    );
-    
-    // Últimas 5 órdenes (sin duplicados)
-    const recentOrders = [...uniqueOrders]
+    // Últimas 5 órdenes
+    const recentOrders = [...orders]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 5);
     
     recentOrders.forEach(order => {
       const orderTime = new Date(order.createdAt).getTime();
-      // Filtrar órdenes automáticas de subastas finalizadas (no son acciones del usuario)
-      // Solo mostrar órdenes manuales de la tienda (type: 'store')
-      if (orderTime > clearedTime && !seenOrderIds.has(order.id) && order.type === 'store') {
-        seenOrderIds.add(order.id);
+      if (orderTime > clearedTime) {
         activities.push({
-          id: order.id, // ID único para identificar duplicados
           type: 'order',
           message: `${order.userName} realizó un pedido de ${formatCurrency(order.amount)}`,
           time: order.createdAt,
@@ -569,20 +498,15 @@ const [auctionForm, setAuctionForm] = useState({
     });
     
     // Últimas 5 pujas
-    const seenBidKeys = new Set<string>(); // Para evitar duplicados de pujas
     const recentBids = auctions
       .flatMap((a: { bids: any[]; title: any; }) => a.bids?.map((b: any) => ({ ...b, auctionTitle: a.title })) || [])
       .sort((a: { createdAt: string | number | Date; }, b: { createdAt: string | number | Date; }) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 5);
     
-    recentBids.forEach((bid: { username: any; amount: number; auctionTitle: any; createdAt: any; id?: string }) => {
+    recentBids.forEach((bid: { username: any; amount: number; auctionTitle: any; createdAt: any; }) => {
       const bidTime = new Date(bid.createdAt).getTime();
-      // Crear una clave única para la puja
-      const bidKey = bid.id || `${bid.username}-${bid.amount}-${bid.auctionTitle}-${bidTime}`;
-      if (bidTime > clearedTime && !seenBidKeys.has(bidKey)) {
-        seenBidKeys.add(bidKey);
+      if (bidTime > clearedTime) {
         activities.push({
-          id: bid.id || bidKey,
           type: 'bid',
           message: `${bid.username} pujó ${formatCurrency(bid.amount)} en "${bid.auctionTitle}"`,
           time: bid.createdAt,
@@ -591,18 +515,10 @@ const [auctionForm, setAuctionForm] = useState({
       }
     });
     
-    // Eliminar duplicados finales por ID (por si acaso)
-    const uniqueActivities = activities.filter((activity, index, self) => 
-      index === self.findIndex((a) => a.id === activity.id)
-    );
-    
-    return uniqueActivities
+    return activities
       .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
       .slice(0, 10);
   };
-  
-  // Memoizar la actividad reciente para evitar recalcularla múltiples veces
-  const recentActivity = useMemo(() => getRecentActivity(), [orders, auctions, refreshKey]);
   
   const getAuctionsEndingSoon = () => {
     const now = new Date();
@@ -641,8 +557,7 @@ const [auctionForm, setAuctionForm] = useState({
   };
 
   useEffect(() => {
-    // Cargar usuarios cuando se abre la pestaña de usuarios o mensajes
-    if (activeTab === 'users' || activeTab === 'messages') {
+    if (activeTab === 'users') {
       loadUsers();
     }
   }, [activeTab]);
@@ -751,11 +666,6 @@ const [auctionForm, setAuctionForm] = useState({
     return;
   }
 
-  if (!user || !user.id) {
-    alert('Debes estar autenticado para crear/editar productos.');
-    return;
-  }
-
   try {
     if (editingProduct) {
       // EDITAR PRODUCTO EXISTENTE
@@ -774,27 +684,10 @@ const [auctionForm, setAuctionForm] = useState({
         updatedAt: new Date().toISOString()
       };
 
-      // Guardar en Firebase PRIMERO (requerido)
-      try {
-        console.log('🔥 Guardando producto actualizado en Firebase...');
-        await update(ref(realtimeDb, `products/${updatedProduct.id}`), updatedProduct);
-        console.log('✅ Producto actualizado en Firebase correctamente');
-        
-        // Solo actualizar estado local después de que Firebase confirme
-        // Firebase sincronizará automáticamente a todos los dispositivos
-        const updatedProducts: Product[] = products.map((p: Product) =>
-          p.id === editingProduct.id ? updatedProduct : p
-        );
-        setProducts(updatedProducts, true); // skipFirebaseSync = true porque ya se guardó
-      } catch (error) {
-        console.error('❌ Error guardando en Firebase:', error);
-        if (error instanceof Error) {
-          alert('❌ Error guardando en Firebase: ' + error.message + '\n\nLos cambios NO se guardaron. Verifica las reglas de Firebase Realtime Database.');
-        } else {
-          alert('❌ Error guardando en Firebase: Error desconocido\n\nLos cambios NO se guardaron.');
-        }
-        return; // No continuar si falla Firebase
-      }
+      const updatedProducts: Product[] = products.map((p: Product) =>
+        p.id === editingProduct.id ? updatedProduct : p
+      );
+      setProducts(updatedProducts);
       logProductAction('Producto actualizado', editingProduct.id, user?.id, user?.username, { name: productForm.name });
       alert('✅ Producto actualizado correctamente');
       setEditingProduct(null);
@@ -802,7 +695,7 @@ const [auctionForm, setAuctionForm] = useState({
 
     } else {
       // CREAR PRODUCTO NUEVO
-      const newProduct: Product = {
+      const newProduct = {
         ...productForm,
         id: `product_${Date.now()}`,
         createdAt: new Date().toISOString(),
@@ -812,26 +705,9 @@ const [auctionForm, setAuctionForm] = useState({
         stickers: productForm.stickers || []
       };
 
-      // Guardar en Firebase PRIMERO (requerido)
-      try {
-        console.log('🔥 Guardando producto nuevo en Firebase...');
-        await update(ref(realtimeDb, `products/${newProduct.id}`), newProduct);
-        console.log('✅ Producto guardado en Firebase correctamente');
-        
-        // Solo actualizar estado local después de que Firebase confirme
-        // Firebase sincronizará automáticamente a todos los dispositivos
-        setProducts([...products, newProduct], true); // skipFirebaseSync = true porque ya se guardó
-      } catch (error) {
-        console.error('❌ Error guardando en Firebase:', error);
-        if (error instanceof Error) {
-          alert('❌ Error guardando en Firebase: ' + error.message + '\n\nEl producto NO se guardó. Verifica las reglas de Firebase Realtime Database.');
-        } else {
-          alert('❌ Error guardando en Firebase: Error desconocido\n\nEl producto NO se guardó.');
-        }
-        return; // No continuar si falla Firebase
-      }
+      setProducts([...products, newProduct as Product]);
       logProductAction('Producto creado', newProduct.id, user?.id, user?.username, { name: productForm.name });
-      alert('✅ Producto creado correctamente y disponible para todos los usuarios');
+      alert('✅ Producto creado correctamente');
       
       // Resetear formulario
       setProductForm({
@@ -855,30 +731,12 @@ const [auctionForm, setAuctionForm] = useState({
   }
 };
 
-  const handleDeleteProduct = async (productId: string) => {
+  const handleDeleteProduct = (productId: string) => {
     const product = products.find((p: { id: string; }) => p.id === productId);
     if (window.confirm(`¿Estás seguro de eliminar "${product?.name}"?\n\nEsta acción no se puede deshacer.`)) {
-      // Eliminar de Firebase PRIMERO (requerido)
-      try {
-        console.log('🗑️ Eliminando producto de Firebase...');
-        await remove(ref(realtimeDb, `products/${productId}`));
-        console.log('✅ Producto eliminado de Firebase correctamente');
-        
-        // Solo eliminar del estado local después de que Firebase confirme
-        // Firebase sincronizará automáticamente a todos los dispositivos
-        const updatedProducts = products.filter((p: Product) => p.id !== productId);
-        setProducts(updatedProducts, true); // skipFirebaseSync = true porque ya se eliminó
-        logProductAction('Producto eliminado', productId, user?.id, user?.username, { name: product?.name || '' });
-        alert('🗑️ Producto eliminado correctamente');
-      } catch (error: any) {
-        console.error('❌ Error eliminando producto:', error);
-        if (error instanceof Error) {
-          alert('❌ Error eliminando de Firebase: ' + error.message + '\n\nEl producto NO se eliminó. Verifica las reglas de Firebase Realtime Database.');
-        } else {
-          alert('❌ Error eliminando de Firebase: Error desconocido\n\nEl producto NO se eliminó.');
-        }
-        // No continuar si falla Firebase
-      }
+      const updatedProducts = products.filter((p: { id: string; }) => p.id !== productId);
+      setProducts(updatedProducts);
+      alert('🗑️ Producto eliminado correctamente');
     }
   };
 
@@ -987,7 +845,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       // Editar antes de republicar
       handleEditAuction(auction);
     } else {
-      // Republicar tal como está - preservar todas las propiedades importantes
+      // Republicar tal como está
       const now = new Date();
       const endTime = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 días desde ahora
       
@@ -1000,15 +858,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         bids: [], // Limpiar ofertas
         winnerId: undefined,
         currentPrice: auction.startingPrice,
-        createdAt: now,
-        // Preservar explícitamente propiedades importantes
-        featured: auction.featured || false,
-        isFlash: auction.isFlash || false,
-        stickers: auction.stickers || [],
-        images: auction.images || [],
-        description: auction.description,
-        categoryId: auction.categoryId,
-        condition: auction.condition || 'new'
+        createdAt: now
       };
 
       const updatedAuctions = [...auctions, republishedAuction];
@@ -1088,32 +938,18 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       const actionLogsBackup = localStorage.getItem('action_logs') || '[]';
       const ordersBackup = localStorage.getItem('orders') || '[]';
       
-      // 🔥 ELIMINAR TODO DE FIREBASE REALTIME DATABASE
-      console.log('🔥 Eliminando todos los datos de Firebase...');
+      // 🔥 ELIMINAR TODAS LAS SUBASTAS DE FIREBASE
+      console.log('🔥 Eliminando todas las subastas de Firebase...');
       try {
-        // Eliminar subastas
         const auctionsRef = ref(realtimeDb, 'auctions');
         await remove(auctionsRef);
         console.log('✅ Todas las subastas eliminadas de Firebase');
-        
-        // Eliminar productos
-        const productsRef = ref(realtimeDb, 'products');
-        await remove(productsRef);
-        console.log('✅ Todos los productos eliminados de Firebase');
-        
-        // Eliminar pedidos
-        const ordersRef = ref(realtimeDb, 'orders');
-        await remove(ordersRef);
-        console.log('✅ Todos los pedidos eliminados de Firebase');
       } catch (firebaseError) {
-        console.error('❌ Error eliminando datos de Firebase:', firebaseError);
-        if (firebaseError instanceof Error) {
-          alert('⚠️ Error eliminando de Firebase: ' + firebaseError.message + '\n\nAlgunos datos pueden no haberse eliminado correctamente.');
-        }
+        console.error('❌ Error eliminando subastas de Firebase:', firebaseError);
         // Continuar aunque falle Firebase
       }
       
-      // Limpiar todo de localStorage (ya no se usa, pero por si acaso)
+      // Limpiar todo de localStorage
       localStorage.removeItem('auctions');
       localStorage.removeItem('products');
       localStorage.removeItem('bots');
@@ -1276,79 +1112,44 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
   }, [activeTab, enhancedStats]);
 
   // Función para enviar mensaje
-  const handleSendMessage = async () => {
+  const handleSendMessage = () => {
+    let userId: string;
+    
+    if (selectedUserForMessage) {
+      // Nuevo mensaje a usuario seleccionado
+      userId = selectedUserForMessage;
+      const message = createMessage('admin', 'Administrador', userId, newMessageContent.trim());
+      saveMessage(message);
+      
+      // Si no existe conversación, crearla seleccionándola
+      if (!conversations.find(c => c.id === `admin_${userId}`)) {
+        // El listener en tiempo real actualizará automáticamente las conversaciones
+        setSelectedConversation(`admin_${userId}`);
+      }
+      setSelectedUserForMessage(null);
+      setShowUserSelector(false);
+    } else if (selectedConversation) {
+      // Mensaje a conversación existente
+      userId = selectedConversation.split('_')[1];
+      const message = createMessage('admin', 'Administrador', userId, newMessageContent.trim());
+      saveMessage(message);
+    } else {
+      return;
+    }
+    
     if (!newMessageContent.trim()) return;
     
-    try {
-      let userId: string;
-      
-      if (selectedUserForMessage) {
-        // Nuevo mensaje a usuario seleccionado
-        userId = selectedUserForMessage;
-        const message = createMessage('admin', 'Administrador', userId, newMessageContent.trim());
-        await saveMessage(message);
-        
-        // Seleccionar la conversación si no está seleccionada
-        const convId = `admin_${userId}`;
-        if (!selectedConversation) {
-          setSelectedConversation(convId);
-        }
-        setSelectedUserForMessage(null);
-        setShowUserSelector(false);
-      } else if (selectedConversation) {
-        // Responder a conversación existente
-        userId = selectedConversation.replace('admin_', '');
-        const message = createMessage('admin', 'Administrador', userId, newMessageContent.trim());
-        await saveMessage(message);
-      } else {
-        console.warn('No hay conversación o usuario seleccionado');
-        return;
-      }
-      
-      setNewMessageContent('');
-      // El mensaje aparecerá automáticamente gracias al listener en tiempo real
-      console.log('✅ Mensaje enviado correctamente');
-    } catch (error) {
-      console.error('❌ Error enviando mensaje:', error);
-      alert('❌ Error al enviar el mensaje. Por favor, intentá nuevamente.');
-    }
+    setNewMessageContent('');
+    // Los listeners en tiempo real actualizarán automáticamente los mensajes y el contador
   };
 
   // Función para guardar configuración de home
-  const handleSaveHomeConfig = async () => {
-    try {
-      const updatedConfig = { 
-        ...homeConfig, 
-        updatedAt: new Date().toISOString(),
-        siteSettings: homeConfig.siteSettings || defaultHomeConfig.siteSettings,
-        themeColors: homeConfig.themeColors || defaultHomeConfig.themeColors,
-        sectionTitles: homeConfig.sectionTitles || defaultHomeConfig.sectionTitles,
-        banners: homeConfig.banners.map(b => ({
-          ...b,
-          createdAt: b.createdAt instanceof Date ? b.createdAt.toISOString() : b.createdAt,
-          updatedAt: b.updatedAt instanceof Date ? b.updatedAt.toISOString() : b.updatedAt
-        })),
-        promotions: homeConfig.promotions.map(p => ({
-          ...p,
-          createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
-          startDate: p.startDate instanceof Date ? p.startDate.toISOString() : (p.startDate || undefined),
-          endDate: p.endDate instanceof Date ? p.endDate.toISOString() : (p.endDate || undefined)
-        })),
-        aboutSection: homeConfig.aboutSection || defaultHomeConfig.aboutSection,
-        contactSection: homeConfig.contactSection || defaultHomeConfig.contactSection
-      };
-      
-      // Guardar en Firebase
-      const homeConfigRef = ref(realtimeDb, 'homeConfig');
-      await firebaseSet(homeConfigRef, updatedConfig);
-      
-      setHomeConfig(homeConfig); // Actualizar estado local
-      await logAdminAction('Configuración de home guardada', user?.id, user?.username);
-      alert('✅ Configuración del inicio guardada correctamente en Firebase');
-    } catch (error) {
-      console.error('❌ Error guardando configuración de home en Firebase:', error);
-      alert('❌ Error al guardar la configuración. Por favor, intenta nuevamente.');
-    }
+  const handleSaveHomeConfig = () => {
+    const updatedConfig = { ...homeConfig, updatedAt: new Date() };
+    localStorage.setItem('homeConfig', JSON.stringify(updatedConfig));
+    setHomeConfig(updatedConfig);
+    logAdminAction('Configuración de home guardada', user?.id, user?.username);
+    alert('✅ Configuración del inicio guardada correctamente');
   };
 
   // Funciones para gestión de banners
@@ -2036,71 +1837,12 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>
                 Actividad Reciente
               </h2>
-              {recentActivity.length > 0 && (
+              {getRecentActivity().length > 0 && (
                 <button
                   onClick={() => {
-                    if (window.confirm('¿Estás seguro de que querés limpiar la actividad reciente?\n\nEsto eliminará permanentemente:\n- Órdenes completadas/canceladas antiguas\n- Pujas de subastas finalizadas\n\nLas órdenes activas y subastas en curso NO se eliminarán.')) {
-                      const now = Date.now();
-                      const clearedTimestamp = now.toString();
-                      
-                      // Guardar timestamp específico por usuario admin para persistencia
-                      if (user?.id) {
-                        localStorage.setItem(`clearedActivityTimestamp_${user.id}`, clearedTimestamp);
-                      }
-                      // También guardar en clave global para compatibilidad
-                      localStorage.setItem('clearedActivityTimestamp', clearedTimestamp);
-                      
-                      // Eliminar órdenes antiguas completadas/canceladas (más de 7 días)
-                      const cutoffDate = now - (7 * 24 * 60 * 60 * 1000); // 7 días
-                      const activeOrderStatuses = ['pending_payment', 'payment_confirmed', 'processing', 'preparing', 'in_transit', 'shipped'];
-                      
-                      const filteredOrders = orders.filter(order => {
-                        // Mantener órdenes activas siempre
-                        if (activeOrderStatuses.includes(order.status)) {
-                          return true;
-                        }
-                        // Mantener órdenes recientes (menos de 7 días)
-                        const orderDate = new Date(order.createdAt).getTime();
-                        if (orderDate >= cutoffDate) {
-                          return true;
-                        }
-                        // Eliminar órdenes antiguas completadas/canceladas
-                        return false;
-                      });
-                      
-                      if (filteredOrders.length < orders.length) {
-                        setOrders(filteredOrders);
-                        console.log(`🗑️ Eliminadas ${orders.length - filteredOrders.length} órdenes antiguas`);
-                      }
-                      
-                      // Limpiar pujas de subastas finalizadas antiguas (más de 7 días)
-                      const updatedAuctions = auctions.map(auction => {
-                        if (auction.status === 'ended') {
-                          const endTime = new Date(auction.endTime).getTime();
-                          const daysSinceEnd = (now - endTime) / (24 * 60 * 60 * 1000);
-                          
-                          // Si la subasta finalizó hace más de 7 días, limpiar pujas antiguas
-                          if (daysSinceEnd > 7 && auction.bids.length > 0) {
-                            // Mantener solo la puja ganadora si existe
-                            const winningBid = auction.bids.reduce((highest, current) => 
-                              current.amount > highest.amount ? current : highest
-                            );
-                            
-                            return {
-                              ...auction,
-                              bids: [winningBid]
-                            };
-                          }
-                        }
-                        return auction;
-                      });
-                      
-                      setAuctions(updatedAuctions);
-                      setRefreshKey(prev => prev + 1);
-                      logAdminAction('Actividad reciente limpiada permanentemente', user?.id, user?.username);
-                      
-                      alert(`✅ Actividad reciente limpiada\n\nEliminadas ${orders.length - filteredOrders.length} órdenes antiguas.`);
-                    }
+                    localStorage.setItem('clearedActivityTimestamp', Date.now().toString());
+                    setRefreshKey(prev => prev + 1);
+                    logAdminAction('Actividad reciente limpiada', user?.id, user?.username);
                   }}
                   className="btn"
                   style={{
@@ -2120,13 +1862,13 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {recentActivity.length === 0 ? (
+              {getRecentActivity().length === 0 ? (
                 <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>
                   No hay actividad reciente
                 </p>
               ) : (
-                recentActivity.map((activity) => (
-                  <div key={activity.id} style={{
+                getRecentActivity().map((activity, idx) => (
+                  <div key={idx} style={{
                     padding: '1rem',
                     background: 'var(--bg-primary)',
                     borderRadius: '0.5rem',
@@ -4370,37 +4112,27 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 }}>
                   Seleccionar Usuario:
                 </label>
-                {loadingUsers ? (
-                  <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    Cargando usuarios...
-                  </div>
-                ) : (
-                  <select
-                    value={selectedUserForMessage || ''}
-                    onChange={(e) => setSelectedUserForMessage(e.target.value || null)}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-secondary)',
-                      color: 'var(--text-primary)',
-                      fontSize: '1rem',
-                      marginBottom: '0.5rem'
-                    }}
-                  >
-                    <option value="">-- Seleccionar usuario --</option>
-                    {realUsers.length === 0 ? (
-                      <option value="" disabled>No hay usuarios disponibles</option>
-                    ) : (
-                      realUsers.map((u: any) => (
-                        <option key={u.id} value={u.id}>
-                          {u.username || u.displayName || u.email?.split('@')[0] || `Usuario ${u.id.slice(0, 8)}`}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                )}
+                <select
+                  value={selectedUserForMessage || ''}
+                  onChange={(e) => setSelectedUserForMessage(e.target.value || null)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-secondary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '1rem',
+                    marginBottom: '0.5rem'
+                  }}
+                >
+                  <option value="">-- Seleccionar usuario --</option>
+                  {realUsers.map((u: any) => (
+                    <option key={u.id} value={u.id}>
+                      {u.username || u.displayName || u.email?.split('@')[0] || `Usuario ${u.id.slice(0, 8)}`}
+                    </option>
+                  ))}
+                </select>
                 {selectedUserForMessage && (
                   <button
                     onClick={() => {
@@ -4504,11 +4236,11 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     {selectedConversation && (
                       <button
-                        onClick={async () => {
+                        onClick={() => {
                           if (window.confirm('¿Eliminar esta conversación completa?')) {
-                            await deleteConversation(selectedConversation);
+                            deleteConversation(selectedConversation);
                             setSelectedConversation(null);
-                            // Las conversaciones se actualizarán automáticamente por el listener
+                            // El listener en tiempo real actualizará automáticamente las conversaciones
                           }
                         }}
                         className="btn btn-danger"
@@ -4527,19 +4259,15 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                     )}
                   </div>
                 </div>
-                <div 
-                  id="admin-messages-container"
-                  style={{
-                    flex: 1,
-                    padding: isMobile ? '0.75rem' : '1rem',
-                    overflowY: 'auto',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '1rem',
-                    minHeight: '200px',
-                    scrollBehavior: 'smooth'
-                  }}
-                >
+                <div style={{
+                  flex: 1,
+                  padding: isMobile ? '0.75rem' : '1rem',
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem',
+                  minHeight: '200px'
+                }}>
                   {conversationMessages.length === 0 ? (
                     <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem', fontSize: isMobile ? '0.875rem' : '1rem' }}>
                       No hay mensajes en esta conversación
@@ -4577,11 +4305,10 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                                 </p>
                               </div>
                               <button
-                                onClick={async () => {
+                                onClick={() => {
                                   if (window.confirm('¿Eliminar este mensaje?')) {
-                                    const convId = selectedConversation || `admin_${selectedUserForMessage}`;
-                                    await deleteMessage(convId, msg.id);
-                                    // Los mensajes se actualizarán automáticamente por el listener
+                                    deleteMessage(msg.conversationId, msg.id);
+                                    // Los listeners en tiempo real actualizarán automáticamente los mensajes y conversaciones
                                   }
                                 }}
                                 style={{
@@ -4611,84 +4338,48 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 <div style={{
                   padding: isMobile ? '0.75rem' : '1rem',
                   borderTop: '1px solid var(--border)',
-                  background: 'var(--bg-tertiary)'
+                  display: 'flex',
+                  gap: '0.5rem',
+                  flexWrap: isMobile ? 'wrap' : 'nowrap'
                 }}>
-                  <div style={{ 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    gap: '0.5rem',
-                    marginBottom: '0.5rem'
-                  }}>
-                    <label style={{ 
-                      fontSize: '0.875rem', 
-                      color: 'var(--text-secondary)', 
-                      fontWeight: 600 
-                    }}>
-                      Escribí tu respuesta:
-                    </label>
-                    <textarea
-                      value={newMessageContent}
-                      onChange={(e) => setNewMessageContent(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && e.ctrlKey) {
-                          e.preventDefault();
-                          handleSendMessage();
-                        }
-                      }}
-                      placeholder="Escribí tu mensaje aquí... (Ctrl+Enter para enviar)"
-                      rows={3}
-                      style={{
-                        width: '100%',
-                        padding: isMobile ? '0.75rem' : '0.875rem 1rem',
-                        borderRadius: '0.75rem',
-                        border: '2px solid var(--border)',
-                        background: 'var(--bg-primary)',
-                        color: 'var(--text-primary)',
-                        fontSize: isMobile ? '16px' : '0.9375rem',
-                        resize: 'vertical',
-                        minHeight: '80px',
-                        fontFamily: 'inherit',
-                        lineHeight: '1.5'
-                      }}
-                    />
-                    <div style={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
+                  <input
+                    type="text"
+                    value={newMessageContent}
+                    onChange={(e) => setNewMessageContent(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                    placeholder="Escribí un mensaje..."
+                    style={{
+                      flex: 1,
+                      padding: isMobile ? '0.75rem' : '0.875rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: isMobile ? '16px' : '1rem', // 16px para evitar zoom en iOS
+                      minWidth: 0
+                    }}
+                  />
+                  <button
+                    onClick={handleSendMessage}
+                    className="btn btn-primary"
+                    disabled={!newMessageContent.trim() || (!selectedConversation && !selectedUserForMessage)}
+                    style={{ 
+                      padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
+                      fontSize: isMobile ? '0.875rem' : '0.9375rem',
+                      display: 'flex',
                       alignItems: 'center',
-                      fontSize: '0.75rem',
-                      color: 'var(--text-secondary)'
-                    }}>
-                      <span>
-                        {newMessageContent.length > 0 && `${newMessageContent.length} caracteres`}
-                      </span>
-                      <span>Ctrl+Enter para enviar</span>
-                    </div>
-                  </div>
-                  <div style={{ 
-                    display: 'flex', 
-                    gap: '0.5rem',
-                    justifyContent: 'flex-end'
-                  }}>
-                    <button
-                      onClick={handleSendMessage}
-                      className="btn btn-primary"
-                      disabled={!newMessageContent.trim() || (!selectedConversation && !selectedUserForMessage)}
-                      style={{ 
-                        padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.5rem',
-                        fontSize: isMobile ? '0.875rem' : '1rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        whiteSpace: 'nowrap',
-                        fontWeight: 600,
-                        minWidth: '120px',
-                        justifyContent: 'center'
-                      }}
-                    >
-                      <Send size={isMobile ? 18 : 20} />
-                      Enviar Mensaje
-                    </button>
-                  </div>
+                      gap: '0.25rem',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <Send size={isMobile ? 18 : 20} />
+                    {!isMobile && 'Enviar'}
+                  </button>
                 </div>
               </>
             ) : (
@@ -4748,7 +4439,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 Editor de Página de Inicio
               </h2>
               <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: isMobile ? '0.875rem' : '1rem' }}>
-                Personalizá completamente tu sitio: logo, colores, títulos, secciones y más
+                Personalizá la sección principal, banners y promociones de tu sitio
               </p>
             </div>
             <button
@@ -4762,336 +4453,6 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               <Save size={18} style={{ marginRight: '0.5rem' }} />
               Guardar Todo
             </button>
-          </div>
-
-          {/* Sección Logo y Configuración del Sitio */}
-          <div style={{
-            background: 'var(--bg-secondary)',
-            padding: isMobile ? '1.5rem' : '2rem',
-            borderRadius: '1rem',
-            border: '1px solid var(--border)',
-            marginBottom: '2rem'
-          }}>
-            <h3 style={{ 
-              margin: 0, 
-              marginBottom: '1.5rem', 
-              color: 'var(--text-primary)',
-              fontSize: isMobile ? '1.25rem' : '1.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <ImageIcon size={24} />
-              Logo y Configuración del Sitio
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                  Nombre del Sitio *
-                </label>
-                <input
-                  type="text"
-                  value={homeConfig.siteSettings?.siteName || ''}
-                  onChange={(e) => setHomeConfig({ 
-                    ...homeConfig, 
-                    siteSettings: { 
-                      ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
-                      siteName: e.target.value 
-                    } 
-                  })}
-                  placeholder="Ej: Subasta Argenta"
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem',
-                    borderRadius: '0.5rem',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                    fontSize: isMobile ? '16px' : '1rem'
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                  Tagline (Eslogan)
-                </label>
-                <input
-                  type="text"
-                  value={homeConfig.siteSettings?.siteTagline || ''}
-                  onChange={(e) => setHomeConfig({ 
-                    ...homeConfig, 
-                    siteSettings: { 
-                      ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
-                      siteTagline: e.target.value 
-                    } 
-                  })}
-                  placeholder="Ej: La plataforma líder de subastas online"
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem',
-                    borderRadius: '0.5rem',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                    fontSize: isMobile ? '16px' : '1rem'
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                  Logo del Sitio
-                </label>
-                <div
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    e.currentTarget.style.borderColor = 'var(--primary)';
-                    e.currentTarget.style.background = 'rgba(214, 90, 0, 0.05)';
-                  }}
-                  onDragLeave={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    e.currentTarget.style.borderColor = 'var(--border)';
-                    e.currentTarget.style.background = 'var(--bg-primary)';
-                  }}
-                  onDrop={(e) => handleImageDrop(e, (url) => setHomeConfig({ 
-                    ...homeConfig, 
-                    siteSettings: { 
-                      ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
-                      logoUrl: url 
-                    } 
-                  }))}
-                  style={{
-                    border: '2px dashed var(--border)',
-                    borderRadius: '0.5rem',
-                    padding: '1rem',
-                    background: 'var(--bg-primary)',
-                    transition: 'all 0.2s',
-                    marginBottom: '0.75rem'
-                  }}
-                >
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleImageFileSelect(e, (url) => setHomeConfig({ 
-                      ...homeConfig, 
-                      siteSettings: { 
-                        ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
-                        logoUrl: url 
-                      } 
-                    }))}
-                    style={{ display: 'none' }}
-                    id="logo-image-input"
-                  />
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
-                      📸 Arrastrá el logo aquí o hacé clic para seleccionar
-                    </div>
-                    <label
-                      htmlFor="logo-image-input"
-                      className="btn btn-secondary"
-                      style={{
-                        padding: '0.625rem 1.25rem',
-                        fontSize: isMobile ? '0.875rem' : '0.9375rem',
-                        cursor: 'pointer',
-                        display: 'inline-block'
-                      }}
-                    >
-                      Seleccionar Logo
-                    </label>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                      También podés pegar una URL abajo
-                    </div>
-                  </div>
-                </div>
-                <input
-                  type="text"
-                  value={homeConfig.siteSettings?.logoUrl || ''}
-                  onChange={(e) => setHomeConfig({ 
-                    ...homeConfig, 
-                    siteSettings: { 
-                      ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
-                      logoUrl: e.target.value 
-                    } 
-                  })}
-                  placeholder="O ingresá una URL: https://ejemplo.com/logo.png"
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem',
-                    borderRadius: '0.5rem',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                    fontSize: isMobile ? '16px' : '1rem',
-                    marginBottom: '0.75rem'
-                  }}
-                />
-                {homeConfig.siteSettings?.logoUrl && (
-                  <div style={{ marginTop: '0.75rem', borderRadius: '0.5rem', overflow: 'hidden', border: '1px solid var(--border)', padding: '1rem', background: 'var(--bg-primary)' }}>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Vista previa del logo:</div>
-                    <img 
-                      src={homeConfig.siteSettings.logoUrl} 
-                      alt="Logo preview" 
-                      style={{ maxHeight: '100px', maxWidth: '100%', objectFit: 'contain' }}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                  Texto del Footer
-                </label>
-                <input
-                  type="text"
-                  value={homeConfig.siteSettings?.footerText || ''}
-                  onChange={(e) => setHomeConfig({ 
-                    ...homeConfig, 
-                    siteSettings: { 
-                      ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
-                      footerText: e.target.value 
-                    } 
-                  })}
-                  placeholder="Ej: © 2024 Subasta Argenta. Todos los derechos reservados."
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem',
-                    borderRadius: '0.5rem',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                    fontSize: isMobile ? '16px' : '1rem'
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Sección Colores del Tema */}
-          <div style={{
-            background: 'var(--bg-secondary)',
-            padding: isMobile ? '1.5rem' : '2rem',
-            borderRadius: '1rem',
-            border: '1px solid var(--border)',
-            marginBottom: '2rem'
-          }}>
-            <h3 style={{ 
-              margin: 0, 
-              marginBottom: '1.5rem', 
-              color: 'var(--text-primary)',
-              fontSize: isMobile ? '1.25rem' : '1.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <span style={{ fontSize: '1.5rem' }}>🎨</span>
-              Colores del Tema
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1.5rem' }}>
-              {Object.entries(homeConfig.themeColors || defaultHomeConfig.themeColors).map(([key, value]) => (
-                <div key={key}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, textTransform: 'capitalize' }}>
-                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                  </label>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <input
-                      type="color"
-                      value={value}
-                      onChange={(e) => setHomeConfig({ 
-                        ...homeConfig, 
-                        themeColors: { 
-                          ...(homeConfig.themeColors || defaultHomeConfig.themeColors), 
-                          [key]: e.target.value 
-                        } 
-                      })}
-                      style={{
-                        width: '60px',
-                        height: '40px',
-                        border: '1px solid var(--border)',
-                        borderRadius: '0.5rem',
-                        cursor: 'pointer'
-                      }}
-                    />
-                    <input
-                      type="text"
-                      value={value}
-                      onChange={(e) => setHomeConfig({ 
-                        ...homeConfig, 
-                        themeColors: { 
-                          ...(homeConfig.themeColors || defaultHomeConfig.themeColors), 
-                          [key]: e.target.value 
-                        } 
-                      })}
-                      placeholder="#000000"
-                      style={{
-                        flex: 1,
-                        padding: '0.75rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid var(--border)',
-                        background: 'var(--bg-primary)',
-                        color: 'var(--text-primary)',
-                        fontSize: isMobile ? '16px' : '1rem',
-                        fontFamily: 'monospace'
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Sección Títulos de Secciones */}
-          <div style={{
-            background: 'var(--bg-secondary)',
-            padding: isMobile ? '1.5rem' : '2rem',
-            borderRadius: '1rem',
-            border: '1px solid var(--border)',
-            marginBottom: '2rem'
-          }}>
-            <h3 style={{ 
-              margin: 0, 
-              marginBottom: '1.5rem', 
-              color: 'var(--text-primary)',
-              fontSize: isMobile ? '1.25rem' : '1.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <span style={{ fontSize: '1.5rem' }}>📝</span>
-              Títulos de Secciones
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1.5rem' }}>
-              {Object.entries(homeConfig.sectionTitles || defaultHomeConfig.sectionTitles).map(([key, value]) => (
-                <div key={key}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, textTransform: 'capitalize' }}>
-                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                  </label>
-                  <input
-                    type="text"
-                    value={value || ''}
-                    onChange={(e) => setHomeConfig({ 
-                      ...homeConfig, 
-                      sectionTitles: { 
-                        ...(homeConfig.sectionTitles || defaultHomeConfig.sectionTitles), 
-                        [key]: e.target.value 
-                      } 
-                    })}
-                    placeholder={`Título para ${key}`}
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-primary)',
-                      color: 'var(--text-primary)',
-                      fontSize: isMobile ? '16px' : '1rem'
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* Sección Hero */}
@@ -5770,288 +5131,6 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               </div>
             )}
           </div>
-
-          {/* Sección Sobre Nosotros */}
-          <div style={{
-            background: 'var(--bg-secondary)',
-            padding: isMobile ? '1.5rem' : '2rem',
-            borderRadius: '1rem',
-            border: '1px solid var(--border)',
-            marginBottom: '2rem'
-          }}>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              marginBottom: '1.5rem',
-              flexWrap: 'wrap',
-              gap: '1rem'
-            }}>
-              <h3 style={{ 
-                margin: 0, 
-                color: 'var(--text-primary)',
-                fontSize: isMobile ? '1.25rem' : '1.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                <span style={{ fontSize: '1.5rem' }}>ℹ️</span>
-                Sección Sobre Nosotros
-              </h3>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
-                <input
-                  type="checkbox"
-                  checked={homeConfig.aboutSection?.active || false}
-                  onChange={(e) => setHomeConfig({ 
-                    ...homeConfig, 
-                    aboutSection: { 
-                      ...(homeConfig.aboutSection || defaultHomeConfig.aboutSection), 
-                      active: e.target.checked 
-                    } 
-                  })}
-                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                />
-                <span style={{ fontSize: isMobile ? '0.875rem' : '0.9375rem' }}>Activar sección</span>
-              </label>
-            </div>
-            {homeConfig.aboutSection?.active && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                    Título
-                  </label>
-                  <input
-                    type="text"
-                    value={homeConfig.aboutSection?.title || ''}
-                    onChange={(e) => setHomeConfig({ 
-                      ...homeConfig, 
-                      aboutSection: { 
-                        ...(homeConfig.aboutSection || defaultHomeConfig.aboutSection), 
-                        title: e.target.value 
-                      } 
-                    })}
-                    placeholder="Sobre Nosotros"
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-primary)',
-                      color: 'var(--text-primary)',
-                      fontSize: isMobile ? '16px' : '1rem'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                    Contenido
-                  </label>
-                  <textarea
-                    value={homeConfig.aboutSection?.content || ''}
-                    onChange={(e) => setHomeConfig({ 
-                      ...homeConfig, 
-                      aboutSection: { 
-                        ...(homeConfig.aboutSection || defaultHomeConfig.aboutSection), 
-                        content: e.target.value 
-                      } 
-                    })}
-                    rows={6}
-                    placeholder="Descripción de tu empresa o plataforma..."
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-primary)',
-                      color: 'var(--text-primary)',
-                      fontSize: isMobile ? '16px' : '1rem',
-                      fontFamily: 'inherit',
-                      resize: 'vertical'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                    Imagen (opcional)
-                  </label>
-                  <input
-                    type="text"
-                    value={homeConfig.aboutSection?.imageUrl || ''}
-                    onChange={(e) => setHomeConfig({ 
-                      ...homeConfig, 
-                      aboutSection: { 
-                        ...(homeConfig.aboutSection || defaultHomeConfig.aboutSection), 
-                        imageUrl: e.target.value 
-                      } 
-                    })}
-                    placeholder="URL de imagen (opcional)"
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-primary)',
-                      color: 'var(--text-primary)',
-                      fontSize: isMobile ? '16px' : '1rem'
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Sección Contacto */}
-          <div style={{
-            background: 'var(--bg-secondary)',
-            padding: isMobile ? '1.5rem' : '2rem',
-            borderRadius: '1rem',
-            border: '1px solid var(--border)',
-            marginBottom: '2rem'
-          }}>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              marginBottom: '1.5rem',
-              flexWrap: 'wrap',
-              gap: '1rem'
-            }}>
-              <h3 style={{ 
-                margin: 0, 
-                color: 'var(--text-primary)',
-                fontSize: isMobile ? '1.25rem' : '1.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                <span style={{ fontSize: '1.5rem' }}>📧</span>
-                Sección Contacto
-              </h3>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
-                <input
-                  type="checkbox"
-                  checked={homeConfig.contactSection?.active || false}
-                  onChange={(e) => setHomeConfig({ 
-                    ...homeConfig, 
-                    contactSection: { 
-                      ...(homeConfig.contactSection || defaultHomeConfig.contactSection), 
-                      active: e.target.checked 
-                    } 
-                  })}
-                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                />
-                <span style={{ fontSize: isMobile ? '0.875rem' : '0.9375rem' }}>Activar sección</span>
-              </label>
-            </div>
-            {homeConfig.contactSection?.active && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                    Título
-                  </label>
-                  <input
-                    type="text"
-                    value={homeConfig.contactSection?.title || ''}
-                    onChange={(e) => setHomeConfig({ 
-                      ...homeConfig, 
-                      contactSection: { 
-                        ...(homeConfig.contactSection || defaultHomeConfig.contactSection), 
-                        title: e.target.value 
-                      } 
-                    })}
-                    placeholder="Contacto"
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-primary)',
-                      color: 'var(--text-primary)',
-                      fontSize: isMobile ? '16px' : '1rem'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                    Email *
-                  </label>
-                  <input
-                    type="email"
-                    value={homeConfig.contactSection?.email || ''}
-                    onChange={(e) => setHomeConfig({ 
-                      ...homeConfig, 
-                      contactSection: { 
-                        ...(homeConfig.contactSection || defaultHomeConfig.contactSection), 
-                        email: e.target.value 
-                      } 
-                    })}
-                    placeholder="contacto@ejemplo.com"
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-primary)',
-                      color: 'var(--text-primary)',
-                      fontSize: isMobile ? '16px' : '1rem'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                    Teléfono (opcional)
-                  </label>
-                  <input
-                    type="text"
-                    value={homeConfig.contactSection?.phone || ''}
-                    onChange={(e) => setHomeConfig({ 
-                      ...homeConfig, 
-                      contactSection: { 
-                        ...(homeConfig.contactSection || defaultHomeConfig.contactSection), 
-                        phone: e.target.value 
-                      } 
-                    })}
-                    placeholder="+54 11 1234-5678"
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-primary)',
-                      color: 'var(--text-primary)',
-                      fontSize: isMobile ? '16px' : '1rem'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                    Dirección (opcional)
-                  </label>
-                  <input
-                    type="text"
-                    value={homeConfig.contactSection?.address || ''}
-                    onChange={(e) => setHomeConfig({ 
-                      ...homeConfig, 
-                      contactSection: { 
-                        ...(homeConfig.contactSection || defaultHomeConfig.contactSection), 
-                        address: e.target.value 
-                      } 
-                    })}
-                    placeholder="Calle, Ciudad, País"
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-primary)',
-                      color: 'var(--text-primary)',
-                      fontSize: isMobile ? '16px' : '1rem'
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       )}
 
@@ -6409,7 +5488,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 </div>
               </div>
             </div>
-          </div>
+          </div>  
 
           {/* Limpieza y Mantenimiento */}
           <div style={{
