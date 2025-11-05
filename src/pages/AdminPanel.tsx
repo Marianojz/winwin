@@ -1139,15 +1139,49 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     }
   }, [activeTab, enhancedStats]);
 
+  // Función helper para crear notificación para otro usuario
+  const createNotificationForUser = async (targetUserId: string, notification: {
+    type: 'new_message' | 'auction_won' | 'auction_outbid' | 'purchase' | 'payment_reminder';
+    title: string;
+    message: string;
+    link?: string;
+  }) => {
+    try {
+      const newNotification = {
+        ...notification,
+        userId: targetUserId,
+        id: `NOTIF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: new Date().toISOString(),
+        read: false
+      };
+      
+      // Guardar directamente en Firebase para el usuario receptor
+      const notificationRef = ref(realtimeDb, `notifications/${targetUserId}/${newNotification.id}`);
+      await set(notificationRef, newNotification);
+      
+      console.log(`✅ Notificación creada para usuario ${targetUserId}: ${newNotification.id}`);
+    } catch (error) {
+      console.error('❌ Error creando notificación para usuario:', error);
+    }
+  };
+
   // Función para enviar mensaje
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     let userId: string;
     
     if (selectedUserForMessage) {
       // Nuevo mensaje a usuario seleccionado
       userId = selectedUserForMessage;
       const message = createMessage('admin', 'Administrador', userId, newMessageContent.trim());
-      saveMessage(message);
+      await saveMessage(message);
+      
+      // Crear notificación para el usuario receptor
+      await createNotificationForUser(userId, {
+        type: 'new_message',
+        title: '💬 Nuevo mensaje del administrador',
+        message: `Tienes un nuevo mensaje: ${newMessageContent.trim().substring(0, 50)}${newMessageContent.trim().length > 50 ? '...' : ''}`,
+        link: '/perfil?tab=messages'
+      });
       
       // Si no existe conversación, crearla seleccionándola
       if (!conversations.find(c => c.id === `admin_${userId}`)) {
@@ -1160,7 +1194,15 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       // Mensaje a conversación existente
       userId = selectedConversation.split('_')[1];
       const message = createMessage('admin', 'Administrador', userId, newMessageContent.trim());
-      saveMessage(message);
+      await saveMessage(message);
+      
+      // Crear notificación para el usuario receptor
+      await createNotificationForUser(userId, {
+        type: 'new_message',
+        title: '💬 Nuevo mensaje del administrador',
+        message: `Tienes un nuevo mensaje: ${newMessageContent.trim().substring(0, 50)}${newMessageContent.trim().length > 50 ? '...' : ''}`,
+        link: '/perfil?tab=messages'
+      });
     } else {
       return;
     }
