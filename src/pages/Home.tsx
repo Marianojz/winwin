@@ -17,30 +17,44 @@ const Home = () => {
     try {
       const homeConfigRef = ref(realtimeDb, 'homeConfig');
       
-      // Escuchar cambios en tiempo real
+      // Escuchar cambios en tiempo real desde Firebase
       const unsubscribe = onValue(homeConfigRef, (snapshot) => {
         const data = snapshot.val();
         
         if (data) {
+          // Cargar TODOS los campos desde Firebase
           setHomeConfig({
             ...defaultHomeConfig,
             ...data,
+            siteSettings: data.siteSettings || defaultHomeConfig.siteSettings,
+            themeColors: data.themeColors || defaultHomeConfig.themeColors,
+            sectionTitles: data.sectionTitles || defaultHomeConfig.sectionTitles,
+            heroTitle: data.heroTitle || defaultHomeConfig.heroTitle,
+            heroSubtitle: data.heroSubtitle || defaultHomeConfig.heroSubtitle,
+            heroImageUrl: data.heroImageUrl || defaultHomeConfig.heroImageUrl,
             banners: data.banners?.map((b: any) => ({
               ...b,
-              createdAt: b.createdAt ? new Date(b.createdAt) : new Date()
+              createdAt: b.createdAt ? new Date(b.createdAt) : new Date(),
+              updatedAt: b.updatedAt ? new Date(b.updatedAt) : undefined
             })) || [],
             promotions: data.promotions?.map((p: any) => ({
               ...p,
-              createdAt: p.createdAt ? new Date(p.createdAt) : new Date()
-            })) || []
+              createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
+              startDate: p.startDate ? new Date(p.startDate) : undefined,
+              endDate: p.endDate ? new Date(p.endDate) : undefined
+            })) || [],
+            aboutSection: data.aboutSection || defaultHomeConfig.aboutSection,
+            contactSection: data.contactSection || defaultHomeConfig.contactSection,
+            updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date()
           });
           console.log('✅ Configuración de home cargada desde Firebase');
         } else {
           // Si no hay configuración en Firebase, usar la por defecto
+          console.log('⚠️ No hay configuración en Firebase, usando valores por defecto');
           setHomeConfig(defaultHomeConfig);
         }
       }, (error) => {
-        console.error('Error cargando configuración del inicio desde Firebase:', error);
+        console.error('❌ Error cargando configuración del inicio desde Firebase:', error);
         setHomeConfig(defaultHomeConfig);
       });
       
@@ -130,11 +144,11 @@ const Home = () => {
                     <img src={banner.imageUrl} alt={banner.title} style={{ width: '100%', height: '200px', objectFit: 'cover' }} />
                   )}
                   {banner.title && (
-                    <div style={{ padding: '1rem', background: 'rgba(0,0,0,0.7)', color: 'white', position: banner.imageUrl ? 'absolute' : 'relative', bottom: 0, left: 0, right: 0 }}>
-                      <h3 style={{ margin: 0, fontSize: '1.125rem' }}>{banner.title}</h3>
-                      {banner.description && <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem' }}>{banner.description}</p>}
+                    <div style={{ padding: '1rem', background: 'rgba(0,0,0,0.7)', color: 'white', position: banner.imageUrl ? 'absolute' : 'relative', bottom: 0, left: 0, right: 0, wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                      <h3 style={{ margin: 0, fontSize: '1.125rem', wordBreak: 'break-word' }}>{banner.title}</h3>
+                      {banner.description && <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem', wordBreak: 'break-word' }}>{banner.description}</p>}
                       {banner.link && banner.linkText && (
-                        <Link to={banner.link} style={{ display: 'inline-block', marginTop: '0.75rem', color: 'white', textDecoration: 'underline', fontWeight: 600 }}>
+                        <Link to={banner.link} style={{ display: 'inline-block', marginTop: '0.75rem', color: 'white', textDecoration: 'underline', fontWeight: 600, wordBreak: 'break-word' }}>
                           {banner.linkText} →
                         </Link>
                       )}
@@ -385,6 +399,8 @@ const Home = () => {
         .hero-title {
           font-size: clamp(2.5rem, 5vw, 4rem);
           margin-bottom: 1.5rem;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
         }
 
         .text-gradient {
@@ -399,6 +415,8 @@ const Home = () => {
           color: var(--text-secondary);
           margin-bottom: 2rem;
           line-height: 1.6;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
         }
 
         .hero-buttons {
@@ -805,6 +823,8 @@ const Home = () => {
           margin-bottom: 0.5rem;
           position: relative;
           z-index: 1;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
         }
 
         .feature-compact-card p {
@@ -813,6 +833,8 @@ const Home = () => {
           line-height: 1.5;
           position: relative;
           z-index: 1;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
         }
 
         .section-title {
@@ -927,6 +949,8 @@ const Home = () => {
           margin-bottom: 0.5rem;
           position: relative;
           z-index: 1;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
         }
 
         .step p {
@@ -935,6 +959,8 @@ const Home = () => {
           font-size: clamp(0.875rem, 1.5vw, 0.9375rem);
           position: relative;
           z-index: 1;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
         }
 
         @media (max-width: 768px) {

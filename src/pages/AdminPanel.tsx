@@ -1,5 +1,5 @@
 // Firebase Realtime Database imports
-import { ref, update, remove } from 'firebase/database';
+import { ref, update, remove, set, onValue } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
 
 // Otras importaciones de Lucide, React, etc.
@@ -77,33 +77,61 @@ const AdminPanel = (): React.ReactElement => {
   }, []); // Solo al montar
   
   // Estado para configuración del inicio
-  const [homeConfig, setHomeConfig] = useState<HomeConfig>(() => {
+  const [homeConfig, setHomeConfig] = useState<HomeConfig>(defaultHomeConfig);
+  
+  // Cargar homeConfig desde Firebase (SIEMPRE desde Firebase, sin localStorage)
+  useEffect(() => {
     try {
-      const saved = localStorage.getItem('homeConfig');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Asegurar que banners y promotions tengan las fechas correctas
-        return {
-          ...parsed,
-          banners: parsed.banners?.map((b: any) => ({
-            ...b,
-            createdAt: b.createdAt ? new Date(b.createdAt) : new Date(),
-            updatedAt: b.updatedAt ? new Date(b.updatedAt) : undefined
-          })) || [],
-          promotions: parsed.promotions?.map((p: any) => ({
-            ...p,
-            createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
-            startDate: p.startDate ? new Date(p.startDate) : undefined,
-            endDate: p.endDate ? new Date(p.endDate) : undefined
-          })) || [],
-          updatedAt: parsed.updatedAt ? new Date(parsed.updatedAt) : new Date()
-        };
-      }
-      return defaultHomeConfig;
-    } catch {
-      return defaultHomeConfig;
+      const homeConfigRef = ref(realtimeDb, 'homeConfig');
+      
+      const unsubscribe = onValue(homeConfigRef, (snapshot) => {
+        const data = snapshot.val();
+        
+        if (data) {
+          // Convertir fechas y asegurar estructura completa
+          const loadedConfig: HomeConfig = {
+            ...defaultHomeConfig,
+            ...data,
+            siteSettings: data.siteSettings || defaultHomeConfig.siteSettings,
+            themeColors: data.themeColors || defaultHomeConfig.themeColors,
+            sectionTitles: data.sectionTitles || defaultHomeConfig.sectionTitles,
+            heroTitle: data.heroTitle || defaultHomeConfig.heroTitle,
+            heroSubtitle: data.heroSubtitle || defaultHomeConfig.heroSubtitle,
+            heroImageUrl: data.heroImageUrl || defaultHomeConfig.heroImageUrl,
+            banners: data.banners?.map((b: any) => ({
+              ...b,
+              createdAt: b.createdAt ? new Date(b.createdAt) : new Date(),
+              updatedAt: b.updatedAt ? new Date(b.updatedAt) : undefined
+            })) || [],
+            promotions: data.promotions?.map((p: any) => ({
+              ...p,
+              createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
+              startDate: p.startDate ? new Date(p.startDate) : undefined,
+              endDate: p.endDate ? new Date(p.endDate) : undefined
+            })) || [],
+            aboutSection: data.aboutSection || defaultHomeConfig.aboutSection,
+            contactSection: data.contactSection || defaultHomeConfig.contactSection,
+            updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date()
+          };
+          setHomeConfig(loadedConfig);
+          console.log('✅ Configuración de home cargada desde Firebase');
+        } else {
+          // Si no hay configuración en Firebase, usar la por defecto
+          console.log('⚠️ No hay configuración en Firebase, usando valores por defecto');
+          setHomeConfig(defaultHomeConfig);
+        }
+      }, (error) => {
+        console.error('❌ Error cargando configuración del inicio desde Firebase:', error);
+        // Solo usar valores por defecto si hay error, NO localStorage
+        setHomeConfig(defaultHomeConfig);
+      });
+      
+      return () => unsubscribe();
+    } catch (error) {
+      console.error('❌ Error configurando listener de homeConfig:', error);
+      setHomeConfig(defaultHomeConfig);
     }
-  });
+  }, []); // Solo al montar, no depende de activeTab
 
   // Estados para templates de mensajes
   const [messageTemplates, setMessageTemplates] = useState<MessageTemplate[]>(() => loadMessageTemplates());
@@ -557,7 +585,7 @@ const [auctionForm, setAuctionForm] = useState({
   };
 
   useEffect(() => {
-    if (activeTab === 'users') {
+    if (activeTab === 'users' || activeTab === 'messages') {
       loadUsers();
     }
   }, [activeTab]);
@@ -1143,13 +1171,44 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     // Los listeners en tiempo real actualizarán automáticamente los mensajes y el contador
   };
 
-  // Función para guardar configuración de home
-  const handleSaveHomeConfig = () => {
-    const updatedConfig = { ...homeConfig, updatedAt: new Date() };
-    localStorage.setItem('homeConfig', JSON.stringify(updatedConfig));
-    setHomeConfig(updatedConfig);
-    logAdminAction('Configuración de home guardada', user?.id, user?.username);
-    alert('✅ Configuración del inicio guardada correctamente');
+  // Función para guardar configuración de home (SOLO en Firebase)
+  const handleSaveHomeConfig = async () => {
+    try {
+      const updatedConfig: HomeConfig = { 
+        ...homeConfig, 
+        updatedAt: new Date() // Mantener como Date para el estado
+      };
+      
+      // Convertir objetos Date a strings para Firebase
+      const configToSave: any = {
+        ...updatedConfig,
+        updatedAt: updatedConfig.updatedAt.toISOString(),
+        banners: updatedConfig.banners.map(b => ({
+          ...b,
+          createdAt: b.createdAt instanceof Date ? b.createdAt.toISOString() : b.createdAt,
+          updatedAt: b.updatedAt instanceof Date ? b.updatedAt.toISOString() : b.updatedAt
+        })),
+        promotions: updatedConfig.promotions.map(p => ({
+          ...p,
+          createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
+          startDate: p.startDate instanceof Date ? p.startDate.toISOString() : p.startDate,
+          endDate: p.endDate instanceof Date ? p.endDate.toISOString() : p.endDate
+        }))
+      };
+      
+      // Guardar SOLO en Firebase (sin localStorage)
+      const homeConfigRef = ref(realtimeDb, 'homeConfig');
+      await set(homeConfigRef, configToSave);
+      
+      // El listener de Firebase actualizará automáticamente el estado
+      setHomeConfig(updatedConfig);
+      logAdminAction('Configuración de home guardada en Firebase', user?.id, user?.username);
+      alert('✅ Configuración del inicio guardada correctamente en Firebase');
+    } catch (error) {
+      console.error('❌ Error guardando configuración en Firebase:', error);
+      alert('❌ Error al guardar en Firebase. Por favor, verifica tu conexión e intenta nuevamente.');
+      throw error; // Re-lanzar el error para que el usuario sepa que falló
+    }
   };
 
   // Funciones para gestión de banners
@@ -4112,27 +4171,51 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 }}>
                   Seleccionar Usuario:
                 </label>
-                <select
-                  value={selectedUserForMessage || ''}
-                  onChange={(e) => setSelectedUserForMessage(e.target.value || null)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: '0.5rem',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-secondary)',
-                    color: 'var(--text-primary)',
-                    fontSize: '1rem',
-                    marginBottom: '0.5rem'
-                  }}
-                >
-                  <option value="">-- Seleccionar usuario --</option>
-                  {realUsers.map((u: any) => (
-                    <option key={u.id} value={u.id}>
-                      {u.username || u.displayName || u.email?.split('@')[0] || `Usuario ${u.id.slice(0, 8)}`}
-                    </option>
-                  ))}
-                </select>
+                {loadingUsers ? (
+                  <div style={{ 
+                    padding: '1rem', 
+                    textAlign: 'center', 
+                    color: 'var(--text-secondary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                    Cargando usuarios...
+                  </div>
+                ) : realUsers.length === 0 ? (
+                  <div style={{ 
+                    padding: '1rem', 
+                    textAlign: 'center', 
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.875rem'
+                  }}>
+                    No hay usuarios registrados
+                  </div>
+                ) : (
+                  <select
+                    value={selectedUserForMessage || ''}
+                    onChange={(e) => setSelectedUserForMessage(e.target.value || null)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-secondary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '1rem',
+                      marginBottom: '0.5rem'
+                    }}
+                  >
+                    <option value="">-- Seleccionar usuario --</option>
+                    {realUsers.map((u: any) => (
+                      <option key={u.id} value={u.id}>
+                        {u.username || u.displayName || u.email?.split('@')[0] || `Usuario ${u.id.slice(0, 8)}`}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 {selectedUserForMessage && (
                   <button
                     onClick={() => {
@@ -4241,8 +4324,8 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                             deleteConversation(selectedConversation);
                             setSelectedConversation(null);
                             // El listener en tiempo real actualizará automáticamente las conversaciones
-                          }
-                        }}
+                    }
+                        }}      
                         className="btn btn-danger"
                         style={{ 
                           padding: isMobile ? '0.5rem' : '0.5rem 0.75rem',
@@ -4602,6 +4685,498 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Configuración del Sitio */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: isMobile ? '1.5rem' : '2rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            marginBottom: '2rem'
+          }}>
+            <h3 style={{ 
+              margin: 0, 
+              marginBottom: '1.5rem', 
+              color: 'var(--text-primary)',
+              fontSize: isMobile ? '1.25rem' : '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <Store size={24} />
+              Configuración del Sitio
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Nombre del Sitio *
+                </label>
+                <input
+                  type="text"
+                  value={homeConfig.siteSettings.siteName}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    siteSettings: { ...homeConfig.siteSettings, siteName: e.target.value }
+                  })}
+                  placeholder="Ej: Subasta Argenta"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '1rem'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Tagline / Eslogan
+                </label>
+                <input
+                  type="text"
+                  value={homeConfig.siteSettings.siteTagline}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    siteSettings: { ...homeConfig.siteSettings, siteTagline: e.target.value }
+                  })}
+                  placeholder="Ej: La plataforma líder de subastas"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '1rem'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  URL del Logo
+                </label>
+                <input
+                  type="text"
+                  value={homeConfig.siteSettings.logoUrl}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    siteSettings: { ...homeConfig.siteSettings, logoUrl: e.target.value }
+                  })}
+                  placeholder="https://ejemplo.com/logo.png"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '1rem'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Texto del Footer
+                </label>
+                <input
+                  type="text"
+                  value={homeConfig.siteSettings.footerText || ''}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    siteSettings: { ...homeConfig.siteSettings, footerText: e.target.value }
+                  })}
+                  placeholder="© 2024 Tu Sitio. Todos los derechos reservados."
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '1rem'
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Títulos de Secciones */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: isMobile ? '1.5rem' : '2rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            marginBottom: '2rem'
+          }}>
+            <h3 style={{ 
+              margin: 0, 
+              marginBottom: '1.5rem', 
+              color: 'var(--text-primary)',
+              fontSize: isMobile ? '1.25rem' : '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <FileText size={24} />
+              Títulos de Secciones
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+                  Título: Subastas
+                </label>
+                <input
+                  type="text"
+                  value={homeConfig.sectionTitles.auctions}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    sectionTitles: { ...homeConfig.sectionTitles, auctions: e.target.value }
+                  })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '0.9375rem'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+                  Título: Tienda
+                </label>
+                <input
+                  type="text"
+                  value={homeConfig.sectionTitles.store}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    sectionTitles: { ...homeConfig.sectionTitles, store: e.target.value }
+                  })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '0.9375rem'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+                  Título: Destacados
+                </label>
+                <input
+                  type="text"
+                  value={homeConfig.sectionTitles.featured}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    sectionTitles: { ...homeConfig.sectionTitles, featured: e.target.value }
+                  })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '0.9375rem'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+                  Título: Promociones
+                </label>
+                <input
+                  type="text"
+                  value={homeConfig.sectionTitles.promotions}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    sectionTitles: { ...homeConfig.sectionTitles, promotions: e.target.value }
+                  })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '0.9375rem'
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Sección Sobre Nosotros */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: isMobile ? '1.5rem' : '2rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            marginBottom: '2rem'
+          }}>
+            <h3 style={{ 
+              margin: 0, 
+              marginBottom: '1.5rem', 
+              color: 'var(--text-primary)',
+              fontSize: isMobile ? '1.25rem' : '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <FileText size={24} />
+              Sección Sobre Nosotros
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                <input
+                  type="checkbox"
+                  checked={homeConfig.aboutSection?.active || false}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    aboutSection: { 
+                      ...(homeConfig.aboutSection || defaultHomeConfig.aboutSection), 
+                      active: e.target.checked 
+                    }
+                  })}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <span>Mostrar sección "Sobre Nosotros"</span>
+              </label>
+              {homeConfig.aboutSection?.active && (
+                <>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      Título
+                    </label>
+                    <input
+                      type="text"
+                      value={homeConfig.aboutSection.title || ''}
+                      onChange={(e) => setHomeConfig({ 
+                        ...homeConfig, 
+                        aboutSection: { 
+                          ...(homeConfig.aboutSection || defaultHomeConfig.aboutSection), 
+                          title: e.target.value 
+                        }
+                      })}
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '1rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      Contenido
+                    </label>
+                    <textarea
+                      value={homeConfig.aboutSection.content || ''}
+                      onChange={(e) => setHomeConfig({ 
+                        ...homeConfig, 
+                        aboutSection: { 
+                          ...(homeConfig.aboutSection || defaultHomeConfig.aboutSection), 
+                          content: e.target.value 
+                        }
+                      })}
+                      rows={4}
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '1rem',
+                        fontFamily: 'inherit',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      URL de Imagen (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={homeConfig.aboutSection.imageUrl || ''}
+                      onChange={(e) => setHomeConfig({ 
+                        ...homeConfig, 
+                        aboutSection: { 
+                          ...(homeConfig.aboutSection || defaultHomeConfig.aboutSection), 
+                          imageUrl: e.target.value 
+                        }
+                      })}
+                      placeholder="https://ejemplo.com/imagen.jpg"
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '1rem'
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Sección de Contacto */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: isMobile ? '1.5rem' : '2rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            marginBottom: '2rem'
+          }}>
+            <h3 style={{ 
+              margin: 0, 
+              marginBottom: '1.5rem', 
+              color: 'var(--text-primary)',
+              fontSize: isMobile ? '1.25rem' : '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <Mail size={24} />
+              Sección de Contacto
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                <input
+                  type="checkbox"
+                  checked={homeConfig.contactSection?.active || false}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    contactSection: { 
+                      ...(homeConfig.contactSection || defaultHomeConfig.contactSection), 
+                      active: e.target.checked 
+                    }
+                  })}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <span>Mostrar sección "Contacto"</span>
+              </label>
+              {homeConfig.contactSection?.active && (
+                <>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      Título
+                    </label>
+                    <input
+                      type="text"
+                      value={homeConfig.contactSection.title || ''}
+                      onChange={(e) => setHomeConfig({ 
+                        ...homeConfig, 
+                        contactSection: { 
+                          ...(homeConfig.contactSection || defaultHomeConfig.contactSection), 
+                          title: e.target.value 
+                        }
+                      })}
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '1rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      value={homeConfig.contactSection.email || ''}
+                      onChange={(e) => setHomeConfig({ 
+                        ...homeConfig, 
+                        contactSection: { 
+                          ...(homeConfig.contactSection || defaultHomeConfig.contactSection), 
+                          email: e.target.value 
+                        }
+                      })}
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '1rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      Teléfono (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={homeConfig.contactSection.phone || ''}
+                      onChange={(e) => setHomeConfig({ 
+                        ...homeConfig, 
+                        contactSection: { 
+                          ...(homeConfig.contactSection || defaultHomeConfig.contactSection), 
+                          phone: e.target.value 
+                        }
+                      })}
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '1rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      Dirección (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={homeConfig.contactSection.address || ''}
+                      onChange={(e) => setHomeConfig({ 
+                        ...homeConfig, 
+                        contactSection: { 
+                          ...(homeConfig.contactSection || defaultHomeConfig.contactSection), 
+                          address: e.target.value 
+                        }
+                      })}
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '1rem'
+                      }}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

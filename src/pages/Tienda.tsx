@@ -65,7 +65,7 @@ const Tienda = () => {
 
         <div className="filters-section">
           <div className="search-box">
-            <Search size={20} />
+            <Search size={18} />
             <input
               type="text"
               placeholder="Buscar productos..."
@@ -75,7 +75,7 @@ const Tienda = () => {
           </div>
 
           <div className="filter-box">
-            <Filter size={20} />
+            <Filter size={18} />
             <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
               <option value="all">Todas las categorías</option>
               <option value="1">Electrónica</option>
@@ -88,7 +88,7 @@ const Tienda = () => {
           </div>
 
           <div className="sort-box">
-            <SlidersHorizontal size={20} />
+            <SlidersHorizontal size={18} />
             <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
               <option value="newest">Más recientes</option>
               <option value="price-asc">Menor precio</option>
@@ -96,16 +96,6 @@ const Tienda = () => {
               <option value="rating">Mejor valorados</option>
             </select>
           </div>
-        </div>
-
-        <div className="info-banner">
-          <h3>Información de compra</h3>
-          <ul>
-            <li>Todos los precios son fijos</li>
-            <li>Stock en tiempo real</li>
-            <li>Pago seguro con MercadoPago</li>
-            <li>Los carritos no aseguran el stock</li>
-          </ul>
         </div>
 
         <div className="results-info">
@@ -122,6 +112,17 @@ const Tienda = () => {
               <p>No se encontraron productos que coincidan con tu búsqueda</p>
             </div>
           )}
+        </div>
+
+        {/* Información de compra movida después de los productos */}
+        <div className="info-banner">
+          <h3>Información de compra</h3>
+          <ul>
+            <li>Todos los precios son fijos</li>
+            <li>Stock en tiempo real</li>
+            <li>Pago seguro con MercadoPago</li>
+            <li>Los carritos no aseguran el stock</li>
+          </ul>
         </div>
       </div>
 
@@ -253,31 +254,52 @@ const Tienda = () => {
 
         @media (max-width: 768px) {
           .tienda-page {
-            padding: 2rem 0;
+            padding: 1.5rem 0;
+          }
+
+          .page-header {
+            margin-bottom: 1.5rem;
           }
 
           .page-header h1 {
-            font-size: 1.75rem;
+            font-size: 1.5rem;
           }
 
           .page-header p {
-            font-size: 0.9375rem;
+            font-size: 0.875rem;
           }
 
           .filters-section {
             flex-direction: column;
-            gap: 0.75rem;
+            gap: 0.625rem;
+            margin-bottom: 1.5rem;
           }
 
           .search-box,
           .filter-box,
           .sort-box {
             min-width: 100%;
-            padding: 0.75rem 1rem;
+            padding: 0.625rem 0.875rem;
+            font-size: 0.9375rem;
+          }
+
+          .search-box input,
+          .filter-box select,
+          .sort-box select {
+            font-size: 0.9375rem;
+          }
+
+          .search-box svg,
+          .filter-box svg,
+          .sort-box svg {
+            width: 18px;
+            height: 18px;
           }
 
           .info-banner {
-            padding: 1.5rem;
+            padding: 1.25rem;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
           }
 
           .info-banner ul {
@@ -286,16 +308,22 @@ const Tienda = () => {
           }
 
           .info-banner h3 {
-            font-size: 1.125rem;
+            font-size: 1rem;
+            margin-bottom: 0.75rem;
+          }
+
+          .info-banner li {
+            font-size: 0.875rem;
           }
 
           .products-grid {
             grid-template-columns: 1fr;
-            gap: 1.5rem;
+            gap: 1.25rem;
           }
 
           .results-info {
             font-size: 0.875rem;
+            margin-bottom: 1rem;
           }
         }
 

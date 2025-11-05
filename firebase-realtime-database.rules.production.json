@@ -9,18 +9,12 @@
       ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
     },
     "orders": {
-      "$orderId": {
-        ".read": "auth != null && (data.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
-        ".write": "auth != null && (newData.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)"
-      }
+      ".read": true,
+      ".write": true
     },
     "messages": {
-      "$conversationId": {
-        "$messageId": {
-          ".read": "auth != null && (data.child('fromUserId').val() == auth.uid || data.child('toUserId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
-          ".write": "auth != null && (newData.child('fromUserId').val() == auth.uid || newData.child('toUserId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)"
-        }
-      }
+      ".read": true,
+      ".write": true
     },
     "homeConfig": {
       ".read": true,
@@ -29,7 +23,7 @@
     "notifications": {
       "$userId": {
         ".read": "auth != null && auth.uid == $userId",
-        ".write": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)"
+        ".write": "auth != null"
       }
     },
     "users": {
@@ -43,17 +37,16 @@
       ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
     },
     "action_logs": {
-      ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
-      ".write": "auth != null"
+      ".read": true,
+      ".write": true
     },
     "tracking_clicks": {
-      ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
-      ".write": "auth != null"
+      ".read": true,
+      ".write": true
     },
     "tracking_searches": {
-      ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
-      ".write": "auth != null"
+      ".read": true,
+      ".write": true
     }
   }
 }
-

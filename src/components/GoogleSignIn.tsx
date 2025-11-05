@@ -11,8 +11,36 @@ const GoogleSignIn = () => {
 
   const handleGoogleSignIn = async () => {
     try {
+      // Limpiar estado previo
+      try {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          await auth.signOut();
+        }
+      } catch (signOutErr) {
+        console.warn('Error al hacer signOut previo:', signOutErr);
+      }
+
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+      
+      // Intentar con popup, si falla usar redirect en móvil
+      let result;
+      try {
+        result = await signInWithPopup(auth, provider);
+      } catch (popupError: any) {
+        // Si es error de popup bloqueado (móvil), usar redirect
+        if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') {
+          const { signInWithRedirect, getRedirectResult } = await import('firebase/auth');
+          await signInWithRedirect(auth, provider);
+          // El redirect manejará el resultado
+          return;
+        }
+        throw popupError;
+      }
+      
       const user = result.user;
 
       // Verificar si el usuario ya existe en Firestore

@@ -89,8 +89,8 @@ const Perfil = () => {
   };
 
   return (
-    <div style={{ minHeight: 'calc(100vh - 80px)', padding: '3rem 0' }}>
-      <div className="container" style={{ maxWidth: '1000px' }}>
+    <div style={{ minHeight: 'calc(100vh - 80px)', padding: isMobile ? '1.5rem 0' : '3rem 0' }}>
+      <div className="container" style={{ maxWidth: '1000px', padding: isMobile ? '0 1rem' : undefined }}>
         {/* Tabs */}
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
           <button
@@ -149,33 +149,43 @@ const Perfil = () => {
 
         {activeTab === 'profile' && (
           <>
-            <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1.5rem', marginBottom: '2rem', display: 'flex', gap: '2rem', alignItems: 'center' }}>
+            <div style={{ 
+              background: 'var(--bg-secondary)', 
+              padding: isMobile ? '1.5rem' : '2rem', 
+              borderRadius: '1.5rem', 
+              marginBottom: '2rem', 
+              display: 'flex', 
+              gap: isMobile ? '1rem' : '2rem', 
+              alignItems: isMobile ? 'flex-start' : 'center',
+              flexDirection: isMobile ? 'column' : 'row'
+            }}>
           <img 
             src={avatarUrl} 
             alt={user.username} 
             style={{ 
-              width: '120px', 
-              height: '120px', 
+              width: isMobile ? '80px' : '120px', 
+              height: isMobile ? '80px' : '120px', 
               borderRadius: '50%', 
               objectFit: 'cover', 
-              border: '4px solid var(--primary)' 
+              border: '4px solid var(--primary)',
+              flexShrink: 0
             }} 
           />
-          <div style={{ flex: 1 }}>
-            <h1 style={{ marginBottom: '0.5rem' }}>{user.username}</h1>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', color: 'var(--text-secondary)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Mail size={18} />
-                <span>{user.email}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h1 style={{ marginBottom: '0.5rem', fontSize: isMobile ? '1.25rem' : '1.5rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{user.username}</h1>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', color: 'var(--text-secondary)', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                <Mail size={18} style={{ flexShrink: 0, marginTop: '0.125rem' }} />
+                <span style={{ wordBreak: 'break-word' }}>{user.email}</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <FileText size={18} />
-                <span>DNI: {user.dni}</span>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                <FileText size={18} style={{ flexShrink: 0, marginTop: '0.125rem' }} />
+                <span style={{ wordBreak: 'break-word' }}>DNI: {user.dni}</span>
               </div>
               {user.address && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <MapPin size={18} />
-                  <span>{user.address.street}, {user.address.locality}, {user.address.province}</span>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  <MapPin size={18} style={{ flexShrink: 0, marginTop: '0.125rem' }} />
+                  <span style={{ wordBreak: 'break-word' }}>{user.address.street}, {user.address.locality}, {user.address.province}</span>
                 </div>
               )}
             </div>
