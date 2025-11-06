@@ -77,9 +77,9 @@ export const saveMessage = async (message: Message): Promise<Message> => {
     // Si es un error de permisos, dar información más útil
     if (error?.code === 'PERMISSION_DENIED' || error?.message?.includes('permission')) {
       console.error('🔒 Error de permisos. Verifica:', {
-        fromUserId: newMessage?.fromUserId || 'unknown',
-        toUserId: newMessage?.toUserId || 'unknown',
-        conversationId: newMessage?.conversationId || 'unknown',
+        fromUserId: message?.fromUserId || 'unknown',
+        toUserId: message?.toUserId || 'unknown',
+        conversationId: message?.conversationId || 'unknown',
         message: 'El usuario debe ser admin O el mensaje debe ser del usuario autenticado. Si fromUserId es "admin", el usuario debe ser admin.'
       });
     }
