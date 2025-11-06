@@ -1,5 +1,5 @@
 // Firebase Realtime Database imports
-import { ref, update, remove, onValue, set as firebaseSet } from 'firebase/database';
+import { ref as dbRef, update, remove, onValue, off, set as firebaseSet } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
 
 // Otras importaciones de Lucide, React, etc.
@@ -24,6 +24,9 @@ import ImageUploader from '../components/ImageUploader';
 import { mockCategories } from '../utils/mockData';
 import { availableStickers, getStickerLabel } from '../utils/stickers';
 import { logAdminAction, logAuctionAction, logProductAction, logOrderAction, logUserAction } from '../utils/actionLogger';
+import { logOrderStatusChange, loadOrderTransactions } from '../utils/orderTransactions';
+import { storage } from '../config/firebase';
+import { ref as storageRef, listAll, deleteObject } from 'firebase/storage';
 import { HomeConfig, defaultHomeConfig } from '../types/homeConfig';
 import { 
   getAllConversations, 
@@ -61,6 +64,7 @@ const AdminPanel = (): React.ReactElement => {
   const [realUsers, setRealUsers] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [refreshKey, setRefreshKey] = useState(0); // Para forzar re-render sin recargar
+  const [clearedActivityTimestamp, setClearedActivityTimestamp] = useState<number>(0); // Timestamp de actividad limpiada
   
   // Cargar bots desde Firebase al montar el componente
   useEffect(() => {
@@ -83,13 +87,55 @@ const AdminPanel = (): React.ReactElement => {
     }
   }, []); // Solo al montar
   
+  // Cargar timestamp de actividad limpiada desde Firebase
+  useEffect(() => {
+    if (user?.id) {
+      const timestampRef = dbRef(realtimeDb, `adminSettings/${user.id}/clearedActivityTimestamp`);
+      const unsubscribe = onValue(timestampRef, (snapshot) => {
+        const timestamp = snapshot.val();
+        if (timestamp) {
+          const timestampNum = typeof timestamp === 'string' ? parseInt(timestamp) : timestamp;
+          setClearedActivityTimestamp(timestampNum);
+          // También guardar en localStorage para compatibilidad
+          localStorage.setItem(`clearedActivityTimestamp_${user.id}`, timestampNum.toString());
+        } else {
+          // Si no hay en Firebase, intentar desde localStorage
+          const localTimestamp = localStorage.getItem(`clearedActivityTimestamp_${user.id}`) || 
+                                 localStorage.getItem('clearedActivityTimestamp');
+          if (localTimestamp) {
+            const timestampNum = parseInt(localTimestamp);
+            setClearedActivityTimestamp(timestampNum);
+          }
+        }
+      }, (error: any) => {
+        // Si hay error de permisos, solo usar localStorage (no es crítico)
+        if (error?.code === 'PERMISSION_DENIED') {
+          console.log('ℹ️ No hay permisos para adminSettings, usando localStorage');
+        } else {
+          console.error('Error cargando timestamp de actividad:', error);
+        }
+        // Fallback a localStorage
+        const localTimestamp = localStorage.getItem(`clearedActivityTimestamp_${user.id}`) || 
+                               localStorage.getItem('clearedActivityTimestamp');
+        if (localTimestamp) {
+          const timestampNum = parseInt(localTimestamp);
+          setClearedActivityTimestamp(timestampNum);
+        }
+      });
+      
+      return () => {
+        off(timestampRef);
+      };
+    }
+  }, [user?.id]);
+  
   // Estado para configuración del inicio
   const [homeConfig, setHomeConfig] = useState<HomeConfig>(defaultHomeConfig);
   
   // Cargar homeConfig desde Firebase
   useEffect(() => {
     try {
-      const homeConfigRef = ref(realtimeDb, 'homeConfig');
+      const homeConfigRef = dbRef(realtimeDb, 'homeConfig');
       
       const unsubscribe = onValue(homeConfigRef, (snapshot) => {
         const data = snapshot.val();
@@ -226,6 +272,7 @@ const AdminPanel = (): React.ReactElement => {
       }, 100);
     }
   }, [conversationMessages.length]);
+
   // ============================================
   // FUNCIONES PARA CREAR SUBASTA
   // ============================================
@@ -366,7 +413,7 @@ const newAuction: Auction = {
       // Guardar en Firebase
       try {
         console.log('🔥 Guardando subasta en Firebase...');
-        await update(ref(realtimeDb, `auctions/${newAuction.id}`), newAuction);
+        await update(dbRef(realtimeDb, `auctions/${newAuction.id}`), newAuction);
         console.log('✅ Subasta guardada en Firebase correctamente');
       } catch (error) {
         console.error('❌ Error guardando en Firebase:', error);
@@ -475,6 +522,7 @@ const [auctionForm, setAuctionForm] = useState({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<OrderStatus | 'all' | 'active' | 'inactive'>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [orderTransactions, setOrderTransactions] = useState<any[]>([]);
   
   // ============================================
   // FUNCIONES PARA ESTADÍSTICAS DEL DASHBOARD
@@ -533,12 +581,8 @@ const [auctionForm, setAuctionForm] = useState({
   };
   
   const getRecentActivity = () => {
-    // Intentar obtener timestamp específico del usuario admin, sino usar el global
-    const userSpecificKey = user?.id ? `clearedActivityTimestamp_${user.id}` : null;
-    const clearedTimestamp = userSpecificKey 
-      ? localStorage.getItem(userSpecificKey) || localStorage.getItem('clearedActivityTimestamp')
-      : localStorage.getItem('clearedActivityTimestamp');
-    const clearedTime = clearedTimestamp ? parseInt(clearedTimestamp) : 0;
+    // Usar el timestamp desde el estado (que viene de Firebase)
+    const clearedTime = clearedActivityTimestamp || 0;
     const activities: any[] = [];
     const seenOrderIds = new Set<string>(); // Para evitar duplicados de órdenes
     
@@ -602,7 +646,7 @@ const [auctionForm, setAuctionForm] = useState({
   };
   
   // Memoizar la actividad reciente para evitar recalcularla múltiples veces
-  const recentActivity = useMemo(() => getRecentActivity(), [orders, auctions, refreshKey]);
+  const recentActivity = useMemo(() => getRecentActivity(), [orders, auctions, refreshKey, clearedActivityTimestamp]);
   
   const getAuctionsEndingSoon = () => {
     const now = new Date();
@@ -777,7 +821,7 @@ const [auctionForm, setAuctionForm] = useState({
       // Guardar en Firebase PRIMERO (requerido)
       try {
         console.log('🔥 Guardando producto actualizado en Firebase...');
-        await update(ref(realtimeDb, `products/${updatedProduct.id}`), updatedProduct);
+        await update(dbRef(realtimeDb, `products/${updatedProduct.id}`), updatedProduct);
         console.log('✅ Producto actualizado en Firebase correctamente');
         
         // Solo actualizar estado local después de que Firebase confirme
@@ -815,7 +859,7 @@ const [auctionForm, setAuctionForm] = useState({
       // Guardar en Firebase PRIMERO (requerido)
       try {
         console.log('🔥 Guardando producto nuevo en Firebase...');
-        await update(ref(realtimeDb, `products/${newProduct.id}`), newProduct);
+        await update(dbRef(realtimeDb, `products/${newProduct.id}`), newProduct);
         console.log('✅ Producto guardado en Firebase correctamente');
         
         // Solo actualizar estado local después de que Firebase confirme
@@ -861,7 +905,7 @@ const [auctionForm, setAuctionForm] = useState({
       // Eliminar de Firebase PRIMERO (requerido)
       try {
         console.log('🗑️ Eliminando producto de Firebase...');
-        await remove(ref(realtimeDb, `products/${productId}`));
+        await remove(dbRef(realtimeDb, `products/${productId}`));
         console.log('✅ Producto eliminado de Firebase correctamente');
         
         // Solo eliminar del estado local después de que Firebase confirme
@@ -1074,43 +1118,99 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
 
   // Función de Reset mejorada - preserva usuarios y logs de ventas
   const handleResetData = async () => {
-    if (!window.confirm('⚠️ ADVERTENCIA: Esto reiniciará todos los datos EXCEPTO usuarios registrados y logs de ventas.\n\n¿Estás seguro de continuar?')) {
+    if (!window.confirm('⚠️ ADVERTENCIA CRÍTICA:\n\nEsto BORRARÁ PERMANENTEMENTE todos los datos excepto usuarios registrados.\n\n¿Estás 100% seguro de continuar?')) {
       return;
     }
     
-    if (!window.confirm('⚠️ ÚLTIMA CONFIRMACIÓN:\n\nSe resetearán:\n- Subastas (también de Firebase)\n- Productos\n- Bots\n- Notificaciones\n\nSe PRESERVARÁN:\n- ✅ Usuarios registrados\n- ✅ Logs de acciones\n- ✅ Historial de pedidos/ventas\n\n¿Proceder?')) {
+    if (!window.confirm('⚠️ ÚLTIMA CONFIRMACIÓN:\n\nSe ELIMINARÁN de Firebase:\n❌ Subastas\n❌ Productos\n❌ Bots\n❌ Notificaciones\n❌ Mensajes\n❌ Pedidos\n❌ Transacciones de pedidos\n❌ Imágenes (subastas, productos, banners)\n\nSe PRESERVARÁN:\n✅ Usuarios registrados\n✅ Configuración de admin\n\n¿Proceder con el borrado completo?')) {
       return;
     }
 
     try {
-      // Guardar datos a preservar
-      const usersBackup = localStorage.getItem('users') || '[]';
-      const actionLogsBackup = localStorage.getItem('action_logs') || '[]';
-      const ordersBackup = localStorage.getItem('orders') || '[]';
+      console.log('🔥 Iniciando borrado completo de Firebase...');
+      const errors: string[] = [];
       
       // 🔥 ELIMINAR TODO DE FIREBASE REALTIME DATABASE
-      console.log('🔥 Eliminando todos los datos de Firebase...');
       try {
         // Eliminar subastas
-        const auctionsRef = ref(realtimeDb, 'auctions');
+        const auctionsRef = dbRef(realtimeDb, 'auctions');
         await remove(auctionsRef);
         console.log('✅ Todas las subastas eliminadas de Firebase');
         
         // Eliminar productos
-        const productsRef = ref(realtimeDb, 'products');
+        const productsRef = dbRef(realtimeDb, 'products');
         await remove(productsRef);
         console.log('✅ Todos los productos eliminados de Firebase');
         
+        // Eliminar bots
+        const botsRef = dbRef(realtimeDb, 'bots');
+        await remove(botsRef);
+        console.log('✅ Todos los bots eliminados de Firebase');
+        
+        // Eliminar notificaciones de todos los usuarios
+        const notificationsRef = dbRef(realtimeDb, 'notifications');
+        await remove(notificationsRef);
+        console.log('✅ Todas las notificaciones eliminadas de Firebase');
+        
+        // Eliminar mensajes de todas las conversaciones
+        const messagesRef = dbRef(realtimeDb, 'messages');
+        await remove(messagesRef);
+        console.log('✅ Todos los mensajes eliminados de Firebase');
+        
         // Eliminar pedidos
-        const ordersRef = ref(realtimeDb, 'orders');
+        const ordersRef = dbRef(realtimeDb, 'orders');
         await remove(ordersRef);
         console.log('✅ Todos los pedidos eliminados de Firebase');
-      } catch (firebaseError) {
-        console.error('❌ Error eliminando datos de Firebase:', firebaseError);
-        if (firebaseError instanceof Error) {
-          alert('⚠️ Error eliminando de Firebase: ' + firebaseError.message + '\n\nAlgunos datos pueden no haberse eliminado correctamente.');
+        
+        // Eliminar transacciones de pedidos
+        const orderTransactionsRef = dbRef(realtimeDb, 'orderTransactions');
+        await remove(orderTransactionsRef);
+        console.log('✅ Todas las transacciones de pedidos eliminadas de Firebase');
+        
+        const orderTransactionsByOrderRef = dbRef(realtimeDb, 'orderTransactionsByOrder');
+        await remove(orderTransactionsByOrderRef);
+        console.log('✅ Todas las transacciones por pedido eliminadas de Firebase');
+        
+        // Eliminar secuencias de pedidos (para reiniciar el contador)
+        const orderSequencesRef = dbRef(realtimeDb, 'orderSequences');
+        await remove(orderSequencesRef);
+        console.log('✅ Secuencias de pedidos eliminadas de Firebase');
+        
+      } catch (firebaseError: any) {
+        console.error('❌ Error eliminando datos de Realtime Database:', firebaseError);
+        errors.push(`Realtime Database: ${firebaseError.message || 'Error desconocido'}`);
+      }
+      
+      // 🔥 ELIMINAR IMÁGENES DE FIREBASE STORAGE
+      try {
+        const foldersToDelete = ['auctions', 'products', 'images', 'banners'];
+        
+        for (const folder of foldersToDelete) {
+          try {
+            const folderRef = storageRef(storage, folder);
+            const listResult = await listAll(folderRef);
+            
+            // Eliminar todos los archivos en la carpeta
+            const deletePromises = listResult.items.map(item => 
+              deleteObject(item).catch(err => {
+                console.warn(`⚠️ No se pudo eliminar ${item.fullPath}:`, err.message);
+                return null;
+              })
+            );
+            
+            await Promise.all(deletePromises);
+            console.log(`✅ Todas las imágenes de ${folder} eliminadas de Firebase Storage`);
+          } catch (folderError: any) {
+            // Si la carpeta no existe, no es un error
+            if (folderError.code !== 'storage/object-not-found') {
+              console.warn(`⚠️ Error eliminando carpeta ${folder}:`, folderError.message);
+              errors.push(`Storage ${folder}: ${folderError.message}`);
+            }
+          }
         }
-        // Continuar aunque falle Firebase
+      } catch (storageError: any) {
+        console.error('❌ Error eliminando imágenes de Storage:', storageError);
+        errors.push(`Firebase Storage: ${storageError.message || 'Error desconocido'}`);
       }
       
       // Limpiar todo de localStorage (ya no se usa, pero por si acaso)
@@ -1119,43 +1219,45 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       localStorage.removeItem('bots');
       localStorage.removeItem('notifications');
       localStorage.removeItem('cart');
-      localStorage.removeItem('theme');
-      
-      // Restaurar datos preservados
-      if (usersBackup !== '[]') {
-        // Los usuarios están en Firebase, no necesitamos restaurar desde localStorage
-        console.log('✅ Usuarios preservados (en Firebase)');
-      }
-      if (actionLogsBackup !== '[]') {
-        localStorage.setItem('action_logs', actionLogsBackup);
-        console.log('✅ Logs de acciones preservados');
-      }
-      if (ordersBackup !== '[]') {
-        localStorage.setItem('orders', ordersBackup);
-        console.log('✅ Logs de ventas/pedidos preservados');
-      }
+      localStorage.removeItem('orders');
       
       // Limpiar estado de la app
       setAuctions([]);
       setProducts([]);
       setBots([]);
+      setOrders([]);
       
       // Registrar acción en log
-      logAdminAction('Sistema reseteado (preservando usuarios y logs, eliminando subastas de Firebase)', user?.id, user?.username);
+      logAdminAction('Sistema reseteado completamente (solo usuarios preservados)', user?.id, user?.username);
       
-      alert('✅ Datos reiniciados correctamente.\n\n✅ Usuarios registrados preservados\n✅ Logs de acciones preservados\n✅ Historial de pedidos preservado\n✅ Subastas eliminadas de Firebase');
+      // Mostrar resultado
+      if (errors.length > 0) {
+        alert(`⚠️ Reset completado con algunos errores:\n\n${errors.join('\n')}\n\n✅ Usuarios registrados preservados\n\nRevisa la consola para más detalles.`);
+      } else {
+        alert('✅ Sistema reseteado completamente.\n\n✅ Usuarios registrados preservados\n✅ Todos los demás datos eliminados de Firebase\n\nLa página se recargará en 2 segundos...');
+      }
       
       // Recargar para aplicar cambios SIN perder sesión
-      // NO hacer logout, solo recargar la página
-      // El usuario ya está autenticado en Firebase, así que seguirá logueado
       setTimeout(() => {
         window.location.reload();
-      }, 1000);
+      }, 2000);
     } catch (error) {
       console.error('Error en reset:', error);
-      alert('❌ Error al resetear datos');
+      alert('❌ Error crítico al resetear datos. Revisa la consola para más detalles.');
     }
   };
+
+  // Cargar transacciones cuando se selecciona un pedido
+  useEffect(() => {
+    if (selectedOrder) {
+      const unsubscribe = loadOrderTransactions(selectedOrder.id, (transactions) => {
+        setOrderTransactions(transactions);
+      });
+      return () => unsubscribe();
+    } else {
+      setOrderTransactions([]);
+    }
+  }, [selectedOrder]);
 
   // Filtrar pedidos y eliminar duplicados
   const uniqueOrders = orders.filter((order: Order, index: number, self: Order[]) => 
@@ -1166,8 +1268,10 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || 
                          order.id.toLowerCase().includes(searchLower) ||
+                         (order.orderNumber && order.orderNumber.toLowerCase().includes(searchLower)) ||
                          order.userId.toLowerCase().includes(searchLower) ||
                          (order.userName && order.userName.toLowerCase().includes(searchLower)) ||
+                         (order.productName && order.productName.toLowerCase().includes(searchLower)) ||
                          formatCurrency(order.amount).toLowerCase().includes(searchLower);
     const matchesStatus = filterStatus === 'all' || order.status === filterStatus;
     return matchesSearch && matchesStatus;
@@ -1275,6 +1379,32 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     }
   }, [activeTab, enhancedStats]);
 
+  // Función helper para crear notificación para otro usuario
+  const createNotificationForUser = async (targetUserId: string, notification: {
+    type: 'new_message' | 'auction_won' | 'auction_outbid' | 'purchase' | 'payment_reminder';
+    title: string;
+    message: string;
+    link?: string;
+  }) => {
+    try {
+      const newNotification = {
+        ...notification,
+        userId: targetUserId,
+        id: `NOTIF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: new Date().toISOString(),
+        read: false
+      };
+      
+      // Guardar directamente en Firebase para el usuario receptor
+      const notificationRef = dbRef(realtimeDb, `notifications/${targetUserId}/${newNotification.id}`);
+      await firebaseSet(notificationRef, newNotification);
+      
+      console.log(`✅ Notificación creada para usuario ${targetUserId}: ${newNotification.id}`);
+    } catch (error) {
+      console.error('❌ Error creando notificación para usuario:', error);
+    }
+  };
+
   // Función para enviar mensaje
   const handleSendMessage = async () => {
     if (!newMessageContent.trim()) return;
@@ -1288,6 +1418,14 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         const message = createMessage('admin', 'Administrador', userId, newMessageContent.trim());
         await saveMessage(message);
         
+        // Crear notificación para el usuario receptor
+        await createNotificationForUser(userId, {
+          type: 'new_message',
+          title: '💬 Nuevo mensaje del administrador',
+          message: `Tienes un nuevo mensaje: ${newMessageContent.trim().substring(0, 50)}${newMessageContent.trim().length > 50 ? '...' : ''}`,
+          link: '/perfil?tab=messages'
+        });
+        
         // Seleccionar la conversación si no está seleccionada
         const convId = `admin_${userId}`;
         if (!selectedConversation) {
@@ -1300,6 +1438,14 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         userId = selectedConversation.replace('admin_', '');
         const message = createMessage('admin', 'Administrador', userId, newMessageContent.trim());
         await saveMessage(message);
+        
+        // Crear notificación para el usuario receptor
+        await createNotificationForUser(userId, {
+          type: 'new_message',
+          title: '💬 Nuevo mensaje del administrador',
+          message: `Tienes un nuevo mensaje: ${newMessageContent.trim().substring(0, 50)}${newMessageContent.trim().length > 50 ? '...' : ''}`,
+          link: '/perfil?tab=messages'
+        });
       } else {
         console.warn('No hay conversación o usuario seleccionado');
         return;
@@ -1339,7 +1485,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       };
       
       // Guardar en Firebase
-      const homeConfigRef = ref(realtimeDb, 'homeConfig');
+      const homeConfigRef = dbRef(realtimeDb, 'homeConfig');
       await firebaseSet(homeConfigRef, updatedConfig);
       
       setHomeConfig(homeConfig); // Actualizar estado local
@@ -1545,6 +1691,44 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     }
 
     try {
+      // Obtener todas las notificaciones del usuario desde Firebase
+      const { notifications } = useStore.getState();
+      const now = Date.now();
+      const readCutoffDate = now - (1 * 24 * 60 * 60 * 1000); // 1 día para leídas
+      const unreadCutoffDate = now - (2 * 24 * 60 * 60 * 1000); // 2 días para no leídas
+      
+      let notificationsDeleted = 0;
+      
+      // Eliminar notificaciones antiguas de Firebase
+      for (const notification of notifications) {
+        let shouldDelete = false;
+        const createdAt = notification.createdAt ? new Date(notification.createdAt).getTime() : 0;
+        const readAt = notification.readAt ? new Date(notification.readAt).getTime() : 0;
+        
+        if (notification.read && readAt > 0) {
+          // Notificación leída: eliminar si fue leída hace más de 1 día
+          if (readAt < readCutoffDate) {
+            shouldDelete = true;
+          }
+        } else if (!notification.read && createdAt > 0) {
+          // Notificación no leída: eliminar si fue creada hace más de 2 días
+          if (createdAt < unreadCutoffDate) {
+            shouldDelete = true;
+          }
+        }
+        
+        if (shouldDelete) {
+          try {
+            const notificationRef = dbRef(realtimeDb, `notifications/${user.id}/${notification.id}`);
+            await remove(notificationRef);
+            notificationsDeleted++;
+            console.log(`🗑️ Notificación ${notification.id} eliminada de Firebase`);
+          } catch (error) {
+            console.error(`❌ Error eliminando notificación ${notification.id} de Firebase:`, error);
+          }
+        }
+      }
+      
       const result = runCleanup(user.id, auctions, orders);
       
       if (result) {
@@ -1562,6 +1746,30 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
             }
             return true;
           });
+          
+          // Eliminar subastas de Firebase
+          const auctionsToRemove = auctions.filter((auction: any) => {
+            if (auction.status === 'active' || auction.status === 'scheduled') return false;
+            if (auction.status === 'ended') {
+              const now = Date.now();
+              const cutoffDate = now - (3 * 24 * 60 * 60 * 1000);
+              const endTime = auction.endTime ? new Date(auction.endTime).getTime() : 0;
+              const createdAt = auction.createdAt ? new Date(auction.createdAt).getTime() : 0;
+              const checkDate = endTime > 0 ? endTime : createdAt;
+              return checkDate < cutoffDate;
+            }
+            return false;
+          });
+          
+          for (const auction of auctionsToRemove) {
+            try {
+              await remove(dbRef(realtimeDb, `auctions/${auction.id}`));
+              console.log(`🗑️ Subasta ${auction.id} eliminada de Firebase`);
+            } catch (error) {
+              console.error(`❌ Error eliminando subasta ${auction.id} de Firebase:`, error);
+            }
+          }
+          
           setAuctions(cleanedAuctions);
         }
         
@@ -1576,6 +1784,28 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
             }
             return true;
           });
+          
+          // Eliminar pedidos de Firebase
+          const ordersToRemove = orders.filter((order: any) => {
+            if (['pending_payment', 'payment_confirmed', 'in_transit'].includes(order.status)) return false;
+            if (['delivered', 'canceled', 'payment_expired'].includes(order.status)) {
+              const now = Date.now();
+              const cutoffDate = now - (7 * 24 * 60 * 60 * 1000);
+              const orderDate = order.createdAt ? new Date(order.createdAt).getTime() : 0;
+              return orderDate < cutoffDate;
+            }
+            return false;
+          });
+          
+          for (const order of ordersToRemove) {
+            try {
+              await remove(dbRef(realtimeDb, `orders/${order.id}`));
+              console.log(`🗑️ Pedido ${order.id} eliminado de Firebase`);
+            } catch (error) {
+              console.error(`❌ Error eliminando pedido ${order.id} de Firebase:`, error);
+            }
+          }
+          
           setOrders(cleanedOrders);
         }
 
@@ -1587,9 +1817,9 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
           }, 500);
         }
 
-        const total = result.notificationsCleaned + result.auctionsCleanup.cleaned + result.ordersCleanup.cleaned;
-        alert(`✅ Limpieza completada:\n- ${result.notificationsCleaned} notificaciones eliminadas\n- ${result.auctionsCleanup.cleaned} subastas eliminadas\n- ${result.ordersCleanup.cleaned} pedidos eliminados\n\nTotal: ${total} elementos eliminados`);
-        logAdminAction('Limpieza manual de datos ejecutada', user.id, user.username, { total });
+        const total = notificationsDeleted + result.auctionsCleanup.cleaned + result.ordersCleanup.cleaned;
+        alert(`✅ Limpieza completada:\n- ${notificationsDeleted} notificaciones eliminadas de Firebase\n- ${result.auctionsCleanup.cleaned} subastas eliminadas de Firebase\n- ${result.ordersCleanup.cleaned} pedidos eliminados de Firebase\n\nTotal: ${total} elementos eliminados`);
+        logAdminAction('Limpieza manual de datos ejecutada', user.id, user.username, { total, notificationsDeleted });
       }
     } catch (error) {
       console.error('Error en limpieza manual:', error);
@@ -2040,66 +2270,120 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 <button
                   onClick={() => {
                     if (window.confirm('¿Estás seguro de que querés limpiar la actividad reciente?\n\nEsto eliminará permanentemente:\n- Órdenes completadas/canceladas antiguas\n- Pujas de subastas finalizadas\n\nLas órdenes activas y subastas en curso NO se eliminarán.')) {
-                      const now = Date.now();
-                      const clearedTimestamp = now.toString();
-                      
-                      // Guardar timestamp específico por usuario admin para persistencia
-                      if (user?.id) {
-                        localStorage.setItem(`clearedActivityTimestamp_${user.id}`, clearedTimestamp);
-                      }
-                      // También guardar en clave global para compatibilidad
-                      localStorage.setItem('clearedActivityTimestamp', clearedTimestamp);
-                      
-                      // Eliminar órdenes antiguas completadas/canceladas (más de 7 días)
-                      const cutoffDate = now - (7 * 24 * 60 * 60 * 1000); // 7 días
-                      const activeOrderStatuses = ['pending_payment', 'payment_confirmed', 'processing', 'preparing', 'in_transit', 'shipped'];
-                      
-                      const filteredOrders = orders.filter(order => {
-                        // Mantener órdenes activas siempre
-                        if (activeOrderStatuses.includes(order.status)) {
-                          return true;
-                        }
-                        // Mantener órdenes recientes (menos de 7 días)
-                        const orderDate = new Date(order.createdAt).getTime();
-                        if (orderDate >= cutoffDate) {
-                          return true;
-                        }
-                        // Eliminar órdenes antiguas completadas/canceladas
-                        return false;
-                      });
-                      
-                      if (filteredOrders.length < orders.length) {
-                        setOrders(filteredOrders);
-                        console.log(`🗑️ Eliminadas ${orders.length - filteredOrders.length} órdenes antiguas`);
-                      }
-                      
-                      // Limpiar pujas de subastas finalizadas antiguas (más de 7 días)
-                      const updatedAuctions = auctions.map(auction => {
-                        if (auction.status === 'ended') {
-                          const endTime = new Date(auction.endTime).getTime();
-                          const daysSinceEnd = (now - endTime) / (24 * 60 * 60 * 1000);
-                          
-                          // Si la subasta finalizó hace más de 7 días, limpiar pujas antiguas
-                          if (daysSinceEnd > 7 && auction.bids.length > 0) {
-                            // Mantener solo la puja ganadora si existe
-                            const winningBid = auction.bids.reduce((highest, current) => 
-                              current.amount > highest.amount ? current : highest
-                            );
-                            
-                            return {
-                              ...auction,
-                              bids: [winningBid]
-                            };
+                      (async () => {
+                        const now = Date.now();
+                        const clearedTimestamp = now.toString();
+                        
+                        try {
+                          // Guardar timestamp en Firebase para persistencia
+                          if (user?.id) {
+                            try {
+                              await firebaseSet(dbRef(realtimeDb, `adminSettings/${user.id}/clearedActivityTimestamp`), clearedTimestamp);
+                            } catch (firebaseError: any) {
+                              // Si falla por permisos, solo usar localStorage
+                              if (firebaseError?.code === 'PERMISSION_DENIED') {
+                                console.log('ℹ️ No hay permisos para guardar en adminSettings, usando localStorage');
+                              } else {
+                                console.error('Error guardando timestamp en Firebase:', firebaseError);
+                              }
+                            }
+                            // También guardar en localStorage para compatibilidad
+                            localStorage.setItem(`clearedActivityTimestamp_${user.id}`, clearedTimestamp);
+                          }
+                        // También guardar en clave global para compatibilidad
+                        localStorage.setItem('clearedActivityTimestamp', clearedTimestamp);
+                        
+                        // Eliminar órdenes antiguas completadas/canceladas (más de 7 días)
+                        const cutoffDate = now - (7 * 24 * 60 * 60 * 1000); // 7 días
+                        const activeOrderStatuses = ['pending_payment', 'payment_confirmed', 'processing', 'preparing', 'in_transit', 'shipped'];
+                        
+                        const filteredOrders = orders.filter(order => {
+                          // Mantener órdenes activas siempre
+                          if (activeOrderStatuses.includes(order.status)) {
+                            return true;
+                          }
+                          // Mantener órdenes recientes (menos de 7 días)
+                          const orderDate = new Date(order.createdAt).getTime();
+                          if (orderDate >= cutoffDate) {
+                            return true;
+                          }
+                          // Eliminar órdenes antiguas completadas/canceladas
+                          return false;
+                        });
+                        
+                        // Eliminar órdenes de Firebase
+                        const ordersToRemove = orders.filter(order => {
+                          if (activeOrderStatuses.includes(order.status)) {
+                            return false; // No eliminar activas
+                          }
+                          const orderDate = new Date(order.createdAt).getTime();
+                          return orderDate < cutoffDate; // Eliminar si es antigua
+                        });
+                        
+                        for (const order of ordersToRemove) {
+                          try {
+                            await remove(dbRef(realtimeDb, `orders/${order.id}`));
+                            console.log(`🗑️ Orden ${order.id} eliminada de Firebase`);
+                          } catch (error) {
+                            console.error(`❌ Error eliminando orden ${order.id} de Firebase:`, error);
                           }
                         }
-                        return auction;
-                      });
-                      
-                      setAuctions(updatedAuctions);
-                      setRefreshKey(prev => prev + 1);
-                      logAdminAction('Actividad reciente limpiada permanentemente', user?.id, user?.username);
-                      
-                      alert(`✅ Actividad reciente limpiada\n\nEliminadas ${orders.length - filteredOrders.length} órdenes antiguas.`);
+                        
+                        if (filteredOrders.length < orders.length) {
+                          setOrders(filteredOrders);
+                          console.log(`🗑️ Eliminadas ${orders.length - filteredOrders.length} órdenes antiguas de Firebase`);
+                        }
+                        
+                        // Limpiar pujas de subastas finalizadas antiguas (más de 7 días)
+                        const updatedAuctions = auctions.map(auction => {
+                          if (auction.status === 'ended') {
+                            const endTime = new Date(auction.endTime).getTime();
+                            const daysSinceEnd = (now - endTime) / (24 * 60 * 60 * 1000);
+                            
+                            // Si la subasta finalizó hace más de 7 días, limpiar pujas antiguas
+                            if (daysSinceEnd > 7 && auction.bids.length > 0) {
+                              // Mantener solo la puja ganadora si existe
+                              const winningBid = auction.bids.reduce((highest, current) => 
+                                current.amount > highest.amount ? current : highest
+                              );
+                              
+                              return {
+                                ...auction,
+                                bids: [winningBid]
+                              };
+                            }
+                          }
+                          return auction;
+                        });
+                        
+                        // Actualizar subastas en Firebase
+                        for (const auction of updatedAuctions) {
+                          if (auction.status === 'ended') {
+                            const endTime = new Date(auction.endTime).getTime();
+                            const daysSinceEnd = (now - endTime) / (24 * 60 * 60 * 1000);
+                            if (daysSinceEnd > 7 && auction.bids.length > 0) {
+                              try {
+                                await update(dbRef(realtimeDb, `auctions/${auction.id}`), {
+                                  bids: auction.bids
+                                });
+                                console.log(`✅ Subasta ${auction.id} actualizada en Firebase (pujas limpiadas)`);
+                              } catch (error) {
+                                console.error(`❌ Error actualizando subasta ${auction.id} en Firebase:`, error);
+                              }
+                            }
+                          }
+                        }
+                        
+                        setAuctions(updatedAuctions);
+                        setRefreshKey(prev => prev + 1);
+                        logAdminAction('Actividad reciente limpiada permanentemente', user?.id, user?.username);
+                        
+                          alert(`✅ Actividad reciente limpiada\n\nEliminadas ${orders.length - filteredOrders.length} órdenes antiguas de Firebase.`);
+                        } catch (error) {
+                          console.error('❌ Error limpiando actividad reciente:', error);
+                          alert('❌ Error al limpiar actividad reciente. Algunos datos pueden no haberse eliminado correctamente.');
+                        }
+                      })();
                     }
                   }}
                   className="btn"
@@ -2748,7 +3032,21 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                         }}
                       />
                     )}
-                    <h3 style={{ margin: 0, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+                    <h3 style={{ 
+                      margin: 0, 
+                      marginBottom: '0.5rem', 
+                      color: 'var(--text-primary)',
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                      lineHeight: 1.3,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      wordBreak: 'break-word',
+                      maxHeight: '2.6em'
+                    }}>
                       {product.name}
                     </h3>
                     <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
@@ -3291,7 +3589,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 }} />
                 <input
                   type="text"
-                  placeholder="Buscar por ID, cliente o monto..."
+                  placeholder="Buscar por número de pedido, ID, cliente, producto o monto..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   style={{
@@ -3442,8 +3740,13 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                         >
                           <td style={{ padding: '1rem' }}>
                             <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: isMobile ? '0.875rem' : '0.9375rem' }}>
-                              #{order.id.slice(-8).toUpperCase()}
+                              {order.orderNumber || `#${order.id.slice(-8).toUpperCase()}`}
                             </div>
+                            {order.orderNumber && (
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                                ID: {order.id.slice(-8).toUpperCase()}
+                              </div>
+                            )}
                           </td>
                           <td style={{ padding: '1rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -3518,15 +3821,35 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                                       shipped: 'Marcar como Entregado'
                                     };
                                     
-                                    const confirmMessage = `¿${statusLabels[nextStatus] || 'Actualizar estado'} del pedido #${order.id.slice(-8)}?\n\nEstado actual: ${statusBadge.text}\nNuevo estado: ${getStatusBadge(nextStatus).text}`;
+                                    const orderDisplay = order.orderNumber || `#${order.id.slice(-8).toUpperCase()}`;
+                                    const confirmMessage = `¿${statusLabels[nextStatus] || 'Actualizar estado'} del pedido ${orderDisplay}?\n\nEstado actual: ${statusBadge.text}\nNuevo estado: ${getStatusBadge(nextStatus).text}`;
                                     
                                     if (window.confirm(confirmMessage)) {
+                                      const previousStatus = order.status;
                                       updateOrderStatus(order.id, nextStatus);
+                                      
+                                      // Registrar en log de acciones
                                       logOrderAction('Estado actualizado', order.id, user?.id, user?.username, { 
                                         oldStatus: order.status, 
                                         newStatus: nextStatus,
                                         actionType: 'manual'
                                       });
+                                      
+                                      // Registrar en log de transacciones
+                                      if (order.orderNumber) {
+                                        logOrderStatusChange(
+                                          order.id,
+                                          order.orderNumber,
+                                          order.userId,
+                                          order.userName,
+                                          nextStatus,
+                                          order.amount,
+                                          previousStatus,
+                                          nextStatus,
+                                          user?.id,
+                                          user?.username
+                                        ).catch(err => console.error('Error registrando transacción:', err));
+                                      }
                                     }
                                   }}
                                   className="btn btn-primary"
@@ -6478,6 +6801,271 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 <AlertTriangle size={18} style={{ marginRight: '0.5rem' }} />
                 Resetear Sistema
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Detalles del Pedido con Historial de Transacciones */}
+      {selectedOrder && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: isMobile ? '1rem' : '2rem',
+            overflow: 'auto'
+          }}
+          onClick={() => setSelectedOrder(null)}
+        >
+          <div
+            style={{
+              background: 'var(--bg-primary)',
+              borderRadius: '1rem',
+              width: '100%',
+              maxWidth: '900px',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+              border: '1px solid var(--border)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header del Modal */}
+            <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid var(--border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+              color: 'white'
+            }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: 700 }}>
+                  📦 Detalles del Pedido
+                </h2>
+                <p style={{ margin: '0.5rem 0 0', opacity: 0.9, fontSize: '0.875rem' }}>
+                  {selectedOrder.orderNumber || `#${selectedOrder.id.slice(-8).toUpperCase()}`}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedOrder(null)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  padding: '0.5rem',
+                  cursor: 'pointer',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <XCircle size={24} />
+              </button>
+            </div>
+
+            {/* Contenido del Modal */}
+            <div style={{ padding: '1.5rem' }}>
+              {/* Información Principal del Pedido */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
+                gap: '1rem',
+                marginBottom: '2rem'
+              }}>
+                <div style={{
+                  background: 'var(--bg-secondary)',
+                  padding: '1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--border)'
+                }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>Cliente</div>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '1rem' }}>
+                    {selectedOrder.userName || 'Sin nombre'}
+                  </div>
+                </div>
+                <div style={{
+                  background: 'var(--bg-secondary)',
+                  padding: '1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--border)'
+                }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>Producto</div>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '1rem' }}>
+                    {selectedOrder.productName || 'Sin nombre'}
+                  </div>
+                </div>
+                <div style={{
+                  background: 'var(--bg-secondary)',
+                  padding: '1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--border)'
+                }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>Monto</div>
+                  <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1.25rem' }}>
+                    {formatCurrency(selectedOrder.amount)}
+                  </div>
+                </div>
+                <div style={{
+                  background: 'var(--bg-secondary)',
+                  padding: '1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--border)'
+                }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>Estado</div>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '1rem' }}>
+                    {getStatusBadge(selectedOrder.status).text}
+                  </div>
+                </div>
+                <div style={{
+                  background: 'var(--bg-secondary)',
+                  padding: '1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--border)'
+                }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>Fecha de Creación</div>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '1rem' }}>
+                    {selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleString('es-AR') : 'N/A'}
+                  </div>
+                </div>
+                <div style={{
+                  background: 'var(--bg-secondary)',
+                  padding: '1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--border)'
+                }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>Método de Entrega</div>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '1rem' }}>
+                    {getDeliveryMethodBadge(selectedOrder.deliveryMethod || 'shipping').text}
+                  </div>
+                </div>
+              </div>
+
+              {/* Historial de Transacciones */}
+              <div style={{
+                marginTop: '2rem',
+                padding: '1rem',
+                background: 'var(--bg-secondary)',
+                borderRadius: '0.75rem',
+                border: '1px solid var(--border)'
+              }}>
+                <h3 style={{
+                  margin: '0 0 1rem',
+                  fontSize: '1.25rem',
+                  fontWeight: 700,
+                  color: 'var(--text-primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <FileText size={20} />
+                  Historial de Transacciones
+                </h3>
+                
+                {orderTransactions.length === 0 ? (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '2rem',
+                    color: 'var(--text-secondary)'
+                  }}>
+                    <FileText size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
+                    <p>No hay transacciones registradas para este pedido</p>
+                  </div>
+                ) : (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem',
+                    maxHeight: '400px',
+                    overflowY: 'auto'
+                  }}>
+                    {orderTransactions.map((txn, index) => {
+                      const txnDate = txn.date ? new Date(txn.date + 'T00:00:00').toLocaleDateString('es-AR') : 'N/A';
+                      const txnTime = txn.time || 'N/A';
+                      
+                      return (
+                        <div
+                          key={txn.id || index}
+                          style={{
+                            padding: '1rem',
+                            background: 'var(--bg-primary)',
+                            borderRadius: '0.5rem',
+                            border: '1px solid var(--border)',
+                            borderLeft: '4px solid var(--primary)'
+                          }}
+                        >
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            flexWrap: 'wrap',
+                            gap: '0.5rem'
+                          }}>
+                            <div style={{ flex: 1, minWidth: '200px' }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                marginBottom: '0.5rem'
+                              }}>
+                                <span style={{
+                                  fontWeight: 700,
+                                  color: 'var(--text-primary)',
+                                  fontSize: '0.9375rem'
+                                }}>
+                                  {txn.actionType === 'created' && '📦 Pedido Creado'}
+                                  {txn.actionType === 'status_changed' && '🔄 Cambio de Estado'}
+                                  {txn.actionType === 'payment_received' && '💳 Pago Recibido'}
+                                  {txn.actionType === 'shipped' && '🚚 Enviado'}
+                                  {txn.actionType === 'delivered' && '✅ Entregado'}
+                                  {txn.actionType === 'cancelled' && '❌ Cancelado'}
+                                  {!txn.actionType && '📝 Transacción'}
+                                </span>
+                              </div>
+                              {txn.previousStatus && txn.newStatus && (
+                                <div style={{
+                                  fontSize: '0.875rem',
+                                  color: 'var(--text-secondary)',
+                                  marginBottom: '0.25rem'
+                                }}>
+                                  {getStatusBadge(txn.previousStatus).text} → {getStatusBadge(txn.newStatus).text}
+                                </div>
+                              )}
+                              {txn.adminName && (
+                                <div style={{
+                                  fontSize: '0.75rem',
+                                  color: 'var(--text-secondary)',
+                                  fontStyle: 'italic'
+                                }}>
+                                  Por: {txn.adminName}
+                                </div>
+                              )}
+                            </div>
+                            <div style={{
+                              textAlign: 'right',
+                              fontSize: '0.875rem',
+                              color: 'var(--text-secondary)'
+                            }}>
+                              <div>{txnDate}</div>
+                              <div>{txnTime}</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

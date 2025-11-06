@@ -34,8 +34,15 @@ const Navbar = () => {
     }
   };
 
-  // Generar avatar URL
-  const avatarUrl = user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.username || 'U')}&size=40&background=FF6B00&color=fff&bold=true`;
+  // Generar avatar URL con validación robusta
+  const getAvatarUrl = () => {
+    if (user?.avatar && typeof user.avatar === 'string' && user.avatar.trim() !== '' && user.avatar.startsWith('http')) {
+      return user.avatar;
+    }
+    const username = user?.username || user?.email?.split('@')[0] || 'U';
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&size=40&background=FF6B00&color=fff&bold=true`;
+  };
+  const avatarUrl = getAvatarUrl();
 
   // Determinar si el enlace está activo para el navbar móvil
   const isActive = (path: string) => location.pathname === path;

@@ -1,6 +1,6 @@
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { auth, db, syncUserToRealtimeDb } from '../config/firebase';
 import { useStore } from '../store/useStore';
 import { useNavigate } from 'react-router-dom';
 import { User } from '../types';
@@ -58,7 +58,7 @@ const GoogleSignIn = () => {
         email: user.email!,
         username: userData?.username || user.displayName || 'Usuario',
         avatar: user.photoURL || userData?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'U')}&size=200&background=FF6B00&color=fff&bold=true`,
-        isAdmin: userData?.role === 'admin',
+        isAdmin: userData?.role === 'admin' || userData?.isAdmin === true,
         dni: userData?.dni || '',
         createdAt: userData?.createdAt ? new Date(userData.createdAt) : new Date(),
         address: userData?.address && userData?.latitude ? {
@@ -71,6 +71,14 @@ const GoogleSignIn = () => {
           }
         } : undefined
       };
+
+      // Sincronizar isAdmin a Realtime Database para que las reglas funcionen
+      await syncUserToRealtimeDb(
+        fullUser.id,
+        fullUser.isAdmin,
+        fullUser.email,
+        fullUser.username
+      );
 
       setUser(fullUser);
       localStorage.setItem('user', JSON.stringify(fullUser));

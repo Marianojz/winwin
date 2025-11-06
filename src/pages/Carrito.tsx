@@ -4,6 +4,8 @@ import { useStore } from '../store/useStore';
 import { formatCurrency } from '../utils/helpers';
 import { Order } from '../types';
 import { createAutoMessage, saveMessage } from '../utils/messages';
+import { generateOrderNumber } from '../utils/orderNumberGenerator';
+import { logOrderCreated } from '../utils/orderTransactions';
 
 const Carrito = () => {
   const navigate = useNavigate();
@@ -43,53 +45,88 @@ const Carrito = () => {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 horas para pagar
 
-    cart.forEach(item => {
-      const order: Order = {
-        id: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        userId: user.id,
-        userName: user.username,
-        productId: item.product.id,
-        productName: item.product.name,
-        productImage: item.product.images[0] || '',
-        productType: 'store',
-        type: 'store',
-        amount: item.product.price * item.quantity,
-        status: 'pending_payment',
-        deliveryMethod: 'shipping',
-        createdAt: now,
-        expiresAt: expiresAt,
-        address: user.address || { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } }
-      };
-
-      addOrder(order);
-
-      // Reducir stock temporalmente (se devolverá si no paga)
-      const updatedProducts = products.map(p =>
-        p.id === item.product.id
-          ? { ...p, stock: p.stock - item.quantity }
-          : p
-      );
-      setProducts(updatedProducts);
-      
-      // Crear mensaje automático para la compra
-      try {
-        const autoMsg = createAutoMessage(
-          user.id,
-          user.username,
-          'purchase',
-          {
-            productName: item.product.name,
+    // Crear órdenes de forma asíncrona para generar números únicos
+    const createOrders = async () => {
+      for (const item of cart) {
+        try {
+          const orderNumber = await generateOrderNumber();
+          const order: Order = {
+            id: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            orderNumber,
+            userId: user.id,
+            userName: user.username,
             productId: item.product.id,
-            orderId: order.id,
-            amount: order.amount
+            productName: item.product.name,
+            productImage: item.product.images[0] || '',
+            productType: 'store',
+            type: 'store',
+            amount: item.product.price * item.quantity,
+            status: 'pending_payment',
+            deliveryMethod: 'shipping',
+            createdAt: now,
+            expiresAt: expiresAt,
+            address: user.address || { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } }
+          };
+
+          await addOrder(order);
+          
+          // Registrar transacción en el log
+          await logOrderCreated(order.id, orderNumber, user.id, user.username, order.amount);
+
+          // Reducir stock temporalmente (se devolverá si no paga)
+          const updatedProducts = products.map(p =>
+            p.id === item.product.id
+              ? { ...p, stock: p.stock - item.quantity }
+              : p
+          );
+          setProducts(updatedProducts);
+          
+          // Crear mensaje automático para la compra
+          try {
+            const autoMsg = createAutoMessage(
+              user.id,
+              user.username,
+              'purchase',
+              {
+                productName: item.product.name,
+                productId: item.product.id,
+                orderId: order.id,
+                amount: order.amount
+              }
+            );
+            saveMessage(autoMsg);
+            console.log(`💬 Mensaje automático enviado para compra de ${item.product.name}`);
+          } catch (error) {
+            console.error('Error creando mensaje automático:', error);
           }
-        );
-        saveMessage(autoMsg);
-        console.log(`💬 Mensaje automático enviado para compra de ${item.product.name}`);
-      } catch (error) {
-        console.error('Error creando mensaje automático:', error);
+        } catch (error) {
+          console.error('Error creando pedido:', error);
+        }
       }
-    });
+      
+      // Notificación para el usuario
+      addNotification({
+        userId: user.id,
+        type: 'purchase',
+        title: '🛍️ Compra Iniciada',
+        message: `Compraste ${cart.length} producto(s) por ${formatCurrency(cartTotal)}. Tenés 48hs para pagar.`,
+        read: false
+      });
+
+      // Notificación para el admin
+      addNotification({
+        userId: 'admin',
+        type: 'purchase',
+        title: '🛍️ Nueva Compra',
+        message: `${user.username} inició una compra por ${formatCurrency(cartTotal)}. Esperando pago.`,
+        read: false
+      });
+
+      clearCart();
+      navigate('/perfil?tab=orders');
+    };
+
+    createOrders();
 
     // Notificación para el usuario
     addNotification({

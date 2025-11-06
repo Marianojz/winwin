@@ -113,9 +113,15 @@ const AuctionManager = () => {
       });
     };
 
-    const updateAuctionStatuses = () => {
+    const updateAuctionStatuses = async () => {
       const now = new Date();
       let needsUpdate = false;
+
+      // Verificar que el usuario esté autenticado antes de procesar
+      if (!user) {
+        console.log('⏳ Esperando autenticación del usuario antes de procesar subastas...');
+        return;
+      }
 
       console.log('🕐 Chequeando subastas - Hora actual:', now.toISOString());
 
@@ -166,7 +172,10 @@ if (endTime <= now) {
       address: { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } }
     };
 
-    addOrder(order);
+    // Usar await para asegurar que el usuario esté disponible
+    addOrder(order).catch(err => {
+      console.error('❌ Error creando pedido automático:', err);
+    });
     console.log(`📝 Orden creada para ${winnerName}: ${finalPrice}`);
 
     // Notificar al ganador
@@ -192,7 +201,9 @@ if (endTime <= now) {
           orderId: order.id
         }
       );
-      saveMessage(autoMsg);
+      saveMessage(autoMsg).catch(err => {
+        console.error('❌ Error creando mensaje automático:', err);
+      });
       console.log(`💬 Mensaje automático enviado a ${winnerName}`);
     } catch (error) {
       console.error('Error creando mensaje automático:', error);
@@ -260,12 +271,12 @@ if (endTime <= now) {
 
     // Ejecutar chequeos normales
     checkForOutbids();
-    updateAuctionStatuses();
+    updateAuctionStatuses().catch(err => console.error('Error en updateAuctionStatuses:', err));
 
     // Ejecutar cada 30 segundos para chequeos más frecuentes
     const interval = setInterval(() => {
       checkForOutbids();
-      updateAuctionStatuses();
+      updateAuctionStatuses().catch(err => console.error('Error en updateAuctionStatuses:', err));
     }, 30000);
 
     return () => clearInterval(interval);

@@ -2,7 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { getDatabase } from 'firebase/database';  // <- NUEVA IMPORTACIÓN
+import { getDatabase, ref, set } from 'firebase/database';  // <- NUEVA IMPORTACIÓN
 
 // Tu configuración actual (NO LA CAMBIES)
 const firebaseConfig = {
@@ -27,6 +27,49 @@ export const storage = getStorage(app);
 export const realtimeDb = getDatabase(app);  // <- NUEVA EXPORTACIÓN
 
 export default app;
+
+// Helper para sincronizar datos del usuario de Firestore a Realtime Database
+// Esto es necesario porque las reglas de Realtime Database verifican isAdmin en Realtime DB
+export async function syncUserToRealtimeDb(userId: string, isAdmin: boolean, email?: string, username?: string) {
+  try {
+    const userRef = ref(realtimeDb, `users/${userId}`);
+    
+    // Verificar si ya existe para no sobrescribir datos importantes
+    const { get: firebaseGet } = await import('firebase/database');
+    const snapshot = await firebaseGet(userRef);
+    
+    if (snapshot.exists()) {
+      const existingData = snapshot.val();
+      // Actualizar solo isAdmin si cambió, preservar otros datos
+      if (existingData.isAdmin !== isAdmin) {
+        await set(userRef, {
+          ...existingData,
+          isAdmin: isAdmin,
+          lastSynced: new Date().toISOString()
+        });
+        console.log('✅ Usuario actualizado en Realtime Database:', userId, 'isAdmin:', isAdmin, '(cambió de', existingData.isAdmin, 'a', isAdmin + ')');
+      } else {
+        console.log('✅ Usuario ya está sincronizado en Realtime Database:', userId, 'isAdmin:', isAdmin);
+      }
+    } else {
+      // Crear nuevo registro
+      await set(userRef, {
+        isAdmin: isAdmin,
+        email: email || '',
+        username: username || 'Usuario',
+        lastSynced: new Date().toISOString()
+      });
+      console.log('✅ Usuario creado en Realtime Database:', userId, 'isAdmin:', isAdmin);
+    }
+  } catch (error: any) {
+    console.error('❌ Error sincronizando usuario a Realtime Database:', error);
+    if (error?.code === 'PERMISSION_DENIED') {
+      console.error('🔒 Error de permisos al sincronizar. Verifica las reglas de Firebase para users/{userId}');
+      console.error('   Las reglas deben permitir que el usuario escriba en users/{auth.uid}');
+    }
+    // No fallar silenciosamente, pero no bloquear el flujo
+  }
+}
 
 // Helper para inicializar usuario desde Firebase Auth
 export function attachAuthListener(onUser: (user: any | null) => void) {
@@ -64,6 +107,15 @@ export function attachAuthListener(onUser: (user: any | null) => void) {
               }
             } : undefined
           };
+          
+          // Sincronizar isAdmin a Realtime Database para que las reglas funcionen
+          syncUserToRealtimeDb(
+            firebaseUser.uid,
+            fullUser.isAdmin,
+            fullUser.email,
+            fullUser.username
+          ).catch(err => console.warn('Error sincronizando usuario:', err));
+          
           onUser(fullUser);
         } else {
           // Si no existe en Firestore, usar datos básicos de Auth

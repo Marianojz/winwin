@@ -330,13 +330,16 @@ isAuthenticated: (() => {
   
   // Función auxiliar para normalizar notificaciones
   _normalizeNotification: (n: any) => {
-    // Normalizar read a boolean estricto
+    // Normalizar read a boolean estricto - verificar múltiples formatos
     let readValue = false;
-    if (n.read === true || n.read === 'true' || String(n.read) === 'true' || n.read === 1) {
+    
+    // Si tiene readAt, definitivamente está leída
+    if (n.readAt) {
       readValue = true;
-    } else if (n.readAt) {
-      // Si tiene readAt pero read no está definido correctamente, asumir que está leída
+    } else if (n.read === true || n.read === 'true' || String(n.read) === 'true' || n.read === 1 || n.read === '1') {
       readValue = true;
+    } else if (n.read === false || n.read === 'false' || String(n.read) === 'false' || n.read === 0 || n.read === '0' || n.read === null || n.read === undefined) {
+      readValue = false;
     }
     
     return {
@@ -355,12 +358,31 @@ isAuthenticated: (() => {
     }
 
     try {
+      // Desconectar listener anterior si existe para evitar múltiples listeners
+      const existingUnsubscribe = (get() as any)._notificationUnsubscribe;
+      if (existingUnsubscribe) {
+        const notificationsRef = ref(realtimeDb, `notifications/${user.id}`);
+        off(notificationsRef);
+        console.log('🔌 Listener anterior desconectado');
+      }
+
       const notificationsRef = ref(realtimeDb, `notifications/${user.id}`);
+      
+      // Usar flag compartido para evitar loops infinitos (guardado en el store)
+      const state = get();
+      if (!(state as any)._notificationProcessing) {
+        (state as any)._notificationProcessing = false;
+      }
       
       // Escuchar cambios en tiempo real
       const unsubscribe = onValue(notificationsRef, (snapshot) => {
+        const currentState = get();
+        // Evitar procesamiento simultáneo
+        if ((currentState as any)._notificationProcessing) {
+          return;
+        }
+        (currentState as any)._notificationProcessing = true;
         const data = snapshot.val();
-        const now = Date.now();
         const normalizeFn = get()._normalizeNotification;
         
         if (!data) {
@@ -371,25 +393,30 @@ isAuthenticated: (() => {
         // Convertir objeto Firebase a array
         const notificationsArray = Object.values(data).map((n: any) => normalizeFn(n));
         
-        // Filtrar notificaciones leídas antiguas (más de 2 días desde que fueron leídas)
-        // Y notificaciones no leídas muy antiguas (más de 7 días desde creación)
+        // Filtrar notificaciones leídas antiguas (más de 1 día desde que fueron leídas)
+        // Y notificaciones no leídas muy antiguas (más de 3 días desde creación)
+        const now = Date.now();
+        const readCutoffDate = now - (1 * 24 * 60 * 60 * 1000); // 1 día para leídas
+        const unreadCutoffDate = now - (3 * 24 * 60 * 60 * 1000); // 3 días para no leídas
+        
+        const notificationsToDelete: string[] = [];
         const filtered = notificationsArray.filter((n: any) => {
           const isRead = n.read === true || n.read === 'true' || String(n.read) === 'true';
           
           if (isRead && n.readAt) {
             const readTime = new Date(n.readAt).getTime();
-            const daysSinceRead = (now - readTime) / (24 * 60 * 60 * 1000);
-            if (daysSinceRead > 2) {
-              return false;
+            if (readTime < readCutoffDate) {
+              notificationsToDelete.push(n.id);
+              return false; // Eliminar leídas hace más de 1 día
             }
             return true;
           }
           
           if (!isRead) {
             const createdAt = new Date(n.createdAt).getTime();
-            const daysSinceCreation = (now - createdAt) / (24 * 60 * 60 * 1000);
-            if (daysSinceCreation > 7) {
-              return false;
+            if (createdAt < unreadCutoffDate) {
+              notificationsToDelete.push(n.id);
+              return false; // Eliminar no leídas hace más de 3 días
             }
             return true;
           }
@@ -397,21 +424,88 @@ isAuthenticated: (() => {
           return true;
         });
         
-        // Convertir a objetos Date para el estado
-        const notifications = filtered.map((n: any) => ({
-          ...n,
-          createdAt: new Date(n.createdAt),
-          read: Boolean(n.read === true || n.read === 'true' || String(n.read) === 'true' || n.readAt),
-          readAt: n.readAt ? new Date(n.readAt) : undefined
-        }));
+        // Eliminar notificaciones antiguas de Firebase en segundo plano
+        // PERO solo si no estamos en un loop (evitar disparar múltiples veces)
+        if (notificationsToDelete.length > 0 && notificationsToDelete.length < 50) {
+          // Usar setTimeout para evitar loops - eliminar en batch después de un delay
+          setTimeout(() => {
+            Promise.all(notificationsToDelete.map(async (id) => {
+              try {
+                const notificationRef = ref(realtimeDb, `notifications/${user.id}/${id}`);
+                await remove(notificationRef);
+              } catch (error) {
+                console.error(`Error eliminando notificación ${id}:`, error);
+              }
+            })).then(() => {
+              console.log(`✅ ${notificationsToDelete.length} notificaciones antiguas eliminadas`);
+            }).finally(() => {
+              const state = get();
+              (state as any)._notificationProcessing = false;
+            });
+          }, 1000); // Delay de 1 segundo para evitar loops
+        } else {
+          const state = get();
+          (state as any)._notificationProcessing = false;
+        }
         
+        // Ordenar por fecha (más recientes primero) y limitar a 200
+        const sorted = filtered.sort((a: any, b: any) => {
+          const dateA = new Date(a.createdAt).getTime();
+          const dateB = new Date(b.createdAt).getTime();
+          return dateB - dateA; // Más recientes primero
+        });
+        
+        // Limitar a las últimas 200 notificaciones
+        const limited = sorted.slice(0, 200);
+        
+        // Convertir a objetos Date para el estado y normalizar read
+        const notifications = limited.map((n: any) => {
+          const normalized = normalizeFn(n);
+          return {
+            ...normalized,
+            createdAt: new Date(normalized.createdAt),
+            read: Boolean(normalized.read), // Usar el valor normalizado
+            readAt: normalized.readAt ? new Date(normalized.readAt) : undefined
+          };
+        });
+        
+        // Contar no leídas: solo las que están cargadas (máximo 200)
         const unreadCount = notifications.filter((n: any) => !n.read).length;
         
-        set({ notifications, unreadCount });
-        console.log(`✅ Cargadas ${notifications.length} notificaciones desde Firebase para ${user.username} (${unreadCount} no leídas)`);
+        // Si hay más de 200 notificaciones, el conteo puede ser mayor
+        // Contar todas las no leídas en el array filtrado completo para un conteo más preciso
+        const totalUnreadInFiltered = filtered.filter((n: any) => {
+          const isRead = n.read === true || n.read === 'true' || String(n.read) === 'true';
+          return !isRead;
+        }).length;
+        
+        // Usar el conteo de las cargadas para la UI, pero mostrar advertencia si hay más
+        const finalUnreadCount = Math.min(unreadCount, totalUnreadInFiltered);
+        
+        set({ notifications, unreadCount: finalUnreadCount });
+        
+        // Solo loggear ocasionalmente para evitar spam (solo la primera vez o si cambió el conteo)
+        const lastCount = (get() as any)._lastNotificationCount || 0;
+        if (finalUnreadCount !== lastCount || !(get() as any)._notificationLogged) {
+          if (filtered.length > 200) {
+            console.log(`✅ Cargadas ${notifications.length} notificaciones (de ${filtered.length} totales) para ${user.username} (${finalUnreadCount} no leídas mostradas)`);
+          } else {
+            console.log(`✅ Cargadas ${notifications.length} notificaciones desde Firebase para ${user.username} (${finalUnreadCount} no leídas)`);
+          }
+          (get() as any)._lastNotificationCount = finalUnreadCount;
+          (get() as any)._notificationLogged = true;
+        }
+        
+        // Resetear flag después de un delay
+        setTimeout(() => {
+          const state = get();
+          (state as any)._notificationProcessing = false;
+        }, 500);
       }, (error) => {
         console.error('Error cargando notificaciones desde Firebase:', error);
         set({ notifications: [], unreadCount: 0 });
+        const state = get();
+        (state as any)._notificationProcessing = false;
       });
       
       // Guardar referencia para poder desconectar después
@@ -489,24 +583,23 @@ isAuthenticated: (() => {
     const wasUnread = notificationToDelete && notificationToDelete.read === false;
     
     try {
-      // Eliminar de Firebase
+      // Eliminar de Firebase PRIMERO
       const notificationRef = ref(realtimeDb, `notifications/${user.id}/${notificationId}`);
       await remove(notificationRef);
       
-      // Actualización optimista local
+      // IMPORTANTE: Esperar un momento para que Firebase procese antes de actualizar estado local
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Actualización del estado local DESPUÉS de confirmar eliminación en Firebase
       set({
         notifications: state.notifications.filter(n => n.id !== notificationId),
         unreadCount: wasUnread ? Math.max(0, state.unreadCount - 1) : state.unreadCount
       });
       
-      console.log(`✅ Notificación eliminada de Firebase: ${notificationId}`);
+      console.log(`✅ Notificación eliminada permanentemente de Firebase: ${notificationId}`);
     } catch (error) {
       console.error('❌ Error eliminando notificación de Firebase:', error);
-      // Fallback: actualizar solo localmente si falla Firebase
-      set({
-        notifications: state.notifications.filter(n => n.id !== notificationId),
-        unreadCount: wasUnread ? Math.max(0, state.unreadCount - 1) : state.unreadCount
-      });
+      // NO actualizar estado local si falla Firebase - el listener de tiempo real cargará el estado correcto
     }
   },
   
@@ -535,14 +628,29 @@ isAuthenticated: (() => {
     const readAt = new Date().toISOString();
     
     try {
-      // Actualizar en Firebase
+      // Obtener la notificación completa de Firebase para actualizarla completamente
       const notificationRef = ref(realtimeDb, `notifications/${user.id}/${notificationId}`);
-      await update(notificationRef, {
+      const snapshot = await firebaseGet(notificationRef);
+      
+      if (!snapshot.exists()) {
+        console.warn(`⚠️ Notificación ${notificationId} no existe en Firebase`);
+        return;
+      }
+      
+      const currentNotification = snapshot.val();
+      
+      // Actualizar en Firebase con set() para garantizar guardado completo
+      await firebaseSet(notificationRef, {
+        ...currentNotification,
         read: true,
         readAt: readAt
       });
       
-      // Actualización optimista local
+      // IMPORTANTE: Esperar un momento para que Firebase procese antes de actualizar estado local
+      // Esto evita que el listener de tiempo real sobrescriba con datos antiguos
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Actualización del estado local DESPUÉS de confirmar guardado en Firebase
       const updatedNotifications = state.notifications.map(n => 
         n.id === notificationId 
           ? { ...n, read: true, readAt: new Date(readAt) }
@@ -559,19 +667,7 @@ isAuthenticated: (() => {
       console.log(`✅ Notificación ${notificationId} marcada como leída en Firebase. No leídas restantes: ${newUnreadCount}`);
     } catch (error) {
       console.error('❌ Error marcando notificación como leída en Firebase:', error);
-      // Fallback: actualizar solo localmente si falla Firebase
-      const updatedNotifications = state.notifications.map(n => 
-        n.id === notificationId 
-          ? { ...n, read: true, readAt: new Date(readAt) }
-          : n
-      );
-      
-      const newUnreadCount = updatedNotifications.filter(n => !n.read).length;
-      
-      set({
-        notifications: updatedNotifications,
-        unreadCount: newUnreadCount
-      });
+      // NO actualizar estado local si falla Firebase - el listener de tiempo real cargará el estado correcto
     }
   },
   
@@ -594,16 +690,31 @@ isAuthenticated: (() => {
     const readAt = new Date().toISOString();
     
     try {
-      // Actualizar todas las notificaciones no leídas en Firebase
-      const updates: any = {};
-      unreadNotifications.forEach(n => {
-        updates[`notifications/${user.id}/${n.id}/read`] = true;
-        updates[`notifications/${user.id}/${n.id}/readAt`] = readAt;
+      // Actualizar todas las notificaciones no leídas en Firebase usando set() para cada una
+      const updatePromises = unreadNotifications.map(async (n) => {
+        try {
+          const notificationRef = ref(realtimeDb, `notifications/${user.id}/${n.id}`);
+          const snapshot = await firebaseGet(notificationRef);
+          
+          if (snapshot.exists()) {
+            const currentNotification = snapshot.val();
+            await firebaseSet(notificationRef, {
+              ...currentNotification,
+              read: true,
+              readAt: readAt
+            });
+          }
+        } catch (error) {
+          console.error(`Error actualizando notificación ${n.id}:`, error);
+        }
       });
       
-      await update(ref(realtimeDb), updates);
+      await Promise.all(updatePromises);
       
-      // Actualización optimista local
+      // IMPORTANTE: Esperar un momento para que Firebase procese antes de actualizar estado local
+      await new Promise(resolve => setTimeout(resolve, 150));
+      
+      // Actualización del estado local DESPUÉS de confirmar guardado en Firebase
       const updatedNotifications = state.notifications.map(n => ({
         ...n,
         read: true, // Forzar a true
@@ -618,17 +729,7 @@ isAuthenticated: (() => {
       console.log(`✅ ${unreadNotifications.length} notificaciones marcadas como leídas en Firebase. Total: ${updatedNotifications.length}`);
     } catch (error) {
       console.error('❌ Error marcando todas las notificaciones como leídas en Firebase:', error);
-      // Fallback: actualizar solo localmente si falla Firebase
-      const updatedNotifications = state.notifications.map(n => ({
-        ...n,
-        read: true,
-        readAt: n.readAt || new Date(readAt)
-      }));
-      
-      set({
-        notifications: updatedNotifications,
-        unreadCount: 0
-      });
+      // NO actualizar estado local si falla Firebase - el listener de tiempo real cargará el estado correcto
     }
   },
 
@@ -823,7 +924,13 @@ isAuthenticated: (() => {
 
     // Guardar en Firebase Realtime Database
     try {
-      console.log('🔥 Guardando pedido en Firebase...');
+      const user = get().user;
+      console.log('🔥 Guardando pedido en Firebase...', { orderId: order.id, userId: order.userId, currentUser: user?.id, isAdmin: user?.isAdmin });
+      
+      // Verificar que el usuario esté autenticado
+      if (!user) {
+        throw new Error('Usuario no autenticado');
+      }
       
       // Construir objeto sin valores undefined (Firebase no los acepta)
       const firebaseOrder: any = {
@@ -842,6 +949,11 @@ isAuthenticated: (() => {
         address: order.address || { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } }
       };
       
+      // Agregar orderNumber si existe
+      if (order.orderNumber) {
+        firebaseOrder.orderNumber = order.orderNumber;
+      }
+      
       // Solo agregar propiedades opcionales si tienen valor
       if (order.expiresAt) {
         firebaseOrder.expiresAt = order.expiresAt instanceof Date ? order.expiresAt.toISOString() : order.expiresAt;
@@ -856,10 +968,23 @@ isAuthenticated: (() => {
         firebaseOrder.deliveredAt = order.deliveredAt instanceof Date ? order.deliveredAt.toISOString() : order.deliveredAt;
       }
       
-      await update(ref(realtimeDb, `orders/${order.id}`), firebaseOrder);
+      // Usar set() para crear nuevas órdenes (mejor compatibilidad con reglas de seguridad)
+      await firebaseSet(ref(realtimeDb, `orders/${order.id}`), firebaseOrder);
       console.log('✅ Pedido guardado en Firebase correctamente');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error guardando pedido en Firebase:', error);
+      
+      // Si es un error de permisos, dar información más útil
+      if (error?.code === 'PERMISSION_DENIED' || error?.message?.includes('permission')) {
+        const user = get().user;
+        console.error('🔒 Error de permisos. Verifica:', {
+          userId: user?.id,
+          isAdmin: user?.isAdmin,
+          orderUserId: order.userId,
+          message: 'El usuario debe ser admin O el pedido debe ser para el mismo usuario. Verifica que isAdmin esté sincronizado en Realtime Database.'
+        });
+      }
+      
       throw error; // Lanzar error - NO guardar localmente si falla Firebase
     }
 
@@ -924,6 +1049,11 @@ isAuthenticated: (() => {
           address: updatedOrder.address || { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } }
         };
         
+        // Agregar orderNumber si existe
+        if (updatedOrder.orderNumber) {
+          firebaseOrder.orderNumber = updatedOrder.orderNumber;
+        }
+        
         // Solo agregar propiedades opcionales si tienen valor
         if (updatedOrder.expiresAt) {
           firebaseOrder.expiresAt = updatedOrder.expiresAt instanceof Date ? updatedOrder.expiresAt.toISOString() : updatedOrder.expiresAt;
@@ -938,15 +1068,20 @@ isAuthenticated: (() => {
           firebaseOrder.deliveredAt = updatedOrder.deliveredAt instanceof Date ? updatedOrder.deliveredAt.toISOString() : updatedOrder.deliveredAt;
         }
         
-        await update(ref(realtimeDb, `orders/${orderId}`), firebaseOrder);
-        console.log('✅ Pedido actualizado en Firebase correctamente');
+        // Usar set() en lugar de update() para garantizar guardado completo
+        await firebaseSet(ref(realtimeDb, `orders/${orderId}`), firebaseOrder);
+        console.log('✅ Pedido actualizado en Firebase correctamente:', orderId, 'Estado:', status);
+        
+        // IMPORTANTE: Solo actualizar estado local DESPUÉS de confirmar guardado en Firebase
+        // Esto evita que el listener de tiempo real sobrescriba con datos antiguos
+        set({ orders: uniqueOrders });
       } catch (error) {
         console.error('❌ Error actualizando pedido en Firebase:', error);
+        // NO actualizar estado local si falla Firebase
         throw error; // Lanzar error para que el llamador sepa que falló
       }
+    } else {
+      console.warn('⚠️ No se encontró el pedido para actualizar:', orderId);
     }
-    
-    // NO guardar en localStorage - TODO debe venir de Firebase
-    set({ orders: uniqueOrders });
   }
 }));

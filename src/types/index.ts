@@ -170,6 +170,7 @@ export interface ShippingAddress {
 
 export interface Order {
   id: string;
+  orderNumber?: string;           // Número único de pedido (tipo factura/remito)
   userId: string;
   userName: string;
   productId: string;
@@ -190,6 +191,26 @@ export interface Order {
   notes?: string;
   address: Address;
   shippingAddress?: ShippingAddress; // AGREGADO para compatibilidad con AdminPanel
+}
+
+// Interfaz para el log de transacciones
+export interface OrderTransaction {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  userId: string;
+  userName: string;
+  status: OrderStatus;
+  amount: number;
+  timestamp: string;
+  date: string;                   // Formato: YYYY-MM-DD
+  time: string;                   // Formato: HH:mm:ss
+  actionType: 'created' | 'status_changed' | 'payment_received' | 'shipped' | 'delivered' | 'cancelled';
+  previousStatus?: OrderStatus;
+  newStatus?: OrderStatus;
+  notes?: string;
+  adminId?: string;
+  adminName?: string;
 }
 
 export interface Report {

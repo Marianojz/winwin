@@ -4,7 +4,7 @@ import { Mail, Lock, LogIn, Eye, EyeOff } from 'lucide-react';
 import GoogleSignIn from '../components/GoogleSignIn';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { auth, db, syncUserToRealtimeDb } from '../config/firebase';
 import { useStore } from '../store/useStore';
 import { User } from '../types';
 
@@ -107,6 +107,14 @@ const Login = () => {
         } : undefined
       };
 
+      // Sincronizar isAdmin a Realtime Database para que las reglas funcionen
+      await syncUserToRealtimeDb(
+        fullUser.id,
+        fullUser.isAdmin,
+        fullUser.email,
+        fullUser.username
+      );
+      
       // Establecer usuario en múltiples lugares para asegurar sincronización
       setUser(fullUser);
       localStorage.setItem('user', JSON.stringify(fullUser));

@@ -71,8 +71,19 @@ export const saveMessage = async (message: Message): Promise<Message> => {
     
     console.log(`✅ Mensaje guardado en Firebase: ${newMessage.id} en conversación ${newMessage.conversationId}`);
     return newMessage;
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error guardando mensaje en Firebase:', error);
+    
+    // Si es un error de permisos, dar información más útil
+    if (error?.code === 'PERMISSION_DENIED' || error?.message?.includes('permission')) {
+      console.error('🔒 Error de permisos. Verifica:', {
+        fromUserId: newMessage?.fromUserId || 'unknown',
+        toUserId: newMessage?.toUserId || 'unknown',
+        conversationId: newMessage?.conversationId || 'unknown',
+        message: 'El usuario debe ser admin O el mensaje debe ser del usuario autenticado. Si fromUserId es "admin", el usuario debe ser admin.'
+      });
+    }
+    
     throw error;
   }
 };
