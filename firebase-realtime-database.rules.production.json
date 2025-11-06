@@ -40,7 +40,7 @@
       ".validate": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
       "$userId": {
         ".read": "auth != null && auth.uid == $userId",
-        ".write": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)"
+        ".write": "auth != null"
       }
     },
     "users": {
@@ -91,4 +91,3 @@
     }
   }
 }
-

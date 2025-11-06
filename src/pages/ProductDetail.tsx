@@ -79,7 +79,7 @@ const ProductDetail = () => {
   };
 
   return (
-    <div style={{ minHeight: 'calc(100vh - 80px)', padding: '2rem 0' }}>
+    <div style={{ minHeight: 'calc(100vh - 80px)', padding: '1rem 0' }}>
       <div className="container" style={{ maxWidth: '1200px' }}>
         <button 
           onClick={() => navigate('/tienda')}
@@ -90,43 +90,34 @@ const ProductDetail = () => {
             background: 'transparent',
             color: 'var(--text-secondary)',
             padding: '0.5rem 0',
-            marginBottom: '1.5rem',
+            marginBottom: '1rem',
             border: 'none',
             cursor: 'pointer',
-            fontSize: '0.9375rem'
+            fontSize: '0.875rem'
           }}
         >
-          <ChevronLeft size={20} />
+          <ChevronLeft size={18} />
           Volver a la Tienda
         </button>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem', alignItems: 'start' }}>
+        <div className="product-detail-grid">
           {/* Galería de Imágenes */}
-          <div>
-            <div style={{ background: 'var(--bg-secondary)', borderRadius: '1rem', overflow: 'hidden', marginBottom: '1rem', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="product-images">
+            <div className="main-image">
               <img 
                 src={product.images[selectedImage]} 
                 alt={product.name}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             </div>
             {product.images.length > 1 && (
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(product.images.length, 4)}, 1fr)`, gap: '0.75rem' }}>
+              <div className="image-thumbnails">
                 {product.images.map((img, idx) => (
                   <button
                     key={idx}
                     onClick={() => setSelectedImage(idx)}
-                    style={{
-                      background: 'var(--bg-secondary)',
-                      border: selectedImage === idx ? '3px solid var(--primary)' : 'none',
-                      borderRadius: '0.75rem',
-                      overflow: 'hidden',
-                      aspectRatio: '1',
-                      cursor: 'pointer',
-                      padding: 0
-                    }}
+                    className={selectedImage === idx ? 'thumbnail active' : 'thumbnail'}
                   >
-                    <img src={img} alt={`${product.name} ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={img} alt={`${product.name} ${idx + 1}`} />
                   </button>
                 ))}
               </div>
@@ -134,8 +125,8 @@ const ProductDetail = () => {
           </div>
 
           {/* Información del Producto */}
-          <div>
-            <h1 style={{ marginBottom: '1rem' }}>{product.name}</h1>
+          <div className="product-info">
+            <h1 className="product-title">{product.name}</h1>
 
             {/* Rating */}
             {product.averageRating > 0 && (
@@ -176,11 +167,9 @@ const ProductDetail = () => {
             </div>
 
             {/* Precio */}
-            <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem', marginBottom: '2rem' }}>
-              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                Precio
-              </div>
-              <div style={{ fontSize: '3rem', fontWeight: 700, color: 'var(--primary)', fontFamily: 'Poppins', marginBottom: '1rem' }}>
+            <div className="price-box">
+              <div className="price-label">Precio</div>
+              <div className="price-amount">
                 {formatCurrency(product.price)}
               </div>
               {quantity > 1 && (
@@ -250,7 +239,7 @@ const ProductDetail = () => {
         </div>
 
         {/* Descripción */}
-        <div style={{ marginTop: '3rem', background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem' }}>
+        <div className="product-description">
           <h2 style={{ marginBottom: '1rem' }}>Descripción del Producto</h2>
           <p style={{ fontSize: '1.0625rem', lineHeight: '1.8', color: 'var(--text-secondary)' }}>
             {product.description}
@@ -311,6 +300,163 @@ const ProductDetail = () => {
           </div>
         )}
       </div>
+
+      <style>{`
+        .product-detail-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 2rem;
+          align-items: start;
+        }
+
+        .product-images {
+          position: sticky;
+          top: 1rem;
+        }
+
+        .main-image {
+          background: var(--bg-secondary);
+          border-radius: 1rem;
+          overflow: hidden;
+          margin-bottom: 1rem;
+          aspect-ratio: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .main-image img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .image-thumbnails {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+          gap: 0.75rem;
+        }
+
+        .thumbnail {
+          background: var(--bg-secondary);
+          border: 2px solid transparent;
+          border-radius: 0.75rem;
+          overflow: hidden;
+          aspect-ratio: 1;
+          cursor: pointer;
+          padding: 0;
+          transition: all 0.2s;
+        }
+
+        .thumbnail.active {
+          border-color: var(--primary);
+        }
+
+        .thumbnail img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .product-title {
+          margin-bottom: 1rem;
+          font-size: 1.75rem;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+        }
+
+        .price-box {
+          background: var(--bg-secondary);
+          padding: 1.5rem;
+          border-radius: 1rem;
+          margin-bottom: 1.5rem;
+        }
+
+        .price-label {
+          font-size: 0.875rem;
+          color: var(--text-secondary);
+          margin-bottom: 0.5rem;
+        }
+
+        .price-amount {
+          font-size: 2rem;
+          font-weight: 700;
+          color: var(--primary);
+          font-family: 'Poppins', sans-serif;
+        }
+
+        .product-description {
+          margin-top: 2rem;
+          background: var(--bg-secondary);
+          padding: 1.5rem;
+          border-radius: 1rem;
+        }
+
+        @media (max-width: 768px) {
+          .product-detail-grid {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+          }
+
+          .product-images {
+            position: relative;
+            top: 0;
+          }
+
+          .main-image {
+            margin-bottom: 0.75rem;
+          }
+
+          .image-thumbnails {
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+          }
+
+          .product-title {
+            font-size: 1.5rem;
+            margin-bottom: 0.75rem;
+          }
+
+          .price-box {
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+          }
+
+          .price-amount {
+            font-size: 1.75rem;
+          }
+
+          .product-description {
+            margin-top: 1.5rem;
+            padding: 1.25rem;
+          }
+
+          .product-description h2 {
+            font-size: 1.25rem;
+          }
+
+          .product-description p {
+            font-size: 0.9375rem;
+            line-height: 1.6;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .product-title {
+            font-size: 1.25rem;
+          }
+
+          .price-amount {
+            font-size: 1.5rem;
+          }
+
+          .image-thumbnails {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+      `}</style>
     </div>
   );
 };

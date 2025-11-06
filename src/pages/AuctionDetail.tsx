@@ -206,7 +206,7 @@ const AuctionDetail = () => {
   };
 
   return (
-    <div style={{ minHeight: 'calc(100vh - 80px)', padding: '2rem 0' }}>
+    <div style={{ minHeight: 'calc(100vh - 80px)', padding: '1rem 0' }}>
       <div className="container" style={{ maxWidth: '1200px' }}>
         <button 
           onClick={() => navigate('/subastas')}
@@ -217,60 +217,46 @@ const AuctionDetail = () => {
             background: 'transparent',
             color: 'var(--text-secondary)',
             padding: '0.5rem 0',
-            marginBottom: '1.5rem',
+            marginBottom: '1rem',
             border: 'none',
             cursor: 'pointer',
-            fontSize: '0.9375rem'
+            fontSize: '0.875rem'
           }}
         >
-          <ChevronLeft size={20} />
+          <ChevronLeft size={18} />
           Volver a Subastas
         </button>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem', alignItems: 'start' }}>
-          <div>
-            <div style={{ background: 'var(--bg-secondary)', borderRadius: '1rem', overflow: 'hidden', marginBottom: '1rem', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="auction-detail-grid">
+          <div className="auction-images">
+            <div className="auction-main-image">
               <img 
                 src={auction.images[selectedImage]} 
                 alt={auction.title}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
-              {auction.images.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setSelectedImage(idx)}
-                  style={{
-                    background: 'var(--bg-secondary)',
-                    border: selectedImage === idx ? '3px solid var(--primary)' : '3px solid transparent',
-                    borderRadius: '0.5rem',
-                    overflow: 'hidden',
-                    cursor: 'pointer',
-                    padding: 0,
-                    aspectRatio: '1'
-                  }}
-                >
-                  <img src={img} alt={`${auction.title} ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </button>
-              ))}
-            </div>
+            {auction.images.length > 1 && (
+              <div className="auction-thumbnails">
+                {auction.images.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedImage(idx)}
+                    className={selectedImage === idx ? 'auction-thumbnail active' : 'auction-thumbnail'}
+                  >
+                    <img src={img} alt={`${auction.title} ${idx + 1}`} />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div>
-            <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>{auction.title}</h1>
+          <div className="auction-info">
+            <h1 className="auction-title">{auction.title}</h1>
             
-            <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', marginBottom: '1.5rem' }}>
-              <div style={{ marginBottom: '1rem' }}>
-                <div style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: 600 }}>💰 Precio Actual de la Subasta</div>
-                <div style={{ 
-                  fontSize: '5rem', 
-                  fontWeight: 900, 
-                  color: 'var(--primary)',
-                  textShadow: '0 4px 12px rgba(255, 107, 0, 0.4), 0 0 20px rgba(255, 107, 0, 0.2)',
-                  letterSpacing: '-2px',
-                  lineHeight: 1
-                }}>
+            <div className="auction-price-box">
+              <div className="auction-price-section">
+                <div className="auction-price-label">💰 Precio Actual de la Subasta</div>
+                <div className="auction-price-amount">
                   {formatCurrency(auction.currentPrice)}
                 </div>
               </div>
@@ -301,17 +287,20 @@ const AuctionDetail = () => {
     }}
   >
     <div
+      className="countdown-container"
       style={{
         marginBottom: '0.5rem',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: '1.5rem',
+        gap: '1rem',
+        flexWrap: 'wrap',
         animation: lessThanTenSeconds ? 'shake-intense 0.25s infinite' : (lessThanOneMinute ? 'pulse-urgent-intense 0.8s ease-in-out infinite' : undefined)
       }}
     >
       <Clock 
-        size={lessThanOneMinute ? 64 : 56} 
+        size={lessThanOneMinute ? 48 : 40} 
+        className="countdown-clock"
         style={{ 
           color: lessThanOneMinute ? '#fff7a7' : 'var(--primary)', 
           transition: 'all .33s',
@@ -320,11 +309,12 @@ const AuctionDetail = () => {
         }} 
       />
       <span
+        className="countdown-text"
         style={{
           fontWeight: '900',
-          fontSize: lessThanOneMinute ? '6.5rem' : '5.5rem',
+          fontSize: lessThanOneMinute ? '3rem' : '2.5rem',
           color: lessThanOneMinute ? '#fff' : 'var(--primary)',
-          letterSpacing: '4px',
+          letterSpacing: '2px',
           transition: 'all .3s',
           animation: lessThanOneMinute ? 'blinker-intense 0.6s steps(2) infinite' : undefined,
           textShadow: lessThanOneMinute ? '0 0 30px rgba(255, 255, 255, 1), 0 0 60px rgba(255, 247, 167, 0.8), 0 0 90px rgba(255, 247, 167, 0.4)' : '0 4px 12px rgba(255, 107, 0, 0.4)',
@@ -338,7 +328,10 @@ const AuctionDetail = () => {
     <div style={{
       fontSize: '1rem', 
       fontWeight: 600,
-      animation: lessThanOneMinute ? 'text-pulse 1s ease-in-out infinite' : undefined
+      animation: lessThanOneMinute ? 'text-pulse 1s ease-in-out infinite' : undefined,
+      wordWrap: 'break-word',
+      overflowWrap: 'break-word',
+      padding: '0 0.5rem'
     }}>
       {lessThanOneMinute ? '¡Poco tiempo! ¡No te quedes afuera!' : 'Subasta Activa'}
     </div>
@@ -466,10 +459,10 @@ const AuctionDetail = () => {
                     />
                   </div>
 
-                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-                    <button onClick={() => incrementBid(500)} className="btn btn-secondary" style={{ flex: 1 }}>+$500</button>
-                    <button onClick={() => incrementBid(1000)} className="btn btn-secondary" style={{ flex: 1 }}>+$1.000</button>
-                    <button onClick={() => incrementBid(5000)} className="btn btn-secondary" style={{ flex: 1 }}>+$5.000</button>
+                  <div className="bid-increment-buttons" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                    <button onClick={() => incrementBid(500)} className="btn btn-secondary" style={{ flex: '1 1 auto', minWidth: '80px' }}>+$500</button>
+                    <button onClick={() => incrementBid(1000)} className="btn btn-secondary" style={{ flex: '1 1 auto', minWidth: '80px' }}>+$1.000</button>
+                    <button onClick={() => incrementBid(5000)} className="btn btn-secondary" style={{ flex: '1 1 auto', minWidth: '80px' }}>+$5.000</button>
                   </div>
 
                   {showBidError && (
@@ -529,7 +522,7 @@ const AuctionDetail = () => {
                   <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: 600 }}>
                     🛒 Compra Directa Disponible
                   </div>
-                  <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--success)', marginBottom: '1rem' }}>
+                  <div className="buy-now-price" style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--success)', marginBottom: '1rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
                     {formatCurrency(auction.buyNowPrice)}
                   </div>
                 </div>
@@ -580,15 +573,15 @@ const AuctionDetail = () => {
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {lastThreeBids.map((bid) => (
-                    <div key={bid.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <User size={16} />
-                        <span>{bid.username}</span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    <div key={bid.id} className="bid-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', minWidth: 0, flex: '1 1 auto' }}>
+                        <User size={16} style={{ flexShrink: 0 }} />
+                        <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>{bid.username}</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                           {formatTimeAgo(bid.createdAt)}
                         </span>
                       </div>
-                      <div style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--primary)', wordBreak: 'break-word', overflowWrap: 'break-word', flexShrink: 0 }}>
                         {formatCurrency(bid.amount)}
                       </div>
                     </div>
@@ -599,51 +592,308 @@ const AuctionDetail = () => {
           </div>
         </div>
 
-        <div style={{ marginTop: '3rem', background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '1rem' }}>
-          <h2 style={{ marginBottom: '1rem' }}>Descripción</h2>
-          <p style={{ fontSize: '1.0625rem', lineHeight: '1.8', color: 'var(--text-secondary)' }}>
+        <div className="auction-description-section" style={{ marginTop: '2rem', background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem' }}>
+          <h2 className="section-title" style={{ marginBottom: '1rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>Descripción</h2>
+          <p className="description-text" style={{ fontSize: '1rem', lineHeight: '1.8', color: 'var(--text-secondary)', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
             {auction.description}
           </p>
 
-          <div style={{ marginTop: '2rem', padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
-            <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div className="how-it-works" style={{ marginTop: '1.5rem', padding: '1.25rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
+            <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
               📖 ¿Cómo funciona?
             </h3>
             <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                <span style={{ color: 'var(--primary)', fontWeight: 700 }}>✓</span>
-                <span>Ofertá en múltiplos de $500</span>
+              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                <span style={{ color: 'var(--primary)', fontWeight: 700, flexShrink: 0 }}>✓</span>
+                <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Ofertá en múltiplos de $500</span>
               </li>
-              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                <span style={{ color: 'var(--primary)', fontWeight: 700 }}>✓</span>
-                <span>Debe superar el precio actual: {formatCurrency(auction.currentPrice)}</span>
+              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                <span style={{ color: 'var(--primary)', fontWeight: 700, flexShrink: 0 }}>✓</span>
+                <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Debe superar el precio actual: {formatCurrency(auction.currentPrice)}</span>
               </li>
-              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                <span style={{ color: 'var(--primary)', fontWeight: 700 }}>✓</span>
-                <span>Ganá ofertando más que otros</span>
+              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                <span style={{ color: 'var(--primary)', fontWeight: 700, flexShrink: 0 }}>✓</span>
+                <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Ganá ofertando más que otros</span>
               </li>
               {auction.buyNowPrice && (
-                <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                  <span style={{ color: 'var(--primary)', fontWeight: 700 }}>✓</span>
-                  <span>O comprá directo por {formatCurrency(auction.buyNowPrice)}</span>
+                <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                  <span style={{ color: 'var(--primary)', fontWeight: 700, flexShrink: 0 }}>✓</span>
+                  <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>O comprá directo por {formatCurrency(auction.buyNowPrice)}</span>
                 </li>
               )}
-              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                <span style={{ color: 'var(--primary)', fontWeight: 700 }}>✓</span>
-                <span>El ganador tiene 48 horas para realizar el pago</span>
+              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                <span style={{ color: 'var(--primary)', fontWeight: 700, flexShrink: 0 }}>✓</span>
+                <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>El ganador tiene 48 horas para realizar el pago</span>
               </li>
-              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                <span style={{ color: 'var(--primary)', fontWeight: 700 }}>✓</span>
-                <span>Si no se completa el pago, la subasta se republica</span>
+              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                <span style={{ color: 'var(--primary)', fontWeight: 700, flexShrink: 0 }}>✓</span>
+                <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Si no se completa el pago, la subasta se republica</span>
               </li>
-              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                <span style={{ color: 'var(--primary)', fontWeight: 700 }}>✓</span>
-                <span>Precio de inicio: {formatCurrency(auction.startingPrice ?? auction.currentPrice)}</span>
+              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                <span style={{ color: 'var(--primary)', fontWeight: 700, flexShrink: 0 }}>✓</span>
+                <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Precio de inicio: {formatCurrency(auction.startingPrice ?? auction.currentPrice)}</span>
               </li>
             </ul>
           </div>
         </div>
       </div>
+
+      <style>{`
+        .auction-detail-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 2rem;
+          align-items: start;
+        }
+
+        .auction-images {
+          position: sticky;
+          top: 1rem;
+        }
+
+        .auction-main-image {
+          background: var(--bg-secondary);
+          border-radius: 1rem;
+          overflow: hidden;
+          margin-bottom: 1rem;
+          aspect-ratio: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .auction-main-image img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .auction-thumbnails {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 0.75rem;
+        }
+
+        .auction-thumbnail {
+          background: var(--bg-secondary);
+          border: 3px solid transparent;
+          border-radius: 0.5rem;
+          overflow: hidden;
+          cursor: pointer;
+          padding: 0;
+          aspect-ratio: 1;
+          transition: all 0.2s;
+        }
+
+        .auction-thumbnail.active {
+          border-color: var(--primary);
+        }
+
+        .auction-thumbnail img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .auction-title {
+          font-size: 1.75rem;
+          margin-bottom: 1rem;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+        }
+
+        .auction-price-box {
+          background: var(--bg-secondary);
+          padding: 1.5rem;
+          border-radius: 1rem;
+          margin-bottom: 1.5rem;
+        }
+
+        .auction-price-label {
+          font-size: 0.9375rem;
+          color: var(--text-secondary);
+          margin-bottom: 0.5rem;
+          fontWeight: 600;
+        }
+
+        .auction-price-amount {
+          font-size: 2.5rem;
+          font-weight: 900;
+          color: var(--primary);
+          text-shadow: 0 4px 12px rgba(255, 107, 0, 0.4), 0 0 20px rgba(255, 107, 0, 0.2);
+          letter-spacing: -1px;
+          line-height: 1;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+        }
+
+        .countdown-text {
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+        }
+
+        @media (max-width: 768px) {
+          .auction-detail-grid {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+          }
+
+          .auction-images {
+            position: relative;
+            top: 0;
+          }
+
+          .auction-main-image {
+            margin-bottom: 0.75rem;
+          }
+
+          .auction-thumbnails {
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+          }
+
+          .auction-title {
+            font-size: 1.5rem;
+            margin-bottom: 0.75rem;
+          }
+
+          .auction-price-box {
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+          }
+
+          .auction-price-label {
+            font-size: 0.875rem;
+          }
+
+          .auction-price-amount {
+            font-size: 2rem;
+            letter-spacing: -0.5px;
+          }
+
+          .countdown-container {
+            gap: 0.75rem !important;
+            padding: 0 0.5rem;
+          }
+
+          .countdown-clock {
+            width: 32px !important;
+            height: 32px !important;
+            flex-shrink: 0;
+          }
+
+          .countdown-text {
+            font-size: 1.75rem !important;
+            letter-spacing: 1px !important;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+          }
+
+          .auction-description-section {
+            padding: 1.25rem !important;
+          }
+
+          .section-title {
+            font-size: 1.125rem !important;
+          }
+
+          .description-text {
+            font-size: 0.9375rem !important;
+          }
+
+          .how-it-works {
+            padding: 1rem !important;
+          }
+
+          .how-it-works h3 {
+            font-size: 0.9375rem !important;
+          }
+
+          .how-it-works li span {
+            font-size: 0.8125rem !important;
+          }
+
+          .bid-item {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+          }
+
+          .bid-increment-buttons button {
+            font-size: 0.8125rem !important;
+            padding: 0.5rem !important;
+          }
+
+          .buy-now-price {
+            font-size: 1.25rem !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .auction-title {
+            font-size: 1.25rem;
+          }
+
+          .auction-price-amount {
+            font-size: 1.75rem;
+          }
+
+          .countdown-container {
+            gap: 0.5rem !important;
+          }
+
+          .countdown-text {
+            font-size: 1.5rem !important;
+            letter-spacing: 0.5px !important;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+          }
+
+          .countdown-clock {
+            width: 28px !important;
+            height: 28px !important;
+            flex-shrink: 0;
+          }
+
+          .auction-description-section {
+            padding: 1.25rem !important;
+            margin-top: 1.5rem !important;
+          }
+
+          .section-title {
+            font-size: 1.25rem !important;
+          }
+
+          .description-text {
+            font-size: 0.9375rem !important;
+          }
+
+          .how-it-works {
+            padding: 1rem !important;
+          }
+
+          .how-it-works h3 {
+            font-size: 1rem !important;
+          }
+
+          .how-it-works li span {
+            font-size: 0.875rem !important;
+          }
+
+          .bid-item {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+          }
+
+          .bid-increment-buttons button {
+            font-size: 0.875rem !important;
+            padding: 0.625rem 0.5rem !important;
+          }
+
+          .buy-now-price {
+            font-size: 1.5rem !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };

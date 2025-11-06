@@ -73,11 +73,23 @@ class ActionLogger {
 
     try {
       // Guardar en Firebase Realtime Database
-      const logsRef = ref(realtimeDb, 'action_logs');
-      await push(logsRef, {
-        ...log,
+      // Filtrar campos undefined ya que Firebase no los acepta
+      const logToSave: any = {
+        id: log.id,
+        action: log.action,
+        entityType: log.entityType,
         timestamp: log.timestamp.toISOString()
-      });
+      };
+      
+      // Solo incluir campos opcionales si no son undefined
+      if (log.userId !== undefined) logToSave.userId = log.userId;
+      if (log.userName !== undefined) logToSave.userName = log.userName;
+      if (log.entityId !== undefined) logToSave.entityId = log.entityId;
+      if (log.details !== undefined && log.details !== null) logToSave.details = log.details;
+      if (log.ipAddress !== undefined) logToSave.ipAddress = log.ipAddress;
+      
+      const logsRef = ref(realtimeDb, 'action_logs');
+      await push(logsRef, logToSave);
       
       // Actualización optimista local
       this.logs.unshift(log);
