@@ -1,4 +1,4 @@
-# 🏆 Subasta Argenta
+# 🏆 Clikio
 
 Aplicación web moderna de subastas y tienda online desarrollada con React + TypeScript + Vite + Firebase. Plataforma completa para gestión de subastas en tiempo real, tienda online, sistema de mensajería y panel administrativo avanzado.
 
@@ -609,11 +609,11 @@ Este es un proyecto en desarrollo activo. Para contribuir:
 
 ## 📄 Licencia
 
-Este proyecto es un demo/prototipo para Subasta Argenta.
+Este proyecto es un demo/prototipo para Clikio.
 
 ## 👨‍💻 Autor
 
-Desarrollado con ❤️ para Subasta Argenta
+Desarrollado con ❤️ para Clikio
 
 ## 📞 Soporte
 

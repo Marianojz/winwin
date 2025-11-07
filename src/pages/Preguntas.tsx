@@ -16,8 +16,8 @@ const Preguntas = () => {
     // Categoría: General
     {
       id: 1,
-      question: '¿Qué es Subasta Argenta?',
-      answer: 'Subasta Argenta es la plataforma líder de subastas y ventas online en Argentina. Ofrecemos dos modalidades: subastas en tiempo real donde podés ofertar por productos únicos, y una tienda tradicional con compra directa. Todas las transacciones son seguras y están protegidas.',
+      question: '¿Qué es Clikio?',
+      answer: 'Clikio es la plataforma líder de subastas y ventas online en Argentina. Ofrecemos dos modalidades: subastas en tiempo real donde podés ofertar por productos únicos, y una tienda tradicional con compra directa. Todas las transacciones son seguras y están protegidas.',
       category: 'general'
     },
     {
@@ -34,7 +34,7 @@ const Preguntas = () => {
     },
     {
       id: 4,
-      question: '¿Es seguro comprar en Subasta Argenta?',
+      question: '¿Es seguro comprar en Clikio?',
       answer: 'Sí, es completamente seguro. Todos los pagos se procesan a través de MercadoPago, una plataforma líder en seguridad de pagos. Además, verificamos la identidad de todos los usuarios mediante DNI y protegemos tus datos según la Ley 25.326 de Protección de Datos Personales de Argentina.',
       category: 'general'
     },
@@ -262,7 +262,7 @@ const Preguntas = () => {
             Preguntas Frecuentes
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '1.125rem' }}>
-            Encontrá respuestas a las dudas más comunes sobre Subasta Argenta
+            Encontrá respuestas a las dudas más comunes sobre Clikio
           </p>
         </div>
 

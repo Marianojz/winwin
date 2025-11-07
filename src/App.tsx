@@ -146,7 +146,7 @@ function App() {
           <div className="container">
             <div className="footer-content">
               <div className="footer-section">
-                <h3>Subasta Argenta</h3>
+                <h3>Clikio</h3>
                 <p>La plataforma líder de subastas y ventas online en Argentina</p>
               </div>
               <div className="footer-section">
@@ -167,7 +167,7 @@ function App() {
               </div>
             </div>
             <div className="footer-bottom">
-              <p>© 2025 Subasta Argenta. Todos los derechos reservados.</p>
+              <p>© 2025 Clikio. Todos los derechos reservados.</p>
             </div>
           </div>
         </footer>

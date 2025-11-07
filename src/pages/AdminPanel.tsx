@@ -5139,7 +5139,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                       siteName: e.target.value 
                     } 
                   })}
-                  placeholder="Ej: Subasta Argenta"
+                  placeholder="Ej: Clikio"
                   style={{
                     width: '100%',
                     padding: '0.875rem',
@@ -5294,7 +5294,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                       footerText: e.target.value 
                     } 
                   })}
-                  placeholder="Ej: © 2024 Subasta Argenta. Todos los derechos reservados."
+                  placeholder="Ej: © 2024 Clikio. Todos los derechos reservados."
                   style={{
                     width: '100%',
                     padding: '0.875rem',
@@ -5852,7 +5852,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   type="text"
                   value={homeConfig.heroTitle}
                   onChange={(e) => setHomeConfig({ ...homeConfig, heroTitle: e.target.value })}
-                  placeholder="Ej: Bienvenido a Subasta Argenta"
+                  placeholder="Ej: Bienvenido a Clikio"
                   style={{
                     width: '100%',
                     padding: '0.875rem',

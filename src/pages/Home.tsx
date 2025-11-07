@@ -93,7 +93,7 @@ const Home = () => {
           <div className="hero-content">
             <div className="hero-text">
               <h1 className="hero-title">
-                {homeConfig.heroTitle || 'Bienvenido a Subasta Argenta'}
+                {homeConfig.heroTitle || 'Bienvenido a Clikio'}
               </h1>
               <p className="hero-subtitle">
                 {homeConfig.heroSubtitle || 'La plataforma líder de subastas y ventas online en Argentina. Descubrí productos únicos y conseguí las mejores ofertas.'}

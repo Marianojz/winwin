@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clickio Logo Mockup (Fix Visual)</title>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f8fafc;
+      padding: 40px;
+      color: #1F2937;
+    }
+    h1, h2, h3 { text-align: center; }
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    .logo-showcase, .variation-card, .applications, .color-palette {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      margin-bottom: 40px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.05);
+    }
+
+    .logo-main {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    .logo-main img {
+      max-width: 260px;
+      width: 100%;
+      height: auto;
+      display: block;
+      object-fit: contain;
+    }
+
+    .brand-name {
+      font-size: 5rem;
+      font-weight: 700;
+      color: #111827;
+      letter-spacing: -0.03em;
+    }
+    .domain {
+      font-size: 1rem;
+      color: #4B5563;
+      margin-top: 6px;
+    }
+
+    .variation-card {
+      text-align: center;
+      padding: 30px;
+      border-radius: 15px;
+      transition: all 0.3s ease;
+    }
+    .variation-dark {
+      background: #0f172a;
+      color: #fff;
+    }
+    .variation-dark img {
+      filter: brightness(10);
+    }
+
+    .color-palette .colors {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 20px;
+    }
+    .color-box {
+      width: 100%; height: 80px; border-radius: 10px; margin-bottom: 8px;
+    }
+    .color-primary { background: #2563EB; }
+    .color-gradient { background: linear-gradient(135deg, #2563EB, #06B6D4); }
+    .color-secondary { background: #111827; }
+
+    .applications .app-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 30px;
+    }
+
+    .mockup-browser, .mockup-app-icon {
+      background: #f1f5f9;
+      border-radius: 12px;
+      padding: 20px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .mockup-browser span {
+      font-size: 1.5rem;
+      margin-left: 10px;
+    }
+
+    .mockup-app-icon {
+      width: 140px; height: 140px;
+      background: linear-gradient(135deg, #2563EB, #06B6D4);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 6px 20px rgba(37,99,235,0.25);
+      overflow: hidden;
+    }
+    .mockup-app-icon img {
+      width: 90%; height: auto; object-fit: contain;
+    }
+
+    .favicon {
+      width: 48px; height: 48px; border-radius: 8px;
+      background: linear-gradient(135deg, #2563EB, #06B6D4);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .favicon img {
+      width: 80%; height: auto;
+    }
+
+    .variations {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+      margin-bottom: 40px;
+    }
+
+    .app-item {
+      text-align: center;
+    }
+
+    .app-item h4 {
+      margin-bottom: 15px;
+      color: #374151;
+      font-size: 1.1rem;
+    }
+
+    .instructions {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      margin-top: 40px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.05);
+    }
+
+    .instructions h2 {
+      color: #2563EB;
+      margin-top: 0;
+    }
+
+    .instructions ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .instructions li {
+      background: #f8fafc;
+      margin-bottom: 12px;
+      padding: 15px;
+      border-radius: 8px;
+      border-left: 4px solid #2563EB;
+    }
+
+    .instructions li strong {
+      color: #2563EB;
+    }
+
+    .instructions code {
+      background: #e5e7eb;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎨 Clickio - Identidad Visual (Fix Visual)</h1>
+
+    <div class="logo-showcase">
+      <div class="logo-main">
+        <img src="preview.webp" alt="Logo principal">
+        <div>
+          <div class="brand-name">CLICKIO</div>
+          <div class="domain">.com.ar</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="variations">
+      <div class="variation-card">
+        <h3>Versión Horizontal</h3>
+        <div class="logo-main">
+          <img src="preview.webp" alt="Logo horizontal">
+          <div>
+            <div class="brand-name">CLICKIO</div>
+            <div class="domain">.com.ar</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="variation-card variation-dark">
+        <h3>Versión Fondo Oscuro</h3>
+        <div class="logo-main">
+          <img src="preview.webp" alt="Logo oscuro">
+          <div>
+            <div class="brand-name">CLICKIO</div>
+            <div class="domain">.com.ar</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="variation-card">
+        <h3>Versión Vertical</h3>
+        <div class="logo-main" style="flex-direction:column;">
+          <img src="preview.webp" alt="Logo vertical">
+          <div class="brand-name">CLICKIO</div>
+          <div class="domain">.com.ar</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="color-palette">
+      <h2>Paleta de Colores</h2>
+      <div class="colors">
+        <div>
+          <div class="color-box color-primary"></div>
+          <p><strong>Azul Primario</strong><br>#2563EB</p>
+        </div>
+        <div>
+          <div class="color-box color-gradient"></div>
+          <p><strong>Gradiente</strong><br>#2563EB → #06B6D4</p>
+        </div>
+        <div>
+          <div class="color-box color-secondary"></div>
+          <p><strong>Negro</strong><br>#111827</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="applications">
+      <h2>Aplicaciones del Logo</h2>
+      <div class="app-grid">
+        <div class="app-item">
+          <h4>Header Website</h4>
+          <div class="mockup-browser">
+            <img src="preview.webp" alt="Header" style="width:90px;">
+            <span>CLICKIO<span style="color:#4B5563;">.com.ar</span></span>
+          </div>
+        </div>
+        <div class="app-item">
+          <h4>App Icon</h4>
+          <div class="mockup-app-icon">
+            <img src="preview.webp" alt="Icono App">
+          </div>
+        </div>
+        <div class="app-item">
+          <h4>Favicon</h4>
+          <div class="favicon">
+            <img src="preview.webp" alt="Favicon">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="instructions">
+      <h2>📋 Instrucciones para Implementar</h2>
+      <ul>
+        <li>
+          <strong>Subir el Logo a Firebase Storage:</strong>
+          <br>Sube el archivo <code>preview.webp</code> (o el logo en formato PNG/SVG) a Firebase Storage en la ruta <code>logo/clickio-logo.png</code> del proyecto <code>clikio-773fa</code>
+        </li>
+        <li>
+          <strong>Actualizar la URL en el Código:</strong>
+          <br>Actualiza la URL en <code>src/types/homeConfig.ts</code> con la URL pública del logo desde Firebase Storage
+        </li>
+        <li>
+          <strong>Crear Favicon e Iconos:</strong>
+          <br>Crea los siguientes archivos en la carpeta <code>public/</code>:
+          <ul style="margin-top: 10px; padding-left: 20px;">
+            <li><code>favicon.ico</code> (16x16 o 32x32)</li>
+            <li><code>favicon-16x16.png</code></li>
+            <li><code>favicon-32x32.png</code></li>
+            <li><code>apple-touch-icon.png</code> (180x180 para iOS)</li>
+          </ul>
+        </li>
+        <li>
+          <strong>Actualizar el Navbar:</strong>
+          <br>Verifica que <code>src/components/Navbar.tsx</code> esté usando el logo desde <code>homeConfig</code> correctamente
+        </li>
+        <li>
+          <strong>Verificar Permisos de Storage:</strong>
+          <br>Asegúrate de que las reglas de Firebase Storage permitan lectura pública para los archivos del logo
+        </li>
+      </ul>
+      <p style="margin-top: 20px; padding: 15px; background: #e0f2fe; border-radius: 8px; border-left: 4px solid #0284c7;">
+        <strong>💡 Nota:</strong> Este archivo HTML usa <code>preview.webp</code> como referencia. Reemplázalo con la URL real del logo una vez que esté subido a Firebase Storage.
+      </p>
+    </div>
+  </div>
+</body>
+</html>

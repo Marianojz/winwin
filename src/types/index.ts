@@ -1,4 +1,4 @@
-// Types for Subasta Argenta
+// Types for Clikio
 
 export interface Address {
   street: string;

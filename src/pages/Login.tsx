@@ -185,7 +185,7 @@ const Login = () => {
       <div className="auth-container">
         <div className="auth-card">
           <h1>Iniciar Sesión</h1>
-          <p className="auth-subtitle">Bienvenido de vuelta a Subasta Argenta</p>
+          <p className="auth-subtitle">Bienvenido de vuelta a Clikio</p>
 
           {error && (
             <div className="alert-error">

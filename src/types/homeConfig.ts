@@ -184,10 +184,10 @@ export const defaultThemeColorSets: ThemeColorSets = {
 };
 
 export const defaultSiteSettings: SiteSettings = {
-  siteName: 'Subasta Argenta',
-  siteTagline: 'La plataforma líder de subastas y ventas online',
-  logoUrl: 'https://firebasestorage.googleapis.com/v0/b/subasta-argenta-474019.firebasestorage.app/o/imagenes%20utiles%2Flogo3.png?alt=media&token=bc5bab5c-0ccd-49e0-932b-2cee25a93b7d',
-  footerText: '© 2024 Subasta Argenta. Todos los derechos reservados.',
+  siteName: 'Clikio',
+  siteTagline: 'Un click, infinitas ofertas',
+  logoUrl: 'https://firebasestorage.googleapis.com/v0/b/clikio-773fa.firebasestorage.app/o/logo%2Fclickio-logo.png?alt=media',
+  footerText: '© 2024 Clikio. Todos los derechos reservados.',
   logoStickers: []
 };
 
@@ -204,7 +204,7 @@ export const defaultHomeConfig: HomeConfig = {
   themeColors: defaultThemeColors,
   themeColorSets: defaultThemeColorSets,
   sectionTitles: defaultSectionTitles,
-  heroTitle: 'Bienvenido a Subasta Argenta',
+  heroTitle: 'Bienvenido a Clikio',
   heroSubtitle: 'La plataforma líder de subastas y ventas online en Argentina. Descubrí productos únicos y conseguí las mejores ofertas.',
   heroImageUrl: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800',
   banners: [],

@@ -48,7 +48,7 @@ const Terminos = () => {
               1. Aceptación de los Términos
             </h2>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-              Al acceder y utilizar Subasta Argenta, aceptás estar sujeto a estos Términos y Condiciones, 
+              Al acceder y utilizar Clikio, aceptás estar sujeto a estos Términos y Condiciones, 
               todas las leyes y regulaciones aplicables, y aceptás que sos responsable del cumplimiento de 
               las leyes locales aplicables.
             </p>
@@ -223,7 +223,7 @@ const Terminos = () => {
             </h2>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
               Todos los pagos se procesan a través de MercadoPago, una plataforma segura de pagos. 
-              Subasta Argenta no almacena información de tarjetas de crédito.
+              Clikio no almacena información de tarjetas de crédito.
             </p>
             <ul style={{ 
               color: 'var(--text-secondary)', 
@@ -265,7 +265,7 @@ const Terminos = () => {
                 El comprador es responsable de proporcionar una dirección válida y completa
               </li>
               <li style={{ marginBottom: '0.5rem' }}>
-                Subasta Argenta no se hace responsable por demoras causadas por el servicio de correo
+                Clikio no se hace responsable por demoras causadas por el servicio de correo
               </li>
               <li style={{ marginBottom: '0.5rem' }}>
                 En caso de productos dañados durante el envío, se debe notificar dentro de las 48 horas
@@ -328,7 +328,7 @@ const Terminos = () => {
             </h2>
             <p style={{ color: 'var(--text-secondary)' }}>
               Todo el contenido de este sitio, incluyendo textos, gráficos, logotipos, imágenes, 
-              videos y software, es propiedad de Subasta Argenta y está protegido por las leyes 
+              videos y software, es propiedad de Clikio y está protegido por las leyes 
               de propiedad intelectual de Argentina. Queda prohibida la reproducción, distribución 
               o modificación sin autorización previa.
             </p>
@@ -368,7 +368,7 @@ const Terminos = () => {
               10. Limitación de Responsabilidad
             </h2>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-              Subasta Argenta actúa como intermediario entre compradores y vendedores. No nos hacemos 
+              Clikio actúa como intermediario entre compradores y vendedores. No nos hacemos 
               responsables por:
             </p>
             <ul style={{ 
@@ -437,7 +437,7 @@ const Terminos = () => {
               12. Modificaciones a los Términos
             </h2>
             <p style={{ color: 'var(--text-secondary)' }}>
-              Subasta Argenta se reserva el derecho de modificar estos términos en cualquier momento. 
+              Clikio se reserva el derecho de modificar estos términos en cualquier momento. 
               Los cambios entrarán en vigor inmediatamente después de su publicación en el sitio. 
               Es tu responsabilidad revisar periódicamente estos términos.
             </p>
@@ -502,7 +502,7 @@ const Terminos = () => {
           borderRadius: '1rem'
         }}>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-            Al utilizar Subasta Argenta, aceptás estos términos y condiciones en su totalidad.
+            Al utilizar Clikio, aceptás estos términos y condiciones en su totalidad.
           </p>
         </div>
       </div>
