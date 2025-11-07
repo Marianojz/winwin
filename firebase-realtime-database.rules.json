@@ -13,9 +13,15 @@
       ".write": true
     },
     "messages": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      ".write": "auth != null",
       "$conversationId": {
-        ".read": "auth != null && (data.child('fromUserId').val() == auth.uid || data.child('toUserId').val() == auth.uid || data.child('fromUserId').val() == 'admin' || data.child('toUserId').val() == 'admin')",
-        ".write": "auth != null"
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/))",
+        ".write": "auth != null",
+        "$messageId": {
+          ".read": "auth != null && (data.child('fromUserId').val() == auth.uid || data.child('toUserId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+          ".write": "auth != null && (newData.child('fromUserId').val() == auth.uid || newData.child('toUserId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)"
+        }
       }
     },
     "homeConfig": {

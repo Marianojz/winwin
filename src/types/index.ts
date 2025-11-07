@@ -140,7 +140,7 @@ export interface Bot {
   updatedAt?: Date | string;
 }
 
-export type Theme = 'light' | 'dark';
+export type Theme = 'light' | 'dark' | 'experimental';
 
 // ========== SISTEMA DE PEDIDOS (ACTUALIZADO) ==========
 

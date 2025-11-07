@@ -108,7 +108,15 @@ export const useStore = create<AppState>((set, get) => ({
   // Theme
   theme: (localStorage.getItem('theme') as Theme) || 'light',
   toggleTheme: () => {
-    const newTheme = get().theme === 'light' ? 'dark' : 'light';
+    const currentTheme = get().theme;
+    let newTheme: Theme;
+    if (currentTheme === 'light') {
+      newTheme = 'dark';
+    } else if (currentTheme === 'dark') {
+      newTheme = 'experimental';
+    } else {
+      newTheme = 'light';
+    }
     localStorage.setItem('theme', newTheme);
     set({ theme: newTheme });
   },
@@ -755,8 +763,13 @@ isAuthenticated: (() => {
           updatedAt: bot.updatedAt ? new Date(bot.updatedAt) : undefined
         })) as Bot[];
         
-        set({ bots: botsArray });
-        console.log(`✅ Cargados ${botsArray.length} bots desde Firebase`);
+        // Eliminar duplicados por ID (por si acaso)
+        const uniqueBots = Array.from(
+          new Map(botsArray.map(bot => [bot.id, bot])).values()
+        );
+        
+        set({ bots: uniqueBots });
+        console.log(`✅ Cargados ${uniqueBots.length} bots desde Firebase (${botsArray.length - uniqueBots.length} duplicados eliminados)`);
       }, (error) => {
         console.error('Error cargando bots desde Firebase:', error);
         set({ bots: [] });

@@ -1,7 +1,11 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Bell, Home, Store, Gavel, LogOut, LayoutDashboard } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { auth } from '../config/firebase';
+import { auth, realtimeDb } from '../config/firebase';
+import { ref, onValue } from 'firebase/database';
+import { useEffect, useState } from 'react';
+import { HomeConfig, defaultHomeConfig } from '../types/homeConfig';
+import { specialEvents } from '../utils/dateSpecialEvents';
 import ThemeToggle from './ThemeToggle';
 import SoundToggle from './SoundToggle';
 import './Navbar.css';
@@ -11,6 +15,7 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const cartItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
+  const [homeConfig, setHomeConfig] = useState<HomeConfig>(defaultHomeConfig);
 
   const handleLogout = async () => {
     try {
@@ -44,6 +49,42 @@ const Navbar = () => {
   };
   const avatarUrl = getAvatarUrl();
 
+  // Cargar homeConfig desde Firebase para obtener logo y colores
+  useEffect(() => {
+    try {
+      const homeConfigRef = ref(realtimeDb, 'homeConfig');
+      const unsubscribe = onValue(homeConfigRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          setHomeConfig({
+            ...defaultHomeConfig,
+            ...data,
+            siteSettings: data.siteSettings || defaultHomeConfig.siteSettings,
+            themeColors: data.themeColors || defaultHomeConfig.themeColors
+          });
+        }
+      }, (error) => {
+        console.error('Error cargando homeConfig en Navbar:', error);
+      });
+      return () => unsubscribe();
+    } catch (error) {
+      console.error('Error configurando listener de homeConfig en Navbar:', error);
+    }
+  }, []);
+
+  // Los colores se aplican en App.tsx según el tema activo
+  // No necesitamos aplicar colores aquí ya que App.tsx maneja todo
+
+  // Obtener logo con fallback
+  const getLogoUrl = () => {
+    return homeConfig.siteSettings?.logoUrl || defaultHomeConfig.siteSettings.logoUrl;
+  };
+
+  // Obtener nombre del sitio con fallback
+  const getSiteName = () => {
+    return homeConfig.siteSettings?.siteName || defaultHomeConfig.siteSettings.siteName;
+  };
+
   // Determinar si el enlace está activo para el navbar móvil
   const isActive = (path: string) => location.pathname === path;
 
@@ -52,13 +93,62 @@ const Navbar = () => {
       {/* Navbar Superior (Desktop) */}
       <nav className="navbar">
         <div className="navbar-container">
-          <Link to="/" className="navbar-logo">
-            <img 
-              src="https://firebasestorage.googleapis.com/v0/b/subasta-argenta-474019.firebasestorage.app/o/imagenes%20utiles%2Flogo3.png?alt=media&token=bc5bab5c-0ccd-49e0-932b-2cee25a93b7d" 
-              alt="Subasta Argenta"
-              className="navbar-logo-img"
-            />
-            <span className="navbar-logo-text">Subasta Argenta</span>
+          <Link to="/" className="navbar-logo" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {getLogoUrl() && (
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <img 
+                  src={getLogoUrl()} 
+                  alt={getSiteName()}
+                  className="navbar-logo-img"
+                  onError={(e) => {
+                    // Si falla la imagen, ocultarla y mostrar solo texto
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+                {/* Mostrar stickers activos */}
+                {(homeConfig.siteSettings?.logoStickers || [])
+                  .filter(sticker => {
+                    if (!sticker.active) return false;
+                    // Si tiene fechas, verificar que estemos en el rango
+                    if (sticker.startDate && sticker.endDate) {
+                      const now = new Date();
+                      const start = new Date(sticker.startDate);
+                      const end = new Date(sticker.endDate);
+                      return now >= start && now <= end;
+                    }
+                    return true;
+                  })
+                  .map(sticker => {
+                    const sizeMap = { small: '0.875rem', medium: '1.125rem', large: '1.5rem' };
+                    const positionMap = {
+                      'top-left': { top: '-8px', left: '-8px' },
+                      'top-right': { top: '-8px', right: '-8px' },
+                      'bottom-left': { bottom: '-8px', left: '-8px' },
+                      'bottom-right': { bottom: '-8px', right: '-8px' },
+                      'center': { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
+                    };
+                    return (
+                      <span
+                        key={sticker.id}
+                        style={{
+                          position: 'absolute',
+                          fontSize: sizeMap[sticker.size],
+                          ...positionMap[sticker.position],
+                          pointerEvents: 'none',
+                          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+                          zIndex: 10,
+                          lineHeight: 1,
+                          animation: 'bounce 2s infinite'
+                        }}
+                        title={specialEvents.find(e => e.type === sticker.type)?.name || 'Sticker'}
+                      >
+                        {sticker.emoji}
+                      </span>
+                    );
+                  })}
+              </div>
+            )}
+            <span className="navbar-logo-text">{getSiteName()}</span>
           </Link>
 
           <div className="navbar-menu">

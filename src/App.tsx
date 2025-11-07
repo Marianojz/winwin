@@ -1,13 +1,18 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSyncFirebase } from './hooks/useSyncFirebase';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { ref, onValue } from 'firebase/database';
+import { realtimeDb } from './config/firebase';
+import { HomeConfig, defaultHomeConfig } from './types/homeConfig';
+import { useStore } from './store/useStore';
 import Terminos from './pages/Terminos';
 import Preguntas from './pages/Preguntas';
 import Navbar from './components/Navbar';
 import AuctionManager from './utils/AuctionManager';
 import OrderManager from './utils/OrderManager';
 import DataCleanupManager from './utils/DataCleanupManager';
-import BotManager from './utils/BotManager';
+// BotManager desactivado - Los bots ahora funcionan desde Cloud Functions (24/7)
+// import BotManager from './utils/BotManager';
 import ScrollToTop from './components/ScrollToTop';
 import Home from './pages/Home';
 import Subastas from './pages/Subastas';
@@ -22,11 +27,77 @@ import Perfil from './pages/Perfil';
 import AdminPanel from './pages/AdminPanel';
 import CompletarPerfil from './pages/CompletarPerfil';
 import ToastContainer from './components/ToastContainer';
-import { useStore } from './store/useStore';
 
 function App() {
   useSyncFirebase();
-  const { user, loadUserNotifications } = useStore();
+  const { user, loadUserNotifications, theme } = useStore();
+  const [homeConfig, setHomeConfig] = useState<HomeConfig>(defaultHomeConfig);
+
+  // Función para aplicar colores según el modo activo
+  const applyThemeColors = (config: HomeConfig, currentTheme: string) => {
+    const root = document.documentElement;
+    let colors;
+    
+    // Priorizar themeColorSets si existe, sino usar themeColors (legacy)
+    if (config.themeColorSets) {
+      if (currentTheme === 'light') {
+        colors = config.themeColorSets.light;
+      } else if (currentTheme === 'dark') {
+        colors = config.themeColorSets.dark;
+      } else {
+        colors = config.themeColorSets.experimental;
+      }
+    } else if (config.themeColors) {
+      colors = config.themeColors;
+    } else {
+      return;
+    }
+
+    root.style.setProperty('--primary', colors.primary);
+    root.style.setProperty('--primary-hover', colors.primaryHover);
+    root.style.setProperty('--secondary', colors.secondary);
+    root.style.setProperty('--bg-primary', colors.background);
+    root.style.setProperty('--bg-secondary', colors.backgroundSecondary);
+    root.style.setProperty('--bg-tertiary', colors.backgroundTertiary);
+    root.style.setProperty('--text-primary', colors.textPrimary);
+    root.style.setProperty('--text-secondary', colors.textSecondary);
+    root.style.setProperty('--border', colors.border);
+    root.style.setProperty('--success', colors.success);
+    root.style.setProperty('--warning', colors.warning);
+    root.style.setProperty('--error', colors.error);
+    root.style.setProperty('--info', colors.info);
+  };
+
+  // Cargar homeConfig y aplicar colores globalmente
+  useEffect(() => {
+    try {
+      const homeConfigRef = ref(realtimeDb, 'homeConfig');
+      const unsubscribe = onValue(homeConfigRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          const config = {
+            ...defaultHomeConfig,
+            ...data,
+            siteSettings: data.siteSettings || defaultHomeConfig.siteSettings,
+            themeColors: data.themeColors || defaultHomeConfig.themeColors,
+            themeColorSets: data.themeColorSets || defaultHomeConfig.themeColorSets
+          };
+          setHomeConfig(config);
+          applyThemeColors(config, theme);
+        }
+      }, (error) => {
+        console.error('Error cargando homeConfig en App:', error);
+      });
+      return () => unsubscribe();
+    } catch (error) {
+      console.error('Error configurando listener de homeConfig en App:', error);
+    }
+  }, [theme]);
+
+  // Aplicar colores cuando cambia el tema
+  useEffect(() => {
+    applyThemeColors(homeConfig, theme);
+  }, [theme, homeConfig]);
   
   // Cargar notificaciones cuando la app inicia y hay un usuario logueado
   // NOTA: Se carga una sola vez al iniciar, las páginas individuales pueden recargar si es necesario
@@ -49,7 +120,8 @@ function App() {
         <AuctionManager />
         <OrderManager />
         <DataCleanupManager />
-        <BotManager />
+        {/* BotManager desactivado - Los bots ahora funcionan desde Cloud Functions (24/7) */}
+        {/* <BotManager /> */}
         <ScrollToTop />
         <ToastContainer />
         <main className="main-content">

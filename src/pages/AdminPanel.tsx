@@ -27,7 +27,8 @@ import { logAdminAction, logAuctionAction, logProductAction, logOrderAction, log
 import { logOrderStatusChange, loadOrderTransactions } from '../utils/orderTransactions';
 import { storage } from '../config/firebase';
 import { ref as storageRef, listAll, deleteObject } from 'firebase/storage';
-import { HomeConfig, defaultHomeConfig } from '../types/homeConfig';
+import { HomeConfig, defaultHomeConfig, LogoSticker } from '../types/homeConfig';
+import { specialEvents, getCurrentSpecialEvents, getStickerForEvent } from '../utils/dateSpecialEvents';
 import { 
   getAllConversations, 
   getMessages, 
@@ -131,6 +132,8 @@ const AdminPanel = (): React.ReactElement => {
   
   // Estado para configuración del inicio
   const [homeConfig, setHomeConfig] = useState<HomeConfig>(defaultHomeConfig);
+  // Estado para modo activo en editor de colores
+  const [activeColorMode, setActiveColorMode] = useState<'light' | 'dark' | 'experimental'>('light');
   
   // Cargar homeConfig desde Firebase
   useEffect(() => {
@@ -146,6 +149,7 @@ const AdminPanel = (): React.ReactElement => {
             ...data,
             siteSettings: data.siteSettings || defaultHomeConfig.siteSettings,
             themeColors: data.themeColors || defaultHomeConfig.themeColors,
+            themeColorSets: data.themeColorSets || defaultHomeConfig.themeColorSets,
             sectionTitles: data.sectionTitles || defaultHomeConfig.sectionTitles,
             banners: data.banners?.map((b: any) => ({
               ...b,
@@ -1466,8 +1470,16 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       const updatedConfig = { 
         ...homeConfig, 
         updatedAt: new Date().toISOString(),
-        siteSettings: homeConfig.siteSettings || defaultHomeConfig.siteSettings,
+        siteSettings: {
+          ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
+          logoStickers: (homeConfig.siteSettings?.logoStickers || []).map(s => ({
+            ...s,
+            startDate: s.startDate || undefined,
+            endDate: s.endDate || undefined
+          }))
+        },
         themeColors: homeConfig.themeColors || defaultHomeConfig.themeColors,
+        themeColorSets: homeConfig.themeColorSets || defaultHomeConfig.themeColorSets,
         sectionTitles: homeConfig.sectionTitles || defaultHomeConfig.sectionTitles,
         banners: homeConfig.banners.map(b => ({
           ...b,
@@ -4338,7 +4350,12 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
             overflow: isMobile ? 'auto' : 'hidden'
           }}>
             {(() => {
-              const filteredBots = bots.filter((bot: any) => {
+              // Eliminar duplicados por ID antes de filtrar
+              const uniqueBots = Array.from(
+                new Map(bots.map((bot: any) => [bot.id, bot])).values()
+              );
+              
+              const filteredBots = uniqueBots.filter((bot: any) => {
                 const matchesSearch = !searchTerm || bot.name.toLowerCase().includes(searchTerm.toLowerCase());
                 const matchesFilter = filterStatus === 'all' || 
                   (filterStatus === 'active' && bot.isActive) ||
@@ -4426,11 +4443,11 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredBots.map((bot: any) => {
+                      {filteredBots.map((bot: any, index: number) => {
                         const bidCount = getBotBidCount(bot.id);
                         return (
                           <tr 
-                            key={bot.id}
+                            key={`bot-${bot.id}-${index}`}
                             style={{ 
                               borderBottom: '1px solid var(--border)',
                               transition: 'background 0.2s'
@@ -5290,6 +5307,302 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 />
               </div>
             </div>
+
+            {/* Sección Stickers para Logo */}
+            <div style={{
+              background: 'var(--bg-secondary)',
+              padding: isMobile ? '1.5rem' : '2rem',
+              borderRadius: '1rem',
+              border: '1px solid var(--border)',
+              marginTop: '2rem'
+            }}>
+              <h3 style={{ 
+                margin: 0, 
+                marginBottom: '1.5rem', 
+                color: 'var(--text-primary)',
+                fontSize: isMobile ? '1.25rem' : '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <span style={{ fontSize: '1.5rem' }}>✨</span>
+                Stickers para el Logo (Fechas Especiales)
+              </h3>
+              <p style={{ 
+                fontSize: '0.875rem', 
+                color: 'var(--text-secondary)', 
+                marginBottom: '1.5rem',
+                lineHeight: '1.6'
+              }}>
+                Agregá stickers decorativos al logo que aparecerán automáticamente en fechas especiales o cuando los actives manualmente.
+              </p>
+
+              {/* Stickers rápidos para fechas especiales */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.75rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Stickers Rápidos (Fechas Especiales)
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  {specialEvents.map(event => {
+                    const existingSticker = homeConfig.siteSettings?.logoStickers?.find(s => s.type === event.type);
+                    const isActive = existingSticker?.active || false;
+                    return (
+                      <button
+                        key={event.type}
+                        onClick={() => {
+                          const stickers = homeConfig.siteSettings?.logoStickers || [];
+                          if (existingSticker) {
+                            // Toggle activo/inactivo
+                            setHomeConfig({
+                              ...homeConfig,
+                              siteSettings: {
+                                ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
+                                logoStickers: stickers.map(s => 
+                                  s.id === existingSticker.id 
+                                    ? { ...s, active: !s.active }
+                                    : s
+                                )
+                              }
+                            });
+                          } else {
+                            // Crear nuevo sticker
+                            const newSticker: LogoSticker = {
+                              id: `sticker-${Date.now()}`,
+                              type: event.type,
+                              emoji: event.emoji,
+                              position: 'top-right',
+                              size: 'medium',
+                              active: true,
+                              startDate: event.startDate.toISOString(),
+                              endDate: event.endDate.toISOString()
+                            };
+                            setHomeConfig({
+                              ...homeConfig,
+                              siteSettings: {
+                                ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
+                                logoStickers: [...stickers, newSticker]
+                              }
+                            });
+                          }
+                        }}
+                        style={{
+                          padding: '0.75rem 1rem',
+                          borderRadius: '0.5rem',
+                          border: `2px solid ${isActive ? 'var(--primary)' : 'var(--border)'}`,
+                          background: isActive ? 'var(--primary)' : 'var(--bg-primary)',
+                          color: isActive ? 'white' : 'var(--text-primary)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          fontSize: '0.9375rem',
+                          fontWeight: isActive ? 600 : 400,
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <span style={{ fontSize: '1.25rem' }}>{event.emoji}</span>
+                        <span>{event.name}</span>
+                        {isActive && <span style={{ fontSize: '0.75rem', opacity: 0.9 }}>✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Lista de stickers configurados */}
+              {(homeConfig.siteSettings?.logoStickers || []).length > 0 && (
+                <div style={{ marginTop: '1.5rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.75rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Stickers Configurados ({(homeConfig.siteSettings?.logoStickers || []).length})
+                  </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {homeConfig.siteSettings.logoStickers.map((sticker, index) => (
+                      <div
+                        key={sticker.id}
+                        style={{
+                          padding: '1rem',
+                          borderRadius: '0.5rem',
+                          border: '1px solid var(--border)',
+                          background: sticker.active ? 'var(--bg-primary)' : 'var(--bg-tertiary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '1rem',
+                          flexWrap: 'wrap'
+                        }}
+                      >
+                        <div style={{ fontSize: '2rem' }}>{sticker.emoji}</div>
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                          <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+                            {specialEvents.find(e => e.type === sticker.type)?.name || 'Personalizado'}
+                          </div>
+                          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                            Posición: {sticker.position} | Tamaño: {sticker.size}
+                          </div>
+                          {sticker.startDate && sticker.endDate && (
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                              {new Date(sticker.startDate).toLocaleDateString()} - {new Date(sticker.endDate).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <select
+                            value={sticker.position}
+                            onChange={(e) => {
+                              const stickers = homeConfig.siteSettings?.logoStickers || [];
+                              setHomeConfig({
+                                ...homeConfig,
+                                siteSettings: {
+                                  ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
+                                  logoStickers: stickers.map(s =>
+                                    s.id === sticker.id
+                                      ? { ...s, position: e.target.value as LogoSticker['position'] }
+                                      : s
+                                  )
+                                }
+                              });
+                            }}
+                            style={{
+                              padding: '0.5rem',
+                              borderRadius: '0.5rem',
+                              border: '1px solid var(--border)',
+                              background: 'var(--bg-primary)',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.875rem'
+                            }}
+                          >
+                            <option value="top-left">Arriba Izquierda</option>
+                            <option value="top-right">Arriba Derecha</option>
+                            <option value="bottom-left">Abajo Izquierda</option>
+                            <option value="bottom-right">Abajo Derecha</option>
+                            <option value="center">Centro</option>
+                          </select>
+                          <select
+                            value={sticker.size}
+                            onChange={(e) => {
+                              const stickers = homeConfig.siteSettings?.logoStickers || [];
+                              setHomeConfig({
+                                ...homeConfig,
+                                siteSettings: {
+                                  ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
+                                  logoStickers: stickers.map(s =>
+                                    s.id === sticker.id
+                                      ? { ...s, size: e.target.value as LogoSticker['size'] }
+                                      : s
+                                  )
+                                }
+                              });
+                            }}
+                            style={{
+                              padding: '0.5rem',
+                              borderRadius: '0.5rem',
+                              border: '1px solid var(--border)',
+                              background: 'var(--bg-primary)',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.875rem'
+                            }}
+                          >
+                            <option value="small">Pequeño</option>
+                            <option value="medium">Mediano</option>
+                            <option value="large">Grande</option>
+                          </select>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={sticker.active}
+                              onChange={(e) => {
+                                const stickers = homeConfig.siteSettings?.logoStickers || [];
+                                setHomeConfig({
+                                  ...homeConfig,
+                                  siteSettings: {
+                                    ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
+                                    logoStickers: stickers.map(s =>
+                                      s.id === sticker.id
+                                        ? { ...s, active: e.target.checked }
+                                        : s
+                                    )
+                                  }
+                                });
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '0.875rem', color: 'var(--text-primary)' }}>Activo</span>
+                          </label>
+                          <button
+                            onClick={() => {
+                              const stickers = homeConfig.siteSettings?.logoStickers || [];
+                              setHomeConfig({
+                                ...homeConfig,
+                                siteSettings: {
+                                  ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
+                                  logoStickers: stickers.filter(s => s.id !== sticker.id)
+                                }
+                              });
+                            }}
+                            style={{
+                              padding: '0.5rem',
+                              borderRadius: '0.5rem',
+                              border: '1px solid var(--error)',
+                              background: 'transparent',
+                              color: 'var(--error)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                            title="Eliminar sticker"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Vista previa del logo con stickers */}
+              {homeConfig.siteSettings?.logoUrl && (homeConfig.siteSettings?.logoStickers || []).filter(s => s.active).length > 0 && (
+                <div style={{ marginTop: '1.5rem', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--bg-primary)' }}>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                    Vista previa del logo con stickers:
+                  </div>
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                    <img
+                      src={homeConfig.siteSettings.logoUrl}
+                      alt="Logo preview"
+                      style={{ maxHeight: '120px', maxWidth: '200px', objectFit: 'contain' }}
+                    />
+                    {(homeConfig.siteSettings.logoStickers || [])
+                      .filter(s => s.active)
+                      .map(sticker => {
+                        const sizeMap = { small: '1.5rem', medium: '2rem', large: '3rem' };
+                        const positionMap = {
+                          'top-left': { top: '-10px', left: '-10px' },
+                          'top-right': { top: '-10px', right: '-10px' },
+                          'bottom-left': { bottom: '-10px', left: '-10px' },
+                          'bottom-right': { bottom: '-10px', right: '-10px' },
+                          'center': { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
+                        };
+                        return (
+                          <span
+                            key={sticker.id}
+                            style={{
+                              position: 'absolute',
+                              fontSize: sizeMap[sticker.size],
+                              ...positionMap[sticker.position],
+                              pointerEvents: 'none',
+                              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+                              zIndex: 10
+                            }}
+                          >
+                            {sticker.emoji}
+                          </span>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Sección Colores del Tema */}
@@ -5310,58 +5623,151 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               gap: '0.5rem'
             }}>
               <span style={{ fontSize: '1.5rem' }}>🎨</span>
-              Colores del Tema
+              Colores del Tema (por Modo)
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1.5rem' }}>
-              {Object.entries(homeConfig.themeColors || defaultHomeConfig.themeColors).map(([key, value]) => (
-                <div key={key}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, textTransform: 'capitalize' }}>
-                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                  </label>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <input
-                      type="color"
-                      value={value}
-                      onChange={(e) => setHomeConfig({ 
-                        ...homeConfig, 
-                        themeColors: { 
-                          ...(homeConfig.themeColors || defaultHomeConfig.themeColors), 
-                          [key]: e.target.value 
-                        } 
-                      })}
-                      style={{
-                        width: '60px',
-                        height: '40px',
-                        border: '1px solid var(--border)',
-                        borderRadius: '0.5rem',
-                        cursor: 'pointer'
-                      }}
-                    />
-                    <input
-                      type="text"
-                      value={value}
-                      onChange={(e) => setHomeConfig({ 
-                        ...homeConfig, 
-                        themeColors: { 
-                          ...(homeConfig.themeColors || defaultHomeConfig.themeColors), 
-                          [key]: e.target.value 
-                        } 
-                      })}
-                      placeholder="#000000"
-                      style={{
-                        flex: 1,
-                        padding: '0.75rem',
+            <div style={{ marginBottom: '1.5rem' }}>
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                Configurá los colores para cada modo (Claro, Oscuro, Experimental). Los cambios se aplican automáticamente en tiempo real.
+              </p>
+            </div>
+
+            {(() => {
+              const themeColorSets = homeConfig.themeColorSets || defaultHomeConfig.themeColorSets;
+              const modeLabels = {
+                light: { label: 'Modo Claro', icon: '☀️' },
+                dark: { label: 'Modo Oscuro', icon: '🌙' },
+                experimental: { label: 'Modo Experimental', icon: '✨' }
+              };
+
+              return (
+                <>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                    {(Object.keys(modeLabels) as Array<'light' | 'dark' | 'experimental'>).map(mode => (
+                      <button
+                        key={mode}
+                        onClick={() => setActiveColorMode(mode)}
+                        style={{
+                          padding: '0.75rem 1.5rem',
+                          borderRadius: '0.5rem',
+                          border: `2px solid ${activeColorMode === mode ? 'var(--primary)' : 'var(--border)'}`,
+                          background: activeColorMode === mode ? 'var(--primary)' : 'var(--bg-primary)',
+                          color: activeColorMode === mode ? 'white' : 'var(--text-primary)',
+                          cursor: 'pointer',
+                          fontSize: '0.9375rem',
+                          fontWeight: activeColorMode === mode ? 600 : 400,
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}
+                      >
+                        <span>{modeLabels[mode].icon}</span>
+                        <span>{modeLabels[mode].label}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1.5rem' }}>
+                    {Object.entries(themeColorSets[activeColorMode]).map(([key, value]) => (
+                      <div key={key} style={{
+                        padding: '1rem',
                         borderRadius: '0.5rem',
                         border: '1px solid var(--border)',
                         background: 'var(--bg-primary)',
-                        color: 'var(--text-primary)',
-                        fontSize: isMobile ? '16px' : '1rem',
-                        fontFamily: 'monospace'
-                      }}
-                    />
+                        transition: 'all 0.2s'
+                      }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, textTransform: 'capitalize', fontSize: '0.9375rem' }}>
+                          {key.replace(/([A-Z])/g, ' $1').trim()}
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <input
+                            type="color"
+                            value={value}
+                            onChange={(e) => {
+                              const newColorSets = {
+                                ...themeColorSets,
+                                [activeColorMode]: {
+                                  ...themeColorSets[activeColorMode],
+                                  [key]: e.target.value
+                                }
+                              };
+                              setHomeConfig({ 
+                                ...homeConfig, 
+                                themeColorSets: newColorSets
+                              });
+                            }}
+                            style={{
+                              width: '60px',
+                              height: '40px',
+                              border: '1px solid var(--border)',
+                              borderRadius: '0.5rem',
+                              cursor: 'pointer',
+                              transition: 'transform 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              (e.target as HTMLInputElement).style.transform = 'scale(1.1)';
+                            }}
+                            onMouseLeave={(e) => {
+                              (e.target as HTMLInputElement).style.transform = 'scale(1)';
+                            }}
+                          />
+                          <input
+                            type="text"
+                            value={value}
+                            onChange={(e) => {
+                              const newValue = e.target.value;
+                              if (/^#[0-9A-Fa-f]{6}$/.test(newValue) || newValue === '') {
+                                const newColorSets = {
+                                  ...themeColorSets,
+                                  [activeColorMode]: {
+                                    ...themeColorSets[activeColorMode],
+                                    [key]: newValue
+                                  }
+                                };
+                                setHomeConfig({ 
+                                  ...homeConfig, 
+                                  themeColorSets: newColorSets
+                                });
+                              }
+                            }}
+                            placeholder="#000000"
+                            style={{
+                              flex: 1,
+                              padding: '0.75rem',
+                              borderRadius: '0.5rem',
+                              border: '1px solid var(--border)',
+                              background: 'var(--bg-primary)',
+                              color: 'var(--text-primary)',
+                              fontSize: isMobile ? '16px' : '1rem',
+                              fontFamily: 'monospace'
+                            }}
+                          />
+                          <div style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '0.5rem',
+                            background: value,
+                            border: '1px solid var(--border)',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                          }} title="Vista previa" />
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              ))}
+                </>
+              );
+            })()}
+            <div style={{ marginTop: '1.5rem', padding: '1rem', borderRadius: '0.5rem', background: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: 500 }}>
+                💡 Tip: Los colores se aplican globalmente a:
+              </div>
+              <ul style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: 0, paddingLeft: '1.5rem', lineHeight: '1.8' }}>
+                <li>Botones y enlaces</li>
+                <li>Fondos y bordes</li>
+                <li>Textos y títulos</li>
+                <li>Elementos de navegación</li>
+                <li>Todos los componentes de la web</li>
+              </ul>
             </div>
           </div>
 

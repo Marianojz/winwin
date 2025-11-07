@@ -36,6 +36,25 @@
   --shadow-lg: rgba(0, 0, 0, 0.5);
 }
 
+[data-theme="experimental"] {
+  /* Experimental Theme */
+  --primary: #9D4EDD;
+  --secondary: #FF006E;
+  --accent: #00D4FF;
+  --bg-primary: #0A0E27;
+  --bg-secondary: #1A1F3A;
+  --bg-tertiary: #2A2F4A;
+  --text-primary: #E0E0FF;
+  --text-secondary: #B0B0FF;
+  --text-tertiary: #8080FF;
+  --border: #4A4F6A;
+  --success: #00F5A0;
+  --warning: #FFD93D;
+  --error: #FF6B9D;
+  --shadow: rgba(157, 78, 221, 0.3);
+  --shadow-lg: rgba(157, 78, 221, 0.5);
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -147,6 +166,36 @@ input:focus, textarea:focus, select:focus {
 .btn-secondary:hover {
   background: var(--primary);
   transform: translateY(-2px);
+}
+
+/* Animaciones para stickers */
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .btn-outline {
