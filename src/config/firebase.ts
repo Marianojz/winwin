@@ -4,15 +4,18 @@ import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getDatabase, ref, set } from 'firebase/database';  // <- NUEVA IMPORTACIÓN
 
-// Tu configuración actual (NO LA CAMBIES)
+// ⚠️ IMPORTANTE: Actualiza estas credenciales con las del nuevo proyecto Firebase
+// Sigue la guía en: GUIA_CAMBIO_DOMINIO_CLICKIO.md
+// Reemplaza TODO este objeto con las credenciales del nuevo proyecto "clickio"
 const firebaseConfig = {
-  apiKey: "AIzaSyDZjD0_YSivgYk2Kta4sFyV6ZFKM-RUYCM",
-  authDomain: "subasta-argenta-winwin.firebaseapp.com",
-  projectId: "subasta-argenta-winwin",
-  storageBucket: "subasta-argenta-winwin.firebasestorage.app",
-  messagingSenderId: "126111072135",
-  appId: "1:126111072135:web:ebcf4453a8a358c4d91d22",
-  databaseURL: "https://subasta-argenta-winwin-default-rtdb.firebaseio.com/"  // <- NUEVA LÍNEA
+  apiKey: "AIzaSyDhJldFdxpezX2MCANk67PBIWPbZacevEc",
+  authDomain: "clikio-773fa.firebaseapp.com",
+  projectId: "clikio-773fa",
+  storageBucket: "clikio-773fa.firebasestorage.app",
+  messagingSenderId: "930158513107",
+  appId: "1:930158513107:web:685ebe622ced3398e8bd26",
+  databaseURL: "https://clikio-773fa-default-rtdb.firebaseio.com"
+  measurementId: "G-13J0SJPW40"  // <- NUEVA LÍNEA
 };
 
 // Inicializar Firebase
