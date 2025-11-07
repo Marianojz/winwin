@@ -186,7 +186,7 @@ export const defaultThemeColorSets: ThemeColorSets = {
 export const defaultSiteSettings: SiteSettings = {
   siteName: 'Clikio',
   siteTagline: 'Un click, infinitas ofertas',
-  logoUrl: 'https://firebasestorage.googleapis.com/v0/b/clikio-773fa.firebasestorage.app/o/logo%2Fclickio-logo.png?alt=media',
+  logoUrl: '', // Se actualizará cuando se suba el logo a Firebase Storage
   footerText: '© 2024 Clikio. Todos los derechos reservados.',
   logoStickers: []
 };

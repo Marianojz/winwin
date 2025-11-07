@@ -77,8 +77,16 @@ const Navbar = () => {
 
   // Obtener logo con fallback
   const getLogoUrl = () => {
-    return homeConfig.siteSettings?.logoUrl || defaultHomeConfig.siteSettings.logoUrl;
+    const url = homeConfig.siteSettings?.logoUrl || defaultHomeConfig.siteSettings.logoUrl;
+    // Si la URL existe pero es del proyecto antiguo o está vacía, retornar null para mostrar placeholder
+    if (!url || url.includes('subasta-argenta-474019')) {
+      return null;
+    }
+    return url;
   };
+
+  // Estado para manejar errores de carga del logo
+  const [logoError, setLogoError] = useState(false);
 
   // Obtener nombre del sitio con fallback
   const getSiteName = () => {
@@ -94,15 +102,19 @@ const Navbar = () => {
       <nav className="navbar">
         <div className="navbar-container">
           <Link to="/" className="navbar-logo" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            {getLogoUrl() && (
+            {(getLogoUrl() && !logoError) ? (
               <div style={{ position: 'relative', display: 'inline-block' }}>
                 <img 
                   src={getLogoUrl()} 
                   alt={getSiteName()}
                   className="navbar-logo-img"
                   onError={(e) => {
-                    // Si falla la imagen, ocultarla y mostrar solo texto
+                    console.warn('⚠️ Error cargando logo desde:', getLogoUrl());
+                    setLogoError(true);
                     (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                  onLoad={() => {
+                    setLogoError(false);
                   }}
                 />
                 {/* Mostrar stickers activos */}
@@ -146,6 +158,23 @@ const Navbar = () => {
                       </span>
                     );
                   })}
+              </div>
+            ) : (
+              // Logo placeholder temporal mientras se sube el logo real
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #2563EB, #06B6D4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontWeight: 700,
+                fontSize: '1.25rem',
+                flexShrink: 0
+              }} title="Logo de Clikio">
+                C
               </div>
             )}
             <span className="navbar-logo-text">{getSiteName()}</span>

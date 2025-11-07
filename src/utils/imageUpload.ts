@@ -15,15 +15,19 @@ export const uploadImage = async (file: File | Blob, folder: string = 'images'):
     }
 
     // Validar tipo
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/svg+xml'];
     if (!validTypes.includes(file.type)) {
-      throw new Error('Formato no válido. Use JPG, PNG o WEBP');
+      throw new Error('Formato no válido. Use JPG, PNG, WEBP o SVG');
     }
 
     // Generar nombre único
     const timestamp = Date.now();
     const randomStr = Math.random().toString(36).substring(7);
-    const extension = file.type.split('/')[1];
+    let extension = file.type.split('/')[1];
+    // Corregir extensión para SVG
+    if (extension === 'svg+xml') {
+      extension = 'svg';
+    }
     const fileName = `${folder}/${timestamp}_${randomStr}.${extension}`;
 
     // Crear referencia en Storage

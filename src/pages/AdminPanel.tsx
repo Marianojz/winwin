@@ -27,6 +27,7 @@ import { logAdminAction, logAuctionAction, logProductAction, logOrderAction, log
 import { logOrderStatusChange, loadOrderTransactions } from '../utils/orderTransactions';
 import { storage } from '../config/firebase';
 import { ref as storageRef, listAll, deleteObject } from 'firebase/storage';
+import { uploadImage } from '../utils/imageUpload';
 import { HomeConfig, defaultHomeConfig, LogoSticker } from '../types/homeConfig';
 import { specialEvents, getCurrentSpecialEvents, getStickerForEvent } from '../utils/dateSpecialEvents';
 import { 
@@ -1600,7 +1601,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     });
   };
 
-  const handleImageDrop = async (e: React.DragEvent<HTMLDivElement>, setImageUrl: (url: string) => void) => {
+  const handleImageDrop = async (e: React.DragEvent<HTMLDivElement>, setImageUrl: (url: string) => void, uploadToStorage: boolean = false, folder: string = 'images') => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -1620,15 +1621,24 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     }
 
     try {
-      const base64 = await convertFileToBase64(file);
-      setImageUrl(base64);
-    } catch (error) {
-      console.error('Error convirtiendo imagen:', error);
-      alert('❌ Error al procesar la imagen');
+      if (uploadToStorage) {
+        // Subir a Firebase Storage
+        console.log(`📤 Subiendo imagen a Firebase Storage en carpeta: ${folder}`);
+        const url = await uploadImage(file, folder);
+        console.log(`✅ Imagen subida exitosamente: ${url}`);
+        setImageUrl(url);
+      } else {
+        // Convertir a base64 (para banners, promociones, etc.)
+        const base64 = await convertFileToBase64(file);
+        setImageUrl(base64);
+      }
+    } catch (error: any) {
+      console.error('Error procesando imagen:', error);
+      alert(`❌ Error al procesar la imagen: ${error.message || 'Error desconocido'}`);
     }
   };
 
-  const handleImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, setImageUrl: (url: string) => void) => {
+  const handleImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, setImageUrl: (url: string) => void, uploadToStorage: boolean = false, folder: string = 'images') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -1647,12 +1657,22 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     }
 
     try {
-      const base64 = await convertFileToBase64(file);
-      setImageUrl(base64);
+      if (uploadToStorage) {
+        // Subir a Firebase Storage
+        console.log(`📤 Subiendo imagen a Firebase Storage en carpeta: ${folder}`);
+        const url = await uploadImage(file, folder);
+        console.log(`✅ Imagen subida exitosamente: ${url}`);
+        setImageUrl(url);
+      } else {
+        // Convertir a base64 (para banners, promociones, etc.)
+        const base64 = await convertFileToBase64(file);
+        setImageUrl(base64);
+      }
       e.target.value = '';
-    } catch (error) {
-      console.error('Error convirtiendo imagen:', error);
-      alert('❌ Error al procesar la imagen');
+    } catch (error: any) {
+      console.error('Error procesando imagen:', error);
+      alert(`❌ Error al procesar la imagen: ${error.message || 'Error desconocido'}`);
+      e.target.value = '';
     }
   };
 
@@ -5200,7 +5220,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                       ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
                       logoUrl: url 
                     } 
-                  }))}
+                  }), true, 'logo')}
                   style={{
                     border: '2px dashed var(--border)',
                     borderRadius: '0.5rem',
@@ -5219,7 +5239,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                         ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
                         logoUrl: url 
                       } 
-                    }))}
+                    }), true, 'logo')}
                     style={{ display: 'none' }}
                     id="logo-image-input"
                   />
