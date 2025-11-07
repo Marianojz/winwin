@@ -49,6 +49,12 @@
     "tracking_searches": {
       ".read": true,
       ".write": true
+    },
+    "adminSettings": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+        ".write": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)"
+      }
     }
   }
 }

@@ -40,6 +40,13 @@
    - Activa el interruptor
    - Selecciona tu email como correo de soporte
    - Haz clic en **"Guardar"**
+6. **⚠️ IMPORTANTE: Agregar Dominios Autorizados**
+   - Ve a la pestaña **"Settings"** (Configuración) o **"Authorized domains"** (Dominios autorizados)
+   - Haz clic en **"Add domain"** o **"Agregar dominio"**
+   - Agrega: `www.clickio.com.ar`
+   - Haz clic en **"Add"** o **"Agregar"**
+   - (Opcional) También agrega: `clickio.com.ar` (sin www)
+   - ✅ **Esto es CRÍTICO:** Sin esto, el login con Google NO funcionará en producción
 
 ### 1.4. Crear Realtime Database
 1. En el menú lateral, haz clic en **"Realtime Database"**
@@ -267,6 +274,7 @@ Antes de considerar que todo está listo, verifica:
 
 - [ ] Nuevo proyecto Firebase creado con nombre "clickio"
 - [ ] Authentication habilitado (Email/Password y Google)
+- [ ] **Dominios autorizados agregados** en Authentication → Settings → Authorized domains (`www.clickio.com.ar`)
 - [ ] Realtime Database creado y **reglas configuradas INMEDIATAMENTE** (no en modo prueba)
 - [ ] Firestore creado (si lo usas) y **reglas configuradas INMEDIATAMENTE**
 - [ ] Storage habilitado (si lo usas) y **reglas configuradas INMEDIATAMENTE**
@@ -303,6 +311,14 @@ Antes de considerar que todo está listo, verifica:
 - Verifica que las credenciales en `firebase.ts` sean correctas
 - Verifica que las reglas de Firebase permitan escritura
 - Abre la consola del navegador (F12) y busca errores
+
+### Problema: "auth/unauthorized-domain" o "The current domain is not authorized for OAuth operations"
+**Solución:**
+- Ve a Firebase Console → **Authentication** → **Settings** → **Authorized domains**
+- Agrega tu dominio: `www.clickio.com.ar`
+- (Opcional) También agrega: `clickio.com.ar`
+- Espera 1-2 minutos y recarga la página
+- Este error aparece cuando intentas usar Google Sign-In sin autorizar el dominio
 
 ---
 
