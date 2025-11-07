@@ -14,7 +14,7 @@ const firebaseConfig = {
   storageBucket: "clikio-773fa.firebasestorage.app",
   messagingSenderId: "930158513107",
   appId: "1:930158513107:web:685ebe622ced3398e8bd26",
-  databaseURL: "https://clikio-773fa-default-rtdb.firebaseio.com"
+  databaseURL: "https://clikio-773fa-default-rtdb.firebaseio.com",
   measurementId: "G-13J0SJPW40"  // <- NUEVA LÍNEA
 };
 
