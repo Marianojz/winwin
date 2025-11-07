@@ -5300,6 +5300,145 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   </div>
                 )}
               </div>
+              
+              {/* Logos por Tema */}
+              <div style={{ marginTop: '2rem', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--bg-tertiary)' }}>
+                <h4 style={{ margin: 0, marginBottom: '1rem', color: 'var(--text-primary)', fontSize: '1.125rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  🎨 Logos por Tema (Opcional)
+                </h4>
+                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+                  Subí logos diferentes para cada modo (Claro, Oscuro, Experimental). Si no subís logos por tema, se usará el logo único de arriba.
+                </p>
+                
+                {(['light', 'dark', 'experimental'] as const).map((themeMode) => {
+                  const themeLabels = {
+                    light: { label: 'Modo Claro', icon: '☀️' },
+                    dark: { label: 'Modo Oscuro', icon: '🌙' },
+                    experimental: { label: 'Modo Experimental', icon: '✨' }
+                  };
+                  const currentLogoUrl = homeConfig.siteSettings?.logoUrls?.[themeMode] || '';
+                  
+                  return (
+                    <div key={themeMode} style={{ marginBottom: '1.5rem', padding: '1rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--bg-primary)' }}>
+                      <label style={{ display: 'block', marginBottom: '0.75rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.9375rem' }}>
+                        {themeLabels[themeMode].icon} {themeLabels[themeMode].label}
+                      </label>
+                      
+                      <div
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          e.currentTarget.style.borderColor = 'var(--primary)';
+                          e.currentTarget.style.background = 'rgba(214, 90, 0, 0.05)';
+                        }}
+                        onDragLeave={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          e.currentTarget.style.borderColor = 'var(--border)';
+                          e.currentTarget.style.background = 'var(--bg-primary)';
+                        }}
+                        onDrop={(e) => handleImageDrop(e, (url) => {
+                          const currentLogoUrls = homeConfig.siteSettings?.logoUrls || {};
+                          setHomeConfig({ 
+                            ...homeConfig, 
+                            siteSettings: { 
+                              ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
+                              logoUrls: {
+                                ...currentLogoUrls,
+                                [themeMode]: url
+                              }
+                            } 
+                          });
+                        }, true, 'logo')}
+                        style={{
+                          border: '2px dashed var(--border)',
+                          borderRadius: '0.5rem',
+                          padding: '0.75rem',
+                          background: 'var(--bg-primary)',
+                          transition: 'all 0.2s',
+                          marginBottom: '0.5rem'
+                        }}
+                      >
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleImageFileSelect(e, (url) => {
+                            const currentLogoUrls = homeConfig.siteSettings?.logoUrls || {};
+                            setHomeConfig({ 
+                              ...homeConfig, 
+                              siteSettings: { 
+                                ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
+                                logoUrls: {
+                                  ...currentLogoUrls,
+                                  [themeMode]: url
+                                }
+                              } 
+                            });
+                          }, true, 'logo')}
+                          style={{ display: 'none' }}
+                          id={`logo-${themeMode}-input`}
+                        />
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                          <label
+                            htmlFor={`logo-${themeMode}-input`}
+                            className="btn btn-secondary"
+                            style={{
+                              padding: '0.5rem 1rem',
+                              fontSize: '0.875rem',
+                              cursor: 'pointer',
+                              display: 'inline-block'
+                            }}
+                          >
+                            {currentLogoUrl ? 'Cambiar Logo' : 'Subir Logo'}
+                          </label>
+                        </div>
+                      </div>
+                      
+                      <input
+                        type="text"
+                        value={currentLogoUrl}
+                        onChange={(e) => {
+                          const currentLogoUrls = homeConfig.siteSettings?.logoUrls || {};
+                          setHomeConfig({ 
+                            ...homeConfig, 
+                            siteSettings: { 
+                              ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
+                              logoUrls: {
+                                ...currentLogoUrls,
+                                [themeMode]: e.target.value
+                              }
+                            } 
+                          });
+                        }}
+                        placeholder={`URL del logo para ${themeLabels[themeMode].label}`}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          borderRadius: '0.5rem',
+                          border: '1px solid var(--border)',
+                          background: 'var(--bg-primary)',
+                          color: 'var(--text-primary)',
+                          fontSize: isMobile ? '16px' : '0.9375rem',
+                          marginBottom: '0.5rem'
+                        }}
+                      />
+                      
+                      {currentLogoUrl && (
+                        <div style={{ borderRadius: '0.5rem', overflow: 'hidden', border: '1px solid var(--border)', padding: '0.75rem', background: 'var(--bg-primary)' }}>
+                          <img 
+                            src={currentLogoUrl} 
+                            alt={`Logo ${themeLabels[themeMode].label}`}
+                            style={{ maxHeight: '60px', maxWidth: '100%', objectFit: 'contain' }}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
                   Texto del Footer

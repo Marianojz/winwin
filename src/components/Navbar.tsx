@@ -11,7 +11,7 @@ import SoundToggle from './SoundToggle';
 import './Navbar.css';
 
 const Navbar = () => {
-  const { user, isAuthenticated, cart, unreadCount, setUser } = useStore();
+  const { user, isAuthenticated, cart, unreadCount, setUser, theme } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
   const cartItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
@@ -70,14 +70,25 @@ const Navbar = () => {
     } catch (error) {
       console.error('Error configurando listener de homeConfig en Navbar:', error);
     }
-  }, []);
+  }, [theme]); // Agregar theme como dependencia para recargar cuando cambie
 
   // Los colores se aplican en App.tsx según el tema activo
   // No necesitamos aplicar colores aquí ya que App.tsx maneja todo
 
-  // Obtener logo con fallback
+  // Obtener logo según el tema activo
   const getLogoUrl = () => {
-    const url = homeConfig.siteSettings?.logoUrl || defaultHomeConfig.siteSettings.logoUrl;
+    const siteSettings = homeConfig.siteSettings || defaultHomeConfig.siteSettings;
+    
+    // Priorizar logos por tema si existen
+    if (siteSettings.logoUrls) {
+      const themeLogo = siteSettings.logoUrls[theme as 'light' | 'dark' | 'experimental'];
+      if (themeLogo && !themeLogo.includes('subasta-argenta-474019')) {
+        return themeLogo;
+      }
+    }
+    
+    // Fallback al logo único (legacy)
+    const url = siteSettings.logoUrl || defaultHomeConfig.siteSettings.logoUrl;
     // Si la URL existe pero es del proyecto antiguo o está vacía, retornar null para mostrar placeholder
     if (!url || url.includes('subasta-argenta-474019')) {
       return null;

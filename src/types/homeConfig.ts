@@ -61,7 +61,12 @@ export interface LogoSticker {
 export interface SiteSettings {
   siteName: string;
   siteTagline: string;
-  logoUrl: string;
+  logoUrl: string; // Logo único (legacy - para compatibilidad)
+  logoUrls?: { // Logos por tema
+    light?: string;
+    dark?: string;
+    experimental?: string;
+  };
   faviconUrl?: string;
   footerText?: string;
   logoStickers?: LogoSticker[];
