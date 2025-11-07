@@ -62,10 +62,10 @@ export interface SiteSettings {
   siteName: string;
   siteTagline: string;
   logoUrl: string; // Logo único (legacy - para compatibilidad)
-  logoUrls: { // Logos por tema
-    light: string;
-    dark: string;
-    experimental: string;
+  logoUrls?: { // Logos por tema
+    light?: string;
+    dark?: string;
+    experimental?: string;
   };
   faviconUrl?: string;
   footerText?: string;
@@ -90,7 +90,7 @@ export interface HomeConfig {
   themeColors: ThemeColors;
   
   // Colores por modo (light, dark, experimental)
-  themeColorSets: ThemeColorSets;
+  themeColorSets?: ThemeColorSets;
   
   // Títulos de secciones
   sectionTitles: SectionTitles;
@@ -188,18 +188,15 @@ export const defaultThemeColorSets: ThemeColorSets = {
   experimental: defaultExperimentalThemeColors
 };
 
-// URLs de los logos desde Firebase Storage
-const LOGO_URLS = {
-  light: 'https://storage.googleapis.com/clikio-773fa.firebasestorage.app/Imagenes%20a%20utilizar/1762515543119.png',
-  dark: 'https://storage.googleapis.com/clikio-773fa.firebasestorage.app/Imagenes%20a%20utilizar/1762515543111.jpg',
-  experimental: 'https://storage.googleapis.com/clikio-773fa.firebasestorage.app/Imagenes%20a%20utilizar/1762515543119.png'
-};
-
 export const defaultSiteSettings: SiteSettings = {
   siteName: 'Clikio',
   siteTagline: 'Un click, infinitas ofertas',
-  logoUrl: LOGO_URLS.light, // Logo por defecto (modo claro)
-  logoUrls: LOGO_URLS, // Todos los logos por tema
+  logoUrl: 'gs://clikio-773fa.firebasestorage.app/Imagenes a utilizar/1762515543119.png',
+  logoUrls: {
+    light: 'gs://clikio-773fa.firebasestorage.app/Imagenes a utilizar/1762515543119.png',
+    dark: 'gs://clikio-773fa.firebasestorage.app/Imagenes a utilizar/1762515543111.jpg',
+    experimental: 'gs://clikio-773fa.firebasestorage.app/Imagenes a utilizar/1762515543119.png'
+  },
   footerText: '© 2024 Clikio. Todos los derechos reservados.',
   logoStickers: []
 };
@@ -234,128 +231,3 @@ export const defaultHomeConfig: HomeConfig = {
   },
   updatedAt: new Date()
 };
-
-// Función auxiliar para obtener el logo según el tema actual
-export function getLogoForTheme(theme: keyof ThemeColorSets): string {
-  return defaultSiteSettings.logoUrls[theme];
-}
-
-// Función para actualizar dinámicamente el logo en el frontend
-export function updateLogoBasedOnTheme(theme: keyof ThemeColorSets): string {
-  const logoUrl = getLogoForTheme(theme);
-  
-  // Actualizar el logo en el DOM (si estás en un entorno de frontend)
-  if (typeof document !== 'undefined') {
-    const logoElements = document.querySelectorAll('[data-logo]');
-    logoElements.forEach(element => {
-      if (element instanceof HTMLImageElement) {
-        element.src = logoUrl;
-      } else if (element instanceof HTMLElement) {
-        element.style.backgroundImage = `url(${logoUrl})`;
-      }
-    });
-  }
-  
-  return logoUrl;
-}
-
-// Función para detectar el tema del sistema y aplicar el logo correspondiente
-export function initializeThemeLogo(): void {
-  if (typeof window === 'undefined') return;
-
-  const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
-  
-  // Detectar tema inicial
-  const initialTheme = prefersDarkScheme.matches ? 'dark' : 'light';
-  updateLogoBasedOnTheme(initialTheme);
-  
-  // Escuchar cambios en el tema del sistema
-  prefersDarkScheme.addEventListener('change', (e) => {
-    const theme = e.matches ? 'dark' : 'light';
-    updateLogoBasedOnTheme(theme);
-  });
-}
-
-// Función para cambiar a modo experimental
-export function setExperimentalTheme(): void {
-  updateLogoBasedOnTheme('experimental');
-  
-  // También puedes agregar una clase al body para CSS
-  if (typeof document !== 'undefined') {
-    document.body.classList.add('theme-experimental');
-    document.body.classList.remove('theme-light', 'theme-dark');
-  }
-}
-
-// Función para cambiar a modo claro
-export function setLightTheme(): void {
-  updateLogoBasedOnTheme('light');
-  
-  if (typeof document !== 'undefined') {
-    document.body.classList.add('theme-light');
-    document.body.classList.remove('theme-dark', 'theme-experimental');
-  }
-}
-
-// Función para cambiar a modo oscuro
-export function setDarkTheme(): void {
-  updateLogoBasedOnTheme('dark');
-  
-  if (typeof document !== 'undefined') {
-    document.body.classList.add('theme-dark');
-    document.body.classList.remove('theme-light', 'theme-experimental');
-  }
-}
-
-// Función para verificar si las URLs de los logos son accesibles
-export async function verifyLogoUrls(): Promise<{ [key: string]: boolean }> {
-  const results: { [key: string]: boolean } = {};
-  
-  for (const [theme, url] of Object.entries(LOGO_URLS)) {
-    try {
-      const response = await fetch(url, { method: 'HEAD' });
-      results[theme] = response.ok;
-    } catch (error) {
-      results[theme] = false;
-    }
-  }
-  
-  return results;
-}
-
-// CSS recomendado para usar con estos logos
-export const logoStyles = `
-  .app-logo {
-    width: 150px;
-    height: 50px;
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    transition: background-image 0.3s ease;
-  }
-
-  .theme-light .app-logo {
-    background-image: url('${LOGO_URLS.light}');
-  }
-
-  .theme-dark .app-logo {
-    background-image: url('${LOGO_URLS.dark}');
-  }
-
-  .theme-experimental .app-logo {
-    background-image: url('${LOGO_URLS.experimental}');
-  }
-
-  /* Fallback para cuando CSS no puede detectar el tema del sistema */
-  @media (prefers-color-scheme: light) {
-    .app-logo:not(.theme-manual) {
-      background-image: url('${LOGO_URLS.light}');
-    }
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .app-logo:not(.theme-manual) {
-      background-image: url('${LOGO_URLS.dark}');
-    }
-  }
-`;
