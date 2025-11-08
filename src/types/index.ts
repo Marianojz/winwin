@@ -223,3 +223,45 @@ export interface Report {
   avgDeliveryTime: number;
   topSellingProducts: { id: string; name: string; sales: number }[];
 }
+
+// ========== SISTEMA DE TICKETS / CENTRO DE AYUDA ==========
+
+export type TicketStatus = 'visto' | 'revision' | 'resuelto';
+
+export type TicketType = 'consulta' | 'problema' | 'reembolso' | 'tecnico' | 'otro';
+
+export interface Ticket {
+  id: string;
+  ticketNumber: string; // Número único de ticket (ej: TKT-2025-001)
+  userId: string; // ID del usuario (puede ser null si no está registrado)
+  userName: string;
+  userEmail: string;
+  userPhone?: string;
+  type: TicketType;
+  subject: string;
+  message: string;
+  status: TicketStatus;
+  adminResponse?: string;
+  adminId?: string; // ID del admin que respondió
+  adminName?: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  resolvedAt?: Date | string;
+  priority?: 'baja' | 'media' | 'alta';
+  relatedOrderId?: string;
+  relatedAuctionId?: string;
+  attachments?: string[]; // URLs de archivos adjuntos
+}
+
+export interface ContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  subject: string;
+  message: string;
+  createdAt: Date | string;
+  read: boolean;
+  readAt?: Date | string;
+  adminResponse?: string;
+}

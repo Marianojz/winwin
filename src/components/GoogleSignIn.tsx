@@ -70,8 +70,16 @@ const GoogleSignIn = () => {
         });
         needsCompleteProfile = true;
       } else {
-        // Usuario existente - verificar si tiene dirección
+        // Usuario existente - actualizar avatar de Google si está disponible
         const userData = userDoc.data();
+        if (user.photoURL && user.photoURL !== userData.avatar) {
+          // Actualizar avatar de Google en Firestore
+          await setDoc(userDocRef, {
+            ...userData,
+            avatar: user.photoURL
+          }, { merge: true });
+        }
+        // Verificar si tiene dirección
         if (!userData.dni || !userData.address || userData.latitude === 0) {
           needsCompleteProfile = true;
         }
@@ -81,11 +89,16 @@ const GoogleSignIn = () => {
       const updatedUserDoc = await getDoc(userDocRef);
       const userData = updatedUserDoc.data();
 
+      // Priorizar siempre el avatar de Google si está disponible
+      const googleAvatar = user.photoURL || '';
+      const savedAvatar = userData?.avatar || '';
+      const finalAvatar = googleAvatar || savedAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || userData?.username || 'U')}&size=200&background=FF6B00&color=fff&bold=true`;
+      
       const fullUser: User = {
         id: user.uid,
         email: user.email!,
         username: userData?.username || user.displayName || 'Usuario',
-        avatar: user.photoURL || userData?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'U')}&size=200&background=FF6B00&color=fff&bold=true`,
+        avatar: finalAvatar,
         isAdmin: userData?.role === 'admin' || userData?.isAdmin === true,
         dni: userData?.dni || '',
         createdAt: userData?.createdAt ? new Date(userData.createdAt) : new Date(),

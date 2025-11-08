@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useSyncFirebase } from './hooks/useSyncFirebase';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { ref, onValue } from 'firebase/database';
 import { realtimeDb } from './config/firebase';
 import { HomeConfig, defaultHomeConfig } from './types/homeConfig';
 import { useStore } from './store/useStore';
 import Terminos from './pages/Terminos';
 import Preguntas from './pages/Preguntas';
+import Ayuda from './pages/Ayuda';
+import Contacto from './pages/Contacto';
 import Navbar from './components/Navbar';
 import AuctionManager from './utils/AuctionManager';
 import OrderManager from './utils/OrderManager';
@@ -78,7 +80,10 @@ function App() {
           const config = {
             ...defaultHomeConfig,
             ...data,
-            siteSettings: data.siteSettings || defaultHomeConfig.siteSettings,
+            siteSettings: {
+              ...(data.siteSettings || defaultHomeConfig.siteSettings),
+              logoStickers: data.siteSettings?.logoStickers || defaultHomeConfig.siteSettings.logoStickers || []
+            },
             themeColors: data.themeColors || defaultHomeConfig.themeColors,
             themeColorSets: data.themeColorSets || defaultHomeConfig.themeColorSets
           };
@@ -138,6 +143,8 @@ function App() {
             <Route path="/perfil" element={<Perfil />} />
             <Route path="/terminos" element={<Terminos />} />
             <Route path="/preguntas" element={<Preguntas />} />
+            <Route path="/ayuda" element={<Ayuda />} />
+            <Route path="/contacto" element={<Contacto />} />
             <Route path="/admin" element={<AdminPanel />} />
             <Route path="/completar-perfil" element={<CompletarPerfil />} />
           </Routes>
@@ -152,17 +159,17 @@ function App() {
               <div className="footer-section">
                 <h4>Enlaces</h4>
                 <ul>
-                  <li><a href="/subastas">Subastas</a></li>
-                  <li><a href="/tienda">Tienda</a></li>
-                  <li><a href="/terminos">Términos y Condiciones</a></li>
+                  <li><Link to="/subastas">Subastas</Link></li>
+                  <li><Link to="/tienda">Tienda</Link></li>
+                  <li><Link to="/terminos">Términos y Condiciones</Link></li>
                 </ul>
               </div>
               <div className="footer-section">
                 <h4>Soporte</h4>
                 <ul>
-                  <li><a href="/ayuda">Centro de Ayuda</a></li>
-                  <li><a href="/contacto">Contacto</a></li>
-                  <li><a href="/preguntas">Preguntas Frecuentes</a></li>
+                  <li><Link to="/ayuda">Centro de Ayuda</Link></li>
+                  <li><Link to="/contacto">Contacto</Link></li>
+                  <li><Link to="/preguntas">Preguntas Frecuentes</Link></li>
                 </ul>
               </div>
             </div>

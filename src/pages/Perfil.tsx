@@ -2,6 +2,7 @@ import { Mail, MapPin, FileText, Award, ShoppingBag, Gavel, LogOut, Send, Messag
 import { useStore } from '../store/useStore';
 import { auth } from '../config/firebase';
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { getUserConversations, getMessages, saveMessage, markMessagesAsRead, getUnreadCount, createMessage } from '../utils/messages';
 import { Message } from '../types';
 import { formatTimeAgo } from '../utils/helpers';
@@ -9,11 +10,28 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 
 const Perfil = () => {
   const { user, auctions } = useStore();
-  const [activeTab, setActiveTab] = useState<'profile' | 'messages'>('profile');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState<'profile' | 'messages'>(
+    tabParam === 'messages' ? 'messages' : 'profile'
+  );
+  
+  // Actualizar tab cuando cambia el query param
+  useEffect(() => {
+    if (tabParam === 'messages') {
+      setActiveTab('messages');
+    }
+  }, [tabParam]);
   const [userMessages, setUserMessages] = useState<Message[]>([]);
   const [newMessageContent, setNewMessageContent] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
+  const [avatarError, setAvatarError] = useState(false);
   const isMobile = useIsMobile();
+  
+  // Resetear error de avatar cuando cambia el usuario
+  useEffect(() => {
+    setAvatarError(false);
+  }, [user?.id, user?.avatar]);
   
   useEffect(() => {
     if (user && activeTab === 'messages') {
@@ -67,7 +85,7 @@ const Perfil = () => {
 
   const myBids = auctions.filter(a => a.bids.some(b => b.userId === user.id));
 
-  // Generar avatar URL (Gravatar con fallback a ui-avatars)
+  // Usar avatar del usuario (prioriza avatar de Google guardado en Firebase)
   const avatarUrl = user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || 'U')}&size=200&background=FF6B00&color=fff&bold=true`;
 
   const handleLogout = async () => {
@@ -159,18 +177,43 @@ const Perfil = () => {
               alignItems: isMobile ? 'flex-start' : 'center',
               flexDirection: isMobile ? 'column' : 'row'
             }}>
-          <img 
-            src={avatarUrl} 
-            alt={user.username} 
-            style={{ 
-              width: isMobile ? '80px' : '120px', 
-              height: isMobile ? '80px' : '120px', 
-              borderRadius: '50%', 
-              objectFit: 'cover', 
+          {!avatarError && avatarUrl ? (
+            <img 
+              src={avatarUrl} 
+              alt={user.username} 
+              style={{ 
+                width: isMobile ? '80px' : '120px', 
+                height: isMobile ? '80px' : '120px', 
+                borderRadius: '50%', 
+                objectFit: 'cover', 
+                border: '4px solid var(--primary)',
+                flexShrink: 0
+              }}
+              onError={() => {
+                setAvatarError(true);
+              }}
+              onLoad={() => {
+                setAvatarError(false);
+              }}
+            />
+          ) : (
+            <div style={{
+              width: isMobile ? '80px' : '120px',
+              height: isMobile ? '80px' : '120px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #FF6B00, #FF8C42)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontWeight: 700,
+              fontSize: isMobile ? '2rem' : '3rem',
               border: '4px solid var(--primary)',
               flexShrink: 0
-            }} 
-          />
+            }}>
+              {(user.username || user.email || 'U')[0].toUpperCase()}
+            </div>
+          )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <h1 style={{ marginBottom: '0.5rem', fontSize: isMobile ? '1.25rem' : '1.5rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{user.username}</h1>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', color: 'var(--text-secondary)', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
@@ -318,27 +361,37 @@ const Perfil = () => {
                   >
                     <div
                       style={{
-                        maxWidth: '70%',
-                        padding: '0.875rem 1.25rem',
+                        maxWidth: isMobile ? '85%' : '70%',
+                        padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
                         borderRadius: '1rem',
                         background: isAdmin ? 'var(--primary)' : 'var(--bg-secondary)',
                         color: isAdmin ? 'white' : 'var(--text-primary)',
                         border: `1px solid ${isAdmin ? 'var(--primary)' : 'var(--border)'}`,
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                        wordWrap: 'break-word',
+                        overflowWrap: 'break-word',
+                        wordBreak: 'break-word'
                       }}
                     >
                       {isAdmin && (
-                        <div style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.25rem', opacity: 0.9 }}>
+                        <div style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: 600, marginBottom: '0.25rem', opacity: 0.9 }}>
                           Administrador
                         </div>
                       )}
                       {msg.isAutoGenerated && (
-                        <div style={{ fontSize: '0.75rem', opacity: 0.8, marginBottom: '0.25rem', fontStyle: 'italic' }}>
+                        <div style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', opacity: 0.8, marginBottom: '0.25rem', fontStyle: 'italic' }}>
                           Mensaje automático
                         </div>
                       )}
-                      <div style={{ marginBottom: '0.5rem' }}>{msg.content}</div>
-                      <div style={{ fontSize: '0.75rem', opacity: 0.7, textAlign: 'right' }}>
+                      <div style={{ 
+                        marginBottom: '0.5rem',
+                        fontSize: isMobile ? '0.875rem' : '1rem',
+                        lineHeight: '1.5',
+                        whiteSpace: 'pre-wrap',
+                        wordWrap: 'break-word',
+                        overflowWrap: 'break-word'
+                      }}>{msg.content}</div>
+                      <div style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', opacity: 0.7, textAlign: 'right' }}>
                         {new Date(msg.createdAt).toLocaleString('es-AR', { 
                           day: '2-digit', 
                           month: '2-digit', 
@@ -388,17 +441,19 @@ const Perfil = () => {
                 value={newMessageContent}
                 onChange={(e) => setNewMessageContent(e.target.value)}
                 placeholder="Escribí tu mensaje al administrador aquí..."
-                rows={3}
+                rows={isMobile ? 2 : 3}
                 style={{ 
                   width: '100%',
-                  padding: '0.875rem 1.25rem', 
+                  padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem', 
                   borderRadius: '0.75rem', 
                   border: '2px solid var(--border)',
-                  fontSize: '0.9375rem',
+                  fontSize: isMobile ? '0.875rem' : '0.9375rem',
                   background: 'var(--bg-tertiary)',
                   color: 'var(--text-primary)',
+                  wordWrap: 'break-word',
+                  overflowWrap: 'break-word',
                   resize: 'vertical',
-                  minHeight: '80px',
+                  minHeight: isMobile ? '60px' : '80px',
                   fontFamily: 'inherit'
                 }}
               />

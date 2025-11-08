@@ -107,6 +107,56 @@ Tu documento en Realtime Database debería verse así:
 - **Después de configurar, cierra sesión y vuelve a iniciar sesión**
 - El sistema sincroniza automáticamente, pero es mejor hacerlo manualmente la primera vez
 
+## 🔒 Problema Común: Error de Permisos en Storage
+
+Si ves este error al intentar subir imágenes:
+```
+Firebase Storage: User does not have permission to access 'logo/...'. (storage/unauthorized)
+```
+
+### 🔍 Diagnóstico
+
+**Causa:** Las reglas de Firebase Storage (en producción) requieren que el usuario esté marcado como admin en **Firestore**, no solo en Realtime Database.
+
+### ✅ Solución Paso a Paso
+
+#### Opción 1: Si estás en DESARROLLO (Recomendado)
+
+1. Ve a **Firebase Console** → **Storage** → **Reglas**
+2. Copia el contenido completo del archivo `storage.rules` (sin `.production`)
+3. Pega en el editor de Firebase Console
+4. Haz clic en **"Publicar"**
+5. Espera 30 segundos
+6. **Cierra sesión y vuelve a iniciar sesión** en tu aplicación
+7. Intenta subir la imagen nuevamente
+
+#### Opción 2: Si estás en PRODUCCIÓN
+
+1. **Verifica en Firestore:**
+   - Ve a **Firestore Database** → **Datos** → Colección `users`
+   - Encuentra tu usuario (User ID: `uk7dN7ERMKXyWdq74V0R73fplqe2`)
+   - Verifica que `isAdmin` sea `true` (tipo **boolean**, NO string)
+   - Si `role` existe, debería ser `"admin"` (string), no `true` (boolean)
+
+2. **Actualiza las reglas de Storage:**
+   - Ve a **Firebase Console** → **Storage** → **Reglas**
+   - Copia el contenido completo del archivo `storage.rules.production`
+   - Pega en el editor de Firebase Console
+   - Haz clic en **"Publicar"**
+   - Espera 30 segundos
+
+3. **Cierra sesión y vuelve a iniciar sesión** en tu aplicación
+   - Esto actualiza el token de autenticación con los nuevos permisos
+
+4. Intenta subir la imagen nuevamente
+
+### ⚠️ Notas Importantes
+
+- **Las reglas de Storage no pueden leer Realtime Database**, solo Firestore
+- **El token de autenticación se actualiza al iniciar sesión**, por eso es importante cerrar y volver a iniciar sesión
+- **Si `isAdmin` está como string `"true"` en lugar de boolean `true`**, las reglas fallarán
+- **El campo `role` debe ser `"admin"` (string)**, no `true` (boolean)
+
 ---
 
 ## ✅ Verificación Rápida

@@ -4,9 +4,13 @@ service firebase.storage {
   match /b/{bucket}/o {
     
     // Helper function para verificar si es admin (requiere Firestore)
+    // Verifica si el usuario existe en Firestore y tiene isAdmin = true
     function isAdmin() {
-      return request.auth != null && 
-             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      if (request.auth == null) {
+        return false;
+      }
+      let userDoc = firestore.get(/databases/(default)/documents/users/$(request.auth.uid));
+      return userDoc.exists && userDoc.data.isAdmin == true;
     }
     
     // Imágenes de subastas - Lectura pública, escritura solo admins

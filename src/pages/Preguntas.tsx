@@ -97,7 +97,7 @@ const Preguntas = () => {
       category: 'tienda'
     },
     {
-      id: 13,
+      id: 16,
       question: '¿El carrito asegura el stock?',
       answer: 'No, el carrito no asegura el stock. El stock se descuenta únicamente cuando confirmás y pagás la compra. Si otro usuario compra el producto antes que vos, ya no estará disponible. Recomendamos finalizar la compra lo antes posible.',
       category: 'tienda'
@@ -149,19 +149,19 @@ const Preguntas = () => {
       category: 'envios'
     },
     {
-      id: 21,
+      id: 25,
       question: '¿Cuánto tarda el envío?',
       answer: 'Los tiempos de entrega varían según tu ubicación. En general: (1) Capital Federal y GBA: 2-5 días hábiles, (2) Interior del país: 5-10 días hábiles. Te enviaremos un código de seguimiento para que puedas rastrear tu pedido.',
       category: 'envios'
     },
     {
-      id: 22,
+      id: 26,
       question: '¿Puedo retirar personalmente?',
       answer: 'Sí, podés coordinar el retiro personal de tu compra en nuestro depósito en Buenos Aires. Esta opción está disponible al momento de finalizar la compra y no tiene costo adicional.',
       category: 'envios'
     },
     {
-      id: 23,
+      id: 27,
       question: '¿Qué hago si mi producto llega dañado?',
       answer: 'Si tu producto llega dañado, debés notificarnos dentro de las 48 horas de recibido. Enviá fotos del daño a través del Centro de Ayuda. Evaluaremos el caso y procederemos con el reembolso o reemplazo según corresponda.',
       category: 'envios'
@@ -398,18 +398,18 @@ const Preguntas = () => {
             flexWrap: 'wrap'
           }}>
             <a 
-              href="/contacto" 
+              href="/ayuda" 
               className="btn btn-primary"
               style={{ textDecoration: 'none' }}
             >
-              Contactar Soporte
+              Centro de Ayuda
             </a>
             <a 
-              href="/ayuda" 
+              href="/contacto" 
               className="btn btn-outline"
               style={{ textDecoration: 'none' }}
             >
-              Centro de Ayuda
+              Contactar
             </a>
           </div>
         </div>

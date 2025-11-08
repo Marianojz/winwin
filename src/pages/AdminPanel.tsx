@@ -11,7 +11,7 @@ import {
   Search, Filter, ShoppingBag, MapPin, BarChart3,
   MousePointerClick, Image as ImageIcon, Save, Store, Mail, Send,
   CheckCircle, Truck, FileText, Calendar, User, CreditCard,
-  ArrowRight, ArrowDown, ArrowUp, Download, Trash
+  ArrowRight, ArrowDown, ArrowUp, Download, Trash, HelpCircle, Ticket as TicketIcon
 } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -41,7 +41,13 @@ import {
   deleteConversation,
   deleteMessage
 } from '../utils/messages';
-import { Message, Conversation } from '../types';
+import { Message, Conversation, Ticket, TicketStatus, ContactMessage } from '../types';
+import { 
+  getAllTickets, 
+  updateTicketStatus, 
+  getAllContactMessages, 
+  markContactMessageAsRead 
+} from '../utils/tickets';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { trackingSystem } from '../utils/tracking';
 import { actionLogger } from '../utils/actionLogger';
@@ -58,7 +64,8 @@ import {
 const AdminPanel = (): React.ReactElement => {
   const { 
     user, auctions, products, bots, orders,
-    addBot, updateBot, deleteBot, setProducts, setAuctions, setBots, setOrders, updateOrderStatus, loadBots
+    addBot, updateBot, deleteBot, setProducts, setAuctions, setBots, setOrders, updateOrderStatus, loadBots,
+    addNotification
   } = useStore();
   
   // Estados principales
@@ -75,6 +82,26 @@ const AdminPanel = (): React.ReactElement => {
       console.log('✅ Cargando bots desde Firebase...');
     }
   }, [user?.isAdmin, loadBots]);
+
+  // Debug: Log de bots activos solo cuando cambien los bots (no en cada render)
+  useEffect(() => {
+    if (bots.length === 0) return;
+    
+    const uniqueBots = Array.from(
+      new Map(bots.map(bot => [bot.id, bot])).values()
+    );
+    const activeBots = uniqueBots.filter((b: { isActive: any; }) => b.isActive);
+    
+    if (bots.length !== uniqueBots.length) {
+      console.warn(`⚠️ Bots duplicados detectados: ${bots.length} total, ${uniqueBots.length} únicos`);
+    }
+    
+    if (activeBots.length > 0) {
+      console.log(`🤖 Bots activos (${activeBots.length}):`, activeBots.map(b => ({ id: b.id, name: b.name, isActive: b.isActive })));
+    } else {
+      console.log(`🤖 No hay bots activos (${uniqueBots.length} bots total)`);
+    }
+  }, [bots]); // Solo se ejecuta cuando cambia el array de bots
   
   // Limpiar duplicados de pedidos al montar el componente
   useEffect(() => {
@@ -148,7 +175,10 @@ const AdminPanel = (): React.ReactElement => {
           setHomeConfig({
             ...defaultHomeConfig,
             ...data,
-            siteSettings: data.siteSettings || defaultHomeConfig.siteSettings,
+            siteSettings: {
+              ...(data.siteSettings || defaultHomeConfig.siteSettings),
+              logoStickers: data.siteSettings?.logoStickers || defaultHomeConfig.siteSettings.logoStickers || []
+            },
             themeColors: data.themeColors || defaultHomeConfig.themeColors,
             themeColorSets: data.themeColorSets || defaultHomeConfig.themeColorSets,
             sectionTitles: data.sectionTitles || defaultHomeConfig.sectionTitles,
@@ -196,6 +226,15 @@ const AdminPanel = (): React.ReactElement => {
   const [adminUnreadCount, setAdminUnreadCount] = useState(0);
   const [showUserSelector, setShowUserSelector] = useState(false);
   const [selectedUserForMessage, setSelectedUserForMessage] = useState<string | null>(null);
+  
+  // Estados para tickets y mensajes de contacto
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [ticketResponse, setTicketResponse] = useState('');
+  const [ticketStatusFilter, setTicketStatusFilter] = useState<TicketStatus | 'todos'>('todos');
+  const [ticketSearchQuery, setTicketSearchQuery] = useState('');
+  
   const isMobile = useIsMobile();
   
   // Cargar conversaciones y contador en tiempo real
@@ -218,6 +257,28 @@ const AdminPanel = (): React.ReactElement => {
     } else {
       setConversations([]);
       setAdminUnreadCount(0);
+    }
+  }, [activeTab]);
+
+  // Cargar tickets y mensajes de contacto
+  useEffect(() => {
+    if (activeTab === 'tickets') {
+      const unsubscribeTickets = getAllTickets((tickets) => {
+        setTickets(tickets);
+      });
+      
+      const unsubscribeMessages = getAllContactMessages((messages) => {
+        setContactMessages(messages);
+      });
+      
+      return () => {
+        unsubscribeTickets();
+        unsubscribeMessages();
+      };
+    } else {
+      setTickets([]);
+      setContactMessages([]);
+      setSelectedTicket(null);
     }
   }, [activeTab]);
   
@@ -571,9 +632,22 @@ const [auctionForm, setAuctionForm] = useState({
       })
       .reduce((sum: any, o: { amount: any; }) => sum + o.amount, 0);
     
-    // Bots
-    const activeBots = bots.filter((b: { isActive: any; }) => b.isActive).length;
-    const totalBotsBalance = bots.reduce((sum: any, b: { balance: any; }) => sum + b.balance, 0);
+    // Bots - Eliminar duplicados antes de calcular
+    const uniqueBots = Array.from(
+      new Map(bots.map(bot => [bot.id, bot])).values()
+    );
+    const activeBots = uniqueBots.filter((b: { isActive: any; }) => b.isActive);
+    const totalBotsBalance = uniqueBots.reduce((sum: any, b: { balance: any; }) => sum + (b.balance || 0), 0);
+    
+    // Tickets
+    const totalTickets = tickets.length;
+    const pendingTickets = tickets.filter((t: Ticket) => t.status === 'visto').length;
+    const inReviewTickets = tickets.filter((t: Ticket) => t.status === 'revision').length;
+    const resolvedTickets = tickets.filter((t: Ticket) => t.status === 'resuelto').length;
+    
+    // Mensajes de contacto
+    const totalContactMessages = contactMessages.length;
+    const unreadContactMessages = contactMessages.filter((m: ContactMessage) => !m.read).length;
     
     return {
       users: { total: totalUsers, active: activeUsers },
@@ -581,7 +655,9 @@ const [auctionForm, setAuctionForm] = useState({
       products: { total: totalProducts, active: activeProducts, lowStock: lowStockProducts, outOfStock: outOfStockProducts },
       orders: { total: totalOrders, pendingPayment, processing, inTransit, delivered },
       revenue: { total: totalRevenue, month: monthRevenue },
-      bots: { active: activeBots, total: bots.length, totalBalance: totalBotsBalance }
+      bots: { active: activeBots.length, total: uniqueBots.length, totalBalance: totalBotsBalance },
+      tickets: { total: totalTickets, pending: pendingTickets, inReview: inReviewTickets, resolved: resolvedTickets },
+      contactMessages: { total: totalContactMessages, unread: unreadContactMessages }
     };
   };
   
@@ -1501,7 +1577,8 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       const homeConfigRef = dbRef(realtimeDb, 'homeConfig');
       await firebaseSet(homeConfigRef, updatedConfig);
       
-      setHomeConfig(homeConfig); // Actualizar estado local
+      // No actualizar estado local manualmente - el listener de Firebase lo hará automáticamente
+      // Esto asegura que los tipos sean correctos (Date vs string)
       await logAdminAction('Configuración de home guardada', user?.id, user?.username);
       alert('✅ Configuración del inicio guardada correctamente en Firebase');
     } catch (error) {
@@ -1867,6 +1944,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     { id: 'orders', label: 'Pedidos', icon: ShoppingCart },
     { id: 'bots', label: 'Bots', icon: Bot },
     { id: 'messages', label: 'Mensajes', icon: Mail, badge: adminUnreadCount > 0 ? adminUnreadCount : undefined },
+    { id: 'tickets', label: 'Tickets', icon: TicketIcon, badge: tickets.filter(t => t.status !== 'resuelto').length > 0 ? tickets.filter(t => t.status !== 'resuelto').length : undefined },
     { id: 'home-config', label: 'Editor Home', icon: ImageIcon },
     { id: 'settings', label: 'Configuración', icon: Activity }
   ];
@@ -2007,6 +2085,20 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               icon={Bot}
               color="var(--secondary)"
               subtitle={`${stats.bots.totalBalance.toLocaleString()} balance total`}
+            />
+            <StatsCard
+              title="Tickets"
+              value={stats.tickets.total}
+              icon={TicketIcon}
+              color="var(--warning)"
+              subtitle={`${stats.tickets.pending} pendientes, ${stats.tickets.resolved} resueltos`}
+            />
+            <StatsCard
+              title="Mensajes de Contacto"
+              value={stats.contactMessages.total}
+              icon={Mail}
+              color="var(--info)"
+              subtitle={`${stats.contactMessages.unread} no leídos`}
             />
           </div>
 
@@ -5496,6 +5588,62 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 Agregá stickers decorativos al logo que aparecerán automáticamente en fechas especiales o cuando los actives manualmente.
               </p>
 
+              {/* Botón para activar todos los stickers */}
+              {(homeConfig.siteSettings?.logoStickers || []).length > 0 && (
+                <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => {
+                      const stickers = homeConfig.siteSettings?.logoStickers || [];
+                      setHomeConfig({
+                        ...homeConfig,
+                        siteSettings: {
+                          ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
+                          logoStickers: stickers.map(s => ({ ...s, active: true }))
+                        }
+                      });
+                    }}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--primary)',
+                      background: 'var(--primary)',
+                      color: 'white',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    ✅ Activar Todos los Stickers
+                  </button>
+                  <button
+                    onClick={() => {
+                      const stickers = homeConfig.siteSettings?.logoStickers || [];
+                      setHomeConfig({
+                        ...homeConfig,
+                        siteSettings: {
+                          ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
+                          logoStickers: stickers.map(s => ({ ...s, active: false }))
+                        }
+                      });
+                    }}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-secondary)',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    ❌ Desactivar Todos
+                  </button>
+                </div>
+              )}
+
               {/* Stickers rápidos para fechas especiales */}
               <div style={{ marginBottom: '1.5rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.75rem', color: 'var(--text-primary)', fontWeight: 500 }}>
@@ -5508,22 +5656,29 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                     return (
                       <button
                         key={event.type}
-                        onClick={() => {
-                          const stickers = homeConfig.siteSettings?.logoStickers || [];
-                          if (existingSticker) {
-                            // Toggle activo/inactivo
-                            setHomeConfig({
-                              ...homeConfig,
-                              siteSettings: {
-                                ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
-                                logoStickers: stickers.map(s => 
-                                  s.id === existingSticker.id 
-                                    ? { ...s, active: !s.active }
-                                    : s
-                                )
-                              }
-                            });
-                          } else {
+                          onClick={() => {
+                            const stickers = homeConfig.siteSettings?.logoStickers || [];
+                            if (existingSticker) {
+                              // Toggle activo/inactivo
+                              // Si se activa, desactivar otros en la misma posición (opcional - comentado para permitir superposiciones)
+                              const newActiveState = !existingSticker.active;
+                              setHomeConfig({
+                                ...homeConfig,
+                                siteSettings: {
+                                  ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
+                                  logoStickers: stickers.map(s => {
+                                    if (s.id === existingSticker.id) {
+                                      return { ...s, active: newActiveState };
+                                    }
+                                    // Opcional: Desactivar otros en la misma posición si se activa este
+                                    // if (newActiveState && s.position === existingSticker.position && s.active) {
+                                    //   return { ...s, active: false };
+                                    // }
+                                    return s;
+                                  })
+                                }
+                              });
+                            } else {
                             // Crear nuevo sticker
                             const newSticker: LogoSticker = {
                               id: `sticker-${Date.now()}`,
@@ -6937,6 +7092,512 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                     }}
                   />
                 </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tickets Tab */}
+      {activeTab === 'tickets' && (
+        <div>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: '2rem',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div>
+              <h2 style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+                Centro de Ayuda
+              </h2>
+              <p style={{ color: 'var(--text-secondary)' }}>
+                Gestioná tickets y mensajes de contacto
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem', flexDirection: isMobile ? 'column' : 'row' }}>
+            {/* Lista de Tickets */}
+            <div style={{ 
+              flex: isMobile ? '1' : '1', 
+              background: 'var(--bg-secondary)', 
+              borderRadius: '0.75rem', 
+              padding: '1.5rem',
+              maxHeight: isMobile ? 'none' : 'calc(100vh - 300px)',
+              overflowY: 'auto'
+            }}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.25rem' }}>Tickets ({tickets.length})</h3>
+                  <button
+                    onClick={async () => {
+                      if (!confirm('⚠️ ¿Estás seguro de que querés eliminar TODOS los tickets? Esta acción no se puede deshacer.')) {
+                        return;
+                      }
+                      if (!confirm('⚠️ ÚLTIMA ADVERTENCIA: Se eliminarán TODOS los tickets. ¿Continuar?')) {
+                        return;
+                      }
+                      try {
+                        const ticketsRef = dbRef(realtimeDb, 'tickets');
+                        await firebaseSet(ticketsRef, null);
+                        alert('✅ Todos los tickets han sido eliminados');
+                      } catch (error) {
+                        console.error('Error eliminando tickets:', error);
+                        alert('❌ Error al eliminar tickets');
+                      }
+                    }}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      borderRadius: '0.5rem',
+                      border: 'none',
+                      background: 'var(--error)',
+                      color: 'white',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <Trash2 size={16} />
+                    Limpiar Tickets
+                  </button>
+                </div>
+                
+                {/* Buscador de tickets */}
+                <input
+                  type="text"
+                  placeholder="Buscar por número de ticket, usuario, email o asunto..."
+                  value={ticketSearchQuery}
+                  onChange={(e) => setTicketSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--bg-tertiary)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.875rem',
+                    marginBottom: '1rem'
+                  }}
+                />
+                
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                  {(['todos', 'visto', 'revision', 'resuelto'] as const).map(status => (
+                    <button
+                      key={status}
+                      onClick={() => setTicketStatusFilter(status)}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '0.5rem',
+                        border: 'none',
+                        background: ticketStatusFilter === status ? 'var(--primary)' : 'var(--bg-tertiary)',
+                        color: ticketStatusFilter === status ? 'white' : 'var(--text-primary)',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: 500
+                      }}
+                    >
+                      {status === 'todos' ? 'Todos' : status === 'visto' ? 'Vistos' : status === 'revision' ? 'En Revisión' : 'Resueltos'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {(() => {
+                // Filtrar tickets por estado y búsqueda
+                const filteredTickets = tickets.filter(t => {
+                  // Filtro por estado
+                  const statusMatch = ticketStatusFilter === 'todos' || t.status === ticketStatusFilter;
+                  
+                  // Filtro por búsqueda
+                  if (!ticketSearchQuery.trim()) {
+                    return statusMatch;
+                  }
+                  
+                  const query = ticketSearchQuery.toLowerCase();
+                  return statusMatch && (
+                    t.ticketNumber.toLowerCase().includes(query) ||
+                    t.userName.toLowerCase().includes(query) ||
+                    t.userEmail.toLowerCase().includes(query) ||
+                    t.subject.toLowerCase().includes(query) ||
+                    t.message.toLowerCase().includes(query)
+                  );
+                });
+                
+                if (filteredTickets.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                      <TicketIcon size={48} style={{ opacity: 0.5, marginBottom: '1rem' }} />
+                      <p>
+                        {ticketSearchQuery.trim() 
+                          ? `No se encontraron tickets que coincidan con "${ticketSearchQuery}"`
+                          : `No hay tickets ${ticketStatusFilter !== 'todos' ? `con estado "${ticketStatusFilter}"` : ''}`
+                        }
+                      </p>
+                    </div>
+                  );
+                }
+                
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {filteredTickets.map(ticket => {
+                      const statusColors: Record<TicketStatus, string> = {
+                        visto: '#3B82F6',
+                        revision: '#F59E0B',
+                        resuelto: '#10B981'
+                      };
+                      return (
+                        <div
+                          key={ticket.id}
+                          onClick={() => setSelectedTicket(ticket)}
+                          style={{
+                            padding: '1rem',
+                            background: selectedTicket?.id === ticket.id ? 'var(--primary)' : 'var(--bg-primary)',
+                            color: selectedTicket?.id === ticket.id ? 'white' : 'var(--text-primary)',
+                            borderRadius: '0.5rem',
+                            cursor: 'pointer',
+                            border: selectedTicket?.id === ticket.id ? '2px solid var(--primary)' : '1px solid var(--bg-tertiary)',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                            <strong style={{ fontSize: '0.9375rem' }}>{ticket.ticketNumber}</strong>
+                            <span style={{
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '0.25rem',
+                              fontSize: '0.75rem',
+                              background: selectedTicket?.id === ticket.id ? 'rgba(255,255,255,0.2)' : statusColors[ticket.status] + '20',
+                              color: selectedTicket?.id === ticket.id ? 'white' : statusColors[ticket.status],
+                              fontWeight: 600
+                            }}>
+                              {ticket.status}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.875rem', opacity: selectedTicket?.id === ticket.id ? 1 : 0.8, marginBottom: '0.25rem' }}>
+                            {ticket.subject}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+                            {ticket.userName} • {formatTimeAgo(new Date(ticket.createdAt))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Detalle del Ticket */}
+            {selectedTicket ? (
+              <div style={{ 
+                flex: isMobile ? '1' : '1', 
+                background: 'var(--bg-secondary)', 
+                borderRadius: '0.75rem', 
+                padding: '1.5rem',
+                maxHeight: isMobile ? 'none' : 'calc(100vh - 300px)',
+                overflowY: 'auto'
+              }}>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                    <div>
+                      <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>{selectedTicket.ticketNumber}</h3>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                        {selectedTicket.userName} ({selectedTicket.userEmail})
+                        {selectedTicket.userPhone && ` • ${selectedTicket.userPhone}`}
+                      </div>
+                    </div>
+                    <select
+                      value={selectedTicket.status}
+                      onChange={async (e) => {
+                        if (!user) return;
+                        const newStatus = e.target.value as TicketStatus;
+                        try {
+                          await updateTicketStatus(
+                            selectedTicket.id,
+                            newStatus,
+                            user.id,
+                            user.username,
+                            ticketResponse || undefined
+                          );
+                          
+                          // Enviar notificación al usuario directamente en Firebase
+                          if (selectedTicket.userId) {
+                            let notificationTitle = '';
+                            let notificationMessage = '';
+                            
+                            switch (newStatus) {
+                              case 'visto':
+                                notificationTitle = 'Ticket Visto';
+                                notificationMessage = `Tu ticket ${selectedTicket.ticketNumber} ha sido visto por nuestro equipo.`;
+                                break;
+                              case 'revision':
+                                notificationTitle = 'Ticket en Revisión';
+                                notificationMessage = `Tu ticket ${selectedTicket.ticketNumber} está en revisión. Te contactaremos pronto.`;
+                                break;
+                              case 'resuelto':
+                                notificationTitle = 'Ticket Resuelto';
+                                notificationMessage = `Tu ticket ${selectedTicket.ticketNumber} ha sido resuelto.${ticketResponse ? ' Revisá la respuesta en el Centro de Ayuda.' : ''}`;
+                                break;
+                            }
+                            
+                            try {
+                              const notificationId = `NOTIF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                              const notificationRef = dbRef(realtimeDb, `notifications/${selectedTicket.userId}/${notificationId}`);
+                              await firebaseSet(notificationRef, {
+                                id: notificationId,
+                                userId: selectedTicket.userId,
+                                type: 'new_message',
+                                title: notificationTitle,
+                                message: notificationMessage,
+                                link: '/ayuda',
+                                read: false,
+                                createdAt: new Date().toISOString()
+                              });
+                              console.log(`✅ Notificación enviada a usuario ${selectedTicket.userId}`);
+                            } catch (notifError) {
+                              console.error('Error enviando notificación:', notifError);
+                            }
+                          }
+                          
+                          setTicketResponse('');
+                          alert('✅ Estado actualizado');
+                        } catch (error) {
+                          alert('❌ Error al actualizar estado');
+                        }
+                      }}
+                      style={{
+                        padding: '0.5rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--bg-tertiary)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)'
+                      }}
+                    >
+                      <option value="visto">Visto</option>
+                      <option value="revision">En Revisión</option>
+                      <option value="resuelto">Resuelto</option>
+                    </select>
+                  </div>
+                  
+                  <div style={{ marginBottom: '1rem' }}>
+                    <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Asunto:</strong>
+                    <p style={{ color: 'var(--text-secondary)' }}>{selectedTicket.subject}</p>
+                  </div>
+                  
+                  <div style={{ marginBottom: '1rem' }}>
+                    <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Mensaje:</strong>
+                    <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                      {selectedTicket.message}
+                    </p>
+                  </div>
+
+                  {selectedTicket.adminResponse && (
+                    <div style={{
+                      background: 'var(--bg-tertiary)',
+                      padding: '1rem',
+                      borderRadius: '0.5rem',
+                      marginBottom: '1rem'
+                    }}>
+                      <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Respuesta del Admin:</strong>
+                      <p style={{ color: 'var(--text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                        {selectedTicket.adminResponse}
+                      </p>
+                    </div>
+                  )}
+
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                      Respuesta (opcional):
+                    </label>
+                    <textarea
+                      value={ticketResponse}
+                      onChange={(e) => setTicketResponse(e.target.value)}
+                      placeholder="Escribí una respuesta para el usuario..."
+                      rows={4}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--bg-tertiary)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '1rem',
+                        fontFamily: 'inherit',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    onClick={async () => {
+                      if (!user) return;
+                      try {
+                        await updateTicketStatus(
+                          selectedTicket.id,
+                          selectedTicket.status,
+                          user.id,
+                          user.username,
+                          ticketResponse || undefined
+                        );
+                        
+                        // Enviar notificación si hay respuesta
+                        if (ticketResponse && selectedTicket.userId) {
+                          try {
+                            const notificationId = `NOTIF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                            const notificationRef = dbRef(realtimeDb, `notifications/${selectedTicket.userId}/${notificationId}`);
+                            await firebaseSet(notificationRef, {
+                              id: notificationId,
+                              userId: selectedTicket.userId,
+                              type: 'new_message',
+                              title: 'Respuesta a tu Ticket',
+                              message: `Tu ticket ${selectedTicket.ticketNumber} tiene una nueva respuesta. Revisá el Centro de Ayuda.`,
+                              link: '/ayuda',
+                              read: false,
+                              createdAt: new Date().toISOString()
+                            });
+                            console.log(`✅ Notificación enviada a usuario ${selectedTicket.userId}`);
+                          } catch (notifError) {
+                            console.error('Error enviando notificación:', notifError);
+                          }
+                        }
+                        
+                        setTicketResponse('');
+                        alert('✅ Respuesta guardada');
+                      } catch (error) {
+                        alert('❌ Error al guardar respuesta');
+                      }
+                    }}
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                  >
+                    Guardar Respuesta
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ 
+                flex: '1', 
+                background: 'var(--bg-secondary)', 
+                borderRadius: '0.75rem', 
+                padding: '2rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--text-secondary)',
+                textAlign: 'center'
+              }}>
+                <div>
+                  <TicketIcon size={64} style={{ opacity: 0.5, marginBottom: '1rem' }} />
+                  <p>Seleccioná un ticket para ver los detalles</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Mensajes de Contacto */}
+          <div style={{ marginTop: '2rem', background: 'var(--bg-secondary)', borderRadius: '0.75rem', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>
+                Mensajes de Contacto ({contactMessages.filter(m => !m.read).length} no leídos)
+              </h3>
+              <button
+                onClick={async () => {
+                  if (!confirm('⚠️ ¿Estás seguro de que querés eliminar TODOS los mensajes de contacto? Esta acción no se puede deshacer.')) {
+                    return;
+                  }
+                  if (!confirm('⚠️ ÚLTIMA ADVERTENCIA: Se eliminarán TODOS los mensajes de contacto. ¿Continuar?')) {
+                    return;
+                  }
+                  try {
+                    const messagesRef = dbRef(realtimeDb, 'contactMessages');
+                    await firebaseSet(messagesRef, null);
+                    alert('✅ Todos los mensajes de contacto han sido eliminados');
+                  } catch (error) {
+                    console.error('Error eliminando mensajes de contacto:', error);
+                    alert('❌ Error al eliminar mensajes de contacto');
+                  }
+                }}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  background: 'var(--error)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <Trash2 size={16} />
+                Limpiar Mensajes
+              </button>
+            </div>
+            {contactMessages.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                <Mail size={48} style={{ opacity: 0.5, marginBottom: '1rem' }} />
+                <p>No hay mensajes de contacto</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {contactMessages.map(msg => (
+                  <div
+                    key={msg.id}
+                    style={{
+                      padding: '1rem',
+                      background: msg.read ? 'var(--bg-primary)' : 'var(--bg-tertiary)',
+                      borderRadius: '0.5rem',
+                      border: msg.read ? '1px solid var(--bg-tertiary)' : '2px solid var(--primary)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                      <div>
+                        <strong style={{ display: 'block' }}>{msg.name}</strong>
+                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                          {msg.email} • {msg.phone}
+                        </div>
+                      </div>
+                      {!msg.read && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              await markContactMessageAsRead(msg.id);
+                            } catch (error) {
+                              alert('❌ Error al marcar como leído');
+                            }
+                          }}
+                          style={{
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '0.25rem',
+                            border: 'none',
+                            background: 'var(--primary)',
+                            color: 'white',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem'
+                          }}
+                        >
+                          Marcar como leído
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <strong style={{ display: 'block', marginBottom: '0.25rem' }}>Asunto: {msg.subject}</strong>
+                      <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                        {msg.message}
+                      </p>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                      {formatTimeAgo(new Date(msg.createdAt))}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

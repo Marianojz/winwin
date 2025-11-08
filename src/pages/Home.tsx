@@ -26,7 +26,10 @@ const Home = () => {
           setHomeConfig({
             ...defaultHomeConfig,
             ...data,
-            siteSettings: data.siteSettings || defaultHomeConfig.siteSettings,
+            siteSettings: {
+              ...(data.siteSettings || defaultHomeConfig.siteSettings),
+              logoStickers: data.siteSettings?.logoStickers || defaultHomeConfig.siteSettings.logoStickers || []
+            },
             themeColors: data.themeColors || defaultHomeConfig.themeColors,
             sectionTitles: data.sectionTitles || defaultHomeConfig.sectionTitles,
             heroTitle: data.heroTitle || defaultHomeConfig.heroTitle,

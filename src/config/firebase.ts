@@ -91,11 +91,23 @@ export function attachAuthListener(onUser: (user: any | null) => void) {
         
         if (userDoc.exists()) {
           const userData = userDoc.data();
+          // Priorizar siempre el avatar de Google si está disponible
+          const googleAvatar = firebaseUser.photoURL || '';
+          const savedAvatar = userData.avatar || '';
+          const finalAvatar = googleAvatar || savedAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username || firebaseUser.displayName || 'U')}&size=200&background=FF6B00&color=fff&bold=true`;
+          
+          // Si hay avatar de Google y es diferente al guardado, actualizarlo en Firestore
+          if (googleAvatar && googleAvatar !== savedAvatar) {
+            updateDoc(userDocRef, { avatar: googleAvatar }).catch(err => 
+              console.warn('Error actualizando avatar en Firestore:', err)
+            );
+          }
+          
           const fullUser = {
             id: firebaseUser.uid,
             email: firebaseUser.email || '',
             username: userData.username || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuario',
-            avatar: userData.avatar || firebaseUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username || 'U')}&size=200&background=FF6B00&color=fff&bold=true`,
+            avatar: finalAvatar,
             isAdmin: userData.role === 'admin' || userData.isAdmin === true,
             dni: userData.dni || '',
             phone: userData.phone || '',

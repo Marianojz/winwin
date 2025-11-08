@@ -26,14 +26,21 @@ Esta es la guía **única y actualizada** para configurar Firebase en modo desar
 ## 📁 Archivos de Reglas
 
 ### Desarrollo (Usar estos ahora)
-- `firebase-realtime-database.rules.json` - Reglas Realtime Database
+- `firebase-realtime-database.rules.json` - Reglas Realtime Database (✅ Actualizado con tickets)
 - `firestore.rules` - Reglas Firestore
 - `storage.rules` - Reglas Storage
 
 ### Producción (Para más adelante)
-- `firebase-realtime-database.rules.production.json`
+- `firebase-realtime-database.rules.production.json` (✅ Actualizado con tickets)
 - `firestore.rules.production`
 - `storage.rules.production`
+
+### ⚠️ IMPORTANTE: Reglas de Tickets
+Las reglas ahora incluyen permisos para:
+- `tickets/` - Usuarios autenticados pueden crear y leer sus propios tickets, admins pueden gestionar todos
+- `contactMessages/` - Cualquiera puede crear mensajes, solo admins pueden leerlos
+
+**Debés actualizar las reglas en Firebase Console** para que funcionen. Ver `ACTUALIZAR_REGLAS_TICKETS.md`
 
 ---
 
@@ -99,6 +106,8 @@ Realtime Database:
 ├── notifications/     (Lectura/Escritura: Usuarios autenticados)
 ├── users/             (Lectura/Escritura: Propio usuario o admins)
 ├── bots/              (Lectura: Todos, Escritura: Admins)
+├── tickets/           (Lectura: Propio usuario/Admins, Escritura: Propio usuario/Admins) ⭐ NUEVO
+├── contactMessages/   (Lectura: Admins, Escritura: Todos) ⭐ NUEVO
 ├── action_logs/       (Lectura/Escritura: Todos)
 ├── tracking_clicks/   (Lectura/Escritura: Todos)
 └── tracking_searches/ (Lectura/Escritura: Todos)
