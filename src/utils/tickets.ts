@@ -1,7 +1,6 @@
 import { ref, push, set, get, onValue, off, update, query, orderByChild, equalTo } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
 import { Ticket, TicketStatus, ContactMessage } from '../types';
-import { addNotification } from '../store/useStore';
 
 // Generar número único de ticket con fecha y hora
 export const generateTicketNumber = (): string => {

@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getDatabase, ref, set } from 'firebase/database';  // <- NUEVA IMPORTACIÓN
 
