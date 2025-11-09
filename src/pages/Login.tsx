@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Mail, Lock, LogIn, Eye, EyeOff } from 'lucide-react';
 import GoogleSignIn from '../components/GoogleSignIn';
 import { signInWithEmailAndPassword } from 'firebase/auth';
@@ -14,12 +14,22 @@ const useStoreDirect = useStore;
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { setUser } = useStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Mostrar error si viene del estado de navegación (por ejemplo, desde redirect)
+  useEffect(() => {
+    if (location.state?.error) {
+      setError(location.state.error);
+      // Limpiar el estado después de mostrarlo
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,7 +68,9 @@ const Login = () => {
       const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password.trim());
       const user = userCredential.user;
 
-      if (!user.emailVerified) {
+      // Verificar email solo si no es login con Google (Google ya verifica el email)
+      // Los usuarios de Google tienen emailVerified = true automáticamente
+      if (!user.emailVerified && !user.providerData?.some((provider: any) => provider.providerId === 'google.com')) {
         setError('Por favor, verificá tu email antes de iniciar sesión. Revisá tu bandeja de entrada.');
         await auth.signOut();
         setLoading(false);

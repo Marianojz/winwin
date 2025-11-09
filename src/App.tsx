@@ -30,41 +30,86 @@ import AdminPanel from './pages/AdminPanel';
 function RedirectHandler() {
   const { setUser } = useStore();
   const navigate = useNavigate();
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     const handleRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result && result.user) {
-          console.log('✅ Google Sign-In redirect exitoso, procesando usuario...');
-          
-          const { fullUser, needsCompleteProfile } = await processGoogleAuthResult(result.user);
-          
-          setUser(fullUser);
+      // Evitar procesar múltiples veces
+      if (isProcessing) {
+        console.log('⏳ Ya se está procesando un redirect...');
+        return;
+      }
 
-          // Redirigir según si necesita completar perfil
-          if (needsCompleteProfile) {
-            navigate('/completar-perfil', { replace: true });
-          } else {
-            // Redirigir según rol
-            if (fullUser.isAdmin) {
-              navigate('/admin', { replace: true });
+      try {
+        console.log('🔍 Verificando redirect result...');
+        const result = await getRedirectResult(auth);
+        
+        if (result && result.user) {
+          setIsProcessing(true);
+          console.log('✅ Google Sign-In redirect exitoso, procesando usuario...', result.user.uid);
+          
+          try {
+            const { fullUser, needsCompleteProfile } = await processGoogleAuthResult(result.user);
+            
+            console.log('👤 Usuario procesado:', {
+              id: fullUser.id,
+              email: fullUser.email,
+              isAdmin: fullUser.isAdmin,
+              needsCompleteProfile
+            });
+            
+            setUser(fullUser);
+
+            // Esperar un momento para asegurar que el estado se actualiza
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // Redirigir según si necesita completar perfil
+            if (needsCompleteProfile) {
+              console.log('📝 Redirigiendo a completar perfil...');
+              navigate('/completar-perfil', { replace: true });
             } else {
-              navigate('/', { replace: true });
+              // Redirigir según rol
+              if (fullUser.isAdmin) {
+                console.log('👑 Redirigiendo a admin...');
+                navigate('/admin', { replace: true });
+              } else {
+                console.log('🏠 Redirigiendo a home...');
+                navigate('/', { replace: true });
+              }
             }
+          } catch (processError: any) {
+            console.error('❌ Error procesando usuario:', processError);
+            navigate('/login', { replace: true, state: { error: 'Error al procesar tu cuenta. Por favor, intentá nuevamente.' } });
+          } finally {
+            setIsProcessing(false);
           }
+        } else {
+          console.log('ℹ️ No hay redirect result pendiente');
         }
       } catch (error: any) {
-        console.error('Error procesando redirect result:', error);
+        console.error('❌ Error procesando redirect result:', error);
+        setIsProcessing(false);
+        
         // No mostrar error si el usuario no viene de un redirect
-        if (error.code !== 'auth/no-auth-event') {
-          console.warn('Error en redirect de Google:', error.message);
+        if (error.code !== 'auth/no-auth-event' && error.code !== 'auth/popup-closed-by-user') {
+          console.warn('⚠️ Error en redirect de Google:', error.message);
+          // Solo navegar a login si es un error real
+          if (error.code && !error.code.includes('no-auth')) {
+            navigate('/login', { replace: true, state: { error: 'Error al iniciar sesión con Google' } });
+          }
         }
       }
     };
 
-    handleRedirectResult();
-  }, [setUser, navigate]);
+    // Esperar un momento antes de verificar el redirect para asegurar que Firebase está listo
+    const timeoutId = setTimeout(() => {
+      handleRedirectResult();
+    }, 500);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [setUser, navigate, isProcessing]);
 
   return null;
 }

@@ -14,14 +14,18 @@ import { User } from '../types';
 export const isMobileDevice = (): boolean => {
   if (typeof window === 'undefined') return false;
   
-  // Detectar móvil por user agent
-  const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-  const mobileRegex = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i;
+  // Detectar móvil por user agent (más confiable)
+  const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera || '';
+  const mobileRegex = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile|tablet/i;
   
-  // También verificar por tamaño de pantalla
+  // Verificar por user agent primero (más confiable)
+  const isMobileUA = mobileRegex.test(userAgent.toLowerCase());
+  
+  // También verificar por tamaño de pantalla como fallback
   const isSmallScreen = window.innerWidth <= 768;
   
-  return mobileRegex.test(userAgent.toLowerCase()) || isSmallScreen;
+  // Priorizar user agent, pero también considerar pantalla pequeña
+  return isMobileUA || (isSmallScreen && window.innerWidth < 1024);
 };
 
 /**
