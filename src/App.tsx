@@ -266,8 +266,16 @@ function RedirectHandler() {
               setIsProcessing(false);
             }
           } else if (firebaseUser && !isProcessing) {
-            // Si no hay redirect result pero hay usuario autenticado, procesarlo directamente
+            // Si no hay redirect result pero hay usuario autenticado, verificar si ya está procesado
             // Esto puede pasar cuando el redirect se perdió pero el usuario está autenticado
+            const currentUser = useStore.getState().user;
+            
+            // Si el usuario ya está en el store, no procesar de nuevo
+            if (currentUser && currentUser.id === firebaseUser.uid) {
+              console.log('✅ [MÓVIL BACKUP] Usuario ya procesado por otro handler, saltando...');
+              return;
+            }
+            
             console.log('🔍 [MÓVIL BACKUP] No hay redirect result, pero usuario autenticado detectado. Procesando directamente...', {
               uid: firebaseUser.uid,
               email: firebaseUser.email,
@@ -275,12 +283,12 @@ function RedirectHandler() {
             });
             
             // Esperar un momento para asegurar que no hay otro proceso en curso
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 300));
             
-            // Verificar nuevamente si ya se procesó
-            const currentUser = useStore.getState().user;
-            if (currentUser && currentUser.id === firebaseUser.uid) {
-              console.log('✅ [MÓVIL BACKUP] Usuario ya procesado por otro handler');
+            // Verificar nuevamente si ya se procesó (doble verificación)
+            const currentUserAfterDelay = useStore.getState().user;
+            if (currentUserAfterDelay && currentUserAfterDelay.id === firebaseUser.uid) {
+              console.log('✅ [MÓVIL BACKUP] Usuario ya procesado durante el delay, saltando...');
               return;
             }
             
@@ -291,6 +299,14 @@ function RedirectHandler() {
               const { fullUser, needsCompleteProfile } = await processGoogleAuthResult(firebaseUser);
               
               if (!mounted) return;
+              
+              // Verificar una vez más antes de actualizar
+              const finalCheck = useStore.getState().user;
+              if (finalCheck && finalCheck.id === firebaseUser.uid) {
+                console.log('✅ [MÓVIL BACKUP] Usuario ya procesado durante processGoogleAuthResult, saltando actualización...');
+                setIsProcessing(false);
+                return;
+              }
               
               console.log('✅ [MÓVIL BACKUP] Usuario procesado exitosamente:', {
                 id: fullUser.id,
@@ -303,7 +319,7 @@ function RedirectHandler() {
               toast.success('¡Inicio de sesión exitoso!', 2000);
               
               // Esperar un momento para asegurar que el estado se actualiza
-              await new Promise(resolve => setTimeout(resolve, 500));
+              await new Promise(resolve => setTimeout(resolve, 300));
               
               if (!mounted) return;
               
