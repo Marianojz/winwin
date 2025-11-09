@@ -1,12 +1,13 @@
 import { useEffect, useState, Suspense, lazy } from 'react';
 import { useSyncFirebase } from './hooks/useSyncFirebase';
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { ref, onValue } from 'firebase/database';
 import { realtimeDb, auth } from './config/firebase';
-import { getRedirectResult } from 'firebase/auth';
+import { getRedirectResult, onAuthStateChanged } from 'firebase/auth';
 import { HomeConfig, defaultHomeConfig } from './types/homeConfig';
 import { useStore } from './store/useStore';
 import { processGoogleAuthResult } from './utils/googleAuthHelper';
+import { toast } from './utils/toast';
 import Navbar from './components/Navbar';
 import AuctionManager from './utils/AuctionManager';
 import OrderManager from './utils/OrderManager';
@@ -28,11 +29,16 @@ import AdminPanel from './pages/AdminPanel';
 
 // Componente interno para manejar redirect result (debe estar dentro de Router)
 function RedirectHandler() {
-  const { setUser } = useStore();
+  const { setUser, user } = useStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [hasCheckedRedirect, setHasCheckedRedirect] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+    let timeoutId: NodeJS.Timeout;
+
     const handleRedirectResult = async () => {
       // Evitar procesar múltiples veces
       if (isProcessing) {
@@ -40,18 +46,25 @@ function RedirectHandler() {
         return;
       }
 
+      if (!mounted) return;
+
       try {
-        console.log('🔍 Verificando redirect result...');
+        console.log('🔍 [MÓVIL] Verificando redirect result...');
         const result = await getRedirectResult(auth);
+        
+        if (!mounted) return;
         
         if (result && result.user) {
           setIsProcessing(true);
-          console.log('✅ Google Sign-In redirect exitoso, procesando usuario...', result.user.uid);
+          console.log('✅ [MÓVIL] Google Sign-In redirect exitoso, procesando usuario...', result.user.uid);
+          toast.info('Procesando tu cuenta...', 2000);
           
           try {
             const { fullUser, needsCompleteProfile } = await processGoogleAuthResult(result.user);
             
-            console.log('👤 Usuario procesado:', {
+            if (!mounted) return;
+            
+            console.log('👤 [MÓVIL] Usuario procesado:', {
               id: fullUser.id,
               email: fullUser.email,
               isAdmin: fullUser.isAdmin,
@@ -59,57 +72,146 @@ function RedirectHandler() {
             });
             
             setUser(fullUser);
+            toast.success('¡Inicio de sesión exitoso!', 2000);
 
             // Esperar un momento para asegurar que el estado se actualiza
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            if (!mounted) return;
 
             // Redirigir según si necesita completar perfil
             if (needsCompleteProfile) {
-              console.log('📝 Redirigiendo a completar perfil...');
+              console.log('📝 [MÓVIL] Redirigiendo a completar perfil...');
               navigate('/completar-perfil', { replace: true });
             } else {
               // Redirigir según rol
               if (fullUser.isAdmin) {
-                console.log('👑 Redirigiendo a admin...');
+                console.log('👑 [MÓVIL] Redirigiendo a admin...');
                 navigate('/admin', { replace: true });
               } else {
-                console.log('🏠 Redirigiendo a home...');
+                console.log('🏠 [MÓVIL] Redirigiendo a home...');
                 navigate('/', { replace: true });
               }
             }
           } catch (processError: any) {
-            console.error('❌ Error procesando usuario:', processError);
-            navigate('/login', { replace: true, state: { error: 'Error al procesar tu cuenta. Por favor, intentá nuevamente.' } });
+            console.error('❌ [MÓVIL] Error procesando usuario:', processError);
+            const errorMsg = 'Error al procesar tu cuenta. Por favor, intentá nuevamente.';
+            toast.error(errorMsg, 5000);
+            if (mounted) {
+              navigate('/login', { replace: true, state: { error: errorMsg } });
+            }
           } finally {
-            setIsProcessing(false);
+            if (mounted) {
+              setIsProcessing(false);
+            }
           }
         } else {
-          console.log('ℹ️ No hay redirect result pendiente');
+          console.log('ℹ️ [MÓVIL] No hay redirect result pendiente');
         }
       } catch (error: any) {
-        console.error('❌ Error procesando redirect result:', error);
-        setIsProcessing(false);
+        console.error('❌ [MÓVIL] Error procesando redirect result:', error);
+        if (mounted) {
+          setIsProcessing(false);
+        }
         
         // No mostrar error si el usuario no viene de un redirect
         if (error.code !== 'auth/no-auth-event' && error.code !== 'auth/popup-closed-by-user') {
-          console.warn('⚠️ Error en redirect de Google:', error.message);
+          console.warn('⚠️ [MÓVIL] Error en redirect de Google:', error.message);
           // Solo navegar a login si es un error real
-          if (error.code && !error.code.includes('no-auth')) {
+          if (error.code && !error.code.includes('no-auth') && mounted) {
             navigate('/login', { replace: true, state: { error: 'Error al iniciar sesión con Google' } });
           }
         }
       }
     };
 
-    // Esperar un momento antes de verificar el redirect para asegurar que Firebase está listo
-    const timeoutId = setTimeout(() => {
+    // En móvil, verificar inmediatamente y también después de un delay
+    // Esto asegura que se capture el redirect incluso si hay problemas de timing
+    if (!hasCheckedRedirect) {
       handleRedirectResult();
-    }, 500);
+      setHasCheckedRedirect(true);
+    }
+    
+    // También verificar después de un delay por si acaso
+    timeoutId = setTimeout(() => {
+      if (mounted && !isProcessing) {
+        handleRedirectResult();
+      }
+    }, 1500);
+
+    // También escuchar cambios en la ubicación (útil cuando vuelve del redirect)
+    const handleLocationChange = () => {
+      if (mounted && !isProcessing && !hasCheckedRedirect) {
+        setTimeout(() => {
+          handleRedirectResult();
+        }, 300);
+      }
+    };
+
+    // Verificar cuando cambia la ruta (útil después de redirect)
+    handleLocationChange();
 
     return () => {
-      clearTimeout(timeoutId);
+      mounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
-  }, [setUser, navigate, isProcessing]);
+  }, [setUser, navigate, isProcessing, hasCheckedRedirect, location.pathname]);
+
+  // Listener adicional para auth state changes en móvil (backup)
+  useEffect(() => {
+    let mounted = true;
+    
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!mounted) return;
+      
+      // Si hay un usuario autenticado pero no está en el store, y estamos en login
+      // podría ser que venga de un redirect que no se procesó
+      if (firebaseUser && !user && location.pathname === '/login') {
+        console.log('🔍 [MÓVIL BACKUP] Usuario autenticado detectado en /login, verificando redirect...');
+        
+        // Intentar procesar el redirect result
+        try {
+          const result = await getRedirectResult(auth);
+          if (result && result.user && !isProcessing) {
+            console.log('✅ [MÓVIL BACKUP] Redirect result encontrado, procesando...');
+            setIsProcessing(true);
+            toast.info('Procesando tu cuenta...', 2000);
+            
+            try {
+              const { fullUser, needsCompleteProfile } = await processGoogleAuthResult(result.user);
+              setUser(fullUser);
+              toast.success('¡Inicio de sesión exitoso!', 2000);
+              
+              if (needsCompleteProfile) {
+                navigate('/completar-perfil', { replace: true });
+              } else if (fullUser.isAdmin) {
+                navigate('/admin', { replace: true });
+              } else {
+                navigate('/', { replace: true });
+              }
+            } catch (err: any) {
+              console.error('❌ [MÓVIL BACKUP] Error procesando:', err);
+              toast.error('Error al procesar tu cuenta', 5000);
+            } finally {
+              setIsProcessing(false);
+            }
+          }
+        } catch (err) {
+          // Ignorar errores de no-auth-event
+          if (err.code !== 'auth/no-auth-event') {
+            console.warn('⚠️ [MÓVIL BACKUP] Error:', err);
+          }
+        }
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, [user, location.pathname, isProcessing, setUser, navigate]);
 
   return null;
 }

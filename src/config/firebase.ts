@@ -78,9 +78,12 @@ export async function syncUserToRealtimeDb(userId: string, isAdmin: boolean, ema
 export function attachAuthListener(onUser: (user: any | null) => void) {
   return onAuthStateChanged(auth, (firebaseUser) => {
     if (!firebaseUser) {
+      console.log('🔐 [AUTH LISTENER] Usuario deslogueado');
       onUser(null);
       return;
     }
+    
+    console.log('🔐 [AUTH LISTENER] Usuario autenticado detectado:', { uid: firebaseUser.uid, email: firebaseUser.email });
     
     // Cargar datos completos del usuario desde Firestore de forma asíncrona
     (async () => {
@@ -123,6 +126,8 @@ export function attachAuthListener(onUser: (user: any | null) => void) {
             } : undefined
           };
           
+          console.log('✅ [AUTH LISTENER] Usuario cargado desde Firestore:', { id: fullUser.id, email: fullUser.email, isAdmin: fullUser.isAdmin });
+          
           // Sincronizar isAdmin a Realtime Database para que las reglas funcionen
           syncUserToRealtimeDb(
             firebaseUser.uid,
@@ -134,6 +139,7 @@ export function attachAuthListener(onUser: (user: any | null) => void) {
           onUser(fullUser);
         } else {
           // Si no existe en Firestore, usar datos básicos de Auth
+          console.warn('⚠️ [AUTH LISTENER] Usuario no existe en Firestore, usando datos básicos');
           const basicUser = {
             id: firebaseUser.uid,
             username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuario',
@@ -147,7 +153,7 @@ export function attachAuthListener(onUser: (user: any | null) => void) {
           onUser(basicUser);
         }
       } catch (error) {
-        console.error('Error cargando datos del usuario desde Firestore:', error);
+        console.error('❌ [AUTH LISTENER] Error cargando datos del usuario desde Firestore:', error);
         // En caso de error, usar datos básicos de Auth
         const basicUser = {
           id: firebaseUser.uid,

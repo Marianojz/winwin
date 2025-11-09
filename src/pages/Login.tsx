@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { Mail, Lock, LogIn, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, LogIn, Eye, EyeOff, AlertCircle, Loader } from 'lucide-react';
 import GoogleSignIn from '../components/GoogleSignIn';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -8,6 +8,7 @@ import { auth, db, syncUserToRealtimeDb } from '../config/firebase';
 import { useStore } from '../store/useStore';
 import { User } from '../types';
 import { PASSWORD_INPUT_ATTRIBUTES, EMAIL_INPUT_ATTRIBUTES } from '../utils/passwordManagerOptimization';
+import { toast } from '../utils/toast';
 
 // Acceso directo al store para métodos que no están en el hook
 const useStoreDirect = useStore;
@@ -45,6 +46,7 @@ const Login = () => {
     if (loading) return;
 
     setLoading(true);
+    console.log('🔐 Iniciando proceso de login...', { email: email.trim() });
 
     try {
       // Limpiar estado previo completamente antes de intentar login
@@ -52,11 +54,12 @@ const Login = () => {
       try {
         const currentUser = auth.currentUser;
         if (currentUser) {
+          console.log('🧹 Limpiando sesión anterior...');
           await auth.signOut();
         }
       } catch (signOutErr) {
         // Ignorar errores de signOut si no hay usuario
-        console.warn('Error al hacer signOut previo:', signOutErr);
+        console.warn('⚠️ Error al hacer signOut previo:', signOutErr);
       }
 
       setUser(null);
@@ -65,12 +68,18 @@ const Login = () => {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Intentar login con Firebase
+      console.log('🔑 Intentando autenticación con Firebase...');
       const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password.trim());
       const user = userCredential.user;
+      console.log('✅ Autenticación exitosa:', { uid: user.uid, email: user.email, emailVerified: user.emailVerified });
 
-      // Verificar email solo si no es login con Google (Google ya verifica el email)
-      // Los usuarios de Google tienen emailVerified = true automáticamente
-      if (!user.emailVerified && !user.providerData?.some((provider: any) => provider.providerId === 'google.com')) {
+      // Verificar email - pero permitir login si el usuario ya existe en Firestore
+      // (usuarios existentes pueden no tener email verificado pero ya están registrados)
+      const userDocCheck = await getDoc(doc(db, 'users', user.uid));
+      const userExists = userDocCheck.exists();
+      
+      // Solo bloquear si es usuario nuevo y no tiene email verificado
+      if (!user.emailVerified && !userExists && !user.providerData?.some((provider: any) => provider.providerId === 'google.com')) {
         setError('Por favor, verificá tu email antes de iniciar sesión. Revisá tu bandeja de entrada.');
         await auth.signOut();
         setLoading(false);
@@ -80,23 +89,55 @@ const Login = () => {
       // Esperar un momento para asegurar que Firebase está listo
       await new Promise(resolve => setTimeout(resolve, 300));
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      let userDoc = await getDoc(doc(db, 'users', user.uid));
       
       if (!userDoc.exists()) {
-        setError('No se encontraron datos del usuario');
-        await auth.signOut();
-        setLoading(false);
-        return;
+        // Si el usuario no existe en Firestore pero está autenticado, crear documento básico
+        console.warn('⚠️ Usuario autenticado pero no existe en Firestore, creando documento básico...');
+        const { setDoc } = await import('firebase/firestore');
+        const basicUserData = {
+          username: user.displayName || user.email?.split('@')[0] || 'Usuario',
+          email: user.email!,
+          avatar: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || user.email?.split('@')[0] || 'U')}&size=200&background=FF6B00&color=fff&bold=true`,
+          dni: '',
+          address: '',
+          locality: '',
+          province: '',
+          latitude: 0,
+          longitude: 0,
+          mapAddress: '',
+          createdAt: new Date().toISOString(),
+          emailVerified: user.emailVerified,
+          role: 'user',
+          isAdmin: false,
+          active: true,
+          phone: ''
+        };
+        await setDoc(doc(db, 'users', user.uid), basicUserData);
+        
+        // Recargar el documento
+        userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (!userDoc.exists()) {
+          setError('Error al crear tu perfil. Por favor, intentá nuevamente.');
+          await auth.signOut();
+          setLoading(false);
+          return;
+        }
       }
 
       const userData = userDoc.data();
       
-      // Verificar que el usuario está activo
+      // Verificar que el usuario está activo (solo si el campo existe y es false)
       if (userData.active === false) {
         setError('Tu cuenta ha sido suspendida. Contactá al administrador.');
         await auth.signOut();
         setLoading(false);
         return;
+      }
+      
+      // Si active no existe, asumir que está activo (compatibilidad con usuarios antiguos)
+      if (userData.active === undefined) {
+        console.log('ℹ️ Usuario sin campo active, asumiendo activo');
       }
       
       const fullUser: User = {
@@ -129,6 +170,7 @@ const Login = () => {
       
       // Establecer usuario - Firebase es la fuente de verdad
       setUser(fullUser);
+      toast.success('¡Inicio de sesión exitoso!', 2000);
       
       // Esperar un momento antes de navegar para asegurar que todo está sincronizado
       await new Promise(resolve => setTimeout(resolve, 200));
@@ -146,22 +188,48 @@ const Login = () => {
       }
 
       // Navegar según rol - con replace para evitar problemas de navegación en móvil
-      setTimeout(() => {
+      // En móvil, usar window.location para forzar recarga completa si es necesario
+      const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile|tablet/i.test(navigator.userAgent.toLowerCase());
+      
+      if (isMobile) {
+        // En móvil, esperar un poco más y usar replace para evitar problemas
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         if (fullUser.isAdmin) {
           navigate('/admin', { replace: true });
         } else {
           navigate('/', { replace: true });
         }
-        // Forzar recarga del estado del usuario después de navegar
+        
+        // Forzar actualización del estado después de navegar
         setTimeout(() => {
           const finalUser = useStore.getState().user;
           if (!finalUser || finalUser.id !== fullUser.id) {
+            console.log('🔄 [MÓVIL] Forzando actualización del usuario después de login');
             setUser(fullUser);
           }
-        }, 300);
-      }, 100);
+        }, 500);
+      } else {
+        // En desktop, comportamiento normal
+        setTimeout(() => {
+          if (fullUser.isAdmin) {
+            navigate('/admin', { replace: true });
+          } else {
+            navigate('/', { replace: true });
+          }
+          // Forzar recarga del estado del usuario después de navegar
+          setTimeout(() => {
+            const finalUser = useStore.getState().user;
+            if (!finalUser || finalUser.id !== fullUser.id) {
+              setUser(fullUser);
+            }
+          }, 300);
+        }, 100);
+      }
     } catch (err: any) {
-      console.error('Error en login:', err);
+      console.error('❌ Error en login:', err);
+      console.error('❌ Código de error:', err.code);
+      console.error('❌ Mensaje de error:', err.message);
       
       // Limpiar estado en caso de error
       try {
@@ -171,19 +239,27 @@ const Login = () => {
       }
       setUser(null);
       
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
-        setError('Email o contraseña incorrectos');
-      } else if (err.code === 'auth/invalid-credential') {
-        setError('Email o contraseña incorrectos');
+      // Mensajes de error más específicos y útiles
+      let errorMessage = 'Error al iniciar sesión. Intentá nuevamente.';
+      
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        errorMessage = 'Email o contraseña incorrectos. Verificá tus credenciales.';
       } else if (err.code === 'auth/too-many-requests') {
-        setError('Demasiados intentos fallidos. Intentá más tarde.');
+        errorMessage = 'Demasiados intentos fallidos. Esperá unos minutos e intentá nuevamente.';
       } else if (err.code === 'auth/invalid-email') {
-        setError('Email inválido');
+        errorMessage = 'El formato del email no es válido.';
       } else if (err.code === 'auth/network-request-failed') {
-        setError('Error de conexión. Verificá tu internet.');
-      } else {
-        setError('Error al iniciar sesión. Intentá nuevamente.');
+        errorMessage = 'Error de conexión. Verificá tu internet e intentá nuevamente.';
+      } else if (err.code === 'auth/user-disabled') {
+        errorMessage = 'Tu cuenta ha sido deshabilitada. Contactá al administrador.';
+      } else if (err.code === 'auth/operation-not-allowed') {
+        errorMessage = 'Este método de autenticación no está habilitado.';
+      } else if (err.message) {
+        errorMessage = `Error: ${err.message}`;
       }
+      
+      setError(errorMessage);
+      toast.error(errorMessage, 5000);
     } finally {
       setLoading(false);
     }
@@ -196,8 +272,34 @@ const Login = () => {
           <h1>Iniciar Sesión</h1>
           <p className="auth-subtitle">Bienvenido de vuelta a Clikio</p>
 
+          {loading && (
+            <div style={{
+              marginBottom: '1rem',
+              padding: '1rem',
+              background: 'var(--bg-secondary)',
+              border: '2px solid var(--primary)',
+              borderRadius: '0.75rem',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '0.75rem'
+            }}>
+              <Loader size={24} className="animate-spin" style={{ color: 'var(--primary)' }} />
+              <p style={{ margin: 0, color: 'var(--text-primary)', fontWeight: 500 }}>
+                {loading ? 'Procesando...' : ''}
+              </p>
+            </div>
+          )}
+
           {error && (
-            <div className="alert-error">
+            <div className="alert-error" style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem'
+            }}>
+              <AlertCircle size={20} />
               {error}
             </div>
           )}

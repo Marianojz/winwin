@@ -1,20 +1,67 @@
-import { useState } from 'react';
-import { signInWithPopup, signInWithRedirect } from 'firebase/auth';
+import { useState, useEffect } from 'react';
+import { signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { useStore } from '../store/useStore';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { createGoogleProvider, isMobileDevice, processGoogleAuthResult } from '../utils/googleAuthHelper';
-import { Loader } from 'lucide-react';
+import { Loader, AlertCircle } from 'lucide-react';
+import { toast } from '../utils/toast';
 
 const GoogleSignIn = () => {
   const { setUser } = useStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
+
+  // Verificar si hay un redirect pendiente al montar el componente
+  useEffect(() => {
+    const checkRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && result.user) {
+          setStatusMessage('Procesando tu cuenta...');
+          setLoading(true);
+          
+          try {
+            const { fullUser, needsCompleteProfile } = await processGoogleAuthResult(result.user);
+            setUser(fullUser);
+            
+            toast.success('¡Inicio de sesión exitoso!', 2000);
+            
+            if (needsCompleteProfile) {
+              navigate('/completar-perfil', { replace: true });
+            } else if (fullUser.isAdmin) {
+              navigate('/admin', { replace: true });
+            } else {
+              navigate('/', { replace: true });
+            }
+          } catch (err: any) {
+            console.error('Error procesando redirect:', err);
+            setError('Error al procesar tu cuenta. Por favor, intentá nuevamente.');
+            toast.error('Error al iniciar sesión', 5000);
+            setLoading(false);
+          }
+        }
+      } catch (err: any) {
+        // Ignorar errores de no-auth-event
+        if (err.code !== 'auth/no-auth-event') {
+          console.warn('Error verificando redirect:', err);
+        }
+      }
+    };
+
+    // Solo verificar si estamos en la página de login
+    if (location.pathname === '/login') {
+      checkRedirect();
+    }
+  }, [location.pathname, setUser, navigate]);
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError('');
+    setStatusMessage('');
 
     try {
       const provider = createGoogleProvider();
@@ -22,8 +69,10 @@ const GoogleSignIn = () => {
       
       // En móvil, usar redirect directamente (más rápido y confiable)
       if (isMobile) {
+        setStatusMessage('Redirigiendo a Google...');
+        toast.info('Redirigiendo a Google para iniciar sesión', 3000);
         await signInWithRedirect(auth, provider);
-        // El redirect result se manejará en App.tsx
+        // El redirect result se manejará en App.tsx o en el useEffect de arriba
         return;
       }
 
@@ -62,13 +111,34 @@ const GoogleSignIn = () => {
       }
       
       setError(errorMessage);
+      toast.error(errorMessage, 5000);
     } finally {
       setLoading(false);
+      setStatusMessage('');
     }
   };
 
   return (
     <div style={{ width: '100%' }}>
+      {statusMessage && (
+        <div style={{
+          marginBottom: '0.75rem',
+          padding: '0.75rem',
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--primary)',
+          borderRadius: '0.5rem',
+          fontSize: '0.875rem',
+          textAlign: 'center',
+          color: 'var(--text-primary)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.5rem'
+        }}>
+          <Loader size={16} className="animate-spin" />
+          {statusMessage}
+        </div>
+      )}
       <button
         onClick={handleGoogleSignIn}
         type="button"
@@ -126,8 +196,13 @@ const GoogleSignIn = () => {
           color: 'white',
           borderRadius: '0.5rem',
           fontSize: '0.875rem',
-          textAlign: 'center'
+          textAlign: 'center',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.5rem'
         }}>
+          <AlertCircle size={18} />
           {error}
         </div>
       )}
