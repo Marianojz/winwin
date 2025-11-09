@@ -122,16 +122,25 @@ const GoogleSignIn = () => {
             
             // IMPORTANTE: signInWithRedirect puede lanzar un error o simplemente redirigir
             // No esperar a que "complete" porque redirige inmediatamente
-            signInWithRedirect(auth, provider).then(() => {
-              console.log('✅ [GOOGLE SIGN-IN] signInWithRedirect promise resuelta (no debería llegar aquí si redirige)');
-            }).catch((err) => {
-              console.error('❌ [GOOGLE SIGN-IN] Error en signInWithRedirect:', err);
-              throw err;
+            console.log('🔄 [GOOGLE SIGN-IN] Llamando a signInWithRedirect...', {
+              authDomain: auth.app.options.authDomain,
+              currentURL: window.location.href
             });
             
-            console.log('🔄 [GOOGLE SIGN-IN] signInWithRedirect llamado, debería redirigir ahora...');
-            // El redirect result se manejará en App.tsx o en el useEffect de arriba
-            // No hacer return aquí porque puede que no redirija inmediatamente
+            try {
+              await signInWithRedirect(auth, provider);
+              // Si llegamos aquí, el redirect no se ejecutó (no debería pasar)
+              console.warn('⚠️ [GOOGLE SIGN-IN] signInWithRedirect no redirigió, esto es inesperado');
+            } catch (redirectErr: any) {
+              console.error('❌ [GOOGLE SIGN-IN] Error en signInWithRedirect:', redirectErr);
+              // Si hay un error, puede ser que el redirect no se pueda ejecutar
+              // Intentar con popup como fallback
+              throw redirectErr;
+            }
+            
+            // Si llegamos aquí sin error, el redirect debería haber ocurrido
+            // No hacer nada más, el redirect result se manejará cuando vuelva
+            console.log('🔄 [GOOGLE SIGN-IN] signInWithRedirect completado, debería estar redirigiendo...');
             return;
           } catch (redirectError: any) {
             // Si el redirect falla, intentar con popup como fallback
