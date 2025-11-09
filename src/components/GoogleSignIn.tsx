@@ -98,27 +98,36 @@ const GoogleSignIn = () => {
         console.log('📱 [GOOGLE SIGN-IN] Verificación móvil:', { sessionStorageAvailable });
         
         if (!sessionStorageAvailable) {
-          // Si sessionStorage no está disponible, usar popup directamente
-          // Redirect NO funcionará sin sessionStorage
-          console.warn('⚠️ [GOOGLE SIGN-IN] sessionStorage no disponible, usando popup en móvil');
+          // Si sessionStorage no está disponible, intentar popup como último recurso
+          console.warn('⚠️ [GOOGLE SIGN-IN] sessionStorage no disponible, intentando popup en móvil');
           setStatusMessage('Abriendo ventana de Google...');
-          toast.info('Usando método alternativo (tu navegador no soporta redirect)', 4000);
+          toast.info('Usando método alternativo', 3000);
           // Continuar con popup (no usar redirect)
         } else {
-          // Si sessionStorage está disponible, intentar usar redirect
-          // PERO: En móvil, redirect puede fallar por problemas de storage particionado
-          // Por seguridad, usar popup directamente en móvil (más confiable)
-          console.log('✅ [GOOGLE SIGN-IN] sessionStorage disponible, pero usando popup en móvil para mayor confiabilidad');
-          setStatusMessage('Abriendo ventana de Google...');
-          toast.info('Abriendo ventana de Google', 3000);
-          // En móvil, usar popup directamente (más confiable que redirect)
-          // Continuar con popup
+          // En móvil, usar redirect (más confiable que popup)
+          // Aunque el redirect result se pueda perder, el listener de backup lo capturará
+          console.log('✅ [GOOGLE SIGN-IN] sessionStorage disponible, usando redirect en móvil');
+          setStatusMessage('Redirigiendo a Google...');
+          toast.info('Redirigiendo a Google para iniciar sesión', 3000);
+          try {
+            console.log('🔄 [GOOGLE SIGN-IN] Llamando a signInWithRedirect...');
+            await signInWithRedirect(auth, provider);
+            console.log('✅ [GOOGLE SIGN-IN] signInWithRedirect completado, redirigiendo...');
+            // El redirect result se manejará en App.tsx o en el useEffect de arriba
+            return;
+          } catch (redirectError: any) {
+            // Si el redirect falla, intentar con popup como fallback
+            console.warn('⚠️ [GOOGLE SIGN-IN] Redirect falló, usando popup como fallback:', redirectError.message);
+            setStatusMessage('Intentando con método alternativo...');
+            toast.warning('Usando método alternativo de autenticación', 3000);
+            // Continuar con popup como fallback (no lanzar error)
+          }
         }
       } else {
         console.log('💻 [GOOGLE SIGN-IN] Desktop detectado, usando popup');
       }
 
-      // En desktop o si sessionStorage no está disponible, usar popup
+      // En desktop o si redirect falló, usar popup
       console.log('🪟 [GOOGLE SIGN-IN] Intentando con popup...');
       try {
         const result = await signInWithPopup(auth, provider);
@@ -148,13 +157,22 @@ const GoogleSignIn = () => {
           navigate('/', { replace: true });
         }
       } catch (popupError: any) {
-        // Si popup falla, intentar con redirect como fallback (solo si no es móvil sin sessionStorage)
-        if ((popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') && isSessionStorageAvailable()) {
+        // Si popup falla en móvil, intentar con redirect como fallback
+        const isPopupBlocked = popupError.code === 'auth/popup-blocked' || 
+                              popupError.code === 'auth/popup-closed-by-user' ||
+                              popupError.message?.includes('Cross-Origin-Opener-Policy') ||
+                              popupError.message?.includes('window.closed');
+        
+        if (isMobile && isPopupBlocked && isSessionStorageAvailable()) {
+          console.warn('⚠️ [GOOGLE SIGN-IN] Popup bloqueado, intentando redirect como fallback...');
+          setStatusMessage('Redirigiendo a Google...');
+          toast.info('Redirigiendo a Google', 3000);
           try {
             await signInWithRedirect(auth, provider);
             return;
           } catch (redirectError: any) {
             // Si redirect también falla, lanzar el error original
+            console.error('❌ [GOOGLE SIGN-IN] Redirect también falló:', redirectError);
             throw popupError;
           }
         }
