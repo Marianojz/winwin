@@ -130,12 +130,11 @@ export const getUserConversations = (userId: string, callback: (messages: Messag
 export const getAllConversations = (callback: (conversations: Conversation[]) => void): (() => void) => {
   try {
     const messagesRef = ref(realtimeDb, 'messages');
+    const conversationsRef = ref(realtimeDb, 'conversations');
     
-    // Escuchar cambios en tiempo real
-    const unsubscribe = onValue(messagesRef, (snapshot) => {
-      const data = snapshot.val();
-      
-      if (!data) {
+    // Función para procesar conversaciones
+    const processConversations = async (messagesData: any, conversationsData: any) => {
+      if (!messagesData) {
         callback([]);
         return;
       }
@@ -147,17 +146,26 @@ export const getAllConversations = (callback: (conversations: Conversation[]) =>
         lastMessage?: Message;
         unreadCount: number;
         updatedAt: Date;
+        status?: 'open' | 'closed';
+        priority?: 'high' | 'medium' | 'low';
+        type?: 'chat' | 'contact' | 'help' | 'ticket';
+        closedAt?: Date;
+        closedBy?: string;
+        reopenedAt?: Date;
       }>();
       
       // Iterar sobre todas las conversaciones
-      Object.keys(data).forEach(conversationId => {
-        const messages = data[conversationId];
+      Object.keys(messagesData).forEach(conversationId => {
+        const messages = messagesData[conversationId];
         if (!messages) return;
         
         // Solo procesar conversaciones admin_usuario
         if (conversationId.startsWith('admin_')) {
           const userId = conversationId.replace('admin_', '');
           const messagesArray = Object.values(messages) as any[];
+          
+          // Obtener datos de conversación si existen
+          const convData = conversationsData?.[conversationId] || {};
           
           messagesArray.forEach(msg => {
             if (!conversationMap.has(conversationId)) {
@@ -167,7 +175,13 @@ export const getAllConversations = (callback: (conversations: Conversation[]) =>
                 userAvatar: undefined,
                 lastMessage: msg,
                 unreadCount: 0,
-                updatedAt: new Date(msg.createdAt)
+                updatedAt: new Date(msg.createdAt),
+                status: convData.status || 'open',
+                priority: convData.priority || 'medium',
+                type: convData.type || 'chat',
+                closedAt: convData.closedAt ? new Date(convData.closedAt) : undefined,
+                closedBy: convData.closedBy,
+                reopenedAt: convData.reopenedAt ? new Date(convData.reopenedAt) : undefined
               });
             }
             
@@ -203,15 +217,49 @@ export const getAllConversations = (callback: (conversations: Conversation[]) =>
           } : undefined,
           updatedAt: conv.updatedAt
         }))
-        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+        .sort((a, b) => {
+          // Ordenar por prioridad primero, luego por fecha
+          const priorityOrder = { high: 3, medium: 2, low: 1 };
+          const aPriority = priorityOrder[a.priority || 'medium'];
+          const bPriority = priorityOrder[b.priority || 'medium'];
+          if (aPriority !== bPriority) {
+            return bPriority - aPriority;
+          }
+          return b.updatedAt.getTime() - a.updatedAt.getTime();
+        });
       
       callback(conversations);
+    };
+    
+    // Escuchar cambios en mensajes
+    const unsubscribeMessages = onValue(messagesRef, async (snapshot) => {
+      const messagesData = snapshot.val();
+      
+      // Obtener datos de conversaciones
+      const conversationsSnapshot = await firebaseGet(conversationsRef);
+      const conversationsData = conversationsSnapshot.exists() ? conversationsSnapshot.val() : null;
+      
+      processConversations(messagesData, conversationsData);
     }, (error) => {
       console.error('Error obteniendo conversaciones desde Firebase:', error);
       callback([]);
     });
     
-    return unsubscribe;
+    // También escuchar cambios en estados de conversaciones
+    const unsubscribeConversations = onValue(conversationsRef, async () => {
+      const messagesSnapshot = await firebaseGet(messagesRef);
+      const messagesData = messagesSnapshot.exists() ? messagesSnapshot.val() : null;
+      
+      const conversationsSnapshot = await firebaseGet(conversationsRef);
+      const conversationsData = conversationsSnapshot.exists() ? conversationsSnapshot.val() : null;
+      
+      processConversations(messagesData, conversationsData);
+    });
+    
+    return () => {
+      unsubscribeMessages();
+      unsubscribeConversations();
+    };
   } catch (error) {
     console.error('Error configurando listener de conversaciones:', error);
     callback([]);
@@ -325,6 +373,166 @@ export const deleteAllConversations = async (): Promise<boolean> => {
   } catch (error) {
     console.error('❌ Error eliminando todas las conversaciones de Firebase:', error);
     return false;
+  }
+};
+
+// ========== GESTIÓN DE ESTADOS DE CONVERSACIÓN ==========
+
+// Obtener estado de conversación
+export const getConversationStatus = async (conversationId: string): Promise<'open' | 'closed' | null> => {
+  try {
+    const statusRef = ref(realtimeDb, `conversations/${conversationId}/status`);
+    const snapshot = await firebaseGet(statusRef);
+    return snapshot.exists() ? snapshot.val() : 'open';
+  } catch (error) {
+    console.error('Error obteniendo estado de conversación:', error);
+    return 'open';
+  }
+};
+
+// Cerrar conversación (solo admin)
+export const closeConversation = async (conversationId: string, adminId: string): Promise<boolean> => {
+  try {
+    const conversationRef = ref(realtimeDb, `conversations/${conversationId}`);
+    const now = new Date().toISOString();
+    
+    await firebaseSet(conversationRef, {
+      status: 'closed',
+      closedAt: now,
+      closedBy: adminId
+    });
+    
+    // Crear mensaje automático de cierre
+    const userId = conversationId.replace('admin_', '');
+    const closeMessage = createMessage(
+      'admin',
+      'Administrador',
+      userId,
+      'Esta conversación ha sido cerrada. Si necesitás más ayuda, podés iniciar una nueva conversación.',
+      { isAutoGenerated: true }
+    );
+    await saveMessage(closeMessage);
+    
+    console.log(`✅ Conversación cerrada: ${conversationId}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Error cerrando conversación:', error);
+    return false;
+  }
+};
+
+// Reabrir conversación (solo admin)
+export const reopenConversation = async (conversationId: string, adminId: string): Promise<boolean> => {
+  try {
+    const conversationRef = ref(realtimeDb, `conversations/${conversationId}`);
+    const now = new Date().toISOString();
+    
+    await firebaseSet(conversationRef, {
+      status: 'open',
+      reopenedAt: now,
+      reopenedBy: adminId
+    });
+    
+    // Crear mensaje automático de reapertura
+    const userId = conversationId.replace('admin_', '');
+    const reopenMessage = createMessage(
+      'admin',
+      'Administrador',
+      userId,
+      'Esta conversación ha sido reabierta. Ya podés responder nuevamente.',
+      { isAutoGenerated: true }
+    );
+    await saveMessage(reopenMessage);
+    
+    console.log(`✅ Conversación reabierta: ${conversationId}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Error reabriendo conversación:', error);
+    return false;
+  }
+};
+
+// Iniciar conversación (usuario o admin)
+export const startConversation = async (
+  conversationId: string,
+  type: 'chat' | 'contact' | 'help' | 'ticket' = 'chat',
+  priority: 'high' | 'medium' | 'low' = 'medium'
+): Promise<boolean> => {
+  try {
+    const conversationRef = ref(realtimeDb, `conversations/${conversationId}`);
+    const now = new Date().toISOString();
+    
+    await firebaseSet(conversationRef, {
+      status: 'open',
+      type,
+      priority,
+      createdAt: now,
+      updatedAt: now
+    });
+    
+    console.log(`✅ Conversación iniciada: ${conversationId}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Error iniciando conversación:', error);
+    return false;
+  }
+};
+
+// Actualizar prioridad de conversación
+export const updateConversationPriority = async (
+  conversationId: string,
+  priority: 'high' | 'medium' | 'low'
+): Promise<boolean> => {
+  try {
+    const priorityRef = ref(realtimeDb, `conversations/${conversationId}/priority`);
+    await firebaseSet(priorityRef, priority);
+    console.log(`✅ Prioridad actualizada: ${conversationId} -> ${priority}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Error actualizando prioridad:', error);
+    return false;
+  }
+};
+
+// Verificar si la conversación existe
+export const conversationExists = async (conversationId: string): Promise<boolean> => {
+  try {
+    const conversationRef = ref(realtimeDb, `conversations/${conversationId}`);
+    const snapshot = await firebaseGet(conversationRef);
+    return snapshot.exists();
+  } catch (error) {
+    console.error('Error verificando existencia de conversación:', error);
+    return false;
+  }
+};
+
+// Escuchar estado de conversación en tiempo real
+export const watchConversationStatus = (
+  conversationId: string,
+  callback: (status: 'open' | 'closed' | null, exists: boolean) => void
+): (() => void) => {
+  try {
+    const conversationRef = ref(realtimeDb, `conversations/${conversationId}`);
+    const unsubscribe = onValue(conversationRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        // Si no existe la conversación, el usuario NO puede enviar mensajes
+        callback(null, false);
+        return;
+      }
+      
+      const conversationData = snapshot.val();
+      const status = conversationData?.status || null;
+      callback(status, true);
+    }, (error) => {
+      console.error('Error escuchando estado de conversación:', error);
+      callback(null, false);
+    });
+    
+    return unsubscribe;
+  } catch (error) {
+    console.error('Error configurando listener de estado:', error);
+    callback(null, false);
+    return () => {};
   }
 };
 

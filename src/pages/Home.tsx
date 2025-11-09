@@ -3,6 +3,7 @@ import { Gavel, Store, TrendingUp, Shield, Clock, Award } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import AuctionCard from '../components/AuctionCard';
 import ProductCard from '../components/ProductCard';
+import AnnouncementWidget from '../components/AnnouncementWidget';
 import { Product } from '../types';
 import { HomeConfig, defaultHomeConfig } from '../types/homeConfig';
 import { useEffect, useState } from 'react';
@@ -133,6 +134,13 @@ const Home = () => {
               />
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Widget de Anuncios */}
+      <section className="announcements-section" style={{ padding: '1.5rem 0' }}>
+        <div className="container">
+          <AnnouncementWidget />
         </div>
       </section>
 

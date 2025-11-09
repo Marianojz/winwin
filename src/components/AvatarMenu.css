@@ -1,0 +1,349 @@
+/* Menú Contextual de Avatar */
+
+.avatar-menu-container {
+  position: relative;
+}
+
+/* Botón Trigger */
+.avatar-menu-trigger {
+  position: relative;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.avatar-menu-trigger:hover {
+  transform: scale(1.05);
+}
+
+.avatar-menu-trigger:active {
+  transform: scale(0.95);
+}
+
+.avatar-menu-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--primary);
+  display: block;
+  transition: border-color 0.2s ease;
+}
+
+.avatar-menu-trigger:hover .avatar-menu-avatar {
+  border-color: var(--secondary);
+}
+
+.avatar-menu-fallback {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 1rem;
+  border: 2px solid var(--primary);
+}
+
+/* Overlay */
+.avatar-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(2px);
+  z-index: 9998;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Menú */
+.avatar-menu {
+  position: absolute;
+  top: calc(100% + 0.75rem);
+  right: 0;
+  background: var(--bg-primary);
+  border-radius: 1rem;
+  box-shadow: 0 8px 24px var(--shadow-lg);
+  min-width: 280px;
+  z-index: 9999;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px) scale(0.95);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+/* Estado: Abierto */
+.avatar-menu.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  pointer-events: all;
+}
+
+/* Estado: Navegando */
+.avatar-menu.navigating {
+  opacity: 0.7;
+  transform: translateY(-5px) scale(0.98);
+  pointer-events: none;
+}
+
+/* Estado: Cerrado */
+.avatar-menu.closed {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px) scale(0.95);
+  pointer-events: none;
+}
+
+/* Header del Menú */
+.avatar-menu-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  background: var(--bg-secondary);
+  position: relative;
+}
+
+.avatar-menu-header-avatar {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.avatar-menu-header-avatar img {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--primary);
+  display: block;
+}
+
+.avatar-menu-header-fallback {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 1.25rem;
+  border: 3px solid var(--primary);
+}
+
+.avatar-menu-header-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.avatar-menu-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.avatar-menu-email {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.avatar-menu-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.avatar-menu-close:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Divider */
+.avatar-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0;
+}
+
+/* Items del Menú */
+.avatar-menu-items {
+  padding: 0.5rem 0;
+}
+
+.avatar-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.avatar-menu-item:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  color: var(--primary);
+  transform: translateX(4px);
+}
+
+.avatar-menu-item:active:not(:disabled) {
+  transform: translateX(2px);
+}
+
+.avatar-menu-item:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.avatar-menu-item.navigating {
+  background: var(--bg-tertiary);
+  color: var(--primary);
+}
+
+.avatar-menu-item.danger {
+  color: var(--error);
+}
+
+.avatar-menu-item.danger:hover:not(:disabled) {
+  background: rgba(255, 59, 48, 0.1);
+  color: var(--error);
+}
+
+/* Estado activo persistente */
+.avatar-menu-item.active {
+  background: var(--bg-secondary);
+  color: var(--primary);
+  font-weight: 600;
+  border-left: 3px solid var(--primary);
+  padding-left: calc(1.25rem - 3px);
+}
+
+.avatar-menu-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--primary);
+  border-radius: 0 2px 2px 0;
+}
+
+.avatar-menu-item svg {
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.avatar-menu-item span {
+  flex: 1;
+}
+
+.avatar-menu-badge {
+  background: var(--error);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 1rem;
+  min-width: 1.25rem;
+  text-align: center;
+}
+
+/* Animación de carga */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .avatar-menu {
+    min-width: 260px;
+    right: -0.5rem;
+  }
+
+  .avatar-menu-header {
+    padding: 1rem;
+  }
+
+  .avatar-menu-item {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* Accesibilidad */
+.avatar-menu-trigger:focus-visible,
+.avatar-menu-item:focus-visible,
+.avatar-menu-close:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Tema oscuro */
+[data-theme="dark"] .avatar-menu {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .avatar-menu-header {
+  background: var(--bg-tertiary);
+}
+

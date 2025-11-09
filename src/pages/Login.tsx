@@ -7,6 +7,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db, syncUserToRealtimeDb } from '../config/firebase';
 import { useStore } from '../store/useStore';
 import { User } from '../types';
+import { PASSWORD_INPUT_ATTRIBUTES, EMAIL_INPUT_ATTRIBUTES } from '../utils/passwordManagerOptimization';
 
 // Acceso directo al store para métodos que no están en el hook
 const useStoreDirect = useStore;
@@ -193,7 +194,14 @@ const Login = () => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="auth-form">
+          <form 
+            onSubmit={handleSubmit} 
+            className="auth-form"
+            id="login-form"
+            name="login-form"
+            autoComplete="on"
+            data-password-manager-friendly="true"
+          >
             <div className="form-group">
               <label htmlFor="email">
                 <Mail size={18} />
@@ -201,12 +209,17 @@ const Login = () => {
               </label>
               <input
                 id="email"
+                name="email"
                 type="email"
+                autoComplete="email username"
                 placeholder="tu@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={loading}
+                data-lpignore="false"
+                data-1p-ignore="false"
+                data-bwignore="false"
               />
             </div>
 
@@ -216,16 +229,18 @@ const Login = () => {
                 Contraseña
               </label>
               <div style={{ position: 'relative', width: '100%' }}>
-                <input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={loading}
-                  style={{ width: '100%', paddingRight: '3rem' }}
-                />
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={loading}
+                style={{ width: '100%', paddingRight: '3rem' }}
+                {...PASSWORD_INPUT_ATTRIBUTES.currentPassword}
+              />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}

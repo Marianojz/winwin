@@ -47,15 +47,30 @@ export interface ThemeColorSets {
   experimental: ThemeColors;
 }
 
+export type StickerEffect = 'floating' | 'pulse' | 'fadeInOut' | 'bounce' | 'slideIn' | 'none';
+export type StickerPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
+export type StickerSize = 'small' | 'medium' | 'large';
+
 export interface LogoSticker {
   id: string;
   type: 'christmas' | 'newyear' | 'cybermonday' | 'blackfriday' | 'valentine' | 'easter' | 'halloween' | 'independence' | 'mothersday' | 'fathersday' | 'childrensday' | 'summer' | 'winter' | 'spring' | 'autumn' | 'custom';
   emoji: string;
-  position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
-  size: 'small' | 'medium' | 'large';
+  position: StickerPosition;
+  size: StickerSize;
   active: boolean;
   startDate?: string;
   endDate?: string;
+  effect?: StickerEffect; // Nuevo: efecto de animación
+  tags?: string[]; // Nuevo: tags para búsqueda
+  customImageUrl?: string; // Nuevo: URL para stickers personalizados (SVG, PNG)
+  sticky?: boolean; // Nuevo: comportamiento sticky en scroll
+}
+
+export interface LogoConfig {
+  size?: 'small' | 'medium' | 'large';
+  position?: 'left' | 'center' | 'right';
+  opacity?: number;
+  hoverEffect?: boolean;
 }
 
 export interface SiteSettings {
@@ -67,6 +82,7 @@ export interface SiteSettings {
     dark?: string;
     experimental?: string;
   };
+  logoConfig?: LogoConfig; // Configuración del logo (tamaño, posición, opacidad, hover)
   faviconUrl?: string;
   footerText?: string;
   logoStickers?: LogoSticker[];

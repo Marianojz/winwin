@@ -1,0 +1,202 @@
+/* Sticker Renderer - Efectos de Animación */
+
+.sticker-renderer {
+  display: inline-block;
+  transition: all 0.3s ease;
+}
+
+/* Floating - Levitación suave continua mejorado */
+.sticker-renderer.floating {
+  animation: floating 3s ease-in-out infinite;
+}
+
+@keyframes floating {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-8px) rotate(2deg);
+  }
+  50% {
+    transform: translateY(-12px) rotate(0deg);
+  }
+  75% {
+    transform: translateY(-8px) rotate(-2deg);
+  }
+}
+
+.sticker-renderer.floating.sticky {
+  position: sticky;
+  animation: floating 3s ease-in-out infinite;
+}
+
+/* Pulse - Pulsación rítmica de atención mejorado */
+.sticker-renderer.pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.9;
+    filter: brightness(1.2);
+  }
+}
+
+.sticker-renderer.pulse.sticky {
+  position: sticky;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* FadeInOut - Aparición/desaparición gradual mejorado */
+.sticker-renderer.fadeInOut {
+  animation: fadeInOut 3s ease-in-out infinite;
+  opacity: 0;
+  animation-fill-mode: both;
+}
+
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+.sticker-renderer.fadeInOut.sticky {
+  position: sticky;
+  animation: fadeInOut 3s ease-in-out infinite;
+}
+
+/* Bounce - Rebote al interactuar */
+.sticker-renderer.bounce {
+  animation: bounce 2s ease-in-out infinite;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  25% {
+    transform: translateY(-8px);
+  }
+  50% {
+    transform: translateY(0);
+  }
+  75% {
+    transform: translateY(-4px);
+  }
+}
+
+.sticker-renderer.bounce.sticky {
+  position: sticky;
+  animation: bounce 2s ease-in-out infinite;
+}
+
+/* SlideIn - Deslizamiento desde bordes mejorado */
+.sticker-renderer.slideIn {
+  animation: slideIn 1s ease-out, slideInIdle 3s ease-in-out 1s infinite;
+  opacity: 0;
+  animation-fill-mode: both;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-30px) translateY(-30px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) translateY(0) scale(1);
+  }
+}
+
+@keyframes slideInIdle {
+  0%, 100% {
+    transform: translateX(0) translateY(0) scale(1);
+  }
+  50% {
+    transform: translateX(2px) translateY(-2px) scale(1.02);
+  }
+}
+
+.sticker-renderer.slideIn.sticky {
+  position: sticky;
+  animation: slideIn 1s ease-out, slideInIdle 3s ease-in-out 1s infinite;
+}
+
+/* None - Sin animación */
+.sticker-renderer.none {
+  animation: none;
+}
+
+/* Sticky positioning - Comportamiento scroll corregido */
+.sticker-renderer.sticky {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  will-change: transform;
+}
+
+/* Mejora para scroll suave */
+.sticker-renderer.sticky {
+  scroll-margin-top: 0;
+  scroll-snap-align: none;
+}
+
+/* Evitar desbordamiento en móviles */
+@media (max-width: 768px) {
+  .sticker-renderer {
+    max-width: 2rem;
+    max-height: 2rem;
+    overflow: hidden;
+  }
+
+  .sticker-renderer img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+}
+
+/* Transiciones suaves de entrada/salida */
+.sticker-renderer {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* Posicionamiento relativo al viewport */
+.sticker-renderer {
+  position: absolute;
+}
+
+.sticker-renderer.sticky {
+  position: sticky;
+}
+
+/* Mejoras de rendimiento */
+.sticker-renderer {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+

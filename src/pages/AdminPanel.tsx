@@ -11,7 +11,8 @@ import {
   Search, Filter, ShoppingBag, MapPin, BarChart3,
   MousePointerClick, Image as ImageIcon, Save, Store, Mail, Send,
   CheckCircle, Truck, FileText, Calendar, User, CreditCard,
-  ArrowRight, ArrowDown, ArrowUp, Download, Trash, HelpCircle, Ticket as TicketIcon
+  ArrowRight, ArrowDown, ArrowUp, Download, Trash, HelpCircle, Ticket as TicketIcon,
+  MessageSquare
 } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -39,7 +40,11 @@ import {
   createMessage,
   createAutoMessage,
   deleteConversation,
-  deleteMessage
+  deleteMessage,
+  closeConversation,
+  reopenConversation,
+  watchConversationStatus,
+  updateConversationPriority
 } from '../utils/messages';
 import { Message, Conversation, Ticket, TicketStatus, ContactMessage } from '../types';
 import { 
@@ -60,10 +65,43 @@ import {
   renderTemplate,
   type MessageTemplate 
 } from '../utils/messageTemplates';
+import LogoManager from '../components/LogoManager';
+import StickerManager from '../components/StickerManager';
+import AnnouncementCreator from '../components/AnnouncementCreator';
+import { Announcement } from '../types/announcements';
+import { getAllAnnouncements, deleteAnnouncement } from '../utils/announcements';
+import { getAllAnnouncementsMetrics, AnnouncementMetrics } from '../utils/announcementAnalytics';
+import { 
+  loadQuickReplies, 
+  addQuickReply, 
+  updateQuickReply, 
+  deleteQuickReply, 
+  getActiveQuickReplies,
+  type QuickReply 
+} from '../utils/quickReplies';
+import { 
+  getChatMetrics, 
+  watchChatMetrics, 
+  calculateResponseTime,
+  type ChatMetrics,
+  type ResponseTimeMetric 
+} from '../utils/chatMetrics';
+import {
+  getUnifiedInbox,
+  getUnreadCountsByType,
+  getUnreadCountsByPriority,
+  filterUnifiedMessages,
+  getTypeBadge,
+  getPriorityBadge,
+  type UnifiedMessage,
+  type UnifiedMessageType,
+  type UnifiedMessagePriority
+} from '../utils/unifiedInbox';
+import './AdminPanel.css';
 
 const AdminPanel = (): React.ReactElement => {
   const { 
-    user, auctions, products, bots, orders,
+    user, auctions, products, bots, orders, theme,
     addBot, updateBot, deleteBot, setProducts, setAuctions, setBots, setOrders, updateOrderStatus, loadBots,
     addNotification
   } = useStore();
@@ -226,6 +264,39 @@ const AdminPanel = (): React.ReactElement => {
   const [adminUnreadCount, setAdminUnreadCount] = useState(0);
   const [showUserSelector, setShowUserSelector] = useState(false);
   const [selectedUserForMessage, setSelectedUserForMessage] = useState<string | null>(null);
+  const [conversationStatus, setConversationStatus] = useState<'open' | 'closed'>('open');
+  const [closingConversation, setClosingConversation] = useState(false);
+  
+  // Estados para plantillas de respuestas rápidas
+  const [quickReplies, setQuickReplies] = useState<QuickReply[]>(() => loadQuickReplies());
+  const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [showQuickReplyEditor, setShowQuickReplyEditor] = useState(false);
+  
+  // Estados para métricas de chat
+  const [chatMetrics, setChatMetrics] = useState<ChatMetrics | null>(null);
+  const [showChatMetrics, setShowChatMetrics] = useState(false);
+  const [selectedConversationMetric, setSelectedConversationMetric] = useState<ResponseTimeMetric | null>(null);
+  
+  // Estados para gestión múltiple
+  const [selectedConversations, setSelectedConversations] = useState<Set<string>>(new Set());
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
+  
+  // Estados para bandeja unificada
+  const [unifiedMessages, setUnifiedMessages] = useState<UnifiedMessage[]>([]);
+  const [unifiedFilter, setUnifiedFilter] = useState<{
+    type: UnifiedMessageType | 'all';
+    priority: UnifiedMessagePriority | 'all';
+    status: string | 'all';
+    search: string;
+    unreadOnly: boolean;
+  }>({
+    type: 'all',
+    priority: 'all',
+    status: 'all',
+    search: '',
+    unreadOnly: false
+  });
+  const [selectedUnifiedMessage, setSelectedUnifiedMessage] = useState<UnifiedMessage | null>(null);
   
   // Estados para tickets y mensajes de contacto
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -235,11 +306,20 @@ const AdminPanel = (): React.ReactElement => {
   const [ticketStatusFilter, setTicketStatusFilter] = useState<TicketStatus | 'todos'>('todos');
   const [ticketSearchQuery, setTicketSearchQuery] = useState('');
   
+  // Estados para anuncios
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [showAnnouncementCreator, setShowAnnouncementCreator] = useState(false);
+  const [announcementMetrics, setAnnouncementMetrics] = useState<any[]>([]);
+  const [showAnnouncementMetrics, setShowAnnouncementMetrics] = useState(false);
+  
+  // Estados para búsqueda de usuarios
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  
   const isMobile = useIsMobile();
   
   // Cargar conversaciones y contador en tiempo real
   useEffect(() => {
-    if (activeTab === 'messages') {
+    if (activeTab === 'messages' || activeTab === 'unified-inbox') {
       // Escuchar conversaciones en tiempo real
       const unsubscribeConversations = getAllConversations((conversations) => {
         setConversations(conversations);
@@ -250,19 +330,84 @@ const AdminPanel = (): React.ReactElement => {
         setAdminUnreadCount(count);
       });
       
+      // Cargar métricas de chat si están visibles (solo en messages)
+      let unsubscribeMetrics: (() => void) | null = null;
+      if (showChatMetrics && activeTab === 'messages') {
+        unsubscribeMetrics = watchChatMetrics((metrics) => {
+          setChatMetrics(metrics);
+        });
+      }
+      
       return () => {
         unsubscribeConversations();
         unsubscribeUnread();
+        if (unsubscribeMetrics) unsubscribeMetrics();
       };
     } else {
       setConversations([]);
       setAdminUnreadCount(0);
+      setChatMetrics(null);
+    }
+  }, [activeTab, showChatMetrics]);
+
+  // Cargar bandeja unificada cuando se activa la tab
+  useEffect(() => {
+    if (activeTab === 'unified-inbox') {
+      // Los datos ya se cargan en los efectos de 'messages' y 'tickets'
+      // Solo necesitamos unificar cuando cambian los datos
     }
   }, [activeTab]);
 
+  // Unificar mensajes cuando cambian las fuentes
+  useEffect(() => {
+    if (activeTab === 'unified-inbox' || activeTab === 'messages' || activeTab === 'tickets') {
+      const unified = getUnifiedInbox(conversations, tickets, contactMessages);
+      setUnifiedMessages(unified);
+    }
+  }, [conversations, tickets, contactMessages, activeTab]);
+
+  // Cargar anuncios cuando se cambia a la tab de anuncios
+  useEffect(() => {
+    if (activeTab === 'announcements') {
+      const unsubscribe = getAllAnnouncements((announcements) => {
+        setAnnouncements(announcements);
+      });
+      return () => unsubscribe();
+    } else {
+      setAnnouncements([]);
+    }
+  }, [activeTab]);
+
+  // Cargar métricas de anuncios
+  useEffect(() => {
+    if (activeTab === 'announcements' && showAnnouncementMetrics) {
+      const unsubscribe = getAllAnnouncementsMetrics((metrics) => {
+        setAnnouncementMetrics(metrics);
+      });
+      return () => unsubscribe();
+    } else {
+      setAnnouncementMetrics([]);
+    }
+  }, [activeTab, showAnnouncementMetrics]);
+
+  // Función para eliminar anuncio
+  const handleDeleteAnnouncement = async (announcementId: string) => {
+    if (!confirm('¿Estás seguro de que querés eliminar este anuncio?')) {
+      return;
+    }
+    try {
+      await deleteAnnouncement(announcementId);
+      setAnnouncements(prev => prev.filter(a => a.id !== announcementId));
+      alert('✅ Anuncio eliminado');
+    } catch (error) {
+      console.error('Error eliminando anuncio:', error);
+      alert('❌ Error al eliminar anuncio');
+    }
+  };
+
   // Cargar tickets y mensajes de contacto
   useEffect(() => {
-    if (activeTab === 'tickets') {
+    if (activeTab === 'tickets' || activeTab === 'unified-inbox') {
       const unsubscribeTickets = getAllTickets((tickets) => {
         setTickets(tickets);
       });
@@ -275,9 +420,8 @@ const AdminPanel = (): React.ReactElement => {
         unsubscribeTickets();
         unsubscribeMessages();
       };
-    } else {
-      setTickets([]);
-      setContactMessages([]);
+    } else if (activeTab !== 'messages') {
+      // Solo limpiar si no estamos en messages (messages también necesita estos datos para unified-inbox)
       setSelectedTicket(null);
     }
   }, [activeTab]);
@@ -338,6 +482,52 @@ const AdminPanel = (): React.ReactElement => {
       }, 100);
     }
   }, [conversationMessages.length]);
+
+  // Escuchar estado de conversación seleccionada
+  useEffect(() => {
+    if (!selectedConversation || !user) return;
+
+    const unsubscribe = watchConversationStatus(selectedConversation, (status) => {
+      setConversationStatus(status || 'open');
+    });
+
+    return () => unsubscribe();
+  }, [selectedConversation, user]);
+
+  // Funciones para gestionar conversaciones
+  const handleCloseConversation = async () => {
+    if (!selectedConversation || !user || closingConversation) return;
+
+    if (!confirm('¿Estás seguro de cerrar esta conversación? El usuario no podrá responder hasta que la reabras.')) {
+      return;
+    }
+
+    setClosingConversation(true);
+    try {
+      await closeConversation(selectedConversation, user.id);
+      setConversationStatus('closed');
+    } catch (error) {
+      console.error('Error cerrando conversación:', error);
+      alert('Error al cerrar la conversación');
+    } finally {
+      setClosingConversation(false);
+    }
+  };
+
+  const handleReopenConversation = async () => {
+    if (!selectedConversation || !user || closingConversation) return;
+
+    setClosingConversation(true);
+    try {
+      await reopenConversation(selectedConversation, user.id);
+      setConversationStatus('open');
+    } catch (error) {
+      console.error('Error reabriendo conversación:', error);
+      alert('Error al reabrir la conversación');
+    } finally {
+      setClosingConversation(false);
+    }
+  };
 
   // ============================================
   // FUNCIONES PARA CREAR SUBASTA
@@ -771,25 +961,6 @@ const [auctionForm, setAuctionForm] = useState({
       loadUsers();
     }
   }, [activeTab]);
-
-  // Protección de acceso - DEBE IR DESPUÉS DE TODOS LOS HOOKS
-  if (!user?.isAdmin) {
-    return (
-      <div style={{ minHeight: 'calc(100vh - 80px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem' }}>
-        <div style={{ textAlign: 'center', background: 'var(--bg-secondary)', padding: '3rem', borderRadius: '1.5rem', maxWidth: '500px' }}>
-          <AlertCircle size={64} color="var(--error)" style={{ marginBottom: '1.5rem' }} />
-          <h2 style={{ marginBottom: '1rem' }}>Acceso Denegado</h2>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
-            Solo los administradores pueden acceder a este panel de control.
-          </p>
-          <button onClick={() => window.location.href = '/'} className="btn btn-primary">
-            Volver al Inicio
-          </button>
-        </div>
-      </div>
-    );
-  }
-
 
   // Funciones para Productos
   const handleEditProduct = (product: Product) => {
@@ -1488,7 +1659,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
 
   // Función para enviar mensaje
   const handleSendMessage = async () => {
-    if (!newMessageContent.trim()) return;
+    if (!newMessageContent.trim() || conversationStatus === 'closed') return;
     
     try {
       let userId: string;
@@ -1541,6 +1712,29 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     }
   };
 
+  // Función para eliminar propiedades undefined recursivamente (Firebase no las acepta)
+  const removeUndefined = (obj: any): any => {
+    if (obj === null || obj === undefined) {
+      return null;
+    }
+    if (Array.isArray(obj)) {
+      return obj.map(item => removeUndefined(item)).filter(item => item !== null && item !== undefined);
+    }
+    if (typeof obj === 'object') {
+      const cleaned: any = {};
+      for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+          const value = obj[key];
+          if (value !== undefined) {
+            cleaned[key] = removeUndefined(value);
+          }
+        }
+      }
+      return cleaned;
+    }
+    return obj;
+  };
+
   // Función para guardar configuración de home
   const handleSaveHomeConfig = async () => {
     try {
@@ -1549,33 +1743,61 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         updatedAt: new Date().toISOString(),
         siteSettings: {
           ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
-          logoStickers: (homeConfig.siteSettings?.logoStickers || []).map(s => ({
-            ...s,
-            startDate: s.startDate || undefined,
-            endDate: s.endDate || undefined
-          }))
+          logoConfig: homeConfig.siteSettings?.logoConfig || undefined,
+          logoStickers: (homeConfig.siteSettings?.logoStickers || []).map(s => {
+            const cleaned: any = { ...s };
+            // Solo incluir startDate y endDate si tienen valores
+            if (s.startDate) {
+              cleaned.startDate = s.startDate instanceof Date ? s.startDate.toISOString() : s.startDate;
+            }
+            if (s.endDate) {
+              cleaned.endDate = s.endDate instanceof Date ? s.endDate.toISOString() : s.endDate;
+            }
+            // Eliminar propiedades undefined explícitamente
+            if (!s.startDate) delete cleaned.startDate;
+            if (!s.endDate) delete cleaned.endDate;
+            return cleaned;
+          })
         },
         themeColors: homeConfig.themeColors || defaultHomeConfig.themeColors,
         themeColorSets: homeConfig.themeColorSets || defaultHomeConfig.themeColorSets,
         sectionTitles: homeConfig.sectionTitles || defaultHomeConfig.sectionTitles,
-        banners: homeConfig.banners.map(b => ({
-          ...b,
-          createdAt: b.createdAt instanceof Date ? b.createdAt.toISOString() : b.createdAt,
-          updatedAt: b.updatedAt instanceof Date ? b.updatedAt.toISOString() : b.updatedAt
-        })),
-        promotions: homeConfig.promotions.map(p => ({
-          ...p,
-          createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
-          startDate: p.startDate instanceof Date ? p.startDate.toISOString() : (p.startDate || undefined),
-          endDate: p.endDate instanceof Date ? p.endDate.toISOString() : (p.endDate || undefined)
-        })),
+        banners: homeConfig.banners.map(b => {
+          const cleaned: any = { ...b };
+          if (b.createdAt) {
+            cleaned.createdAt = b.createdAt instanceof Date ? b.createdAt.toISOString() : b.createdAt;
+          }
+          if (b.updatedAt) {
+            cleaned.updatedAt = b.updatedAt instanceof Date ? b.updatedAt.toISOString() : b.updatedAt;
+          }
+          return cleaned;
+        }),
+        promotions: homeConfig.promotions.map(p => {
+          const cleaned: any = { ...p };
+          if (p.createdAt) {
+            cleaned.createdAt = p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt;
+          }
+          if (p.startDate) {
+            cleaned.startDate = p.startDate instanceof Date ? p.startDate.toISOString() : p.startDate;
+          }
+          if (p.endDate) {
+            cleaned.endDate = p.endDate instanceof Date ? p.endDate.toISOString() : p.endDate;
+          }
+          // Eliminar propiedades undefined explícitamente
+          if (!p.startDate) delete cleaned.startDate;
+          if (!p.endDate) delete cleaned.endDate;
+          return cleaned;
+        }),
         aboutSection: homeConfig.aboutSection || defaultHomeConfig.aboutSection,
         contactSection: homeConfig.contactSection || defaultHomeConfig.contactSection
       };
       
+      // Eliminar todas las propiedades undefined antes de guardar en Firebase
+      const cleanedConfig = removeUndefined(updatedConfig);
+      
       // Guardar en Firebase
       const homeConfigRef = dbRef(realtimeDb, 'homeConfig');
-      await firebaseSet(homeConfigRef, updatedConfig);
+      await firebaseSet(homeConfigRef, cleanedConfig);
       
       // No actualizar estado local manualmente - el listener de Firebase lo hará automáticamente
       // Esto asegura que los tipos sean correctos (Date vs string)
@@ -1936,6 +2158,10 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     }
   };
 
+  // Calcular contadores para bandeja unificada
+  const unifiedUnreadCounts = getUnreadCountsByType(unifiedMessages);
+  const totalUnreadUnified = unifiedUnreadCounts.total;
+
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
     { id: 'auctions', label: 'Subastas', icon: Gavel },
@@ -1943,21 +2169,49 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     { id: 'users', label: 'Usuarios', icon: Users },
     { id: 'orders', label: 'Pedidos', icon: ShoppingCart },
     { id: 'bots', label: 'Bots', icon: Bot },
-    { id: 'messages', label: 'Mensajes', icon: Mail, badge: adminUnreadCount > 0 ? adminUnreadCount : undefined },
+    { id: 'unified-inbox', label: 'Bandeja Unificada', icon: Mail, badge: totalUnreadUnified > 0 ? totalUnreadUnified : undefined },
+    { id: 'messages', label: 'Mensajes', icon: MessageSquare, badge: adminUnreadCount > 0 ? adminUnreadCount : undefined },
     { id: 'tickets', label: 'Tickets', icon: TicketIcon, badge: tickets.filter(t => t.status !== 'resuelto').length > 0 ? tickets.filter(t => t.status !== 'resuelto').length : undefined },
+    { id: 'announcements', label: 'Anuncios', icon: Bell },
     { id: 'home-config', label: 'Editor Home', icon: ImageIcon },
     { id: 'settings', label: 'Configuración', icon: Activity }
   ];
 
+  // Tabs principales para navegación móvil inferior (solo las más importantes)
+  const mainMobileTabs = tabs.filter(tab => 
+    ['dashboard', 'auctions', 'products', 'orders', 'unified-inbox'].includes(tab.id)
+  );
+
+  // Protección de acceso - DEBE IR DESPUÉS DE TODOS LOS HOOKS
+  if (!user?.isAdmin) {
+    return (
+      <div style={{ minHeight: 'calc(100vh - 80px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem' }}>
+        <div style={{ textAlign: 'center', background: 'var(--bg-secondary)', padding: '3rem', borderRadius: '1.5rem', maxWidth: '500px' }}>
+          <AlertCircle size={64} color="var(--error)" style={{ marginBottom: '1.5rem' }} />
+          <h2 style={{ marginBottom: '1rem' }}>Acceso Denegado</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
+            Solo los administradores pueden acceder a este panel de control.
+          </p>
+          <button onClick={() => window.location.href = '/'} className="btn btn-primary">
+            Volver al Inicio
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ 
+    <div className={isMobile ? 'admin-panel-mobile' : ''} style={{ 
       minHeight: 'calc(100vh - 80px)', 
       background: 'var(--bg-primary)', 
-      padding: isMobile ? '1rem' : '2rem',
-      paddingTop: '1rem'
+      padding: isMobile ? '0' : '2rem',
+      paddingTop: isMobile ? '0' : '1rem'
     }}>
       {/* Header */}
-      <div style={{ marginBottom: isMobile ? '1rem' : '2rem' }}>
+      <div className={isMobile ? 'admin-header-mobile' : ''} style={{ 
+        marginBottom: isMobile ? '1rem' : '2rem',
+        padding: isMobile ? '1rem' : '0'
+      }}>
         <h1 style={{ 
           fontSize: isMobile ? '1.5rem' : '2rem', 
           fontWeight: 700, 
@@ -1975,15 +2229,16 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       </div>
 
       {/* Tabs Navigation - Optimizado para móvil */}
-      <div style={{
-        display: 'flex',
+      <div className={isMobile ? '' : ''} style={{
+        display: isMobile ? 'none' : 'flex',
         gap: isMobile ? '0.25rem' : '0.5rem',
         marginBottom: isMobile ? '1rem' : '2rem',
         overflowX: 'auto',
         paddingBottom: '0.5rem',
         borderBottom: '2px solid var(--border)',
         scrollbarWidth: 'thin',
-        WebkitOverflowScrolling: 'touch'
+        WebkitOverflowScrolling: 'touch',
+        padding: isMobile ? '0 1rem' : '0'
       }}>
         {tabs.map(tab => {
           const Icon = tab.icon;
@@ -2034,11 +2289,15 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         })}
       </div>
 
+      {/* Main Content */}
+      <div className={isMobile ? 'admin-main-content-mobile' : ''} style={{
+        padding: isMobile ? '1rem' : '0'
+      }}>
       {/* Dashboard Tab */}
       {activeTab === 'dashboard' && (
         <div>
           {/* Stats Cards */}
-          <div style={{
+          <div className={isMobile ? 'mobile-data-grid' : ''} style={{
             display: 'grid',
             gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(250px, 1fr))',
             gap: '1.5rem',
@@ -2721,12 +2980,12 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
 
           <div style={{
             background: 'var(--bg-secondary)',
-            padding: '2rem',
+            padding: isMobile ? '1.5rem' : '2rem',
             borderRadius: '1rem',
             border: '1px solid var(--border)',
             maxWidth: '800px'
           }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className={isMobile ? 'mobile-form-compact' : ''} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {/* Título */}
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
@@ -2739,12 +2998,12 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   placeholder="Ej: iPhone 13 Pro Max 256GB"
                   style={{
                     width: '100%',
-                    padding: '0.75rem',
+                    padding: isMobile ? '1rem' : '0.75rem',
                     borderRadius: '0.5rem',
                     border: '1px solid var(--border)',
                     background: 'var(--bg-primary)',
                     color: 'var(--text-primary)',
-                    fontSize: '1rem'
+                    fontSize: isMobile ? '16px' : '1rem'
                   }}
                 />
               </div>
@@ -3250,12 +3509,12 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
 
           <div style={{
             background: 'var(--bg-secondary)',
-            padding: '2rem',
+            padding: isMobile ? '1.5rem' : '2rem',
             borderRadius: '1rem',
             border: '1px solid var(--border)',
             maxWidth: '800px'
           }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className={isMobile ? 'mobile-form-compact' : ''} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {/* Nombre */}
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
@@ -3268,12 +3527,12 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   placeholder="Ej: iPhone 13 Pro Max"
                   style={{
                     width: '100%',
-                    padding: '0.75rem',
+                    padding: isMobile ? '1rem' : '0.75rem',
                     borderRadius: '0.5rem',
                     border: '1px solid var(--border)',
                     background: 'var(--bg-primary)',
                     color: 'var(--text-primary)',
-                    fontSize: '1rem'
+                    fontSize: isMobile ? '16px' : '1rem'
                   }}
                 />
               </div>
@@ -3480,8 +3739,38 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
 
       {/* Usuarios Tab */}
       {activeTab === 'users' && (
-        <div>
-          <h2 style={{ margin: 0, marginBottom: '1.5rem', color: 'var(--text-primary)' }}>Gestión de Usuarios</h2>
+        <div className={isMobile ? 'user-management-mobile' : ''}>
+          {/* Sticky Search Bar (Mobile) */}
+          {isMobile && (
+            <div className="user-management-search-sticky">
+              <div style={{ position: 'relative' }}>
+                <Search size={20} style={{ 
+                  position: 'absolute', 
+                  left: '1rem', 
+                  top: '50%', 
+                  transform: 'translateY(-50%)',
+                  color: 'var(--text-secondary)'
+                }} />
+                <input
+                  type="text"
+                  placeholder="Buscar usuarios..."
+                  value={userSearchQuery}
+                  onChange={(e) => setUserSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '1rem 1rem 1rem 3rem',
+                    borderRadius: '0.75rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '16px'
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          <h2 style={{ margin: 0, marginBottom: '1.5rem', color: 'var(--text-primary)', padding: isMobile ? '0 1rem' : '0' }}>Gestión de Usuarios</h2>
           {loadingUsers ? (
             <div style={{ textAlign: 'center', padding: '3rem' }}>
               <RefreshCw size={48} style={{ 
@@ -3491,19 +3780,68 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               <p style={{ color: 'var(--text-secondary)', marginTop: '1rem' }}>Cargando usuarios...</p>
             </div>
           ) : (
-            <div style={{
+            <div className={isMobile ? 'user-management-list-mobile' : ''} style={{
               display: 'grid',
               gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))',
-              gap: '1.5rem'
+              gap: isMobile ? '0.75rem' : '1.5rem',
+              padding: isMobile ? '0 1rem' : '0'
             }}>
-              {realUsers.map((userItem: any) => (
-                <div key={userItem.id} style={{
-                  background: 'var(--bg-secondary)',
-                  padding: '1.5rem',
-                  borderRadius: '1rem',
-                  border: '1px solid var(--border)',
-                  cursor: 'pointer'
-                }} onClick={() => setSelectedUser(userItem)}>
+              {realUsers
+                .filter((userItem: any) => {
+                  if (!userSearchQuery) return true;
+                  const query = userSearchQuery.toLowerCase();
+                  return (
+                    userItem.username?.toLowerCase().includes(query) ||
+                    userItem.email?.toLowerCase().includes(query) ||
+                    userItem.id?.toLowerCase().includes(query)
+                  );
+                })
+                .map((userItem: any) => (
+                <div 
+                  key={userItem.id} 
+                  className={isMobile ? 'user-card-mobile' : ''}
+                  style={{
+                    background: 'var(--bg-secondary)',
+                    padding: isMobile ? '1rem' : '1.5rem',
+                    borderRadius: '1rem',
+                    border: '1px solid var(--border)',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}
+                  onClick={() => !isMobile && setSelectedUser(userItem)}
+                  onTouchStart={(e) => {
+                    if (isMobile) {
+                      const touch = e.touches[0];
+                      (e.currentTarget as any).touchStartX = touch.clientX;
+                      (e.currentTarget as any).touchStartY = touch.clientY;
+                    }
+                  }}
+                  onTouchMove={(e) => {
+                    if (isMobile) {
+                      const touch = e.touches[0];
+                      const startX = (e.currentTarget as any).touchStartX;
+                      const deltaX = touch.clientX - startX;
+                      if (Math.abs(deltaX) > 50) {
+                        e.currentTarget.style.transform = `translateX(${deltaX}px)`;
+                      }
+                    }
+                  }}
+                  onTouchEnd={(e) => {
+                    if (isMobile) {
+                      const touch = e.changedTouches[0];
+                      const startX = (e.currentTarget as any).touchStartX;
+                      const deltaX = touch.clientX - startX;
+                      if (deltaX < -100) {
+                        // Swipe left - mostrar acciones
+                        (e.currentTarget as any).classList.add('swiped');
+                      } else {
+                        e.currentTarget.style.transform = '';
+                        (e.currentTarget as any).classList.remove('swiped');
+                      }
+                    }
+                  }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
                     <div style={{
                       width: '48px',
@@ -3540,28 +3878,45 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                       </span>
                     )}
                   </div>
-                  <div style={{ 
-                    display: 'flex', 
-                    gap: '0.5rem', 
-                    flexWrap: 'wrap',
-                    flexDirection: isMobile ? 'column' : 'row'
-                  }}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedUser(userItem);
-                      }}
-                      className="btn btn-secondary"
-                      style={{ 
-                        flex: isMobile ? 'none' : 1,
-                        width: isMobile ? '100%' : 'auto',
-                        padding: isMobile ? '0.75rem 1rem' : '0.625rem 1rem'
-                      }}
-                    >
-                      <Eye size={16} style={{ marginRight: '0.25rem' }} />
-                      Ver Detalles
-                    </button>
-                  </div>
+                  {!isMobile && (
+                    <div style={{ 
+                      display: 'flex', 
+                      gap: '0.5rem', 
+                      flexWrap: 'wrap',
+                      flexDirection: 'row'
+                    }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedUser(userItem);
+                        }}
+                        className="btn btn-secondary"
+                        style={{ 
+                          flex: 1,
+                          padding: '0.625rem 1rem'
+                        }}
+                      >
+                        <Eye size={16} style={{ marginRight: '0.25rem' }} />
+                        Ver Detalles
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Swipe Actions (Mobile) */}
+                  {isMobile && (
+                    <div className="user-swipe-actions">
+                      <button
+                        className="user-swipe-action-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedUser(userItem);
+                        }}
+                      >
+                        <Eye size={18} />
+                        Ver
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -3753,7 +4108,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
           </div>
 
           {/* Lista de Pedidos - Tabla Profesional */}
-          <div style={{ 
+          <div className={isMobile ? 'mobile-table-container' : ''} style={{ 
             background: 'var(--bg-secondary)', 
             borderRadius: '1rem', 
             border: '1px solid var(--border)',
@@ -3771,7 +4126,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <table className={isMobile ? 'mobile-table' : ''} style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ 
                       background: 'var(--bg-primary)', 
@@ -4743,9 +5098,498 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         </div>
       )}
 
+      {/* Bandeja Unificada Tab */}
+      {activeTab === 'unified-inbox' && (
+        <div>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: '2rem',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div>
+              <h2 style={{ 
+                margin: 0, 
+                marginBottom: '0.5rem', 
+                color: 'var(--text-primary)',
+                fontSize: isMobile ? '1.5rem' : '2rem'
+              }}>
+                Bandeja Unificada
+              </h2>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: isMobile ? '0.875rem' : '1rem' }}>
+                Todos los mensajes en un solo lugar - Chat, Contacto y Tickets
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setUnifiedFilter(prev => ({ ...prev, unreadOnly: !prev.unreadOnly }))}
+                className={unifiedFilter.unreadOnly ? "btn btn-primary" : "btn btn-secondary"}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Bell size={18} />
+                {unifiedFilter.unreadOnly ? 'Mostrar Todos' : 'Solo No Leídos'}
+              </button>
+            </div>
+          </div>
+
+          {/* Filtros */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: isMobile ? '1rem' : '1.5rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            marginBottom: '2rem'
+          }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Tipo
+                </label>
+                <select
+                  value={unifiedFilter.type}
+                  onChange={(e) => setUnifiedFilter(prev => ({ ...prev, type: e.target.value as UnifiedMessageType | 'all' }))}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  <option value="all">Todos</option>
+                  <option value="chat">💬 Chat</option>
+                  <option value="contact">📧 Contacto</option>
+                  <option value="ticket">🎫 Ticket</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Prioridad
+                </label>
+                <select
+                  value={unifiedFilter.priority}
+                  onChange={(e) => setUnifiedFilter(prev => ({ ...prev, priority: e.target.value as UnifiedMessagePriority | 'all' }))}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  <option value="all">Todas</option>
+                  <option value="high">🔴 Alta</option>
+                  <option value="medium">🟡 Media</option>
+                  <option value="low">🟢 Baja</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Estado
+                </label>
+                <select
+                  value={unifiedFilter.status}
+                  onChange={(e) => setUnifiedFilter(prev => ({ ...prev, status: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  <option value="all">Todos</option>
+                  <option value="open">⚪ Abierto</option>
+                  <option value="closed">🔴 Cerrado</option>
+                  <option value="visto">Visto</option>
+                  <option value="revision">En Revisión</option>
+                  <option value="resuelto">Resuelto</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Buscar
+                </label>
+                <input
+                  type="text"
+                  placeholder="Buscar por usuario, contenido..."
+                  value={unifiedFilter.search}
+                  onChange={(e) => setUnifiedFilter(prev => ({ ...prev, search: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.875rem'
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Estadísticas rápidas */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)',
+            gap: '1rem',
+            marginBottom: '2rem'
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #3B82F6, #2563EB)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              color: 'white'
+            }}>
+              <div style={{ fontSize: '0.875rem', opacity: 0.9, marginBottom: '0.5rem' }}>💬 Chat</div>
+              <div style={{ fontSize: '2rem', fontWeight: 700 }}>{unifiedUnreadCounts.chat}</div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>no leídos</div>
+            </div>
+            <div style={{
+              background: 'linear-gradient(135deg, #10B981, #059669)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              color: 'white'
+            }}>
+              <div style={{ fontSize: '0.875rem', opacity: 0.9, marginBottom: '0.5rem' }}>📧 Contacto</div>
+              <div style={{ fontSize: '2rem', fontWeight: 700 }}>{unifiedUnreadCounts.contact}</div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>no leídos</div>
+            </div>
+            <div style={{
+              background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              color: 'white'
+            }}>
+              <div style={{ fontSize: '0.875rem', opacity: 0.9, marginBottom: '0.5rem' }}>🎫 Ticket</div>
+              <div style={{ fontSize: '2rem', fontWeight: 700 }}>{unifiedUnreadCounts.ticket}</div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>no leídos</div>
+            </div>
+            <div style={{
+              background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              color: 'white'
+            }}>
+              <div style={{ fontSize: '0.875rem', opacity: 0.9, marginBottom: '0.5rem' }}>📬 Total</div>
+              <div style={{ fontSize: '2rem', fontWeight: 700 }}>{totalUnreadUnified}</div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>no leídos</div>
+            </div>
+          </div>
+
+          {/* Lista de mensajes unificados */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            padding: isMobile ? '0.75rem' : '1rem',
+            maxHeight: isMobile ? 'none' : 'calc(100vh - 500px)',
+            overflowY: 'auto'
+          }}>
+            {filterUnifiedMessages(unifiedMessages, unifiedFilter).length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                <Mail size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
+                <p>No hay mensajes que coincidan con los filtros</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {filterUnifiedMessages(unifiedMessages, unifiedFilter).map((msg) => {
+                  const typeBadge = getTypeBadge(msg.type);
+                  const priorityBadge = getPriorityBadge(msg.priority);
+                  const isSelected = selectedUnifiedMessage?.id === msg.id;
+                  
+                  return (
+                    <div
+                      key={msg.id}
+                      onClick={() => setSelectedUnifiedMessage(msg)}
+                      style={{
+                        padding: isMobile ? '1rem' : '1.25rem',
+                        background: isSelected ? 'var(--primary)' : (msg.read ? 'var(--bg-primary)' : 'var(--bg-tertiary)'),
+                        color: isSelected ? 'white' : 'var(--text-primary)',
+                        borderRadius: '0.75rem',
+                        border: `2px solid ${isSelected ? 'var(--primary)' : (msg.read ? 'var(--border)' : priorityBadge.color)}`,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        position: 'relative'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '0.75rem' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                            <span style={{
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '0.375rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              background: typeBadge.color,
+                              color: 'white'
+                            }}>
+                              {typeBadge.label}
+                            </span>
+                            <span style={{
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '0.375rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              background: priorityBadge.color,
+                              color: 'white'
+                            }}>
+                              {priorityBadge.label}
+                            </span>
+                            {msg.status && (
+                              <span style={{
+                                padding: '0.25rem 0.75rem',
+                                borderRadius: '0.375rem',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                background: msg.status === 'open' ? '#10B981' : msg.status === 'closed' ? '#EF4444' : 'var(--bg-secondary)',
+                                color: 'white'
+                              }}>
+                                {msg.status === 'open' ? '⚪ Abierto' : msg.status === 'closed' ? '🔴 Cerrado' : msg.status}
+                              </span>
+                            )}
+                            {!msg.read && (
+                              <span style={{
+                                width: '10px',
+                                height: '10px',
+                                borderRadius: '50%',
+                                background: 'var(--error)',
+                                display: 'inline-block'
+                              }} />
+                            )}
+                          </div>
+                          <h3 style={{ 
+                            margin: 0, 
+                            marginBottom: '0.5rem', 
+                            fontSize: isMobile ? '1rem' : '1.125rem',
+                            fontWeight: 600,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {msg.username}
+                          </h3>
+                          {msg.subject && (
+                            <p style={{ 
+                              margin: '0 0 0.5rem 0', 
+                              fontSize: '0.875rem', 
+                              fontWeight: 500,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {msg.subject}
+                            </p>
+                          )}
+                          <p style={{ 
+                            margin: 0, 
+                            fontSize: '0.875rem', 
+                            opacity: 0.8,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical'
+                          }}>
+                            {msg.content}
+                          </p>
+                        </div>
+                        <div style={{ textAlign: 'right', fontSize: '0.75rem', opacity: 0.7, whiteSpace: 'nowrap' }}>
+                          {formatTimeAgo(msg.createdAt)}
+                        </div>
+                      </div>
+                      {msg.userEmail && (
+                        <div style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: '0.5rem' }}>
+                          📧 {msg.userEmail}
+                          {msg.userPhone && ` • 📱 ${msg.userPhone}`}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Detalle del mensaje seleccionado */}
+          {selectedUnifiedMessage && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.75)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10000,
+              padding: isMobile ? '1rem' : '2rem'
+            }}
+            onClick={() => setSelectedUnifiedMessage(null)}
+            >
+              <div style={{
+                background: 'var(--bg-primary)',
+                borderRadius: '1rem',
+                width: '100%',
+                maxWidth: '700px',
+                maxHeight: '90vh',
+                overflow: 'auto',
+                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+                border: '1px solid var(--border)'
+              }}
+              onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{
+                  padding: '1.5rem',
+                  borderBottom: '1px solid var(--border)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: 'linear-gradient(135deg, var(--primary), #d65a00)',
+                  color: 'white'
+                }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>
+                      {selectedUnifiedMessage.username}
+                    </h3>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                      {getTypeBadge(selectedUnifiedMessage.type).label}
+                      {getPriorityBadge(selectedUnifiedMessage.priority).label}
+                      {selectedUnifiedMessage.status && (
+                        <span>{selectedUnifiedMessage.status === 'open' ? '⚪ Abierto' : selectedUnifiedMessage.status === 'closed' ? '🔴 Cerrado' : selectedUnifiedMessage.status}</span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedUnifiedMessage(null)}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      padding: '0.5rem',
+                      cursor: 'pointer',
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <XCircle size={24} />
+                  </button>
+                </div>
+                <div style={{ padding: '1.5rem' }}>
+                  {selectedUnifiedMessage.subject && (
+                    <div style={{ marginBottom: '1rem' }}>
+                      <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Asunto:</strong>
+                      <p style={{ color: 'var(--text-secondary)' }}>{selectedUnifiedMessage.subject}</p>
+                    </div>
+                  )}
+                  <div style={{ marginBottom: '1rem' }}>
+                    <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Mensaje:</strong>
+                    <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                      {selectedUnifiedMessage.content}
+                    </p>
+                  </div>
+                  {selectedUnifiedMessage.userEmail && (
+                    <div style={{ marginBottom: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                      <strong>Email:</strong> {selectedUnifiedMessage.userEmail}
+                      {selectedUnifiedMessage.userPhone && (
+                        <>
+                          <br />
+                          <strong>Teléfono:</strong> {selectedUnifiedMessage.userPhone}
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {selectedUnifiedMessage.ticketNumber && (
+                    <div style={{ marginBottom: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                      <strong>Ticket:</strong> {selectedUnifiedMessage.ticketNumber}
+                    </div>
+                  )}
+                  {selectedUnifiedMessage.metadata?.adminResponse && (
+                    <div style={{
+                      background: 'var(--bg-secondary)',
+                      padding: '1rem',
+                      borderRadius: '0.5rem',
+                      marginTop: '1rem'
+                    }}>
+                      <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Respuesta del Admin:</strong>
+                      <p style={{ color: 'var(--text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                        {selectedUnifiedMessage.metadata.adminResponse}
+                      </p>
+                    </div>
+                  )}
+                  <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      Recibido: {selectedUnifiedMessage.createdAt.toLocaleString('es-AR')}
+                    </div>
+                  </div>
+                  {/* Botones de acción según el tipo */}
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
+                    {selectedUnifiedMessage.type === 'chat' && (
+                      <button
+                        onClick={() => {
+                          setSelectedUnifiedMessage(null);
+                          setSelectedConversation(selectedUnifiedMessage.conversationId || null);
+                          setActiveTab('messages');
+                        }}
+                        className="btn btn-primary"
+                      >
+                        Abrir Conversación
+                      </button>
+                    )}
+                    {selectedUnifiedMessage.type === 'ticket' && (
+                      <button
+                        onClick={() => {
+                          setSelectedUnifiedMessage(null);
+                          const ticket = tickets.find(t => t.id === selectedUnifiedMessage.id.replace('ticket_', ''));
+                          if (ticket) {
+                            setSelectedTicket(ticket);
+                            setActiveTab('tickets');
+                          }
+                        }}
+                        className="btn btn-primary"
+                      >
+                        Ver Ticket
+                      </button>
+                    )}
+                    {selectedUnifiedMessage.type === 'contact' && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            await markContactMessageAsRead(selectedUnifiedMessage.id.replace('contact_', ''));
+                            setSelectedUnifiedMessage({ ...selectedUnifiedMessage, read: true });
+                          } catch (error) {
+                            alert('❌ Error al marcar como leído');
+                          }
+                        }}
+                        className="btn btn-secondary"
+                        disabled={selectedUnifiedMessage.read}
+                      >
+                        {selectedUnifiedMessage.read ? 'Leído' : 'Marcar como Leído'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Mensajería Tab - Mejorado */}
       {activeTab === 'messages' && (
-        <div style={{ 
+        <div className={isMobile ? 'chat-management-mobile' : ''} style={{ 
           display: 'flex', 
           flexDirection: isMobile ? 'column' : 'row',
           gap: '1rem', 
@@ -4753,7 +5597,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
           minHeight: isMobile ? 'auto' : '500px' 
         }}>
           {/* Lista de Conversaciones */}
-          <div style={{
+          <div className={isMobile ? 'chat-conversations-list-mobile' : ''} style={{
             width: isMobile ? '100%' : '300px',
             background: 'var(--bg-secondary)',
             borderRadius: '1rem',
@@ -4947,13 +5791,67 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   gap: '0.5rem',
                   flexWrap: 'wrap'
                 }}>
-                  <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: isMobile ? '1rem' : '1.125rem' }}>
-                    {selectedConversation 
-                      ? conversations.find(c => c.id === selectedConversation)?.username || 'Usuario'
-                      : realUsers.find((u: any) => u.id === selectedUserForMessage)?.username || 'Usuario'
-                    }
-                  </h3>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: isMobile ? '1rem' : '1.125rem' }}>
+                      {selectedConversation 
+                        ? conversations.find(c => c.id === selectedConversation)?.username || 'Usuario'
+                        : realUsers.find((u: any) => u.id === selectedUserForMessage)?.username || 'Usuario'
+                      }
+                    </h3>
+                    <div style={{ 
+                      fontSize: '0.75rem', 
+                      color: conversationStatus === 'open' ? '#10B981' : 'var(--text-secondary)',
+                      marginTop: '0.25rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem'
+                    }}>
+                      <span>●</span>
+                      {conversationStatus === 'open' ? 'Conversación abierta' : 'Conversación cerrada'}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    {selectedConversation && (
+                      <>
+                        {conversationStatus === 'open' ? (
+                          <button
+                            onClick={handleCloseConversation}
+                            disabled={closingConversation}
+                            className="btn btn-outline"
+                            style={{ 
+                              padding: isMobile ? '0.5rem 0.75rem' : '0.5rem 1rem',
+                              fontSize: isMobile ? '0.75rem' : '0.875rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              whiteSpace: 'nowrap'
+                            }}
+                            title="Cerrar conversación"
+                          >
+                            <XCircle size={16} />
+                            {!isMobile && 'Cerrar'}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={handleReopenConversation}
+                            disabled={closingConversation}
+                            className="btn btn-primary"
+                            style={{ 
+                              padding: isMobile ? '0.5rem 0.75rem' : '0.5rem 1rem',
+                              fontSize: isMobile ? '0.75rem' : '0.875rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              whiteSpace: 'nowrap'
+                            }}
+                            title="Reabrir conversación"
+                          >
+                            <CheckCircle size={16} />
+                            {!isMobile && 'Reabrir'}
+                          </button>
+                        )}
+                      </>
+                    )}
                     {selectedConversation && (
                       <button
                         onClick={async () => {
@@ -5087,7 +5985,8 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                           handleSendMessage();
                         }
                       }}
-                      placeholder="Escribí tu mensaje aquí... (Ctrl+Enter para enviar)"
+                      placeholder={conversationStatus === 'closed' ? 'Esta conversación está cerrada. Reabrila para enviar mensajes.' : "Escribí tu mensaje aquí... (Ctrl+Enter para enviar)"}
+                      disabled={conversationStatus === 'closed'}
                       rows={3}
                       style={{
                         width: '100%',
@@ -5124,7 +6023,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                     <button
                       onClick={handleSendMessage}
                       className="btn btn-primary"
-                      disabled={!newMessageContent.trim() || (!selectedConversation && !selectedUserForMessage)}
+                      disabled={!newMessageContent.trim() || (!selectedConversation && !selectedUserForMessage) || conversationStatus === 'closed'}
                       style={{ 
                         padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.5rem',
                         fontSize: isMobile ? '0.875rem' : '1rem',
@@ -5289,108 +6188,33 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   }}
                 />
               </div>
+              {/* Opciones de Logo - Usando LogoManager */}
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                  Logo del Sitio
-                </label>
-                <div
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    e.currentTarget.style.borderColor = 'var(--primary)';
-                    e.currentTarget.style.background = 'rgba(214, 90, 0, 0.05)';
-                  }}
-                  onDragLeave={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    e.currentTarget.style.borderColor = 'var(--border)';
-                    e.currentTarget.style.background = 'var(--bg-primary)';
-                  }}
-                  onDrop={(e) => handleImageDrop(e, (url) => setHomeConfig({ 
+                <LogoManager
+                  currentLogoUrl={homeConfig.siteSettings?.logoUrl || ''}
+                  currentLogoConfig={homeConfig.siteSettings?.logoConfig}
+                  onLogoChange={(url) => setHomeConfig({ 
                     ...homeConfig, 
                     siteSettings: { 
                       ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
                       logoUrl: url 
                     } 
-                  }), true, 'logo')}
-                  style={{
-                    border: '2px dashed var(--border)',
-                    borderRadius: '0.5rem',
-                    padding: '1rem',
-                    background: 'var(--bg-primary)',
-                    transition: 'all 0.2s',
-                    marginBottom: '0.75rem'
-                  }}
-                >
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleImageFileSelect(e, (url) => setHomeConfig({ 
+                  })}
+                  onConfigChange={(config) => {
+                    // Guardar configuración del logo en siteSettings
+                    setHomeConfig({ 
                       ...homeConfig, 
                       siteSettings: { 
-                        ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
-                        logoUrl: url 
+                        ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
+                        logoConfig: {
+                          ...(homeConfig.siteSettings?.logoConfig || {}),
+                          ...config
+                        }
                       } 
-                    }), true, 'logo')}
-                    style={{ display: 'none' }}
-                    id="logo-image-input"
-                  />
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
-                      📸 Arrastrá el logo aquí o hacé clic para seleccionar
-                    </div>
-                    <label
-                      htmlFor="logo-image-input"
-                      className="btn btn-secondary"
-                      style={{
-                        padding: '0.625rem 1.25rem',
-                        fontSize: isMobile ? '0.875rem' : '0.9375rem',
-                        cursor: 'pointer',
-                        display: 'inline-block'
-                      }}
-                    >
-                      Seleccionar Logo
-                    </label>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                      También podés pegar una URL abajo
-                    </div>
-                  </div>
-                </div>
-                <input
-                  type="text"
-                  value={homeConfig.siteSettings?.logoUrl || ''}
-                  onChange={(e) => setHomeConfig({ 
-                    ...homeConfig, 
-                    siteSettings: { 
-                      ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
-                      logoUrl: e.target.value 
-                    } 
-                  })}
-                  placeholder="O ingresá una URL: https://ejemplo.com/logo.png"
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem',
-                    borderRadius: '0.5rem',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                    fontSize: isMobile ? '16px' : '1rem',
-                    marginBottom: '0.75rem'
+                    });
                   }}
+                  theme={theme || 'light'}
                 />
-                {homeConfig.siteSettings?.logoUrl && (
-                  <div style={{ marginTop: '0.75rem', borderRadius: '0.5rem', overflow: 'hidden', border: '1px solid var(--border)', padding: '1rem', background: 'var(--bg-primary)' }}>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Vista previa del logo:</div>
-                    <img 
-                      src={homeConfig.siteSettings.logoUrl} 
-                      alt="Logo preview" 
-                      style={{ maxHeight: '100px', maxWidth: '100%', objectFit: 'contain' }}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                  </div>
-                )}
               </div>
               
               {/* Logos por Tema */}
@@ -5559,7 +6383,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               </div>
             </div>
 
-            {/* Sección Stickers para Logo */}
+            {/* Catálogo de Stickers - Usando StickerManager */}
             <div style={{
               background: 'var(--bg-secondary)',
               padding: isMobile ? '1.5rem' : '2rem',
@@ -5567,355 +6391,16 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               border: '1px solid var(--border)',
               marginTop: '2rem'
             }}>
-              <h3 style={{ 
-                margin: 0, 
-                marginBottom: '1.5rem', 
-                color: 'var(--text-primary)',
-                fontSize: isMobile ? '1.25rem' : '1.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                <span style={{ fontSize: '1.5rem' }}>✨</span>
-                Stickers para el Logo (Fechas Especiales)
-              </h3>
-              <p style={{ 
-                fontSize: '0.875rem', 
-                color: 'var(--text-secondary)', 
-                marginBottom: '1.5rem',
-                lineHeight: '1.6'
-              }}>
-                Agregá stickers decorativos al logo que aparecerán automáticamente en fechas especiales o cuando los actives manualmente.
-              </p>
-
-              {/* Botón para activar todos los stickers */}
-              {(homeConfig.siteSettings?.logoStickers || []).length > 0 && (
-                <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <button
-                    onClick={() => {
-                      const stickers = homeConfig.siteSettings?.logoStickers || [];
-                      setHomeConfig({
-                        ...homeConfig,
-                        siteSettings: {
-                          ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
-                          logoStickers: stickers.map(s => ({ ...s, active: true }))
-                        }
-                      });
-                    }}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid var(--primary)',
-                      background: 'var(--primary)',
-                      color: 'white',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    ✅ Activar Todos los Stickers
-                  </button>
-                  <button
-                    onClick={() => {
-                      const stickers = homeConfig.siteSettings?.logoStickers || [];
-                      setHomeConfig({
-                        ...homeConfig,
-                        siteSettings: {
-                          ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
-                          logoStickers: stickers.map(s => ({ ...s, active: false }))
-                        }
-                      });
-                    }}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-secondary)',
-                      color: 'var(--text-primary)',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    ❌ Desactivar Todos
-                  </button>
-                </div>
-              )}
-
-              {/* Stickers rápidos para fechas especiales */}
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.75rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                  Stickers Rápidos (Fechas Especiales)
-                </label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-                  {specialEvents.map(event => {
-                    const existingSticker = homeConfig.siteSettings?.logoStickers?.find(s => s.type === event.type);
-                    const isActive = existingSticker?.active || false;
-                    return (
-                      <button
-                        key={event.type}
-                          onClick={() => {
-                            const stickers = homeConfig.siteSettings?.logoStickers || [];
-                            if (existingSticker) {
-                              // Toggle activo/inactivo
-                              // Si se activa, desactivar otros en la misma posición (opcional - comentado para permitir superposiciones)
-                              const newActiveState = !existingSticker.active;
-                              setHomeConfig({
-                                ...homeConfig,
-                                siteSettings: {
-                                  ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
-                                  logoStickers: stickers.map(s => {
-                                    if (s.id === existingSticker.id) {
-                                      return { ...s, active: newActiveState };
-                                    }
-                                    // Opcional: Desactivar otros en la misma posición si se activa este
-                                    // if (newActiveState && s.position === existingSticker.position && s.active) {
-                                    //   return { ...s, active: false };
-                                    // }
-                                    return s;
-                                  })
-                                }
-                              });
-                            } else {
-                            // Crear nuevo sticker
-                            const newSticker: LogoSticker = {
-                              id: `sticker-${Date.now()}`,
-                              type: event.type,
-                              emoji: event.emoji,
-                              position: 'top-right',
-                              size: 'medium',
-                              active: true,
-                              startDate: event.startDate.toISOString(),
-                              endDate: event.endDate.toISOString()
-                            };
-                            setHomeConfig({
-                              ...homeConfig,
-                              siteSettings: {
-                                ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
-                                logoStickers: [...stickers, newSticker]
-                              }
-                            });
-                          }
-                        }}
-                        style={{
-                          padding: '0.75rem 1rem',
-                          borderRadius: '0.5rem',
-                          border: `2px solid ${isActive ? 'var(--primary)' : 'var(--border)'}`,
-                          background: isActive ? 'var(--primary)' : 'var(--bg-primary)',
-                          color: isActive ? 'white' : 'var(--text-primary)',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          fontSize: '0.9375rem',
-                          fontWeight: isActive ? 600 : 400,
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        <span style={{ fontSize: '1.25rem' }}>{event.emoji}</span>
-                        <span>{event.name}</span>
-                        {isActive && <span style={{ fontSize: '0.75rem', opacity: 0.9 }}>✓</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Lista de stickers configurados */}
-              {(homeConfig.siteSettings?.logoStickers || []).length > 0 && (
-                <div style={{ marginTop: '1.5rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.75rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                    Stickers Configurados ({(homeConfig.siteSettings?.logoStickers || []).length})
-                  </label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    {homeConfig.siteSettings.logoStickers.map((sticker, index) => (
-                      <div
-                        key={sticker.id}
-                        style={{
-                          padding: '1rem',
-                          borderRadius: '0.5rem',
-                          border: '1px solid var(--border)',
-                          background: sticker.active ? 'var(--bg-primary)' : 'var(--bg-tertiary)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '1rem',
-                          flexWrap: 'wrap'
-                        }}
-                      >
-                        <div style={{ fontSize: '2rem' }}>{sticker.emoji}</div>
-                        <div style={{ flex: 1, minWidth: '200px' }}>
-                          <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
-                            {specialEvents.find(e => e.type === sticker.type)?.name || 'Personalizado'}
-                          </div>
-                          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                            Posición: {sticker.position} | Tamaño: {sticker.size}
-                          </div>
-                          {sticker.startDate && sticker.endDate && (
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                              {new Date(sticker.startDate).toLocaleDateString()} - {new Date(sticker.endDate).toLocaleDateString()}
-                            </div>
-                          )}
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                          <select
-                            value={sticker.position}
-                            onChange={(e) => {
-                              const stickers = homeConfig.siteSettings?.logoStickers || [];
-                              setHomeConfig({
-                                ...homeConfig,
-                                siteSettings: {
-                                  ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
-                                  logoStickers: stickers.map(s =>
-                                    s.id === sticker.id
-                                      ? { ...s, position: e.target.value as LogoSticker['position'] }
-                                      : s
-                                  )
-                                }
-                              });
-                            }}
-                            style={{
-                              padding: '0.5rem',
-                              borderRadius: '0.5rem',
-                              border: '1px solid var(--border)',
-                              background: 'var(--bg-primary)',
-                              color: 'var(--text-primary)',
-                              fontSize: '0.875rem'
-                            }}
-                          >
-                            <option value="top-left">Arriba Izquierda</option>
-                            <option value="top-right">Arriba Derecha</option>
-                            <option value="bottom-left">Abajo Izquierda</option>
-                            <option value="bottom-right">Abajo Derecha</option>
-                            <option value="center">Centro</option>
-                          </select>
-                          <select
-                            value={sticker.size}
-                            onChange={(e) => {
-                              const stickers = homeConfig.siteSettings?.logoStickers || [];
-                              setHomeConfig({
-                                ...homeConfig,
-                                siteSettings: {
-                                  ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
-                                  logoStickers: stickers.map(s =>
-                                    s.id === sticker.id
-                                      ? { ...s, size: e.target.value as LogoSticker['size'] }
-                                      : s
-                                  )
-                                }
-                              });
-                            }}
-                            style={{
-                              padding: '0.5rem',
-                              borderRadius: '0.5rem',
-                              border: '1px solid var(--border)',
-                              background: 'var(--bg-primary)',
-                              color: 'var(--text-primary)',
-                              fontSize: '0.875rem'
-                            }}
-                          >
-                            <option value="small">Pequeño</option>
-                            <option value="medium">Mediano</option>
-                            <option value="large">Grande</option>
-                          </select>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={sticker.active}
-                              onChange={(e) => {
-                                const stickers = homeConfig.siteSettings?.logoStickers || [];
-                                setHomeConfig({
-                                  ...homeConfig,
-                                  siteSettings: {
-                                    ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
-                                    logoStickers: stickers.map(s =>
-                                      s.id === sticker.id
-                                        ? { ...s, active: e.target.checked }
-                                        : s
-                                    )
-                                  }
-                                });
-                              }}
-                              style={{ cursor: 'pointer' }}
-                            />
-                            <span style={{ fontSize: '0.875rem', color: 'var(--text-primary)' }}>Activo</span>
-                          </label>
-                          <button
-                            onClick={() => {
-                              const stickers = homeConfig.siteSettings?.logoStickers || [];
-                              setHomeConfig({
-                                ...homeConfig,
-                                siteSettings: {
-                                  ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
-                                  logoStickers: stickers.filter(s => s.id !== sticker.id)
-                                }
-                              });
-                            }}
-                            style={{
-                              padding: '0.5rem',
-                              borderRadius: '0.5rem',
-                              border: '1px solid var(--error)',
-                              background: 'transparent',
-                              color: 'var(--error)',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}
-                            title="Eliminar sticker"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Vista previa del logo con stickers */}
-              {homeConfig.siteSettings?.logoUrl && (homeConfig.siteSettings?.logoStickers || []).filter(s => s.active).length > 0 && (
-                <div style={{ marginTop: '1.5rem', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--bg-primary)' }}>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                    Vista previa del logo con stickers:
-                  </div>
-                  <div style={{ position: 'relative', display: 'inline-block' }}>
-                    <img
-                      src={homeConfig.siteSettings.logoUrl}
-                      alt="Logo preview"
-                      style={{ maxHeight: '120px', maxWidth: '200px', objectFit: 'contain' }}
-                    />
-                    {(homeConfig.siteSettings.logoStickers || [])
-                      .filter(s => s.active)
-                      .map(sticker => {
-                        const sizeMap = { small: '1.5rem', medium: '2rem', large: '3rem' };
-                        const positionMap = {
-                          'top-left': { top: '-10px', left: '-10px' },
-                          'top-right': { top: '-10px', right: '-10px' },
-                          'bottom-left': { bottom: '-10px', left: '-10px' },
-                          'bottom-right': { bottom: '-10px', right: '-10px' },
-                          'center': { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
-                        };
-                        return (
-                          <span
-                            key={sticker.id}
-                            style={{
-                              position: 'absolute',
-                              fontSize: sizeMap[sticker.size],
-                              ...positionMap[sticker.position],
-                              pointerEvents: 'none',
-                              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
-                              zIndex: 10
-                            }}
-                          >
-                            {sticker.emoji}
-                          </span>
-                        );
-                      })}
-                  </div>
-                </div>
-              )}
+              <StickerManager
+                stickers={homeConfig.siteSettings?.logoStickers || []}
+                onStickersChange={(stickers) => setHomeConfig({
+                  ...homeConfig,
+                  siteSettings: {
+                    ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings),
+                    logoStickers: stickers
+                  }
+                })}
+              />
             </div>
           </div>
 
@@ -7604,6 +8089,214 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         </div>
       )}
 
+      {/* Anuncios Tab */}
+      {activeTab === 'announcements' && (
+        <div>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: '2rem',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div>
+              <h2 style={{ 
+                margin: 0, 
+                marginBottom: '0.5rem', 
+                color: 'var(--text-primary)',
+                fontSize: isMobile ? '1.5rem' : '2rem'
+              }}>
+                Gestión de Anuncios
+              </h2>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: isMobile ? '0.875rem' : '1rem' }}>
+                Creá y gestioná anuncios para los usuarios
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setShowAnnouncementMetrics(!showAnnouncementMetrics)}
+                className="btn btn-secondary"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <BarChart3 size={20} />
+                {showAnnouncementMetrics ? 'Ocultar' : 'Ver'} Métricas
+              </button>
+              <button
+                onClick={() => setShowAnnouncementCreator(true)}
+                className="btn btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Plus size={20} />
+                Nuevo Anuncio
+              </button>
+            </div>
+          </div>
+
+          {/* Sección de Analytics */}
+          {showAnnouncementMetrics && (
+            <div style={{
+              background: 'var(--bg-secondary)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              border: '1px solid var(--border)',
+              marginBottom: '2rem'
+            }}>
+              <h3 style={{ margin: '0 0 1rem 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <TrendingUp size={20} />
+                Métricas de Anuncios
+              </h3>
+              {announcementMetrics.length === 0 ? (
+                <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>
+                  No hay métricas disponibles aún. Las métricas se generan cuando los usuarios interactúan con los anuncios.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {announcementMetrics.map((metric: AnnouncementMetrics) => (
+                    <div
+                      key={metric.announcementId}
+                      style={{
+                        padding: '1rem',
+                        background: 'var(--bg-primary)',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)'
+                      }}
+                    >
+                      <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>
+                        {metric.title}
+                      </h4>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+                        gap: '1rem',
+                        marginTop: '0.5rem'
+                      }}>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                            Vistas
+                          </div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)' }}>
+                            {metric.totalViews}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                            Clicks
+                          </div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--success)' }}>
+                            {metric.totalClicks}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                            Engagement Rate
+                          </div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: metric.engagementRate > 15 ? 'var(--success)' : 'var(--warning)' }}>
+                            {metric.engagementRate}%
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                            Usuarios Únicos
+                          </div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {metric.uniqueUsers}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                            Descartados
+                          </div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                            {metric.totalDismisses}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                            Clicks en Enlaces
+                          </div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)' }}>
+                            {metric.totalLinkClicks}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Lista de anuncios existentes */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: '1.5rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)'
+          }}>
+            <h3 style={{ margin: '0 0 1rem 0', color: 'var(--text-primary)' }}>
+              Anuncios Activos ({announcements.filter(a => a.status === 'active').length})
+            </h3>
+            {announcements.length === 0 ? (
+              <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>
+                No hay anuncios creados aún
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {announcements.map((announcement) => (
+                  <div
+                    key={announcement.id}
+                    style={{
+                      padding: '1rem',
+                      background: 'var(--bg-primary)',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                      <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>{announcement.title}</h4>
+                      <span style={{
+                        padding: '0.25rem 0.75rem',
+                        borderRadius: '0.25rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        background: announcement.status === 'active' ? 'var(--success)' : 'var(--text-secondary)',
+                        color: 'white'
+                      }}>
+                        {announcement.status === 'active' ? 'Activo' : announcement.status === 'expired' ? 'Expirado' : 'Borrador'}
+                      </span>
+                    </div>
+                    <p style={{ margin: '0.5rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                      {announcement.content.substring(0, 100)}...
+                    </p>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <button
+                        onClick={() => handleDeleteAnnouncement(announcement.id)}
+                        className="btn btn-danger"
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                      >
+                        <Trash2 size={16} style={{ marginRight: '0.25rem' }} />
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Modal de creación de anuncio */}
+          {showAnnouncementCreator && (
+            <AnnouncementCreator
+              onClose={() => setShowAnnouncementCreator(false)}
+              onSave={() => {
+                setShowAnnouncementCreator(false);
+              }}
+            />
+          )}
+        </div>
+      )}
+
       {/* Configuración Tab */}
       {activeTab === 'settings' && (
         <div>
@@ -8031,6 +8724,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
           </div>
         </div>
       )}
+      </div>
 
       {/* Modal de Detalles del Pedido con Historial de Transacciones */}
       {selectedOrder && (
@@ -8296,37 +8990,48 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
           </div>
         </div>
       )}
+
+      {/* Navegación inferior móvil */}
+      {isMobile && (
+        <div className="admin-bottom-nav">
+          {mainMobileTabs.map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`nav-item-mobile ${isActive ? 'active' : ''}`}
+                style={{ position: 'relative' }}
+              >
+                <Icon size={24} />
+                <span>{tab.label}</span>
+                {tab.badge && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '0.25rem',
+                    right: '0.25rem',
+                    background: 'var(--error)',
+                    color: 'white',
+                    borderRadius: '50%',
+                    width: '18px',
+                    height: '18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.625rem',
+                    fontWeight: 700
+                  }}>
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
 
 export default AdminPanel;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,33 +1,38 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense, lazy } from 'react';
 import { useSyncFirebase } from './hooks/useSyncFirebase';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { ref, onValue } from 'firebase/database';
 import { realtimeDb } from './config/firebase';
 import { HomeConfig, defaultHomeConfig } from './types/homeConfig';
 import { useStore } from './store/useStore';
-import Terminos from './pages/Terminos';
-import Preguntas from './pages/Preguntas';
-import Ayuda from './pages/Ayuda';
-import Contacto from './pages/Contacto';
 import Navbar from './components/Navbar';
 import AuctionManager from './utils/AuctionManager';
 import OrderManager from './utils/OrderManager';
 import DataCleanupManager from './utils/DataCleanupManager';
-// BotManager desactivado - Los bots ahora funcionan desde Cloud Functions (24/7)
-// import BotManager from './utils/BotManager';
 import ScrollToTop from './components/ScrollToTop';
+import LoadingSpinner from './components/LoadingSpinner';
+import { cleanExpiredCache } from './utils/geolocationCache';
+import { preventZoomOnInput, restoreViewport } from './utils/mobileOptimizations';
 import Home from './pages/Home';
 import Subastas from './pages/Subastas';
 import AuctionDetail from './pages/AuctionDetail';
 import ProductDetail from './pages/ProductDetail';
 import Tienda from './pages/Tienda';
 import Login from './pages/Login';
-import Registro from './pages/Registro';
 import Carrito from './pages/Carrito';
 import Notificaciones from './pages/Notificaciones';
 import Perfil from './pages/Perfil';
 import AdminPanel from './pages/AdminPanel';
-import CompletarPerfil from './pages/CompletarPerfil';
+
+// Lazy loading de componentes de registro
+const Registro = lazy(() => import('./pages/Registro'));
+const RegistroMobile = lazy(() => import('./pages/RegistroMobile'));
+const CompletarPerfil = lazy(() => import('./pages/CompletarPerfil'));
+const CompletarPerfilGoogle = lazy(() => import('./pages/CompletarPerfilGoogle'));
+const Terminos = lazy(() => import('./pages/Terminos'));
+const Preguntas = lazy(() => import('./pages/Preguntas'));
+const Ayuda = lazy(() => import('./pages/Ayuda'));
+const Contacto = lazy(() => import('./pages/Contacto'));
 import ToastContainer from './components/ToastContainer';
 
 function App() {
@@ -117,6 +122,20 @@ function App() {
       return () => clearTimeout(timer);
     }
   }, [user?.id]); // Ejecutar solo cuando el usuario cambie
+
+  // Limpiar cache de geolocalización expirado al iniciar
+  useEffect(() => {
+    cleanExpiredCache();
+  }, []);
+
+  // Configurar viewport para móviles
+  useEffect(() => {
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+      preventZoomOnInput();
+      return () => restoreViewport();
+    }
+  }, []);
   
   return (
     <Router basename={import.meta.env.BASE_URL}>
@@ -137,16 +156,66 @@ function App() {
             <Route path="/tienda" element={<Tienda />} />
             <Route path="/producto/:id" element={<ProductDetail />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/registro" element={<Registro />} />
+            <Route 
+              path="/registro" 
+              element={
+                <Suspense fallback={<LoadingSpinner size="lg" text="Cargando registro..." />}>
+                  <Registro />
+                </Suspense>
+              } 
+            />
             <Route path="/carrito" element={<Carrito />} />
             <Route path="/notificaciones" element={<Notificaciones />} />
             <Route path="/perfil" element={<Perfil />} />
-            <Route path="/terminos" element={<Terminos />} />
-            <Route path="/preguntas" element={<Preguntas />} />
-            <Route path="/ayuda" element={<Ayuda />} />
-            <Route path="/contacto" element={<Contacto />} />
+            <Route 
+              path="/terminos" 
+              element={
+                <Suspense fallback={<LoadingSpinner size="md" text="Cargando..." />}>
+                  <Terminos />
+                </Suspense>
+              } 
+            />
+            <Route 
+              path="/preguntas" 
+              element={
+                <Suspense fallback={<LoadingSpinner size="md" text="Cargando..." />}>
+                  <Preguntas />
+                </Suspense>
+              } 
+            />
+            <Route 
+              path="/ayuda" 
+              element={
+                <Suspense fallback={<LoadingSpinner size="md" text="Cargando..." />}>
+                  <Ayuda />
+                </Suspense>
+              } 
+            />
+            <Route 
+              path="/contacto" 
+              element={
+                <Suspense fallback={<LoadingSpinner size="md" text="Cargando..." />}>
+                  <Contacto />
+                </Suspense>
+              } 
+            />
             <Route path="/admin" element={<AdminPanel />} />
-            <Route path="/completar-perfil" element={<CompletarPerfil />} />
+            <Route 
+              path="/completar-perfil" 
+              element={
+                <Suspense fallback={<LoadingSpinner size="lg" text="Cargando..." />}>
+                  <CompletarPerfil />
+                </Suspense>
+              } 
+            />
+            <Route 
+              path="/completar-perfil-google" 
+              element={
+                <Suspense fallback={<LoadingSpinner size="lg" text="Cargando..." />}>
+                  <CompletarPerfilGoogle />
+                </Suspense>
+              } 
+            />
           </Routes>
         </main>
         <footer className="footer">

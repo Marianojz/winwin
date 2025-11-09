@@ -48,6 +48,11 @@
   transition: transform 0.3s ease;
 }
 
+.navbar-logo-hover:hover {
+  transform: scale(1.05);
+  opacity: 0.9;
+}
+
 .navbar-logo:hover .navbar-logo-img {
   transform: rotate(-5deg) scale(1.05);
 }

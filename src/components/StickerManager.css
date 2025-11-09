@@ -1,0 +1,414 @@
+/* Sticker Manager Component */
+
+.sticker-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background: var(--bg-secondary);
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+}
+
+.sticker-manager-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.sticker-manager-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.sticker-manager-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sticker-manager-add-btn:hover {
+  background: var(--secondary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.sticker-manager-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sticker-manager-empty {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: var(--text-secondary);
+}
+
+.sticker-manager-empty-hint {
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  opacity: 0.7;
+}
+
+.sticker-manager-item {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.sticker-manager-item:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.sticker-manager-item-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: var(--bg-secondary);
+  border-radius: 0.5rem;
+  flex-shrink: 0;
+}
+
+.sticker-manager-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sticker-manager-item-main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sticker-manager-item-emoji {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.sticker-manager-item-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.sticker-manager-tag {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+}
+
+.sticker-manager-item-meta {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.sticker-manager-item-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.sticker-manager-action-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sticker-manager-action-btn:hover {
+  background: var(--bg-secondary);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.sticker-manager-action-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: var(--error);
+  color: var(--error);
+}
+
+/* Formulario de edición */
+.sticker-manager-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+}
+
+.sticker-manager-select {
+  padding: 0.625rem 0.875rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sticker-manager-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 37, 99, 235), 0.1);
+}
+
+.sticker-manager-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sticker-manager-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.sticker-manager-edit-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.sticker-manager-save-btn,
+.sticker-manager-cancel-btn {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sticker-manager-save-btn {
+  background: var(--primary);
+  color: white;
+}
+
+.sticker-manager-save-btn:hover {
+  background: var(--secondary);
+}
+
+.sticker-manager-cancel-btn {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.sticker-manager-cancel-btn:hover {
+  background: var(--bg-secondary);
+}
+
+/* Mobile Optimizations */
+.sticker-manager-grid-mobile {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.sticker-manager-card-mobile {
+  flex-direction: column;
+  padding: 1rem;
+  min-height: 120px;
+  position: relative;
+  overflow: hidden;
+  touch-action: pan-y;
+  transition: transform 0.3s ease;
+}
+
+.sticker-manager-card-mobile.swiped {
+  transform: translateX(-80px);
+}
+
+.sticker-manager-card-mobile .sticker-manager-item-preview {
+  width: 100%;
+  height: 80px;
+  margin-bottom: 0.5rem;
+}
+
+.sticker-manager-card-mobile .sticker-manager-item-info {
+  flex: 1;
+  width: 100%;
+}
+
+.sticker-manager-card-mobile .sticker-manager-item-main {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+}
+
+.mobile-actions {
+  width: 100%;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.sticker-manager-swipe-delete {
+  position: absolute;
+  right: -80px;
+  top: 0;
+  bottom: 0;
+  width: 80px;
+  background: var(--error);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: right 0.3s ease;
+}
+
+.sticker-manager-card-mobile.swiped .sticker-manager-swipe-delete {
+  right: 0;
+}
+
+.sticker-manager-swipe-delete-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+/* Preview Modal Full-Screen */
+.sticker-manager-preview-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.sticker-manager-preview-content {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  background: var(--bg-primary);
+  border-radius: 1rem;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.sticker-manager-preview-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sticker-manager-preview-display {
+  width: 200px;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border-radius: 1rem;
+  padding: 2rem;
+}
+
+.sticker-manager-preview-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.sticker-manager-preview-emoji {
+  font-size: 8rem;
+  line-height: 1;
+}
+
+.sticker-manager-preview-info {
+  width: 100%;
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.sticker-manager-preview-info p {
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .sticker-manager {
+    padding: 1rem;
+  }
+
+  .sticker-manager-item:not(.sticker-manager-card-mobile) {
+    flex-direction: column;
+  }
+
+  .sticker-manager-item-main:not(.sticker-manager-card-mobile .sticker-manager-item-main) {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .sticker-manager-edit-form {
+    padding: 0.75rem;
+  }
+}
+

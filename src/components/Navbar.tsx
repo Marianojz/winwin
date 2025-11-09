@@ -1,7 +1,7 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Bell, Home, Store, Gavel, LogOut, LayoutDashboard, MessageSquare } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { ShoppingCart, Bell, Home, Store, Gavel, MessageSquare } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { auth, realtimeDb } from '../config/firebase';
+import { realtimeDb } from '../config/firebase';
 import { ref, onValue } from 'firebase/database';
 import { useEffect, useState } from 'react';
 import { HomeConfig, defaultHomeConfig } from '../types/homeConfig';
@@ -9,37 +9,16 @@ import { specialEvents } from '../utils/dateSpecialEvents';
 import { getUnreadCount } from '../utils/messages';
 import ThemeToggle from './ThemeToggle';
 import SoundToggle from './SoundToggle';
+import AvatarMenu from './AvatarMenu';
+import StickerRenderer from './StickerRenderer';
 import './Navbar.css';
 
 const Navbar = () => {
-  const { user, isAuthenticated, cart, unreadCount, setUser, theme } = useStore();
+  const { user, isAuthenticated, cart, unreadCount, theme } = useStore();
   const location = useLocation();
-  const navigate = useNavigate();
   const cartItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
   const [homeConfig, setHomeConfig] = useState<HomeConfig>(defaultHomeConfig);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
-
-  const handleLogout = async () => {
-    try {
-      await auth.signOut(); // CERRAR SESIÓN EN FIREBASE
-      const { clearNotifications } = useStore.getState();
-      clearNotifications(); // Limpiar notificaciones
-      setUser(null);
-      localStorage.removeItem('user');
-      console.log('✅ Sesión cerrada correctamente');
-      // Redirigir al inicio después de cerrar sesión
-      navigate('/', { replace: true });
-    } catch (error) {
-      console.error('❌ Error al cerrar sesión:', error);
-      // Limpiar igualmente aunque falle Firebase
-      const { clearNotifications } = useStore.getState();
-      clearNotifications(); // Limpiar notificaciones
-      setUser(null);
-      localStorage.removeItem('user');
-      // Redirigir al inicio incluso si hay error
-      navigate('/', { replace: true });
-    }
-  };
 
   // Generar avatar URL - priorizar avatar de Google guardado en Firebase
   const getAvatarUrl = () => {
@@ -161,16 +140,6 @@ const Navbar = () => {
 
   // Estado para manejar errores de carga del logo
   const [logoError, setLogoError] = useState(false);
-  // Estado para manejar errores de carga del avatar (botón pequeño)
-  const [avatarErrorSmall, setAvatarErrorSmall] = useState(false);
-  // Estado para manejar errores de carga del avatar (dropdown)
-  const [avatarErrorLarge, setAvatarErrorLarge] = useState(false);
-  
-  // Resetear errores de avatar cuando cambia el usuario
-  useEffect(() => {
-    setAvatarErrorSmall(false);
-    setAvatarErrorLarge(false);
-  }, [user?.id, user?.avatar]);
   
   // Cargar contador de mensajes no leídos
   useEffect(() => {
@@ -194,6 +163,31 @@ const Navbar = () => {
     return homeConfig.siteSettings?.siteName || defaultHomeConfig.siteSettings.siteName;
   };
 
+  // Obtener configuración del logo
+  const getLogoConfig = () => {
+    const logoConfig = homeConfig.siteSettings?.logoConfig || {};
+    const LOGO_SIZES = {
+      small: { width: '120px', height: 'auto' },
+      medium: { width: '200px', height: 'auto' },
+      large: { width: '300px', height: 'auto' }
+    };
+    
+    const size = logoConfig.size || 'medium';
+    const position = logoConfig.position || 'left';
+    const opacity = logoConfig.opacity !== undefined ? logoConfig.opacity : 1;
+    const hoverEffect = logoConfig.hoverEffect !== undefined ? logoConfig.hoverEffect : true;
+    
+    return {
+      sizeStyles: LOGO_SIZES[size],
+      position,
+      opacity,
+      hoverEffect,
+      className: hoverEffect ? 'navbar-logo-hover' : ''
+    };
+  };
+
+  const logoConfig = getLogoConfig();
+
   // Determinar si el enlace está activo para el navbar móvil
   const isActive = (path: string) => location.pathname === path;
 
@@ -201,14 +195,34 @@ const Navbar = () => {
     <>
       {/* Navbar Superior (Desktop) */}
       <nav className="navbar">
-        <div className="navbar-container">
-          <Link to="/" className="navbar-logo" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ position: 'relative', display: 'inline-block' }}>
+        <div className="navbar-container" style={{ 
+          justifyContent: logoConfig.position === 'center' ? 'center' : 
+                         logoConfig.position === 'right' ? 'flex-end' : 'flex-start'
+        }}>
+          <Link to="/" className="navbar-logo" style={{ 
+            position: 'relative', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '0.75rem',
+            justifyContent: logoConfig.position === 'center' ? 'center' : 
+                           logoConfig.position === 'right' ? 'flex-end' : 'flex-start'
+          }}>
+            <div style={{ 
+              position: 'relative', 
+              display: 'inline-block',
+              opacity: logoConfig.opacity,
+              transition: 'opacity 0.3s ease'
+            }}>
               {(getLogoUrl() && !logoError) ? (
                 <img 
                   src={getLogoUrl()} 
                   alt={getSiteName()}
-                  className="navbar-logo-img"
+                  className={`navbar-logo-img ${logoConfig.className}`}
+                  style={{
+                    ...logoConfig.sizeStyles,
+                    maxWidth: '100%',
+                    height: 'auto'
+                  }}
                   onError={(e) => {
                     console.warn('⚠️ Error cargando logo desde:', getLogoUrl());
                     setLogoError(true);
@@ -258,34 +272,9 @@ const Navbar = () => {
                 // Debug: Log para verificar stickers (solo una vez cuando cambian)
                 // Los logs se movieron a un useEffect para evitar spam
                 
-                return activeStickers.map(sticker => {
-                  const sizeMap = { small: '0.875rem', medium: '1.125rem', large: '1.5rem' };
-                  const positionMap = {
-                    'top-left': { top: '-8px', left: '-8px' },
-                    'top-right': { top: '-8px', right: '-8px' },
-                    'bottom-left': { bottom: '-8px', left: '-8px' },
-                    'bottom-right': { bottom: '-8px', right: '-8px' },
-                    'center': { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
-                  };
-                  return (
-                    <span
-                      key={sticker.id}
-                      style={{
-                        position: 'absolute',
-                        fontSize: sizeMap[sticker.size],
-                        ...positionMap[sticker.position],
-                        pointerEvents: 'none',
-                        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
-                        zIndex: 10,
-                        lineHeight: 1,
-                        animation: 'bounce 2s infinite'
-                      }}
-                      title={specialEvents.find(e => e.type === sticker.type)?.name || 'Sticker'}
-                    >
-                      {sticker.emoji}
-                    </span>
-                  );
-                });
+                return activeStickers.map(sticker => (
+                  <StickerRenderer key={sticker.id} sticker={sticker} />
+                ));
               })()}
             </div>
             <span className="navbar-logo-text">{getSiteName()}</span>
@@ -324,90 +313,13 @@ const Navbar = () => {
                   {unreadMessagesCount > 0 && <span className="navbar-badge">{unreadMessagesCount}</span>}
                 </Link>
 
-                <div className="navbar-user-menu">
-                  <button className="navbar-icon-btn" title="Mi cuenta">
-                    {!avatarErrorSmall ? (
-                      <img 
-                        src={avatarUrl}
-                        alt={user?.username}
-                        className="navbar-avatar-img"
-                        onError={() => {
-                          setAvatarErrorSmall(true);
-                        }}
-                        onLoad={() => {
-                          setAvatarErrorSmall(false);
-                        }}
-                      />
-                    ) : (
-                      <div style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #FF6B00, #FF8C42)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white',
-                        fontWeight: 700,
-                        fontSize: '0.875rem',
-                        flexShrink: 0
-                      }}>
-                        {getUserInitial()}
-                      </div>
-                    )}
-                  </button>
-                  <div className="navbar-dropdown">
-                    <div className="navbar-dropdown-header">
-                      {!avatarErrorLarge ? (
-                        <img 
-                          src={avatarUrl} 
-                          alt={user?.username}
-                          onError={() => {
-                            setAvatarErrorLarge(true);
-                          }}
-                          onLoad={() => {
-                            setAvatarErrorLarge(false);
-                          }}
-                        />
-                      ) : (
-                        <div style={{
-                          width: '48px',
-                          height: '48px',
-                          borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #FF6B00, #FF8C42)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'white',
-                          fontWeight: 700,
-                          fontSize: '1.25rem',
-                          flexShrink: 0
-                        }}>
-                          {getUserInitial()}
-                        </div>
-                      )}
-                      <div>
-                        <div className="navbar-dropdown-name">{user?.username}</div>
-                        <div className="navbar-dropdown-email">{user?.email}</div>
-                      </div>
-                    </div>
-                    <div className="navbar-dropdown-divider" />
-                    <Link to="/perfil" className="navbar-dropdown-item">
-                      <Home size={18} />
-                      Mi Perfil
-                    </Link>
-                    {user?.isAdmin && (
-                      <Link to="/admin" className="navbar-dropdown-item">
-                        <LayoutDashboard size={18} />
-                        Panel Admin
-                      </Link>
-                    )}
-                    <button onClick={handleLogout} className="navbar-dropdown-item">
-                      <LogOut size={18} />
-                      Cerrar Sesión
-                    </button>
-                  </div>
-                </div>
+                {user && (
+                  <AvatarMenu
+                    user={user}
+                    avatarUrl={avatarUrl}
+                    getUserInitial={getUserInitial}
+                  />
+                )}
               </>
             ) : (
               <Link to="/login" className="btn btn-primary">

@@ -1,32 +1,50 @@
-import { Mail, MapPin, FileText, Award, ShoppingBag, Gavel, LogOut, Send, MessageSquare } from 'lucide-react';
+import { Mail, MapPin, FileText, Award, ShoppingBag, Gavel, LogOut, Send, MessageSquare, Camera, Settings, LayoutDashboard, TrendingUp, Bell, HelpCircle, Phone } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { auth } from '../config/firebase';
+import { auth, db } from '../config/firebase';
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { getUserConversations, getMessages, saveMessage, markMessagesAsRead, getUnreadCount, createMessage } from '../utils/messages';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { getUserConversations, getMessages, saveMessage, markMessagesAsRead, getUnreadCount, createMessage, watchConversationStatus } from '../utils/messages';
 import { Message } from '../types';
 import { formatTimeAgo } from '../utils/helpers';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { doc, updateDoc } from 'firebase/firestore';
+import AvatarGallery from '../components/AvatarGallery';
+import ChatWidget from '../components/ChatWidget';
+import DashboardCompact, { DashboardMetric, QuickAction, DashboardCard } from '../components/DashboardCompact';
+import AnnouncementWidget from '../components/AnnouncementWidget';
 
 const Perfil = () => {
   const { user, auctions } = useStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState<'profile' | 'messages'>(
-    tabParam === 'messages' ? 'messages' : 'profile'
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'messages' | 'settings'>(
+    tabParam === 'messages' ? 'messages' : tabParam === 'settings' ? 'settings' : tabParam === 'profile' ? 'profile' : 'dashboard'
   );
+  const navigate = useNavigate();
   
   // Actualizar tab cuando cambia el query param
   useEffect(() => {
     if (tabParam === 'messages') {
       setActiveTab('messages');
+    } else if (tabParam === 'settings') {
+      setActiveTab('settings');
+    } else if (tabParam === 'profile') {
+      setActiveTab('profile');
+    } else {
+      setActiveTab('dashboard');
     }
   }, [tabParam]);
   const [userMessages, setUserMessages] = useState<Message[]>([]);
   const [newMessageContent, setNewMessageContent] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const [avatarError, setAvatarError] = useState(false);
+  const [showAvatarGallery, setShowAvatarGallery] = useState(false);
+  const [updatingAvatar, setUpdatingAvatar] = useState(false);
+  const [conversationStatus, setConversationStatus] = useState<'open' | 'closed' | null>(null);
+  const [conversationExists, setConversationExists] = useState(false);
   const isMobile = useIsMobile();
+  
+  const conversationId = user ? `admin_${user.id}` : null;
   
   // Resetear error de avatar cuando cambia el usuario
   useEffect(() => {
@@ -34,9 +52,7 @@ const Perfil = () => {
   }, [user?.id, user?.avatar]);
   
   useEffect(() => {
-    if (user && activeTab === 'messages') {
-      const conversationId = `admin_${user.id}`;
-      
+    if (user && activeTab === 'messages' && conversationId) {
       // Escuchar mensajes en tiempo real
       const unsubscribeMessages = getUserConversations(user.id, (messages) => {
         setUserMessages(messages);
@@ -57,15 +73,24 @@ const Perfil = () => {
         setUnreadCount(count);
       });
       
+      // Escuchar estado de conversación
+      const unsubscribeStatus = watchConversationStatus(conversationId, (status, exists) => {
+        setConversationStatus(status);
+        setConversationExists(exists);
+      });
+      
       return () => {
         unsubscribeMessages();
         unsubscribeUnread();
+        unsubscribeStatus();
       };
     } else {
       setUserMessages([]);
       setUnreadCount(0);
+      setConversationStatus(null);
+      setConversationExists(false);
     }
-  }, [user, activeTab]);
+  }, [user, activeTab, conversationId]);
   
   // Auto-scroll cuando se envía un mensaje
   useEffect(() => {
@@ -84,9 +109,163 @@ const Perfil = () => {
   }
 
   const myBids = auctions.filter(a => a.bids.some(b => b.userId === user.id));
+  const wonAuctions = auctions.filter(a => 
+    a.status === 'ended' && 
+    a.bids.length > 0 && 
+    a.bids[a.bids.length - 1].userId === user.id
+  );
+  const activeBids = myBids.filter(a => a.status === 'active');
 
   // Usar avatar del usuario (prioriza avatar de Google guardado en Firebase)
   const avatarUrl = user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || 'U')}&size=200&background=FF6B00&color=fff&bold=true`;
+
+  // Preparar métricas para el dashboard
+  const dashboardMetrics: DashboardMetric[] = [
+    {
+      label: 'Subastas Participadas',
+      value: myBids.length,
+      icon: <Gavel size={20} />,
+      trend: myBids.length > 0 ? 'up' : 'neutral'
+    },
+    {
+      label: 'Ofertas Activas',
+      value: activeBids.length,
+      icon: <TrendingUp size={20} />,
+      trend: activeBids.length > 0 ? 'up' : 'neutral'
+    },
+    {
+      label: 'Subastas Ganadas',
+      value: wonAuctions.length,
+      icon: <Award size={20} />,
+      trend: wonAuctions.length > 0 ? 'up' : 'neutral'
+    },
+    {
+      label: 'Mensajes Sin Leer',
+      value: unreadCount,
+      icon: <Bell size={20} />,
+      trend: unreadCount > 0 ? 'up' : 'neutral',
+      trendValue: unreadCount > 0 ? `${unreadCount} nuevo${unreadCount > 1 ? 's' : ''}` : undefined
+    }
+  ];
+
+  // Acciones rápidas
+  const quickActions: QuickAction[] = [
+    {
+      label: 'Ver Subastas',
+      icon: <Gavel size={18} />,
+      onClick: () => navigate('/subastas'),
+      variant: 'primary'
+    },
+    {
+      label: 'Ir a Tienda',
+      icon: <ShoppingBag size={18} />,
+      onClick: () => navigate('/tienda'),
+      variant: 'primary'
+    },
+    {
+      label: 'Notificaciones',
+      icon: <Bell size={18} />,
+      onClick: () => navigate('/notificaciones'),
+      variant: unreadCount > 0 ? 'warning' : 'secondary'
+    },
+    {
+      label: 'Mensajes',
+      icon: <MessageSquare size={18} />,
+      onClick: () => {
+        setActiveTab('messages');
+        setSearchParams({ tab: 'messages' });
+      },
+      variant: unreadCount > 0 ? 'warning' : 'secondary'
+    }
+  ];
+
+  // Tarjetas del dashboard
+  const dashboardCards: DashboardCard[] = [
+    {
+      title: 'Resumen de Cuenta',
+      content: (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Estado:</span>
+            <strong style={{ color: 'var(--success)' }}>Activo</strong>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Miembro desde:</span>
+            <strong style={{ color: 'var(--text-primary)' }}>
+              {user.createdAt ? new Date(user.createdAt).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' }) : 'Reciente'}
+            </strong>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Email verificado:</span>
+            <strong style={{ color: user.emailVerified ? 'var(--success)' : 'var(--warning)' }}>
+              {user.emailVerified ? '✓ Sí' : '✗ No'}
+            </strong>
+          </div>
+        </div>
+      )
+    },
+    {
+      title: 'Actividad Reciente',
+      content: (
+        <div>
+          {myBids.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {myBids.slice(0, 3).map(auction => (
+                <div key={auction.id} style={{ 
+                  padding: '0.75rem', 
+                  background: 'var(--bg-tertiary)', 
+                  borderRadius: '0.5rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {auction.title}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      ${auction.bids.find(b => b.userId === user.id)?.amount.toLocaleString() || '0'}
+                    </div>
+                  </div>
+                  <span className={`badge ${auction.status === 'active' ? 'badge-success' : 'badge-secondary'}`} style={{ flexShrink: 0 }}>
+                    {auction.status === 'active' ? 'Activa' : 'Finalizada'}
+                  </span>
+                </div>
+              ))}
+              {myBids.length > 3 && (
+                <div style={{ textAlign: 'center', paddingTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  +{myBids.length - 3} más
+                </div>
+              )}
+            </div>
+          ) : (
+            <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '1rem', fontSize: '0.9rem' }}>
+              No hay actividad reciente
+            </p>
+          )}
+        </div>
+      )
+    },
+    {
+      title: 'Recuadro Especial',
+      content: (
+        <div style={{ 
+          padding: '2rem', 
+          textAlign: 'center', 
+          background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+          borderRadius: '0.75rem',
+          color: 'white'
+        }}>
+          <Award size={48} style={{ marginBottom: '1rem', opacity: 0.9 }} />
+          <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem' }}>Espacio Reservado</h3>
+          <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.9 }}>
+            Este espacio está reservado para contenido especial pendiente de definir.
+          </p>
+        </div>
+      ),
+      className: 'special-card'
+    }
+  ];
 
   const handleLogout = async () => {
     try {
@@ -106,13 +285,68 @@ const Perfil = () => {
     }
   };
 
+  const handleAvatarSelect = async (avatarUrl: string) => {
+    if (!user) return;
+
+    setUpdatingAvatar(true);
+    try {
+      // Actualizar en Firestore
+      await updateDoc(doc(db, 'users', user.id), {
+        avatar: avatarUrl
+      });
+
+      // Actualizar en el store
+      const { setUser } = useStore.getState();
+      setUser({
+        ...user,
+        avatar: avatarUrl
+      });
+
+      // Actualizar en localStorage
+      const updatedUser = { ...user, avatar: avatarUrl };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+
+      setShowAvatarGallery(false);
+    } catch (error) {
+      console.error('Error al actualizar avatar:', error);
+      alert('Error al actualizar el avatar. Intentá nuevamente.');
+    } finally {
+      setUpdatingAvatar(false);
+    }
+  };
+
   return (
     <div style={{ minHeight: 'calc(100vh - 80px)', padding: isMobile ? '1.5rem 0' : '3rem 0' }}>
       <div className="container" style={{ maxWidth: '1000px', padding: isMobile ? '0 1rem' : undefined }}>
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
           <button
-            onClick={() => setActiveTab('profile')}
+            onClick={() => {
+              setActiveTab('dashboard');
+              setSearchParams({ tab: 'dashboard' });
+            }}
+            className="btn"
+            style={{
+              background: activeTab === 'dashboard' ? 'var(--primary)' : 'var(--bg-secondary)',
+              color: activeTab === 'dashboard' ? 'white' : 'var(--text-primary)',
+              padding: '0.875rem 1.5rem',
+              borderRadius: '0.75rem',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <LayoutDashboard size={18} />
+            Dashboard
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('profile');
+              setSearchParams({ tab: 'profile' });
+            }}
             className="btn"
             style={{
               background: activeTab === 'profile' ? 'var(--primary)' : 'var(--bg-secondary)',
@@ -131,7 +365,10 @@ const Perfil = () => {
             Perfil
           </button>
           <button
-            onClick={() => setActiveTab('messages')}
+            onClick={() => {
+              setActiveTab('messages');
+              setSearchParams({ tab: 'messages' });
+            }}
             className="btn"
             style={{
               background: activeTab === 'messages' ? 'var(--primary)' : 'var(--bg-secondary)',
@@ -163,7 +400,44 @@ const Perfil = () => {
               </span>
             )}
           </button>
+          <button
+            onClick={() => {
+              setActiveTab('settings');
+              setSearchParams({ tab: 'settings' });
+            }}
+            className="btn"
+            style={{
+              background: activeTab === 'settings' ? 'var(--primary)' : 'var(--bg-secondary)',
+              color: activeTab === 'settings' ? 'white' : 'var(--text-primary)',
+              padding: '0.875rem 1.5rem',
+              borderRadius: '0.75rem',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <Settings size={18} />
+            Configuración
+          </button>
         </div>
+
+        {activeTab === 'dashboard' && (
+          <div style={{ marginBottom: '2rem' }}>
+            {/* Widget de Anuncios */}
+            <div style={{ marginBottom: '2rem' }}>
+              <AnnouncementWidget />
+            </div>
+            
+            <DashboardCompact
+              metrics={dashboardMetrics}
+              quickActions={quickActions}
+              cards={dashboardCards}
+            />
+          </div>
+        )}
 
         {activeTab === 'profile' && (
           <>
@@ -177,43 +451,68 @@ const Perfil = () => {
               alignItems: isMobile ? 'flex-start' : 'center',
               flexDirection: isMobile ? 'column' : 'row'
             }}>
-          {!avatarError && avatarUrl ? (
-            <img 
-              src={avatarUrl} 
-              alt={user.username} 
-              style={{ 
-                width: isMobile ? '80px' : '120px', 
-                height: isMobile ? '80px' : '120px', 
-                borderRadius: '50%', 
-                objectFit: 'cover', 
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            {!avatarError && avatarUrl ? (
+              <img 
+                src={avatarUrl} 
+                alt={user.username} 
+                style={{ 
+                  width: isMobile ? '80px' : '120px', 
+                  height: isMobile ? '80px' : '120px', 
+                  borderRadius: '50%', 
+                  objectFit: 'cover', 
+                  border: '4px solid var(--primary)',
+                  flexShrink: 0
+                }}
+                onError={() => {
+                  setAvatarError(true);
+                }}
+                onLoad={() => {
+                  setAvatarError(false);
+                }}
+              />
+            ) : (
+              <div style={{
+                width: isMobile ? '80px' : '120px',
+                height: isMobile ? '80px' : '120px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #FF6B00, #FF8C42)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontWeight: 700,
+                fontSize: isMobile ? '2rem' : '3rem',
                 border: '4px solid var(--primary)',
                 flexShrink: 0
+              }}>
+                {(user.username || user.email || 'U')[0].toUpperCase()}
+              </div>
+            )}
+            <button
+              onClick={() => setShowAvatarGallery(true)}
+              className="btn btn-primary"
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                right: 0,
+                width: isMobile ? '32px' : '40px',
+                height: isMobile ? '32px' : '40px',
+                borderRadius: '50%',
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '3px solid var(--bg-secondary)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                cursor: 'pointer'
               }}
-              onError={() => {
-                setAvatarError(true);
-              }}
-              onLoad={() => {
-                setAvatarError(false);
-              }}
-            />
-          ) : (
-            <div style={{
-              width: isMobile ? '80px' : '120px',
-              height: isMobile ? '80px' : '120px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #FF6B00, #FF8C42)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontWeight: 700,
-              fontSize: isMobile ? '2rem' : '3rem',
-              border: '4px solid var(--primary)',
-              flexShrink: 0
-            }}>
-              {(user.username || user.email || 'U')[0].toUpperCase()}
-            </div>
-          )}
+              title="Cambiar avatar"
+              disabled={updatingAvatar}
+            >
+              <Camera size={isMobile ? 16 : 20} />
+            </button>
+          </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h1 style={{ marginBottom: '0.5rem', fontSize: isMobile ? '1.25rem' : '1.5rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{user.username}</h1>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', color: 'var(--text-secondary)', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
@@ -406,84 +705,257 @@ const Perfil = () => {
             )}
           </div>
 
-          {/* Input para enviar mensaje */}
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (!newMessageContent.trim() || !user) return;
+          {/* Botones de Contacto y Centro de Ayuda */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', 
+            gap: '1rem', 
+            marginBottom: '2rem' 
+          }}>
+            <button
+              onClick={() => navigate('/contacto')}
+              className="btn btn-primary"
+              style={{
+                padding: '1rem 1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.75rem',
+                fontWeight: 600,
+                fontSize: isMobile ? '0.875rem' : '1rem',
+                background: 'linear-gradient(135deg, #3B82F6, #2563EB)',
+                border: 'none',
+                borderRadius: '0.75rem',
+                color: 'white',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+              }}
+            >
+              <Phone size={20} />
+              Contacto
+            </button>
+            <button
+              onClick={() => navigate('/ayuda')}
+              className="btn btn-secondary"
+              style={{
+                padding: '1rem 1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.75rem',
+                fontWeight: 600,
+                fontSize: isMobile ? '0.875rem' : '1rem',
+                background: 'linear-gradient(135deg, #10B981, #059669)',
+                border: 'none',
+                borderRadius: '0.75rem',
+                color: 'white',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+              }}
+            >
+              <HelpCircle size={20} />
+              Centro de Ayuda
+            </button>
+          </div>
 
-              try {
-                const message = createMessage(
-                  user.id,
-                  user.username,
-                  'admin',
-                  newMessageContent.trim()
-                );
-                
-                // Guardar mensaje en Firebase (se actualizará automáticamente por el listener)
-                await saveMessage(message);
-                setNewMessageContent('');
-                
-                // El mensaje aparecerá automáticamente gracias al listener en tiempo real
-                console.log('✅ Mensaje enviado correctamente');
-              } catch (error) {
-                console.error('❌ Error enviando mensaje:', error);
-                alert('❌ Error al enviar el mensaje. Por favor, intentá nuevamente.');
-              }
-            }}
-            style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end' }}
-          >
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                Escribí tu mensaje:
-              </label>
-              <textarea
-                value={newMessageContent}
-                onChange={(e) => setNewMessageContent(e.target.value)}
-                placeholder="Escribí tu mensaje al administrador aquí..."
-                rows={isMobile ? 2 : 3}
-                style={{ 
-                  width: '100%',
-                  padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem', 
-                  borderRadius: '0.75rem', 
-                  border: '2px solid var(--border)',
-                  fontSize: isMobile ? '0.875rem' : '0.9375rem',
-                  background: 'var(--bg-tertiary)',
-                  color: 'var(--text-primary)',
-                  wordWrap: 'break-word',
-                  overflowWrap: 'break-word',
-                  resize: 'vertical',
-                  minHeight: isMobile ? '60px' : '80px',
-                  fontFamily: 'inherit'
+          {/* Input para enviar mensaje - Solo si la conversación existe y está abierta */}
+          {conversationExists && conversationStatus === 'open' ? (
+            <>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!newMessageContent.trim() || !user || !conversationExists || conversationStatus !== 'open') {
+                    if (!conversationExists) {
+                      alert('⚠️ No podés enviar mensajes hasta que el administrador inicie la conversación.');
+                    }
+                    return;
+                  }
+
+                  try {
+                    const message = createMessage(
+                      user.id,
+                      user.username,
+                      'admin',
+                      newMessageContent.trim()
+                    );
+                    
+                    // Guardar mensaje en Firebase (se actualizará automáticamente por el listener)
+                    await saveMessage(message);
+                    setNewMessageContent('');
+                    
+                    // El mensaje aparecerá automáticamente gracias al listener en tiempo real
+                    console.log('✅ Mensaje enviado correctamente');
+                  } catch (error) {
+                    console.error('❌ Error enviando mensaje:', error);
+                    alert('❌ Error al enviar el mensaje. Por favor, intentá nuevamente.');
+                  }
                 }}
-              />
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                {newMessageContent.length > 0 && `${newMessageContent.length} caracteres`}
+                style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end' }}
+              >
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                    Escribí tu mensaje:
+                  </label>
+                  <textarea
+                    value={newMessageContent}
+                    onChange={(e) => setNewMessageContent(e.target.value)}
+                    placeholder="Escribí tu mensaje al administrador aquí..."
+                    rows={isMobile ? 2 : 3}
+                    disabled={conversationStatus !== 'open'}
+                    style={{ 
+                      width: '100%',
+                      padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem', 
+                      borderRadius: '0.75rem', 
+                      border: '2px solid var(--border)',
+                      fontSize: isMobile ? '0.875rem' : '0.9375rem',
+                      background: conversationStatus === 'open' ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
+                      color: 'var(--text-primary)',
+                      wordWrap: 'break-word',
+                      overflowWrap: 'break-word',
+                      resize: 'vertical',
+                      minHeight: isMobile ? '60px' : '80px',
+                      fontFamily: 'inherit',
+                      opacity: conversationStatus === 'open' ? 1 : 0.6,
+                      cursor: conversationStatus === 'open' ? 'text' : 'not-allowed'
+                    }}
+                  />
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    {newMessageContent.length > 0 && `${newMessageContent.length} caracteres`}
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ 
+                    padding: '0.875rem 1.5rem', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem',
+                    height: 'fit-content',
+                    whiteSpace: 'nowrap',
+                    fontWeight: 600
+                  }}
+                  disabled={!newMessageContent.trim() || conversationStatus !== 'open'}
+                >
+                  <Send size={18} />
+                  Enviar Mensaje
+                </button>
+              </form>
+
+              <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'var(--info-light)', borderRadius: '0.75rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                💡 <strong>Tip:</strong> Cuando ganás una subasta o realizás una compra, te enviamos automáticamente un mensaje. Podés responder aquí para coordinar el pago y entrega.
+              </div>
+            </>
+          ) : !conversationExists ? (
+            <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center', border: '1px solid var(--border)' }}>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9375rem', fontWeight: 600 }}>
+                💬 Esperando que el administrador inicie la conversación
+              </p>
+              <p style={{ margin: '0.75rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                Solo el administrador puede iniciar conversaciones. Podés usar el botón de <strong>Contacto</strong> para solicitar ayuda.
+              </p>
+            </div>
+          ) : (
+            <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center', border: '1px solid var(--border)' }}>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>
+                ⚠️ Esta conversación está cerrada. Solo podés leer los mensajes anteriores.
+              </p>
+              <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                El administrador puede reabrir la conversación cuando sea necesario.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'settings' && (
+        <div style={{ background: 'var(--bg-secondary)', padding: isMobile ? '1.5rem' : '2rem', borderRadius: '1.5rem' }}>
+          <h2 style={{ marginBottom: '2rem', fontSize: isMobile ? '1.25rem' : '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Settings size={28} />
+            Configuración
+          </h2>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            {/* Sección de Preferencias */}
+            <div>
+              <h3 style={{ marginBottom: '1rem', fontSize: '1.125rem', color: 'var(--text-primary)' }}>Preferencias</h3>
+              <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '1rem' }}>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                  Aquí podrás configurar tus preferencias de cuenta en el futuro.
+                </p>
+                <div style={{ padding: '1rem', background: 'var(--bg-secondary)', borderRadius: '0.75rem', border: '1px dashed var(--border)' }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: 0, textAlign: 'center' }}>
+                    🚧 Funcionalidad en desarrollo
+                  </p>
+                </div>
               </div>
             </div>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              style={{ 
-                padding: '0.875rem 1.5rem', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '0.5rem',
-                height: 'fit-content',
-                whiteSpace: 'nowrap',
-                fontWeight: 600
-              }}
-              disabled={!newMessageContent.trim()}
-            >
-              <Send size={18} />
-              Enviar Mensaje
-            </button>
-          </form>
 
-          <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'var(--info-light)', borderRadius: '0.75rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-            💡 <strong>Tip:</strong> Cuando ganás una subasta o realizás una compra, te enviamos automáticamente un mensaje. Podés responder aquí para coordinar el pago y entrega.
+            {/* Sección de Privacidad */}
+            <div>
+              <h3 style={{ marginBottom: '1rem', fontSize: '1.125rem', color: 'var(--text-primary)' }}>Privacidad</h3>
+              <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '1rem' }}>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                  Configura cómo otros usuarios pueden ver tu información.
+                </p>
+                <div style={{ padding: '1rem', background: 'var(--bg-secondary)', borderRadius: '0.75rem', border: '1px dashed var(--border)' }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: 0, textAlign: 'center' }}>
+                    🚧 Funcionalidad en desarrollo
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Sección de Notificaciones */}
+            <div>
+              <h3 style={{ marginBottom: '1rem', fontSize: '1.125rem', color: 'var(--text-primary)' }}>Notificaciones</h3>
+              <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '1rem' }}>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                  Controla qué notificaciones recibes.
+                </p>
+                <div style={{ padding: '1rem', background: 'var(--bg-secondary)', borderRadius: '0.75rem', border: '1px dashed var(--border)' }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: 0, textAlign: 'center' }}>
+                    🚧 Funcionalidad en desarrollo
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+      )}
+
+      {/* Widget de Chat - Solo visible en tab de mensajes */}
+      {activeTab === 'messages' && (
+        <div style={{ position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 1000 }}>
+          <ChatWidget />
+        </div>
+      )}
+
+      {/* Galería de Avatares */}
+      {showAvatarGallery && (
+        <AvatarGallery
+          currentAvatar={user.avatar}
+          onSelect={handleAvatarSelect}
+          onClose={() => setShowAvatarGallery(false)}
+        />
       )}
       </div>
     </div>

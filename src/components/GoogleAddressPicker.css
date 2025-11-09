@@ -1,0 +1,524 @@
+.google-address-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+  /* Scroll suave para todos los dispositivos */
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  /* Centrado vertical mejorado */
+  min-height: calc(100vh - 200px);
+  justify-content: flex-start;
+  /* Scroll snap para todos los dispositivos */
+  scroll-snap-type: y proximity;
+}
+
+/* Sección de búsqueda */
+.address-search-container {
+  /* Sticky header para todos los dispositivos */
+  position: sticky;
+  top: 0;
+  width: 100%;
+  z-index: 10;
+  background: var(--bg-primary);
+  padding-bottom: 0.5rem;
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--bg-primary);
+  border: 2px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  transition: all 0.2s ease;
+}
+
+.search-input-wrapper:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.1);
+}
+
+.search-icon {
+  color: var(--text-secondary);
+  margin-right: 0.75rem;
+  flex-shrink: 0;
+}
+
+.address-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 1rem;
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+.address-search-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.address-search-input:focus {
+  /* Ajuste automático al enfocar para todos */
+  scroll-margin-top: 120px;
+}
+
+.search-loader {
+  color: var(--primary);
+  animation: spin 1s linear infinite;
+  margin-left: 0.5rem;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Lista de predicciones */
+.predictions-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 0.5rem;
+  background: var(--bg-primary);
+  border: 2px solid var(--border);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 12px var(--shadow-lg);
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1000;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.prediction-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 1rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  border-bottom: 1px solid var(--border);
+}
+
+.prediction-item:last-child {
+  border-bottom: none;
+}
+
+.prediction-item:hover {
+  background: var(--bg-secondary);
+}
+
+.prediction-item:active {
+  background: var(--bg-tertiary);
+}
+
+.prediction-item svg {
+  color: var(--primary);
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.prediction-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.prediction-main-text {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+  font-size: 0.95rem;
+}
+
+.prediction-secondary-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sección de campos */
+.address-fields-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: var(--bg-secondary);
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  /* Scroll suave entre secciones */
+  scroll-margin-top: 100px;
+  scroll-snap-align: start;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  margin-bottom: 0.5rem;
+}
+
+.section-title svg {
+  color: var(--primary);
+}
+
+.address-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+/* Agrupación visual mejorada de campos relacionados - Desktop */
+.address-fields-grid > .field-group:nth-child(1) {
+  /* Calle - destacado */
+  background: var(--bg-secondary);
+  border: 2px solid var(--border);
+}
+
+.address-fields-grid > .field-group:nth-child(2) {
+  /* Número - destacado */
+  background: var(--bg-secondary);
+  border: 2px solid var(--border);
+}
+
+.address-fields-grid > .field-group:nth-child(5) {
+  /* Calles laterales - destacado */
+  background: var(--bg-secondary);
+  border: 2px solid var(--border);
+  margin-top: 0.5rem;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  /* Agrupación visual mejorada para todos */
+  padding: 0.75rem;
+  background: var(--bg-primary);
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+}
+
+.field-group:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(255, 107, 0, 0.1);
+}
+
+.field-group-full {
+  grid-column: 1 / -1;
+}
+
+.field-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.address-field {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.address-field:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.1);
+  /* Ajuste automático al enfocar para todos */
+  scroll-margin-top: 120px;
+}
+
+.address-field::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Indicador de validación */
+.validation-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-top: 0.5rem;
+}
+
+.validation-indicator.valid {
+  background: rgba(0, 200, 83, 0.1);
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+
+.validation-indicator.invalid {
+  background: rgba(255, 187, 0, 0.1);
+  color: var(--warning);
+  border: 1px solid var(--warning);
+}
+
+/* Sección del mapa */
+.map-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  /* Scroll suave entre secciones */
+  scroll-margin-top: 100px;
+  scroll-snap-align: start;
+}
+
+.google-map-container {
+  width: 100%;
+  height: 400px;
+  border-radius: 0.75rem;
+  border: 2px solid var(--border);
+  overflow: hidden;
+  background: var(--bg-tertiary);
+}
+
+.map-hint {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0;
+  font-style: italic;
+  text-align: center;
+}
+
+/* Dirección formateada */
+.formatted-address {
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+}
+
+.formatted-address strong {
+  display: block;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.formatted-address p {
+  color: var(--text-secondary);
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+/* Estilos Mobile */
+@media (max-width: 768px) {
+  .google-address-picker {
+    gap: 1.25rem;
+    padding: 0;
+    /* Centrado vertical en viewport */
+    min-height: calc(100vh - 200px);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .address-search-container {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg-primary);
+    padding-bottom: 0.5rem;
+  }
+
+  .address-fields-section {
+    padding: 1.25rem;
+    /* Agrupación visual mejorada */
+    background: var(--bg-secondary);
+    border-radius: 1rem;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+
+  .address-fields-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  /* Agrupación visual de campos relacionados */
+  .field-group {
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: var(--bg-primary);
+    border-radius: 0.5rem;
+    border: 1px solid var(--border);
+    transition: all 0.2s ease;
+  }
+
+  .field-group:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(255, 107, 0, 0.1);
+  }
+
+  .field-group-full {
+    grid-column: 1;
+  }
+
+  .google-map-container {
+    height: 300px;
+    min-height: 300px;
+  }
+
+  .predictions-list {
+    max-height: 250px;
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin: 0;
+    border-radius: 1rem 1rem 0 0;
+    max-height: 50vh;
+    animation: slideUp 0.3s ease;
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .prediction-item {
+    padding: 1rem;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Ajuste automático al enfocar - mejorado */
+  .address-field:focus,
+  .address-search-input:focus {
+    scroll-margin-top: 120px;
+  }
+
+  /* Scroll suave entre secciones */
+  .address-fields-section,
+  .map-section {
+    scroll-margin-top: 100px;
+    scroll-snap-align: start;
+  }
+
+  .google-address-picker {
+    scroll-snap-type: y proximity;
+  }
+
+  /* Agrupación visual mejorada de campos relacionados */
+  /* Calle y número juntos visualmente */
+  .address-fields-grid > .field-group:nth-child(1) {
+    background: var(--bg-secondary);
+    border: 2px solid var(--border);
+    margin-bottom: 0.5rem;
+  }
+  
+  .address-fields-grid > .field-group:nth-child(2) {
+    background: var(--bg-secondary);
+    border: 2px solid var(--border);
+    margin-bottom: 0.5rem;
+  }
+  
+  /* Piso y depto juntos */
+  .address-fields-grid > .field-group:nth-child(3),
+  .address-fields-grid > .field-group:nth-child(4) {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+  }
+  
+  /* Calles laterales destacado */
+  .address-fields-grid > .field-group:nth-child(5) {
+    background: var(--bg-secondary);
+    border: 2px solid var(--border);
+    margin-top: 0.5rem;
+  }
+  
+  /* Localidad, provincia y código postal agrupados */
+  .address-fields-grid > .field-group:nth-child(6),
+  .address-fields-grid > .field-group:nth-child(7),
+  .address-fields-grid > .field-group:nth-child(8) {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+  }
+
+  /* Sección del mapa con mejor espaciado */
+  .map-section {
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 1rem;
+    border: 1px solid var(--border);
+  }
+}
+
+/* Estilos para tablets */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .address-fields-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Mejoras de accesibilidad */
+.address-field:focus-visible,
+.address-search-input:focus-visible,
+.prediction-item:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Animación de carga */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.loading {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
