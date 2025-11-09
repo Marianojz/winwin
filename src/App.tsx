@@ -50,7 +50,34 @@ function RedirectHandler() {
 
       try {
         console.log('🔍 [MÓVIL] Verificando redirect result...');
-        const result = await getRedirectResult(auth);
+        let result;
+        try {
+          result = await getRedirectResult(auth);
+        } catch (redirectError: any) {
+          // Manejar error específico de missing initial state
+          if (redirectError.message?.includes('missing initial state') || 
+              redirectError.message?.includes('sessionStorage') ||
+              redirectError.message?.includes('storage-partitioned')) {
+            console.warn('⚠️ [MÓVIL] Error de sessionStorage al procesar redirect, limpiando estado...');
+            toast.warning('Problema con el navegador. Por favor, intentá iniciar sesión nuevamente.', 5000);
+            
+            // Limpiar cualquier estado de autenticación pendiente
+            try {
+              await auth.signOut();
+            } catch (e) {
+              // Ignorar errores de signOut
+            }
+            
+            // Navegar a login con mensaje claro
+            if (mounted) {
+              navigate('/login', { replace: true, state: { 
+                error: 'Problema con el navegador. El sistema usará un método alternativo automáticamente. Por favor, intentá iniciar sesión nuevamente.' 
+              } });
+            }
+            return;
+          }
+          throw redirectError;
+        }
         
         if (!mounted) return;
         
@@ -173,7 +200,34 @@ function RedirectHandler() {
         
         // Intentar procesar el redirect result
         try {
-          const result = await getRedirectResult(auth);
+          let result;
+          try {
+            result = await getRedirectResult(auth);
+          } catch (redirectError: any) {
+            // Manejar error específico de missing initial state
+            if (redirectError.message?.includes('missing initial state') || 
+                redirectError.message?.includes('sessionStorage') ||
+                redirectError.message?.includes('storage-partitioned')) {
+              console.warn('⚠️ [MÓVIL BACKUP] Error de sessionStorage al procesar redirect');
+              toast.error('Problema con el navegador. Por favor, intentá iniciar sesión nuevamente.', 5000);
+              
+              // Limpiar estado
+              try {
+                await auth.signOut();
+              } catch (e) {
+                // Ignorar
+              }
+              
+              if (mounted) {
+                navigate('/login', { replace: true, state: { 
+                  error: 'Problema con el navegador. Por favor, intentá iniciar sesión nuevamente usando el botón de Google.' 
+                } });
+              }
+              return;
+            }
+            throw redirectError;
+          }
+          
           if (result && result.user && !isProcessing) {
             console.log('✅ [MÓVIL BACKUP] Redirect result encontrado, procesando...');
             setIsProcessing(true);

@@ -19,7 +19,29 @@ const GoogleSignIn = () => {
   useEffect(() => {
     const checkRedirect = async () => {
       try {
-        const result = await getRedirectResult(auth);
+        let result;
+        try {
+          result = await getRedirectResult(auth);
+        } catch (redirectError: any) {
+          // Manejar error específico de missing initial state
+          if (redirectError.message?.includes('missing initial state') || 
+              redirectError.message?.includes('sessionStorage') ||
+              redirectError.message?.includes('storage-partitioned')) {
+            console.warn('⚠️ Error de sessionStorage al procesar redirect en GoogleSignIn');
+            setError('Problema con el navegador. El sistema usará un método alternativo. Por favor, intentá iniciar sesión nuevamente.');
+            toast.error('Problema detectado. El sistema usará método alternativo automáticamente.', 5000);
+            
+            // Limpiar estado
+            try {
+              await auth.signOut();
+            } catch (e) {
+              // Ignorar
+            }
+            return;
+          }
+          throw redirectError;
+        }
+        
         if (result && result.user) {
           setStatusMessage('Procesando tu cuenta...');
           setLoading(true);
@@ -68,11 +90,20 @@ const GoogleSignIn = () => {
       const isMobile = isMobileDevice();
       
       // En móvil, verificar si sessionStorage está disponible antes de usar redirect
+      // IMPORTANTE: Si sessionStorage no está disponible, redirect NO funcionará
       if (isMobile) {
         const sessionStorageAvailable = isSessionStorageAvailable();
         
-        if (sessionStorageAvailable) {
-          // Si sessionStorage está disponible, usar redirect
+        if (!sessionStorageAvailable) {
+          // Si sessionStorage no está disponible, usar popup directamente
+          // Redirect NO funcionará sin sessionStorage
+          console.warn('⚠️ sessionStorage no disponible, usando popup en móvil');
+          setStatusMessage('Abriendo ventana de Google...');
+          toast.info('Abriendo ventana de Google (método alternativo)', 3000);
+          // Continuar con popup (no usar redirect)
+        } else {
+          // Si sessionStorage está disponible, intentar usar redirect
+          // Pero si falla, automáticamente usar popup
           setStatusMessage('Redirigiendo a Google...');
           toast.info('Redirigiendo a Google para iniciar sesión', 3000);
           try {
@@ -80,24 +111,12 @@ const GoogleSignIn = () => {
             // El redirect result se manejará en App.tsx o en el useEffect de arriba
             return;
           } catch (redirectError: any) {
-            // Si el redirect falla por problemas de storage, intentar con popup
-            if (redirectError.message?.includes('initial state') || 
-                redirectError.message?.includes('sessionStorage') ||
-                redirectError.code === 'auth/unauthorized-domain') {
-              console.warn('⚠️ Redirect falló, intentando con popup como fallback');
-              setStatusMessage('Intentando con método alternativo...');
-              toast.warning('Usando método alternativo de autenticación', 3000);
-              // Continuar con popup como fallback
-            } else {
-              throw redirectError;
-            }
+            // Si el redirect falla por cualquier razón, usar popup como fallback
+            console.warn('⚠️ Redirect falló, usando popup como fallback:', redirectError.message);
+            setStatusMessage('Intentando con método alternativo...');
+            toast.warning('Usando método alternativo de autenticación', 3000);
+            // Continuar con popup como fallback (no lanzar error)
           }
-        } else {
-          // Si sessionStorage no está disponible, usar popup directamente
-          console.warn('⚠️ sessionStorage no disponible, usando popup en móvil');
-          setStatusMessage('Abriendo ventana de Google...');
-          toast.info('Abriendo ventana de Google', 2000);
-          // Continuar con popup
         }
       }
 

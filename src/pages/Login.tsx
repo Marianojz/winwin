@@ -27,6 +27,7 @@ const Login = () => {
   useEffect(() => {
     if (location.state?.error) {
       setError(location.state.error);
+      toast.warning(location.state.error, 6000);
       // Limpiar el estado después de mostrarlo
       navigate(location.pathname, { replace: true, state: {} });
     }
