@@ -81,6 +81,7 @@ const GoogleSignIn = () => {
   }, [location.pathname, setUser, navigate]);
 
   const handleGoogleSignIn = async () => {
+    console.log('🖱️ [GOOGLE SIGN-IN] Botón clickeado, iniciando proceso...');
     setLoading(true);
     setError('');
     setStatusMessage('');
@@ -89,7 +90,11 @@ const GoogleSignIn = () => {
       const provider = createGoogleProvider();
       const isMobile = isMobileDevice();
       
-      console.log('🔐 [GOOGLE SIGN-IN] Iniciando proceso...', { isMobile });
+      console.log('🔐 [GOOGLE SIGN-IN] Iniciando proceso...', { 
+        isMobile,
+        authDomain: auth.app.options.authDomain,
+        currentUser: auth.currentUser?.uid
+      });
       
       // En móvil, verificar si sessionStorage está disponible antes de usar redirect
       // IMPORTANTE: Si sessionStorage no está disponible, redirect NO funcionará
@@ -110,10 +115,23 @@ const GoogleSignIn = () => {
           setStatusMessage('Redirigiendo a Google...');
           toast.info('Redirigiendo a Google para iniciar sesión', 3000);
           try {
-            console.log('🔄 [GOOGLE SIGN-IN] Llamando a signInWithRedirect...');
-            await signInWithRedirect(auth, provider);
-            console.log('✅ [GOOGLE SIGN-IN] signInWithRedirect completado, redirigiendo...');
+            console.log('🔄 [GOOGLE SIGN-IN] Llamando a signInWithRedirect...', {
+              providerId: provider.providerId,
+              authDomain: auth.app.options.authDomain
+            });
+            
+            // IMPORTANTE: signInWithRedirect puede lanzar un error o simplemente redirigir
+            // No esperar a que "complete" porque redirige inmediatamente
+            signInWithRedirect(auth, provider).then(() => {
+              console.log('✅ [GOOGLE SIGN-IN] signInWithRedirect promise resuelta (no debería llegar aquí si redirige)');
+            }).catch((err) => {
+              console.error('❌ [GOOGLE SIGN-IN] Error en signInWithRedirect:', err);
+              throw err;
+            });
+            
+            console.log('🔄 [GOOGLE SIGN-IN] signInWithRedirect llamado, debería redirigir ahora...');
             // El redirect result se manejará en App.tsx o en el useEffect de arriba
+            // No hacer return aquí porque puede que no redirija inmediatamente
             return;
           } catch (redirectError: any) {
             // Si el redirect falla, intentar con popup como fallback
