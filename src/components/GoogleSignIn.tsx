@@ -3,7 +3,7 @@ import { signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase
 import { auth } from '../config/firebase';
 import { useStore } from '../store/useStore';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { createGoogleProvider, isMobileDevice, processGoogleAuthResult } from '../utils/googleAuthHelper';
+import { createGoogleProvider, isMobileDevice, isSessionStorageAvailable, processGoogleAuthResult } from '../utils/googleAuthHelper';
 import { Loader, AlertCircle } from 'lucide-react';
 import { toast } from '../utils/toast';
 
@@ -67,38 +67,103 @@ const GoogleSignIn = () => {
       const provider = createGoogleProvider();
       const isMobile = isMobileDevice();
       
-      // En móvil, usar redirect directamente (más rápido y confiable)
+      // En móvil, verificar si sessionStorage está disponible antes de usar redirect
       if (isMobile) {
-        setStatusMessage('Redirigiendo a Google...');
-        toast.info('Redirigiendo a Google para iniciar sesión', 3000);
-        await signInWithRedirect(auth, provider);
-        // El redirect result se manejará en App.tsx o en el useEffect de arriba
-        return;
+        const sessionStorageAvailable = isSessionStorageAvailable();
+        
+        if (sessionStorageAvailable) {
+          // Si sessionStorage está disponible, usar redirect
+          setStatusMessage('Redirigiendo a Google...');
+          toast.info('Redirigiendo a Google para iniciar sesión', 3000);
+          try {
+            await signInWithRedirect(auth, provider);
+            // El redirect result se manejará en App.tsx o en el useEffect de arriba
+            return;
+          } catch (redirectError: any) {
+            // Si el redirect falla por problemas de storage, intentar con popup
+            if (redirectError.message?.includes('initial state') || 
+                redirectError.message?.includes('sessionStorage') ||
+                redirectError.code === 'auth/unauthorized-domain') {
+              console.warn('⚠️ Redirect falló, intentando con popup como fallback');
+              setStatusMessage('Intentando con método alternativo...');
+              toast.warning('Usando método alternativo de autenticación', 3000);
+              // Continuar con popup como fallback
+            } else {
+              throw redirectError;
+            }
+          }
+        } else {
+          // Si sessionStorage no está disponible, usar popup directamente
+          console.warn('⚠️ sessionStorage no disponible, usando popup en móvil');
+          setStatusMessage('Abriendo ventana de Google...');
+          toast.info('Abriendo ventana de Google', 2000);
+          // Continuar con popup
+        }
       }
 
-      // En desktop, usar popup
+      // En desktop o si sessionStorage no está disponible, usar popup
       try {
         const result = await signInWithPopup(auth, provider);
         const { fullUser, needsCompleteProfile } = await processGoogleAuthResult(result.user);
         
         setUser(fullUser);
+        toast.success('¡Inicio de sesión exitoso!', 2000);
 
         // Redirigir según si necesita completar perfil
         if (needsCompleteProfile) {
           navigate('/completar-perfil', { replace: true });
+        } else if (fullUser.isAdmin) {
+          navigate('/admin', { replace: true });
         } else {
           navigate('/', { replace: true });
         }
       } catch (popupError: any) {
-        // Si popup falla, intentar con redirect como fallback
-        if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') {
-          await signInWithRedirect(auth, provider);
-          return;
+        // Si popup falla, intentar con redirect como fallback (solo si no es móvil sin sessionStorage)
+        if ((popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') && isSessionStorageAvailable()) {
+          try {
+            await signInWithRedirect(auth, provider);
+            return;
+          } catch (redirectError: any) {
+            // Si redirect también falla, lanzar el error original
+            throw popupError;
+          }
         }
         throw popupError;
       }
     } catch (error: any) {
       console.error('Error con Google Sign-In:', error);
+      
+      // Manejar error específico de sessionStorage/missing initial state
+      if (error.message?.includes('missing initial state') || 
+          error.message?.includes('sessionStorage') ||
+          error.message?.includes('storage-partitioned')) {
+        console.warn('⚠️ Error de sessionStorage detectado, intentando con popup...');
+        setStatusMessage('Intentando método alternativo...');
+        toast.warning('Problema con almacenamiento, usando método alternativo', 3000);
+        
+        // Intentar con popup como último recurso
+        try {
+          const provider = createGoogleProvider();
+          const result = await signInWithPopup(auth, provider);
+          const { fullUser, needsCompleteProfile } = await processGoogleAuthResult(result.user);
+          
+          setUser(fullUser);
+          toast.success('¡Inicio de sesión exitoso!', 2000);
+          
+          if (needsCompleteProfile) {
+            navigate('/completar-perfil', { replace: true });
+          } else if (fullUser.isAdmin) {
+            navigate('/admin', { replace: true });
+          } else {
+            navigate('/', { replace: true });
+          }
+          return; // Salir exitosamente
+        } catch (popupError: any) {
+          // Si popup también falla, mostrar error
+          console.error('Popup también falló:', popupError);
+          error = popupError; // Continuar con el manejo de error normal
+        }
+      }
       
       // Mensajes de error más específicos
       let errorMessage = 'Error al iniciar sesión con Google. Intentá nuevamente.';
@@ -108,6 +173,8 @@ const GoogleSignIn = () => {
         errorMessage = 'El popup fue bloqueado. Por favor, permití popups para este sitio.';
       } else if (error.code === 'auth/cancelled-popup-request') {
         errorMessage = 'Solo se puede abrir un popup a la vez. Intentá nuevamente.';
+      } else if (error.message?.includes('missing initial state')) {
+        errorMessage = 'Problema con el navegador. Intentá cerrar y abrir la pestaña nuevamente.';
       }
       
       setError(errorMessage);

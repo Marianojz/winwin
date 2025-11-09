@@ -29,6 +29,20 @@ export const isMobileDevice = (): boolean => {
 };
 
 /**
+ * Verifica si sessionStorage está disponible
+ */
+export const isSessionStorageAvailable = (): boolean => {
+  try {
+    const test = '__sessionStorage_test__';
+    sessionStorage.setItem(test, test);
+    sessionStorage.removeItem(test);
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
+/**
  * Crea el provider de Google con configuración optimizada
  */
 export const createGoogleProvider = (): GoogleAuthProvider => {
