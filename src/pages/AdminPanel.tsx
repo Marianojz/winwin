@@ -1747,11 +1747,19 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
           logoStickers: (homeConfig.siteSettings?.logoStickers || []).map(s => {
             const cleaned: any = { ...s };
             // Solo incluir startDate y endDate si tienen valores
+            // startDate y endDate son strings en LogoSticker, no Date
+            // Pero pueden venir como Date desde Firebase, así que los convertimos a string si es necesario
             if (s.startDate) {
-              cleaned.startDate = s.startDate instanceof Date ? s.startDate.toISOString() : s.startDate;
+              const startDateValue = s.startDate as any;
+              cleaned.startDate = typeof startDateValue === 'string' 
+                ? startDateValue 
+                : (startDateValue instanceof Date ? startDateValue.toISOString() : String(startDateValue));
             }
             if (s.endDate) {
-              cleaned.endDate = s.endDate instanceof Date ? s.endDate.toISOString() : s.endDate;
+              const endDateValue = s.endDate as any;
+              cleaned.endDate = typeof endDateValue === 'string' 
+                ? endDateValue 
+                : (endDateValue instanceof Date ? endDateValue.toISOString() : String(endDateValue));
             }
             // Eliminar propiedades undefined explícitamente
             if (!s.startDate) delete cleaned.startDate;

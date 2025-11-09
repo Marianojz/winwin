@@ -52,10 +52,11 @@ const convertChatMessage = (conversation: Conversation): UnifiedMessage => {
 // Convertir ticket a formato unificado
 const convertTicket = (ticket: Ticket): UnifiedMessage => {
   // Determinar prioridad basada en tipo y estado
+  // TicketType: 'consulta' | 'problema' | 'reembolso' | 'tecnico' | 'otro'
   let priority: UnifiedMessagePriority = 'medium';
-  if (ticket.type === 'urgente' || ticket.type === 'problema') {
+  if (ticket.type === 'problema' || ticket.type === 'reembolso') {
     priority = 'high';
-  } else if (ticket.type === 'consulta' || ticket.type === 'sugerencia') {
+  } else if (ticket.type === 'consulta' || ticket.type === 'otro') {
     priority = 'low';
   }
   

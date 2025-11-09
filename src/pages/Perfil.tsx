@@ -197,8 +197,8 @@ const Perfil = () => {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ color: 'var(--text-secondary)' }}>Email verificado:</span>
-            <strong style={{ color: user.emailVerified ? 'var(--success)' : 'var(--warning)' }}>
-              {user.emailVerified ? '✓ Sí' : '✗ No'}
+            <strong style={{ color: (user as any).emailVerified ? 'var(--success)' : 'var(--warning)' }}>
+              {(user as any).emailVerified ? '✓ Sí' : '✗ No'}
             </strong>
           </div>
         </div>
