@@ -3,22 +3,34 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: #f8f9fa;
+  background: var(--bg-primary, #f8f9fa);
+  width: 100%;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+  position: relative;
 }
 
 .admin-header-mobile {
   position: sticky;
   top: 0;
-  background: white;
+  background: var(--bg-primary, white);
   padding: 1rem;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--border, #e0e0e0);
   z-index: 100;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .admin-main-content-mobile {
   flex: 1;
   padding: 1rem;
-  padding-bottom: 80px; /* Espacio para navbar inferior */
+  padding-bottom: 80px; /* Space for bottom nav */
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch; /* Smooth scroll on iOS */
+  position: relative;
 }
 
 /* Navegación inferior móvil */
@@ -73,10 +85,22 @@
 }
 
 .mobile-card-compact {
-  background: white;
+  background: var(--bg-primary, white);
   border-radius: 12px;
-  padding: 1.25rem;
+  padding: 1rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 0.75rem;
+  overflow: hidden; /* Prevent content overflow */
+  
+  /* Improved touch feedback */
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.2s ease;
+}
+
+.mobile-card-compact:active {
+  transform: scale(0.98);
 }
 
 /* Formularios móviles optimizados */
@@ -140,34 +164,76 @@
   color: var(--text-primary);
 }
 
-/* Media queries para aplicar estilos solo en móvil */
+/* Media queries for mobile optimization */
 @media (max-width: 768px) {
   .admin-panel-mobile {
     display: flex;
+    padding: 0;
   }
 
   .admin-header-mobile {
-    display: block;
+    display: flex;
+    padding: 0.75rem;
   }
 
   .admin-main-content-mobile {
-    display: block;
+    padding: 0.75rem;
+    margin-bottom: 70px; /* Ensure content doesn't get hidden behind bottom nav */
   }
 
   .admin-bottom-nav {
     display: flex;
+    height: 60px; /* Fixed height for bottom nav */
   }
 
   .mobile-data-grid {
     display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    width: 100%;
   }
 
   .mobile-form-compact {
     display: flex;
+    width: 100%;
   }
 
   .mobile-table-container {
     display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -0.75rem; /* Negative margin to allow full-width scroll */
+    padding: 0 0.75rem;
+  }
+
+  /* Fix for sections visibility */
+  .admin-section {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    margin-bottom: 1rem;
+  }
+
+  /* Ensure all action buttons are easily tappable */
+  .action-button, 
+  button,
+  .nav-item-mobile {
+    min-height: 44px; /* iOS minimum tap target size */
+    min-width: 44px;
+    padding: 0.5rem 1rem;
+  }
+
+  /* Improve table responsiveness */
+  .mobile-table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .mobile-table th,
+  .mobile-table td {
+    min-width: 120px; /* Ensure columns don't get too narrow */
   }
 }
 
