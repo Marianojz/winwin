@@ -89,51 +89,72 @@ const GoogleSignIn = () => {
       const provider = createGoogleProvider();
       const isMobile = isMobileDevice();
       
+      console.log('🔐 [GOOGLE SIGN-IN] Iniciando proceso...', { isMobile });
+      
       // En móvil, verificar si sessionStorage está disponible antes de usar redirect
       // IMPORTANTE: Si sessionStorage no está disponible, redirect NO funcionará
       if (isMobile) {
         const sessionStorageAvailable = isSessionStorageAvailable();
+        console.log('📱 [GOOGLE SIGN-IN] Verificación móvil:', { sessionStorageAvailable });
         
         if (!sessionStorageAvailable) {
           // Si sessionStorage no está disponible, usar popup directamente
           // Redirect NO funcionará sin sessionStorage
-          console.warn('⚠️ sessionStorage no disponible, usando popup en móvil');
+          console.warn('⚠️ [GOOGLE SIGN-IN] sessionStorage no disponible, usando popup en móvil');
           setStatusMessage('Abriendo ventana de Google...');
-          toast.info('Abriendo ventana de Google (método alternativo)', 3000);
+          toast.info('Usando método alternativo (tu navegador no soporta redirect)', 4000);
           // Continuar con popup (no usar redirect)
         } else {
           // Si sessionStorage está disponible, intentar usar redirect
           // Pero si falla, automáticamente usar popup
+          console.log('✅ [GOOGLE SIGN-IN] sessionStorage disponible, usando redirect');
           setStatusMessage('Redirigiendo a Google...');
           toast.info('Redirigiendo a Google para iniciar sesión', 3000);
           try {
+            console.log('🔄 [GOOGLE SIGN-IN] Llamando a signInWithRedirect...');
             await signInWithRedirect(auth, provider);
+            console.log('✅ [GOOGLE SIGN-IN] signInWithRedirect completado, redirigiendo...');
             // El redirect result se manejará en App.tsx o en el useEffect de arriba
             return;
           } catch (redirectError: any) {
             // Si el redirect falla por cualquier razón, usar popup como fallback
-            console.warn('⚠️ Redirect falló, usando popup como fallback:', redirectError.message);
+            console.warn('⚠️ [GOOGLE SIGN-IN] Redirect falló, usando popup como fallback:', redirectError.message);
             setStatusMessage('Intentando con método alternativo...');
             toast.warning('Usando método alternativo de autenticación', 3000);
             // Continuar con popup como fallback (no lanzar error)
           }
         }
+      } else {
+        console.log('💻 [GOOGLE SIGN-IN] Desktop detectado, usando popup');
       }
 
       // En desktop o si sessionStorage no está disponible, usar popup
+      console.log('🪟 [GOOGLE SIGN-IN] Intentando con popup...');
       try {
         const result = await signInWithPopup(auth, provider);
+        console.log('✅ [GOOGLE SIGN-IN] Popup exitoso, procesando usuario...', result.user.uid);
+        
         const { fullUser, needsCompleteProfile } = await processGoogleAuthResult(result.user);
+        
+        console.log('👤 [GOOGLE SIGN-IN] Usuario procesado:', {
+          id: fullUser.id,
+          email: fullUser.email,
+          isAdmin: fullUser.isAdmin,
+          needsCompleteProfile
+        });
         
         setUser(fullUser);
         toast.success('¡Inicio de sesión exitoso!', 2000);
 
         // Redirigir según si necesita completar perfil
         if (needsCompleteProfile) {
+          console.log('📝 [GOOGLE SIGN-IN] Redirigiendo a completar perfil...');
           navigate('/completar-perfil', { replace: true });
         } else if (fullUser.isAdmin) {
+          console.log('👑 [GOOGLE SIGN-IN] Redirigiendo a admin...');
           navigate('/admin', { replace: true });
         } else {
+          console.log('🏠 [GOOGLE SIGN-IN] Redirigiendo a home...');
           navigate('/', { replace: true });
         }
       } catch (popupError: any) {
