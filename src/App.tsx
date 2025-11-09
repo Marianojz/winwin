@@ -251,6 +251,31 @@ function RedirectHandler() {
             } finally {
               setIsProcessing(false);
             }
+          } else if (firebaseUser && !isProcessing) {
+            // Si no hay redirect result pero hay usuario autenticado, procesarlo directamente
+            // Esto puede pasar cuando el redirect se perdió pero el usuario está autenticado
+            console.log('🔍 [MÓVIL BACKUP] No hay redirect result, pero usuario autenticado detectado. Procesando directamente...', firebaseUser.uid);
+            setIsProcessing(true);
+            toast.info('Procesando tu cuenta...', 2000);
+            
+            try {
+              const { fullUser, needsCompleteProfile } = await processGoogleAuthResult(firebaseUser);
+              setUser(fullUser);
+              toast.success('¡Inicio de sesión exitoso!', 2000);
+              
+              if (needsCompleteProfile) {
+                navigate('/completar-perfil', { replace: true });
+              } else if (fullUser.isAdmin) {
+                navigate('/admin', { replace: true });
+              } else {
+                navigate('/', { replace: true });
+              }
+            } catch (err: any) {
+              console.error('❌ [MÓVIL BACKUP] Error procesando usuario:', err);
+              toast.error('Error al procesar tu cuenta', 5000);
+            } finally {
+              setIsProcessing(false);
+            }
           }
         } catch (err) {
           // Ignorar errores de no-auth-event

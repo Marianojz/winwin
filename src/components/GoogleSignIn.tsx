@@ -106,23 +106,13 @@ const GoogleSignIn = () => {
           // Continuar con popup (no usar redirect)
         } else {
           // Si sessionStorage está disponible, intentar usar redirect
-          // Pero si falla, automáticamente usar popup
-          console.log('✅ [GOOGLE SIGN-IN] sessionStorage disponible, usando redirect');
-          setStatusMessage('Redirigiendo a Google...');
-          toast.info('Redirigiendo a Google para iniciar sesión', 3000);
-          try {
-            console.log('🔄 [GOOGLE SIGN-IN] Llamando a signInWithRedirect...');
-            await signInWithRedirect(auth, provider);
-            console.log('✅ [GOOGLE SIGN-IN] signInWithRedirect completado, redirigiendo...');
-            // El redirect result se manejará en App.tsx o en el useEffect de arriba
-            return;
-          } catch (redirectError: any) {
-            // Si el redirect falla por cualquier razón, usar popup como fallback
-            console.warn('⚠️ [GOOGLE SIGN-IN] Redirect falló, usando popup como fallback:', redirectError.message);
-            setStatusMessage('Intentando con método alternativo...');
-            toast.warning('Usando método alternativo de autenticación', 3000);
-            // Continuar con popup como fallback (no lanzar error)
-          }
+          // PERO: En móvil, redirect puede fallar por problemas de storage particionado
+          // Por seguridad, usar popup directamente en móvil (más confiable)
+          console.log('✅ [GOOGLE SIGN-IN] sessionStorage disponible, pero usando popup en móvil para mayor confiabilidad');
+          setStatusMessage('Abriendo ventana de Google...');
+          toast.info('Abriendo ventana de Google', 3000);
+          // En móvil, usar popup directamente (más confiable que redirect)
+          // Continuar con popup
         }
       } else {
         console.log('💻 [GOOGLE SIGN-IN] Desktop detectado, usando popup');
