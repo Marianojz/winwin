@@ -17,8 +17,17 @@ function Root() {
       if (!isMountedRef.current) return;
       
       const currentUser = useStore.getState().user;
+      
+      console.log('🔐 [MAIN] Auth listener callback:', {
+        hasUser: !!user,
+        userId: user?.id,
+        userEmail: user?.email,
+        hasCurrentUser: !!currentUser,
+        currentUserId: currentUser?.id
+      });
+      
       if (!user && currentUser) {
-        console.log('🔐 Usuario deslogueado de Firebase, limpiando estado');
+        console.log('🔐 [MAIN] Usuario deslogueado de Firebase, limpiando estado');
         const { clearNotifications } = useStore.getState();
         clearNotifications(); // Limpiar notificaciones al desloguearse
         if (isMountedRef.current) {
@@ -31,8 +40,15 @@ function Root() {
                             (user.isAdmin !== undefined && user.isAdmin !== currentUser.isAdmin) ||
                             (user.username && user.username !== currentUser.username);
         
+        console.log('🔐 [MAIN] Evaluando actualización de usuario:', {
+          shouldUpdate,
+          hasCurrentUser: !!currentUser,
+          sameId: currentUser?.id === user.id,
+          isAdminChanged: user.isAdmin !== undefined && user.isAdmin !== currentUser?.isAdmin
+        });
+        
         if (shouldUpdate && isMountedRef.current) {
-          console.log('🔐 Usuario autenticado en Firebase, actualizando estado');
+          console.log('🔐 [MAIN] Usuario autenticado en Firebase, actualizando estado');
           // Si el usuario actual tiene isAdmin pero el nuevo no lo tiene aún, preservar isAdmin
           if (currentUser?.isAdmin && user.isAdmin === undefined) {
             user.isAdmin = currentUser.isAdmin;
@@ -40,6 +56,8 @@ function Root() {
           // NO guardar en localStorage - Firebase es la fuente de verdad
           setUser(user);
           // NO cargar notificaciones aquí - App.tsx lo hará para evitar duplicados
+        } else {
+          console.log('🔐 [MAIN] No se actualiza usuario (ya está actualizado o no es necesario)');
         }
       }
     });
