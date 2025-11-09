@@ -42,14 +42,19 @@ function RedirectHandler() {
     const handleRedirectResult = async () => {
       // Evitar procesar múltiples veces
       if (isProcessing) {
-        console.log('⏳ Ya se está procesando un redirect...');
+        console.log('⏳ [MÓVIL] Ya se está procesando un redirect...');
         return;
       }
 
       if (!mounted) return;
 
       try {
-        console.log('🔍 [MÓVIL] Verificando redirect result...');
+        console.log('🔍 [MÓVIL] Verificando redirect result...', {
+          currentUser: auth.currentUser?.uid,
+          pathname: location.pathname,
+          search: location.search,
+          hash: location.hash
+        });
         let result;
         try {
           result = await getRedirectResult(auth);
