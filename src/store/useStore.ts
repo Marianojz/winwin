@@ -121,42 +121,17 @@ export const useStore = create<AppState>((set, get) => ({
     set({ theme: newTheme });
   },
 
-  // User
-user: (() => {
-  try {
-    const saved = localStorage.getItem('user');
-    if (!saved) return null;
-    const parsed = JSON.parse(saved);
-    // Asegurar que las fechas se parseen correctamente
-    if (parsed.createdAt) {
-      parsed.createdAt = new Date(parsed.createdAt);
+  // User - SIEMPRE desde Firebase, NO localStorage
+  user: null,
+  setUser: (user) => {
+    if (!user) {
+      // Limpiar notificaciones cuando el usuario se desloguea
+      set({ notifications: [], unreadCount: 0 });
     }
-    // Asegurar que isAdmin sea boolean
-    if (parsed.isAdmin !== undefined) {
-      parsed.isAdmin = Boolean(parsed.isAdmin);
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-})(),
-setUser: (user) => {
-  if (user) {
-    localStorage.setItem('user', JSON.stringify(user));
-  } else {
-    // Limpiar notificaciones cuando el usuario se desloguea
-    set({ notifications: [], unreadCount: 0 });
-    localStorage.removeItem('user');
-  }
-  set({ user, isAuthenticated: !!user });
-},
-isAuthenticated: (() => {
-  try {
-    return !!localStorage.getItem('user');
-  } catch {
-    return false;
-  }
-})(),
+    // NO guardar en localStorage - siempre usar Firebase como fuente de verdad
+    set({ user, isAuthenticated: !!user });
+  },
+  isAuthenticated: false,
 
   // Auctions - TODO desde Firebase, no localStorage
   auctions: [],

@@ -1,10 +1,12 @@
 import { useEffect, useState, Suspense, lazy } from 'react';
 import { useSyncFirebase } from './hooks/useSyncFirebase';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { ref, onValue } from 'firebase/database';
-import { realtimeDb } from './config/firebase';
+import { realtimeDb, auth } from './config/firebase';
+import { getRedirectResult } from 'firebase/auth';
 import { HomeConfig, defaultHomeConfig } from './types/homeConfig';
 import { useStore } from './store/useStore';
+import { processGoogleAuthResult } from './utils/googleAuthHelper';
 import Navbar from './components/Navbar';
 import AuctionManager from './utils/AuctionManager';
 import OrderManager from './utils/OrderManager';
@@ -23,6 +25,49 @@ import Carrito from './pages/Carrito';
 import Notificaciones from './pages/Notificaciones';
 import Perfil from './pages/Perfil';
 import AdminPanel from './pages/AdminPanel';
+
+// Componente interno para manejar redirect result (debe estar dentro de Router)
+function RedirectHandler() {
+  const { setUser } = useStore();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && result.user) {
+          console.log('✅ Google Sign-In redirect exitoso, procesando usuario...');
+          
+          const { fullUser, needsCompleteProfile } = await processGoogleAuthResult(result.user);
+          
+          setUser(fullUser);
+
+          // Redirigir según si necesita completar perfil
+          if (needsCompleteProfile) {
+            navigate('/completar-perfil', { replace: true });
+          } else {
+            // Redirigir según rol
+            if (fullUser.isAdmin) {
+              navigate('/admin', { replace: true });
+            } else {
+              navigate('/', { replace: true });
+            }
+          }
+        }
+      } catch (error: any) {
+        console.error('Error procesando redirect result:', error);
+        // No mostrar error si el usuario no viene de un redirect
+        if (error.code !== 'auth/no-auth-event') {
+          console.warn('Error en redirect de Google:', error.message);
+        }
+      }
+    };
+
+    handleRedirectResult();
+  }, [setUser, navigate]);
+
+  return null;
+}
 
 // Lazy loading de componentes de registro
 const Registro = lazy(() => import('./pages/Registro'));
@@ -140,6 +185,7 @@ function App() {
   return (
     <Router basename={import.meta.env.BASE_URL}>
       <div className="app">
+        <RedirectHandler />
         <Navbar />
         <AuctionManager />
         <OrderManager />

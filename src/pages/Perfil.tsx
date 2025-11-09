@@ -8,6 +8,7 @@ import { Message } from '../types';
 import { formatTimeAgo } from '../utils/helpers';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { doc, updateDoc } from 'firebase/firestore';
+import { getUserAvatarUrl } from '../utils/avatarHelper';
 import AvatarGallery from '../components/AvatarGallery';
 import ChatWidget from '../components/ChatWidget';
 import DashboardCompact, { DashboardMetric, QuickAction, DashboardCard } from '../components/DashboardCompact';
@@ -116,8 +117,8 @@ const Perfil = () => {
   );
   const activeBids = myBids.filter(a => a.status === 'active');
 
-  // Usar avatar del usuario (prioriza avatar de Google guardado en Firebase)
-  const avatarUrl = user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || 'U')}&size=200&background=FF6B00&color=fff&bold=true`;
+  // Usar función helper unificada para obtener avatar desde Firebase
+  const avatarUrl = getUserAvatarUrl(user);
 
   // Preparar métricas para el dashboard
   const dashboardMetrics: DashboardMetric[] = [
@@ -273,14 +274,12 @@ const Perfil = () => {
       const { clearNotifications } = useStore.getState();
       clearNotifications(); // Limpiar notificaciones
       useStore.getState().setUser(null);
-      localStorage.removeItem('user');
       // Redirigir al inicio usando navigate
       window.location.href = '/';
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
       // Limpiar igualmente aunque falle
       useStore.getState().setUser(null);
-      localStorage.removeItem('user');
       window.location.href = '/';
     }
   };
@@ -295,16 +294,12 @@ const Perfil = () => {
         avatar: avatarUrl
       });
 
-      // Actualizar en el store
+      // Actualizar en el store - Firebase es la fuente de verdad
       const { setUser } = useStore.getState();
       setUser({
         ...user,
         avatar: avatarUrl
       });
-
-      // Actualizar en localStorage
-      const updatedUser = { ...user, avatar: avatarUrl };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
 
       setShowAvatarGallery(false);
     } catch (error) {

@@ -119,7 +119,6 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
       const { clearNotifications } = useStore.getState();
       clearNotifications();
       setUser(null);
-      localStorage.removeItem('user');
       
       // FadeOut antes de redirigir
       setTimeout(() => {
@@ -130,7 +129,6 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
       console.error('Error al cerrar sesión:', error);
       // Limpiar igualmente aunque falle
       setUser(null);
-      localStorage.removeItem('user');
       navigate('/', { replace: true });
       closeMenu();
     }

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Image, Palette, Sparkles, Smile, Briefcase, X, Check, Loader, RotateCcw } from 'lucide-react';
+import { Upload, Image, Palette, Sparkles, Smile, Briefcase, X, Check, Loader, RotateCcw, Zap, Music, Sparkles as SparklesIcon, Shirt } from 'lucide-react';
 import { uploadImage } from '../utils/imageUpload';
 import { auth } from '../config/firebase';
 import { compressAvatar, supportsWebP } from '../utils/imageCompression';
@@ -20,7 +20,7 @@ interface AvatarGalleryProps {
 }
 
 const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps) => {
-  const [activeTab, setActiveTab] = useState<'serios' | 'felices' | 'bizarros' | 'upload' | 'google' | 'editor'>('serios');
+  const [activeTab, setActiveTab] = useState<'serios' | 'felices' | 'bizarros' | 'cyber' | 'punk' | 'monkey' | 'modernos' | 'upload' | 'google' | 'editor'>('serios');
   const [selectedAvatar, setSelectedAvatar] = useState<AvatarOption | null>(null);
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentAvatar || null);
@@ -163,6 +163,168 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
         description: 'Transición estilizada entre humano y máquina',
         style: 'cyborg estilizado',
         imageUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=Cyborg&backgroundColor=2a2a2a&size=200`
+      }
+    ],
+    cyber: [
+      {
+        id: 'c1',
+        name: 'Cyber Neon Warrior',
+        description: 'Guerrero cyberpunk con efectos neon futuristas',
+        style: 'cyber neon',
+        imageUrl: `https://api.dicebear.com/7.x/pixel-art/svg?seed=CyberNeon&backgroundColor=0a0a0a&size=200`
+      },
+      {
+        id: 'c2',
+        name: 'Matrix Hacker',
+        description: 'Avatar estilo Matrix con código digital',
+        style: 'matrix hacker',
+        imageUrl: `https://api.dicebear.com/7.x/pixel-art/svg?seed=Matrix&backgroundColor=00ff00&size=200`
+      },
+      {
+        id: 'c3',
+        name: 'Cyber Glitch',
+        description: 'Efecto glitch digital con colores vibrantes',
+        style: 'glitch digital',
+        imageUrl: `https://api.dicebear.com/7.x/pixel-art/svg?seed=Glitch&backgroundColor=ff00ff&size=200`
+      },
+      {
+        id: 'c4',
+        name: 'Neon Synthwave',
+        description: 'Estilo synthwave con paleta de colores retro-futurista',
+        style: 'synthwave neon',
+        imageUrl: `https://api.dicebear.com/7.x/pixel-art/svg?seed=Synthwave&backgroundColor=ff0080&size=200`
+      },
+      {
+        id: 'c5',
+        name: 'Digital Ghost',
+        description: 'Avatar etéreo con efectos de partículas digitales',
+        style: 'ghost digital',
+        imageUrl: `https://api.dicebear.com/7.x/pixel-art/svg?seed=Ghost&backgroundColor=00ffff&size=200`
+      },
+      {
+        id: 'c6',
+        name: 'Cyber Samurai',
+        description: 'Samurai futurista con elementos tecnológicos',
+        style: 'cyber samurai',
+        imageUrl: `https://api.dicebear.com/7.x/pixel-art/svg?seed=Samurai&backgroundColor=1a1a2e&size=200`
+      }
+    ],
+    punk: [
+      {
+        id: 'p1',
+        name: 'Punk Rock Rebel',
+        description: 'Avatar rebelde con estilo punk rock clásico',
+        style: 'punk rock',
+        imageUrl: `https://api.dicebear.com/7.x/personas/svg?seed=PunkRock&backgroundColor=000000&size=200`
+      },
+      {
+        id: 'p2',
+        name: 'Street Punk',
+        description: 'Estilo street punk con actitud urbana',
+        style: 'street punk',
+        imageUrl: `https://api.dicebear.com/7.x/personas/svg?seed=StreetPunk&backgroundColor=1a1a1a&size=200`
+      },
+      {
+        id: 'p3',
+        name: 'Punk Attitude',
+        description: 'Avatar con actitud punk y colores vibrantes',
+        style: 'punk attitude',
+        imageUrl: `https://api.dicebear.com/7.x/personas/svg?seed=Attitude&backgroundColor=ff0000&size=200`
+      },
+      {
+        id: 'p4',
+        name: 'Alternative Punk',
+        description: 'Estilo alternativo punk con elementos únicos',
+        style: 'alternative punk',
+        imageUrl: `https://api.dicebear.com/7.x/personas/svg?seed=Alternative&backgroundColor=8b008b&size=200`
+      },
+      {
+        id: 'p5',
+        name: 'Punk Fashion',
+        description: 'Moda punk con accesorios característicos',
+        style: 'punk fashion',
+        imageUrl: `https://api.dicebear.com/7.x/personas/svg?seed=Fashion&backgroundColor=2d2d2d&size=200`
+      }
+    ],
+    monkey: [
+      {
+        id: 'm1',
+        name: 'Cool Monkey',
+        description: 'Mono con estilo moderno y actitud cool',
+        style: 'cool monkey',
+        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=MonkeyCool&backgroundColor=ff6b00&size=200`
+      },
+      {
+        id: 'm2',
+        name: 'Cyber Monkey',
+        description: 'Mono futurista con elementos tecnológicos',
+        style: 'cyber monkey',
+        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=CyberMonkey&backgroundColor=00d4ff&size=200`
+      },
+      {
+        id: 'm3',
+        name: 'Funky Monkey',
+        description: 'Mono con estilo funky y colores vibrantes',
+        style: 'funky monkey',
+        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=FunkyMonkey&backgroundColor=ff00ff&size=200`
+      },
+      {
+        id: 'm4',
+        name: 'Street Monkey',
+        description: 'Mono urbano con estilo street',
+        style: 'street monkey',
+        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=StreetMonkey&backgroundColor=9d4edd&size=200`
+      },
+      {
+        id: 'm5',
+        name: 'Monkey Business',
+        description: 'Mono divertido con personalidad única',
+        style: 'monkey business',
+        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Business&backgroundColor=ffb800&size=200`
+      }
+    ],
+    modernos: [
+      {
+        id: 'mod1',
+        name: 'Minimalista Moderno',
+        description: 'Diseño minimalista y elegante estilo 2024',
+        style: 'minimalista',
+        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Minimal&backgroundColor=f5f5f5&size=200`
+      },
+      {
+        id: 'mod2',
+        name: 'Fashion Forward',
+        description: 'Avatar con estilo de moda contemporánea',
+        style: 'fashion forward',
+        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Fashion&backgroundColor=ffffff&size=200`
+      },
+      {
+        id: 'mod3',
+        name: 'Trendy Urban',
+        description: 'Estilo urbano trendy y actual',
+        style: 'trendy urban',
+        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Trendy&backgroundColor=e0e0e0&size=200`
+      },
+      {
+        id: 'mod4',
+        name: 'Contemporary Style',
+        description: 'Diseño contemporáneo con toques modernos',
+        style: 'contemporary',
+        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Contemporary&backgroundColor=f0f0f0&size=200`
+      },
+      {
+        id: 'mod5',
+        name: 'Modern Elegance',
+        description: 'Elegancia moderna con líneas limpias',
+        style: 'modern elegance',
+        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Elegance&backgroundColor=d4d4d4&size=200`
+      },
+      {
+        id: 'mod6',
+        name: 'Chic Modern',
+        description: 'Estilo chic y sofisticado',
+        style: 'chic modern',
+        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Chic&backgroundColor=cccccc&size=200`
       }
     ]
   };
@@ -385,6 +547,34 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
             >
               <Sparkles size={18} />
               Bizarros
+            </button>
+            <button
+              className={`tab ${activeTab === 'cyber' ? 'active' : ''}`}
+              onClick={() => setActiveTab('cyber')}
+            >
+              <Zap size={18} />
+              Cyber
+            </button>
+            <button
+              className={`tab ${activeTab === 'punk' ? 'active' : ''}`}
+              onClick={() => setActiveTab('punk')}
+            >
+              <Music size={18} />
+              Punk
+            </button>
+            <button
+              className={`tab ${activeTab === 'monkey' ? 'active' : ''}`}
+              onClick={() => setActiveTab('monkey')}
+            >
+              <SparklesIcon size={18} />
+              Monkey
+            </button>
+            <button
+              className={`tab ${activeTab === 'modernos' ? 'active' : ''}`}
+              onClick={() => setActiveTab('modernos')}
+            >
+              <Shirt size={18} />
+              Modernos
             </button>
             <button
               className={`tab ${activeTab === 'upload' ? 'active' : ''}`}

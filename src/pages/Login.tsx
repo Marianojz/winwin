@@ -50,7 +50,6 @@ const Login = () => {
       }
 
       setUser(null);
-      localStorage.removeItem('user');
       
       // Esperar un momento para asegurar que Firebase limpia el estado
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -116,9 +115,8 @@ const Login = () => {
         fullUser.username
       );
       
-      // Establecer usuario en múltiples lugares para asegurar sincronización
+      // Establecer usuario - Firebase es la fuente de verdad
       setUser(fullUser);
-      localStorage.setItem('user', JSON.stringify(fullUser));
       
       // Esperar un momento antes de navegar para asegurar que todo está sincronizado
       await new Promise(resolve => setTimeout(resolve, 200));
@@ -147,7 +145,6 @@ const Login = () => {
           const finalUser = useStore.getState().user;
           if (!finalUser || finalUser.id !== fullUser.id) {
             setUser(fullUser);
-            localStorage.setItem('user', JSON.stringify(fullUser));
           }
         }, 300);
       }, 100);
@@ -161,7 +158,6 @@ const Login = () => {
         // Ignorar errores de signOut
       }
       setUser(null);
-      localStorage.removeItem('user');
       
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
         setError('Email o contraseña incorrectos');

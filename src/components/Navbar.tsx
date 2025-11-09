@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { HomeConfig, defaultHomeConfig } from '../types/homeConfig';
 import { specialEvents } from '../utils/dateSpecialEvents';
 import { getUnreadCount } from '../utils/messages';
+import { getUserAvatarUrl, getUserInitial } from '../utils/avatarHelper';
 import ThemeToggle from './ThemeToggle';
 import SoundToggle from './SoundToggle';
 import AvatarMenu from './AvatarMenu';
@@ -20,23 +21,8 @@ const Navbar = () => {
   const [homeConfig, setHomeConfig] = useState<HomeConfig>(defaultHomeConfig);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
-  // Generar avatar URL - priorizar avatar de Google guardado en Firebase
-  const getAvatarUrl = () => {
-    // Si hay avatar guardado en Firebase (incluye avatar de Google), usarlo
-    if (user?.avatar && typeof user.avatar === 'string' && user.avatar.trim() !== '' && user.avatar.startsWith('http')) {
-      return user.avatar;
-    }
-    // Si no hay avatar, generar uno con ui-avatars como fallback
-    const username = user?.username || user?.email?.split('@')[0] || 'U';
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&size=40&background=FF6B00&color=fff&bold=true`;
-  };
-  
-  // Función para obtener la inicial del usuario (para fallback)
-  const getUserInitial = () => {
-    return (user?.username || user?.email || 'U')[0].toUpperCase();
-  };
-  
-  const avatarUrl = getAvatarUrl();
+  // Usar función helper unificada para obtener avatar desde Firebase
+  const avatarUrl = getUserAvatarUrl(user);
   
   // Debug: Log del avatar solo cuando cambia
   useEffect(() => {
@@ -195,10 +181,7 @@ const Navbar = () => {
     <>
       {/* Navbar Superior (Desktop) */}
       <nav className="navbar">
-        <div className="navbar-container" style={{ 
-          justifyContent: logoConfig.position === 'center' ? 'center' : 
-                         logoConfig.position === 'right' ? 'flex-end' : 'flex-start'
-        }}>
+        <div className="navbar-container">
           <Link to="/" className="navbar-logo" style={{ 
             position: 'relative', 
             display: 'flex', 
@@ -293,11 +276,9 @@ const Navbar = () => {
           </div>
 
           <div className="navbar-actions">
-            <ThemeToggle />
-            <SoundToggle />
-            
             {isAuthenticated ? (
               <>
+                {/* Acciones principales del usuario */}
                 <Link to="/carrito" className="navbar-icon-btn" title="Carrito">
                   <ShoppingCart size={20} />
                   {cartItemsCount > 0 && <span className="navbar-badge">{cartItemsCount}</span>}
@@ -313,18 +294,33 @@ const Navbar = () => {
                   {unreadMessagesCount > 0 && <span className="navbar-badge">{unreadMessagesCount}</span>}
                 </Link>
 
+                {/* Separador visual */}
+                <div style={{ width: '1px', height: '24px', background: 'var(--border)', margin: '0 0.25rem' }} />
+
+                {/* Configuración */}
+                <ThemeToggle />
+                <SoundToggle />
+
+                {/* Avatar del usuario */}
                 {user && (
                   <AvatarMenu
                     user={user}
                     avatarUrl={avatarUrl}
-                    getUserInitial={getUserInitial}
+                    getUserInitial={() => getUserInitial(user)}
                   />
                 )}
               </>
             ) : (
-              <Link to="/login" className="btn btn-primary">
-                Iniciar Sesión
-              </Link>
+              <>
+                {/* Configuración para usuarios no autenticados */}
+                <ThemeToggle />
+                <SoundToggle />
+                
+                {/* Botón de login */}
+                <Link to="/login" className="btn btn-primary">
+                  Iniciar Sesión
+                </Link>
+              </>
             )}
           </div>
         </div>

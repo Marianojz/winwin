@@ -72,13 +72,13 @@ const Contacto = () => {
 
   return (
     <div style={{ minHeight: '100vh', padding: '2rem 0' }}>
-      <div className="container" style={{ maxWidth: '1000px' }}>
+      <div className="container" style={{ maxWidth: '1000px', padding: '0 1rem' }}>
         {/* Encabezado */}
         <div style={{ 
           textAlign: 'center', 
           marginBottom: '3rem',
           background: 'var(--bg-secondary)',
-          padding: '2rem',
+          padding: '2rem 1.5rem',
           borderRadius: '1rem'
         }}>
           <div style={{ 
@@ -89,22 +89,27 @@ const Contacto = () => {
           }}>
             <Mail size={48} />
           </div>
-          <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>
+          <h1 style={{ fontSize: 'clamp(1.75rem, 4vw, 2.5rem)', marginBottom: '0.5rem' }}>
             Contactanos
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '1.125rem' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 'clamp(0.9375rem, 2vw, 1.125rem)' }}>
             Enviá un mensaje y nuestro equipo te responderá a la brevedad
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '3rem' }}>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+          gap: '2rem', 
+          marginBottom: '3rem' 
+        }}>
           {/* Información de contacto */}
           <div style={{
             background: 'var(--bg-secondary)',
-            padding: '2rem',
+            padding: 'clamp(1.5rem, 3vw, 2rem)',
             borderRadius: '1rem'
           }}>
-            <h2 style={{ marginBottom: '1.5rem', fontSize: '1.5rem' }}>Información de Contacto</h2>
+            <h2 style={{ marginBottom: '1.5rem', fontSize: 'clamp(1.25rem, 3vw, 1.5rem)' }}>Información de Contacto</h2>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
@@ -156,10 +161,10 @@ const Contacto = () => {
           {/* Formulario */}
           <div style={{
             background: 'var(--bg-secondary)',
-            padding: '2rem',
+            padding: 'clamp(1.5rem, 3vw, 2rem)',
             borderRadius: '1rem'
           }}>
-            <h2 style={{ marginBottom: '1.5rem', fontSize: '1.5rem' }}>Enviar Mensaje</h2>
+            <h2 style={{ marginBottom: '1.5rem', fontSize: 'clamp(1.25rem, 3vw, 1.5rem)' }}>Enviar Mensaje</h2>
 
             <form onSubmit={handleSubmit}>
               {error && (
@@ -210,7 +215,8 @@ const Contacto = () => {
                     border: '1px solid var(--bg-tertiary)',
                     background: 'var(--bg-primary)',
                     color: 'var(--text-primary)',
-                    fontSize: '1rem'
+                    fontSize: '16px',
+                    boxSizing: 'border-box'
                   }}
                 />
               </div>
@@ -231,7 +237,8 @@ const Contacto = () => {
                     border: '1px solid var(--bg-tertiary)',
                     background: 'var(--bg-primary)',
                     color: 'var(--text-primary)',
-                    fontSize: '1rem'
+                    fontSize: '16px',
+                    boxSizing: 'border-box'
                   }}
                 />
               </div>
@@ -253,7 +260,8 @@ const Contacto = () => {
                     border: '1px solid var(--bg-tertiary)',
                     background: 'var(--bg-primary)',
                     color: 'var(--text-primary)',
-                    fontSize: '1rem'
+                    fontSize: '16px',
+                    boxSizing: 'border-box'
                   }}
                 />
               </div>
@@ -274,7 +282,8 @@ const Contacto = () => {
                     border: '1px solid var(--bg-tertiary)',
                     background: 'var(--bg-primary)',
                     color: 'var(--text-primary)',
-                    fontSize: '1rem'
+                    fontSize: '16px',
+                    boxSizing: 'border-box'
                   }}
                 />
               </div>
@@ -296,9 +305,10 @@ const Contacto = () => {
                     border: '1px solid var(--bg-tertiary)',
                     background: 'var(--bg-primary)',
                     color: 'var(--text-primary)',
-                    fontSize: '1rem',
+                    fontSize: '16px',
                     fontFamily: 'inherit',
-                    resize: 'vertical'
+                    resize: 'vertical',
+                    boxSizing: 'border-box'
                   }}
                 />
               </div>
@@ -330,6 +340,23 @@ const Contacto = () => {
           </div>
         </div>
       </div>
+      <style>{`
+        @media (max-width: 768px) {
+          .container {
+            padding: 0 1rem !important;
+          }
+          
+          div[style*="grid-template-columns"] {
+            grid-template-columns: 1fr !important;
+            gap: 1.5rem !important;
+          }
+          
+          input, textarea, select {
+            font-size: 16px !important;
+            box-sizing: border-box !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };

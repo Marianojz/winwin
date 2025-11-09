@@ -95,8 +95,8 @@ const CompletarPerfilGoogle = () => {
         }
       };
 
+      // Firebase es la fuente de verdad - NO guardar en localStorage
       setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
 
       navigate('/');
     } catch (err) {

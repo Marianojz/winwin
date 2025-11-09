@@ -220,8 +220,10 @@ const Ayuda = () => {
             ) : (
               <form onSubmit={handleSubmit} style={{
                 background: 'var(--bg-secondary)',
-                padding: '2rem',
-                borderRadius: '1rem'
+                padding: isMobile ? '1.5rem' : '2rem',
+                borderRadius: '1rem',
+                maxWidth: '100%',
+                boxSizing: 'border-box'
               }}>
                 {error && (
                   <div style={{
@@ -269,7 +271,8 @@ const Ayuda = () => {
                       border: '1px solid var(--bg-tertiary)',
                       background: 'var(--bg-primary)',
                       color: 'var(--text-primary)',
-                      fontSize: '1rem'
+                      fontSize: '16px',
+                      boxSizing: 'border-box'
                     }}
                   >
                     <option value="consulta">Consulta General</option>
@@ -297,7 +300,8 @@ const Ayuda = () => {
                       border: '1px solid var(--bg-tertiary)',
                       background: 'var(--bg-primary)',
                       color: 'var(--text-primary)',
-                      fontSize: '1rem'
+                      fontSize: '16px',
+                      boxSizing: 'border-box'
                     }}
                   />
                 </div>
@@ -318,7 +322,8 @@ const Ayuda = () => {
                       border: '1px solid var(--bg-tertiary)',
                       background: 'var(--bg-primary)',
                       color: 'var(--text-primary)',
-                      fontSize: '1rem'
+                      fontSize: '16px',
+                      boxSizing: 'border-box'
                     }}
                   />
                 </div>
@@ -340,9 +345,10 @@ const Ayuda = () => {
                       border: '1px solid var(--bg-tertiary)',
                       background: 'var(--bg-primary)',
                       color: 'var(--text-primary)',
-                      fontSize: '1rem',
+                      fontSize: '16px',
                       fontFamily: 'inherit',
-                      resize: 'vertical'
+                      resize: 'vertical',
+                      boxSizing: 'border-box'
                     }}
                   />
                 </div>

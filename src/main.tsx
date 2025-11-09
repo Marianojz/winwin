@@ -37,10 +37,7 @@ function Root() {
           if (currentUser?.isAdmin && user.isAdmin === undefined) {
             user.isAdmin = currentUser.isAdmin;
           }
-          // Guardar en localStorage para persistencia
-          if (user.id) {
-            localStorage.setItem('user', JSON.stringify(user));
-          }
+          // NO guardar en localStorage - Firebase es la fuente de verdad
           setUser(user);
           // NO cargar notificaciones aquí - App.tsx lo hará para evitar duplicados
         }

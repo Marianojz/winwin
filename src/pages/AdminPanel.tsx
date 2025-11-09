@@ -2185,10 +2185,8 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     { id: 'settings', label: 'Configuración', icon: Activity }
   ];
 
-  // Tabs principales para navegación móvil inferior (solo las más importantes)
-  const mainMobileTabs = tabs.filter(tab => 
-    ['dashboard', 'auctions', 'products', 'orders', 'unified-inbox'].includes(tab.id)
-  );
+  // Tabs para navegación móvil inferior (todas las secciones)
+  const mainMobileTabs = tabs;
 
   // Protección de acceso - DEBE IR DESPUÉS DE TODOS LOS HOOKS
   if (!user?.isAdmin) {
@@ -2238,7 +2236,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
 
       {/* Tabs Navigation - Optimizado para móvil */}
       <div className={isMobile ? '' : ''} style={{
-        display: isMobile ? 'none' : 'flex',
+        display: 'flex',
         gap: isMobile ? '0.25rem' : '0.5rem',
         marginBottom: isMobile ? '1rem' : '2rem',
         overflowX: 'auto',
@@ -9011,9 +9009,10 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 onClick={() => setActiveTab(tab.id)}
                 className={`nav-item-mobile ${isActive ? 'active' : ''}`}
                 style={{ position: 'relative' }}
+                title={tab.label}
               >
-                <Icon size={24} />
-                <span>{tab.label}</span>
+                <Icon size={20} />
+                <span style={{ fontSize: '0.65rem', lineHeight: '1' }}>{tab.label.length > 10 ? tab.label.substring(0, 10) + '...' : tab.label}</span>
                 {tab.badge && (
                   <span style={{
                     position: 'absolute',
