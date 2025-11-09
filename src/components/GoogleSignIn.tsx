@@ -117,16 +117,13 @@ const GoogleSignIn = () => {
           try {
             console.log('🔄 [GOOGLE SIGN-IN] Llamando a signInWithRedirect...', {
               providerId: provider.providerId,
-              authDomain: auth.app.options.authDomain
+              authDomain: auth.app.options.authDomain,
+              currentURL: window.location.href,
+              currentOrigin: window.location.origin
             });
             
             // IMPORTANTE: signInWithRedirect puede lanzar un error o simplemente redirigir
             // No esperar a que "complete" porque redirige inmediatamente
-            console.log('🔄 [GOOGLE SIGN-IN] Llamando a signInWithRedirect...', {
-              authDomain: auth.app.options.authDomain,
-              currentURL: window.location.href
-            });
-            
             try {
               await signInWithRedirect(auth, provider);
               // Si llegamos aquí, el redirect no se ejecutó (no debería pasar)
