@@ -127,21 +127,23 @@ const ProductCard = ({ product }: ProductCardProps) => {
         </div>
       </div>
 
-      <style>{`
+            <style>{`
         .product-card {
           background: var(--bg-secondary);
-          border-radius: 1rem;
+          border-radius: 0.75rem;
           overflow: hidden;
-          box-shadow: 0 2px 12px var(--shadow);
+          box-shadow: 0 2px 8px var(--shadow);
           transition: all 0.3s ease;
           display: flex;
           flex-direction: column;
           height: 100%;
+          border: 1px solid var(--border);
         }
 
         .product-card:hover {
-          transform: translateY(-6px);
-          box-shadow: 0 12px 32px var(--shadow-lg);
+          transform: translateY(-4px);
+          box-shadow: 0 8px 24px var(--shadow-lg);
+          border-color: var(--primary);
         }
 
         .product-card-image {
@@ -170,20 +172,33 @@ const ProductCard = ({ product }: ProductCardProps) => {
           position: absolute;
           top: 0.75rem;
           right: 0.75rem;
-          font-size: 0.8125rem;
+          font-size: 0.75rem;
+          padding: 0.25rem 0.5rem;
+          border-radius: 0.375rem;
+          font-weight: 600;
+        }
+
+        .badge-warning {
+          background: rgba(245, 158, 11, 0.9);
+          color: white;
+        }
+
+        .badge-error {
+          background: rgba(239, 68, 68, 0.9);
+          color: white;
         }
 
         .product-card-content {
-          padding: 1.25rem;
+          padding: 1rem;
           display: flex;
           flex-direction: column;
-          gap: 0.75rem;
+          gap: 0.5rem;
           flex: 1;
         }
 
         .product-card-title {
-          font-size: 1.125rem;
-          font-weight: 700;
+          font-size: 0.875rem;
+          font-weight: 600;
           color: var(--text-primary);
           margin: 0;
           line-height: 1.3;
@@ -191,10 +206,11 @@ const ProductCard = ({ product }: ProductCardProps) => {
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
           overflow: hidden;
+          min-height: 2.3em;
         }
 
         .product-card-description {
-          font-size: 0.875rem;
+          font-size: 0.75rem;
           color: var(--text-secondary);
           margin: 0;
           display: -webkit-box;
@@ -210,7 +226,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
         }
 
         .rating-count {
-          font-size: 0.8125rem;
+          font-size: 0.75rem;
           color: var(--text-secondary);
           margin-left: 0.25rem;
         }
@@ -220,30 +236,65 @@ const ProductCard = ({ product }: ProductCardProps) => {
           justify-content: space-between;
           align-items: center;
           margin-top: auto;
-          padding-top: 0.75rem;
+          padding-top: 0.5rem;
           border-top: 1px solid var(--border);
         }
 
         .product-price {
-          font-size: 1.5rem;
+          font-size: 1.125rem;
           font-weight: 700;
           color: var(--primary);
           font-family: 'Poppins', sans-serif;
         }
 
         .product-stock {
-          font-size: 0.875rem;
+          font-size: 0.75rem;
           color: var(--text-secondary);
         }
 
         .product-card-actions {
           display: grid;
-          grid-template-columns: auto 1fr;
+          grid-template-columns: 1fr 1fr;
           gap: 0.5rem;
         }
 
         .product-card-actions .btn {
-          padding: 0.625rem 1rem;
+          padding: 0.5rem 0.75rem;
+          font-size: 0.8125rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.375rem;
+        }
+
+        @media (max-width: 768px) {
+          .product-card-content {
+            padding: 0.75rem;
+            gap: 0.375rem;
+          }
+          
+          .product-card-title {
+            font-size: 0.8125rem;
+          }
+          
+          .product-price {
+            font-size: 1rem;
+          }
+          
+          .product-card-actions .btn {
+            padding: 0.4375rem 0.625rem;
+            font-size: 0.75rem;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .product-card-content {
+            padding: 0.5rem;
+          }
+          
+          .product-card-actions {
+            gap: 0.375rem;
+          }
         }
       `}</style>
     </Link>
