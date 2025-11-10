@@ -248,7 +248,17 @@ const Registro = () => {
       const user = userCredential.user;
 
       // Preparar datos de dirección
-      const addressComponents = addressData?.components || {};
+      const addressComponents: {
+        street?: string;
+        streetNumber?: string;
+        floor?: string;
+        apartment?: string;
+        crossStreets?: string;
+        locality?: string;
+        province?: string;
+        postalCode?: string;
+        country?: string;
+      } = addressData?.components || {};
       const fullAddress = addressData?.formatted || formData.address;
 
       await setDoc(doc(db, 'users', user.uid), {

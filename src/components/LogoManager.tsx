@@ -14,6 +14,7 @@ interface LogoConfig {
   position: LogoPosition;
   opacity: number;
   hoverEffect: boolean;
+  faviconUrl?: string; // URL del favicon generado desde el logo
 }
 
 interface LogoManagerProps {

@@ -187,7 +187,7 @@ const GoogleAddressPicker = ({
 
       // Función para geocodificación inversa (definida localmente para evitar dependencias)
       const handleReverseGeocode = (lat: number, lng: number) => {
-        if (!geocoderInstance) return;
+        if (!geocoder) return;
         setLoading(true);
         
         // Actualizar posición del marcador inmediatamente (feedback visual instantáneo)
@@ -198,7 +198,7 @@ const GoogleAddressPicker = ({
           mapInstance.panTo({ lat, lng });
         }
         
-        geocoderInstance.geocode(
+        geocoder.geocode(
           { location: { lat, lng } },
           (results: any[], status: string) => {
             if (status === 'OK' && results && results.length > 0) {
