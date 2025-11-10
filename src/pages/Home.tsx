@@ -713,14 +713,21 @@ const Home = () => {
         }
 
         .featured-products-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-          gap: 0.875rem;
-          flex: 1;
-          position: relative;
-          z-index: 1;
-          min-height: 0;
-        }
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.875rem;
+  flex: 1;
+  position: relative;
+  zIndex: 1;
+  min-height: 0;
+}
+
+@media (max-width: 480px) {
+  .featured-products-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+}
 
         .featured-products-grid > * {
           min-height: 0;
@@ -1057,6 +1064,11 @@ const Home = () => {
           }
         }
 
+        @media (max-width: 768px) {
+  .featured-products-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
         @media (max-width: 480px) {
           .hero-title {
             font-size: 1.75rem !important;
