@@ -230,69 +230,25 @@ const Home = () => {
                 </div>
               )}
               {featuredProducts.length > 0 && (
-                <div 
-                  className="featured-products-wrapper featured-section-store"
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '1rem',
-                    padding: '1.5rem 1rem',
-                    background: 'var(--bg-secondary)',
-                    borderRadius: '0.75rem',
-                    transition: 'all 0.3s ease',
-                    border: '2px solid transparent',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    height: '100%'
-                  }}
-                >
-                  <div className="featured-products-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', position: 'relative', zIndex: 1 }}>
-                    <div 
-                      className="featured-badge featured-badge-store"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        padding: '0.5rem 0.875rem',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem',
-                        fontWeight: 600,
-                        width: 'fit-content',
-                        position: 'relative',
-                        zIndex: 1,
-                        background: 'linear-gradient(135deg, #3b82f6, #60a5fa)',
-                        color: 'white',
-                        boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
-                        transition: 'all 0.3s ease'
-                      }}
-                    >
+                <div className="featured-products-wrapper featured-section-store">
+                  <div className="featured-products-header">
+                    <div className="featured-badge featured-badge-store">
                       <Store size={18} />
                       Productos Destacados
                     </div>
-                    <Link to="/tienda" className="section-link-small" style={{ color: 'var(--primary)', fontWeight: 600, fontSize: '0.875rem', transition: 'color 0.2s ease' }}>
+                    <Link to="/tienda" className="section-link-small">
                       Ver todos →
                     </Link>
                   </div>
-                  <div 
-                    className="featured-products-grid"
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: (() => {
-                        const count = Math.min(featuredProducts.length, 3);
-                        if (count === 1) return '1fr';
-                        if (count === 2) return 'repeat(2, 1fr)';
-                        return 'repeat(3, 1fr)';
-                      })(),
-                      gap: '0.875rem',
-                      flex: 1,
-                      position: 'relative',
-                      zIndex: 1,
-                      minHeight: 0
-                    }}
-                  >
-                    {featuredProducts.slice(0, 3).map((product: Product) => (
-                      <ProductCard key={product.id} product={product} />
-                    ))}
+                  <div className="featured-products-grid">
+                    {Array.from({ length: 4 }).map((_, index) => {
+                      const product = featuredProducts[index];
+                      return product ? (
+                        <ProductCard key={product.id} product={product} />
+                      ) : (
+                        <div key={`empty-${index}`} className="empty-product-slot"></div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -988,6 +944,100 @@ const Home = () => {
           overflow-wrap: break-word;
         }
 
+                /* Nuevos estilos para productos destacados en 2x2 */
+        .featured-products-wrapper {
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 1rem !important;
+          padding: 1.5rem 1rem !important;
+          background: var(--bg-secondary) !important;
+          border-radius: 0.75rem !important;
+          transition: all 0.3s ease !important;
+          border: 2px solid transparent !important;
+          position: relative !important;
+          overflow: hidden !important;
+          min-height: 400px !important;
+        }
+
+        .featured-products-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 0.5rem;
+          position: relative;
+          z-index: 1;
+        }
+
+        .featured-badge-store {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.5rem 0.875rem;
+          border-radius: 0.5rem;
+          font-size: 0.875rem;
+          font-weight: 600;
+          width: fit-content;
+          position: relative;
+          z-index: 1;
+          background: linear-gradient(135deg, #3b82f6, #60a5fa);
+          color: white;
+          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+          transition: all 0.3s ease;
+        }
+
+        .section-link-small {
+          color: var(--primary);
+          font-weight: 600;
+          font-size: 0.875rem;
+          transition: color 0.2s ease;
+        }
+
+        .section-link-small:hover {
+          color: var(--secondary);
+        }
+
+        .featured-products-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          grid-template-rows: repeat(2, 1fr);
+          gap: 0.875rem;
+          flex: 1;
+          position: relative;
+          z-index: 1;
+          min-height: 0;
+        }
+
+        .empty-product-slot {
+          background: rgba(255, 255, 255, 0.05);
+          border: 2px dashed rgba(255, 255, 255, 0.1);
+          border-radius: 0.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 120px;
+        }
+
+        .empty-product-slot::after {
+          content: "Próximamente";
+          color: rgba(255, 255, 255, 0.3);
+          font-size: 0.875rem;
+          font-weight: 500;
+        }
+
+        /* Efectos hover */
+        .featured-products-wrapper:hover {
+          transform: translateY(-4px) !important;
+          border-color: #3b82f6 !important;
+          box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4),
+                      0 0 40px rgba(59, 130, 246, 0.3) !important;
+        }
+
+        .featured-products-wrapper:hover .featured-badge-store {
+          box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6),
+                      0 0 20px rgba(59, 130, 246, 0.4) !important;
+          transform: scale(1.05) !important;
+        }
+
         @media (max-width: 768px) {
           .hero {
             padding: 2rem 0;
@@ -1035,9 +1085,11 @@ const Home = () => {
             padding: 1.25rem 0.875rem;
           }
 
+          /* ✅ CORREGIDO: Mantener 2 columnas en móvil */
           .featured-products-grid {
-            grid-template-columns: 1fr;
-            gap: 0.875rem;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            min-height: 300px;
           }
 
           .features-compact-grid {
@@ -1064,11 +1116,6 @@ const Home = () => {
           }
         }
 
-        @media (max-width: 768px) {
-  .featured-products-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
         @media (max-width: 480px) {
           .hero-title {
             font-size: 1.75rem !important;
@@ -1104,9 +1151,16 @@ const Home = () => {
             padding: 1rem 0.75rem;
           }
 
+          /* ✅ CORREGIDO: Mantener 2 columnas también en móvil pequeño */
           .featured-products-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
             gap: 0.75rem;
+            min-height: 250px;
+          }
+
+          .empty-product-slot {
+            min-height: 80px;
           }
 
           .featured-badge {
