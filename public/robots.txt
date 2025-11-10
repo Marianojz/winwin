@@ -1,0 +1,72 @@
+# robots.txt para Clikio.com.ar
+# Última actualización: 2025
+
+# Permitir todos los bots de búsqueda
+User-agent: *
+Allow: /
+
+# Permitir indexación de páginas públicas importantes
+Allow: /
+Allow: /subastas
+Allow: /tienda
+Allow: /producto/
+Allow: /subastas/
+Allow: /terminos
+Allow: /preguntas
+Allow: /ayuda
+Allow: /contacto
+
+# Excluir rutas privadas y administrativas
+Disallow: /admin
+Disallow: /admin/
+Disallow: /perfil
+Disallow: /carrito
+Disallow: /notificaciones
+Disallow: /completar-perfil
+Disallow: /completar-perfil-google
+Disallow: /login
+Disallow: /registro
+
+# Excluir archivos y carpetas técnicas
+Disallow: /api/
+Disallow: /*.json$
+Disallow: /_next/
+Disallow: /static/
+
+# Configuración específica para Googlebot
+User-agent: Googlebot
+Allow: /
+Allow: /subastas
+Allow: /tienda
+Allow: /producto/
+Allow: /subastas/
+Crawl-delay: 1
+
+# Configuración específica para Googlebot-Image
+User-agent: Googlebot-Image
+Allow: /
+Allow: /subastas
+Allow: /tienda
+
+# Configuración para Bingbot
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
+
+# Bloquear bots maliciosos conocidos
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
+
+# Sitemap principal
+Sitemap: https://www.clickio.com.ar/sitemap.xml
+
+# Sitemap alternativo (si tienes múltiples sitemaps)
+# Sitemap: https://www.clickio.com.ar/sitemap-products.xml
+# Sitemap: https://www.clickio.com.ar/sitemap-auctions.xml
+

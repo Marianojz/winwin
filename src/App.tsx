@@ -15,6 +15,7 @@ import OrderManager from './utils/OrderManager';
 import DataCleanupManager from './utils/DataCleanupManager';
 import ScrollToTop from './components/ScrollToTop';
 import LoadingSpinner from './components/LoadingSpinner';
+import Hreflang from './components/Hreflang';
 import { cleanExpiredCache } from './utils/geolocationCache';
 import { preventZoomOnInput, restoreViewport } from './utils/mobileOptimizations';
 import Home from './pages/Home';
@@ -537,6 +538,7 @@ function App() {
     <Router basename={import.meta.env.BASE_URL}>
       <div className="app">
         <RedirectHandler />
+        <Hreflang />
         <Navbar />
         <AuctionManager />
         <OrderManager />
