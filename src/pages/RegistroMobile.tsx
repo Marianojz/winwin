@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, User, Phone, Eye, EyeOff, Loader, CheckCircle } from 'lucide-react';
+import { Mail, Lock, User, Phone, Eye, EyeOff, Loader, CheckCircle, AlertCircle, X } from 'lucide-react';
 import { createUserWithEmailAndPassword, sendEmailVerification, User as FirebaseUser } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
@@ -37,6 +37,85 @@ const RegistroMobile = () => {
     apartment: '',
     crossStreets: ''
   });
+
+  // Estados de validación en tiempo real
+  const [fieldValidation, setFieldValidation] = useState<{
+    name: 'valid' | 'invalid' | 'neutral';
+    phone: 'valid' | 'invalid' | 'neutral';
+    email: 'valid' | 'invalid' | 'neutral';
+    password: 'valid' | 'invalid' | 'neutral';
+    confirmPassword: 'valid' | 'invalid' | 'neutral';
+    address: 'valid' | 'invalid' | 'neutral';
+  }>({
+    name: 'neutral',
+    phone: 'neutral',
+    email: 'neutral',
+    password: 'neutral',
+    confirmPassword: 'neutral',
+    address: 'neutral'
+  });
+
+  // Validación en tiempo real
+  useEffect(() => {
+    // Validar nombre
+    if (formData.name.trim()) {
+      setFieldValidation(prev => ({ ...prev, name: formData.name.trim().length >= 2 ? 'valid' : 'invalid' }));
+    } else {
+      setFieldValidation(prev => ({ ...prev, name: 'neutral' }));
+    }
+
+    // Validar teléfono
+    if (formData.phone.trim()) {
+      const phoneRegex = /^[\d\s\-\+\(\)]+$/;
+      const digits = formData.phone.replace(/\D/g, '');
+      setFieldValidation(prev => ({ 
+        ...prev, 
+        phone: phoneRegex.test(formData.phone) && digits.length >= 10 ? 'valid' : 'invalid' 
+      }));
+    } else {
+      setFieldValidation(prev => ({ ...prev, phone: 'neutral' }));
+    }
+
+    // Validar email
+    if (formData.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const emailParts = formData.email.split('@');
+      const isValid = emailRegex.test(formData.email) && 
+                      emailParts.length === 2 && 
+                      emailParts[1].includes('.') && 
+                      emailParts[1].split('.')[1]?.length >= 2;
+      setFieldValidation(prev => ({ ...prev, email: isValid ? 'valid' : 'invalid' }));
+    } else {
+      setFieldValidation(prev => ({ ...prev, email: 'neutral' }));
+    }
+
+    // Validar contraseña
+    if (formData.password) {
+      setFieldValidation(prev => ({ ...prev, password: formData.password.length >= 6 ? 'valid' : 'invalid' }));
+    } else {
+      setFieldValidation(prev => ({ ...prev, password: 'neutral' }));
+    }
+
+    // Validar confirmación de contraseña
+    if (formData.confirmPassword) {
+      setFieldValidation(prev => ({ 
+        ...prev, 
+        confirmPassword: formData.password === formData.confirmPassword && formData.confirmPassword.length >= 6 ? 'valid' : 'invalid' 
+      }));
+    } else {
+      setFieldValidation(prev => ({ ...prev, confirmPassword: 'neutral' }));
+    }
+
+    // Validar dirección
+    if (addressData) {
+      const hasRequired = addressData.components.street && addressData.components.streetNumber;
+      const { lat, lng } = addressData.coordinates;
+      const inRange = lat >= -55 && lat <= -21 && lng >= -73 && lng <= -53;
+      setFieldValidation(prev => ({ ...prev, address: hasRequired && inRange ? 'valid' : 'invalid' }));
+    } else {
+      setFieldValidation(prev => ({ ...prev, address: 'neutral' }));
+    }
+  }, [formData, addressData]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
@@ -78,10 +157,17 @@ const RegistroMobile = () => {
       return false;
     }
 
-    // Validación de email estándar
+    // Validación de email estándar con verificación de dominio
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       setError('Email inválido');
+      return false;
+    }
+    
+    // Validar que el email tenga un dominio válido (al menos 2 caracteres después del punto)
+    const emailParts = formData.email.split('@');
+    if (emailParts.length !== 2 || !emailParts[1].includes('.') || emailParts[1].split('.')[1]?.length < 2) {
+      setError('Email inválido: dominio no válido');
       return false;
     }
 
@@ -97,8 +183,22 @@ const RegistroMobile = () => {
       return false;
     }
 
+    // Validación de dirección - debe ser válida y existente
     if (!addressData) {
       setError('Por favor, seleccioná una dirección válida');
+      return false;
+    }
+    
+    // Validar que tenga calle y número mínimo
+    if (!addressData.components.street || !addressData.components.streetNumber) {
+      setError('Por favor, completá al menos la calle y el número');
+      return false;
+    }
+    
+    // Validar coordenadas dentro de rangos geográficos permitidos (Argentina)
+    const { lat, lng } = addressData.coordinates;
+    if (lat < -55 || lat > -21 || lng < -73 || lng > -53) {
+      setError('La dirección debe estar dentro de Argentina');
       return false;
     }
 
@@ -174,14 +274,23 @@ const RegistroMobile = () => {
       });
 
       // Enviar email de verificación
-      await sendEmailVerification(user, {
-        url: `${window.location.origin}/login?verified=true`,
-        handleCodeInApp: false
-      });
-
-      // Mostrar modal de verificación
-      setRegisteredUser(user);
-      setShowVerificationModal(true);
+      try {
+        await sendEmailVerification(user, {
+          url: `${window.location.origin}/login?verified=true`,
+          handleCodeInApp: false
+        });
+        
+        // Mostrar modal de verificación
+        setRegisteredUser(user);
+        setShowVerificationModal(true);
+        setSuccess('¡Cuenta creada exitosamente! Verificá tu email para activar tu cuenta.');
+      } catch (verificationError: any) {
+        console.error('Error enviando email de verificación:', verificationError);
+        // Aún así mostrar el modal, el usuario puede reenviar
+        setRegisteredUser(user);
+        setShowVerificationModal(true);
+        setError('Cuenta creada, pero hubo un problema al enviar el email. Podés reenviarlo desde el modal.');
+      }
 
     } catch (err: any) {
       console.error('Error al registrar:', err);
@@ -235,18 +344,22 @@ const RegistroMobile = () => {
               <User size={18} />
               Nombre completo *
             </label>
-            <input
-              id="name"
-              name="name"
-              type="text"
-              autoComplete="name"
-              placeholder="Nombre completo"
-              value={formData.name}
-              onChange={handleChange}
-              required
-              className="form-input"
-              {...NAME_INPUT_ATTRIBUTES}
-            />
+            <div className="input-wrapper">
+              <input
+                id="name"
+                name="name"
+                type="text"
+                autoComplete="name"
+                placeholder="Nombre completo"
+                value={formData.name}
+                onChange={handleChange}
+                required
+                className={`form-input ${fieldValidation.name === 'valid' ? 'input-valid' : fieldValidation.name === 'invalid' ? 'input-invalid' : ''}`}
+                {...NAME_INPUT_ATTRIBUTES}
+              />
+              {fieldValidation.name === 'valid' && <CheckCircle className="validation-icon icon-valid" size={18} />}
+              {fieldValidation.name === 'invalid' && formData.name.trim() && <X className="validation-icon icon-invalid" size={18} />}
+            </div>
           </div>
 
           <div className="form-group">
@@ -254,17 +367,21 @@ const RegistroMobile = () => {
               <Phone size={18} />
               Teléfono *
             </label>
-            <input
-              id="phone"
-              name="phone"
-              type="tel"
-              placeholder="11 1234-5678"
-              value={formData.phone}
-              onChange={handleChange}
-              required
-              className="form-input"
-              {...PHONE_INPUT_ATTRIBUTES}
-            />
+            <div className="input-wrapper">
+              <input
+                id="phone"
+                name="phone"
+                type="tel"
+                placeholder="11 1234-5678"
+                value={formData.phone}
+                onChange={handleChange}
+                required
+                className={`form-input ${fieldValidation.phone === 'valid' ? 'input-valid' : fieldValidation.phone === 'invalid' ? 'input-invalid' : ''}`}
+                {...PHONE_INPUT_ATTRIBUTES}
+              />
+              {fieldValidation.phone === 'valid' && <CheckCircle className="validation-icon icon-valid" size={18} />}
+              {fieldValidation.phone === 'invalid' && formData.phone.trim() && <X className="validation-icon icon-invalid" size={18} />}
+            </div>
           </div>
 
           <div className="form-group">
@@ -272,18 +389,22 @@ const RegistroMobile = () => {
               <Mail size={18} />
               Email *
             </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              placeholder="tu@email.com"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              className="form-input"
-              {...EMAIL_INPUT_ATTRIBUTES}
-            />
+            <div className="input-wrapper">
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                placeholder="tu@email.com"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                className={`form-input ${fieldValidation.email === 'valid' ? 'input-valid' : fieldValidation.email === 'invalid' ? 'input-invalid' : ''}`}
+                {...EMAIL_INPUT_ATTRIBUTES}
+              />
+              {fieldValidation.email === 'valid' && <CheckCircle className="validation-icon icon-valid" size={18} />}
+              {fieldValidation.email === 'invalid' && formData.email.trim() && <X className="validation-icon icon-invalid" size={18} />}
+            </div>
           </div>
 
           <div className="form-group">
@@ -301,18 +422,22 @@ const RegistroMobile = () => {
                 onChange={handleChange}
                 required
                 minLength={6}
-                className="form-input"
+                className={`form-input ${fieldValidation.password === 'valid' ? 'input-valid' : fieldValidation.password === 'invalid' ? 'input-invalid' : ''}`}
                 {...PASSWORD_INPUT_ATTRIBUTES.newPassword}
               />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowPassword(!showPassword)}
-                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                tabIndex={-1}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+              <div className="password-input-icons">
+                {fieldValidation.password === 'valid' && <CheckCircle className="validation-icon icon-valid" size={18} />}
+                {fieldValidation.password === 'invalid' && formData.password && <X className="validation-icon icon-invalid" size={18} />}
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -331,22 +456,26 @@ const RegistroMobile = () => {
                 onChange={handleChange}
                 required
                 minLength={6}
-                className="form-input"
+                className={`form-input ${fieldValidation.confirmPassword === 'valid' ? 'input-valid' : fieldValidation.confirmPassword === 'invalid' ? 'input-invalid' : ''}`}
                 {...PASSWORD_INPUT_ATTRIBUTES.confirmPassword}
               />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                tabIndex={-1}
-              >
-                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+              <div className="password-input-icons">
+                {fieldValidation.confirmPassword === 'valid' && <CheckCircle className="validation-icon icon-valid" size={18} />}
+                {fieldValidation.confirmPassword === 'invalid' && formData.confirmPassword && <X className="validation-icon icon-invalid" size={18} />}
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Dirección Inteligente */}
+          {/* Dirección Inteligente - Mobile-First Optimizado */}
           <div className="address-section">
             <h2 className="section-title">Dirección de Envío</h2>
             <p className="section-description">
@@ -374,97 +503,137 @@ const RegistroMobile = () => {
               showMap={true}
             />
             
-            {/* Campos de dirección integrados - estructura mobile-first */}
-            <div className="address-group">
-              <input
-                type="text"
-                autoComplete="address-line1"
-                placeholder="Calle"
-                value={addressFields.street}
-                onChange={(e) => {
-                  setAddressFields(prev => ({ ...prev, street: e.target.value }));
-                  // Actualizar addressData si existe
-                  if (addressData) {
-                    const updated = {
-                      ...addressData,
-                      components: { ...addressData.components, street: e.target.value }
-                    };
-                    setAddressData(updated);
-                    handleAddressSelect(updated);
-                  }
-                }}
-                className="address-input"
-              />
-              <input
-                type="text"
-                autoComplete="address-line2"
-                placeholder="Número"
-                value={addressFields.number}
-                onChange={(e) => {
-                  setAddressFields(prev => ({ ...prev, number: e.target.value }));
-                  if (addressData) {
-                    const updated = {
-                      ...addressData,
-                      components: { ...addressData.components, streetNumber: e.target.value }
-                    };
-                    setAddressData(updated);
-                    handleAddressSelect(updated);
-                  }
-                }}
-                className="address-input"
-              />
-              <input
-                type="text"
-                placeholder="Piso (opcional)"
-                value={addressFields.floor}
-                onChange={(e) => {
-                  setAddressFields(prev => ({ ...prev, floor: e.target.value }));
-                  if (addressData) {
-                    const updated = {
-                      ...addressData,
-                      components: { ...addressData.components, floor: e.target.value }
-                    };
-                    setAddressData(updated);
-                    handleAddressSelect(updated);
-                  }
-                }}
-                className="address-input"
-              />
-              <input
-                type="text"
-                placeholder="Departamento (opcional)"
-                value={addressFields.apartment}
-                onChange={(e) => {
-                  setAddressFields(prev => ({ ...prev, apartment: e.target.value }));
-                  if (addressData) {
-                    const updated = {
-                      ...addressData,
-                      components: { ...addressData.components, apartment: e.target.value }
-                    };
-                    setAddressData(updated);
-                    handleAddressSelect(updated);
-                  }
-                }}
-                className="address-input"
-              />
-              <input
-                type="text"
-                placeholder="Entre calles (opcional)"
-                value={addressFields.crossStreets}
-                onChange={(e) => {
-                  setAddressFields(prev => ({ ...prev, crossStreets: e.target.value }));
-                  if (addressData) {
-                    const updated = {
-                      ...addressData,
-                      components: { ...addressData.components, crossStreets: e.target.value }
-                    };
-                    setAddressData(updated);
-                    handleAddressSelect(updated);
-                  }
-                }}
-                className="address-input"
-              />
+            {/* Campos principales de dirección - Primera línea */}
+            <div className="address-main-fields">
+              <div className="address-field-primary">
+                <label htmlFor="street" className="address-label">Calle *</label>
+                <input
+                  id="street"
+                  type="text"
+                  autoComplete="address-line1"
+                  placeholder="Av. Corrientes"
+                  value={addressFields.street}
+                  onChange={(e) => {
+                    setAddressFields(prev => ({ ...prev, street: e.target.value }));
+                    if (addressData) {
+                      const updated = {
+                        ...addressData,
+                        components: { ...addressData.components, street: e.target.value }
+                      };
+                      setAddressData(updated);
+                      handleAddressSelect(updated);
+                    }
+                  }}
+                  className="address-input address-input-primary"
+                  required
+                />
+              </div>
+              <div className="address-field-primary">
+                <label htmlFor="number" className="address-label">Número *</label>
+                <input
+                  id="number"
+                  type="text"
+                  autoComplete="address-line2"
+                  placeholder="1234"
+                  value={addressFields.number}
+                  onChange={(e) => {
+                    setAddressFields(prev => ({ ...prev, number: e.target.value }));
+                    if (addressData) {
+                      const updated = {
+                        ...addressData,
+                        components: { ...addressData.components, streetNumber: e.target.value }
+                      };
+                      setAddressData(updated);
+                      handleAddressSelect(updated);
+                    }
+                  }}
+                  className="address-input address-input-primary"
+                  required
+                />
+              </div>
             </div>
+            
+            {/* Información adicional opcional - Recuadro aparte */}
+            <details className="address-additional-info">
+              <summary className="address-additional-summary">
+                <span>Información adicional (opcional)</span>
+              </summary>
+              <div className="address-additional-fields">
+                <div className="address-field-secondary">
+                  <label htmlFor="floor" className="address-label">Piso</label>
+                  <input
+                    id="floor"
+                    type="text"
+                    placeholder="Ej: 4"
+                    value={addressFields.floor}
+                    onChange={(e) => {
+                      setAddressFields(prev => ({ ...prev, floor: e.target.value }));
+                      if (addressData) {
+                        const updated = {
+                          ...addressData,
+                          components: { ...addressData.components, floor: e.target.value }
+                        };
+                        setAddressData(updated);
+                        handleAddressSelect(updated);
+                      }
+                    }}
+                    className="address-input address-input-secondary"
+                  />
+                </div>
+                <div className="address-field-secondary">
+                  <label htmlFor="apartment" className="address-label">Departamento</label>
+                  <input
+                    id="apartment"
+                    type="text"
+                    placeholder="Ej: A, B, 1, 2"
+                    value={addressFields.apartment}
+                    onChange={(e) => {
+                      setAddressFields(prev => ({ ...prev, apartment: e.target.value }));
+                      if (addressData) {
+                        const updated = {
+                          ...addressData,
+                          components: { ...addressData.components, apartment: e.target.value }
+                        };
+                        setAddressData(updated);
+                        handleAddressSelect(updated);
+                      }
+                    }}
+                    className="address-input address-input-secondary"
+                  />
+                </div>
+                <div className="address-field-secondary address-field-full">
+                  <label htmlFor="crossStreets" className="address-label">Entre calles</label>
+                  <input
+                    id="crossStreets"
+                    type="text"
+                    placeholder="Ej: Entre Av. Corrientes y Av. Córdoba"
+                    value={addressFields.crossStreets}
+                    onChange={(e) => {
+                      setAddressFields(prev => ({ ...prev, crossStreets: e.target.value }));
+                      if (addressData) {
+                        const updated = {
+                          ...addressData,
+                          components: { ...addressData.components, crossStreets: e.target.value }
+                        };
+                        setAddressData(updated);
+                        handleAddressSelect(updated);
+                      }
+                    }}
+                    className="address-input address-input-secondary"
+                  />
+                </div>
+              </div>
+            </details>
+            
+            {/* Provincia siempre visible y centrada */}
+            {addressData && (
+              <div className="address-province-display">
+                <label className="address-label">Provincia</label>
+                <div className="province-value">
+                  {addressData.components.province || 'No especificada'}
+                </div>
+              </div>
+            )}
             
             {/* Mapa en tiempo real - se renderiza dentro de GoogleAddressPicker */}
             <div id="address-map" className="interactive-map-container">

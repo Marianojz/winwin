@@ -122,6 +122,66 @@
   box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.1);
 }
 
+/* Indicadores de validación */
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-valid {
+  border-color: var(--success) !important;
+  padding-right: 2.75rem;
+}
+
+.input-invalid {
+  border-color: var(--error) !important;
+  padding-right: 2.75rem;
+}
+
+.validation-icon {
+  position: absolute;
+  right: 1rem;
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+.icon-valid {
+  color: var(--success);
+  animation: fadeInScale 0.3s ease;
+}
+
+.icon-invalid {
+  color: var(--error);
+  animation: fadeInScale 0.3s ease;
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.password-input-icons {
+  position: absolute;
+  right: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.password-input-wrapper .password-toggle {
+  pointer-events: auto;
+  position: relative;
+  right: 0;
+}
+
 .form-input::placeholder {
   color: var(--text-tertiary);
 }
@@ -134,7 +194,12 @@
 }
 
 .password-input-wrapper .form-input {
-  padding-right: 3rem;
+  padding-right: 4.5rem; /* Espacio para iconos de validación + toggle */
+}
+
+.password-input-wrapper .form-input.input-valid,
+.password-input-wrapper .form-input.input-invalid {
+  padding-right: 4.5rem;
 }
 
 .password-toggle {
@@ -186,7 +251,153 @@
   margin-top: 1rem;
 }
 
-/* Grupo de campos de dirección - estructura mobile-first */
+/* Campos principales de dirección - Primera línea */
+.address-main-fields {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.address-field-primary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.address-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.address-input-primary {
+  width: 100%;
+  padding: 1rem;
+  border: 2px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 16px; /* Previene zoom en iOS */
+  font-family: inherit;
+  transition: all 0.2s ease;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 48px; /* Tamaño mínimo para touch */
+}
+
+.address-input-primary:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.1);
+  scroll-margin-top: 120px;
+}
+
+/* Información adicional opcional - Recuadro aparte */
+.address-additional-info {
+  margin: 1rem 0;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+
+.address-additional-summary {
+  padding: 1rem;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 500;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 48px; /* Tamaño mínimo para touch */
+  transition: background 0.2s ease;
+}
+
+.address-additional-summary:hover {
+  background: var(--bg-tertiary);
+}
+
+.address-additional-summary::-webkit-details-marker {
+  display: none;
+}
+
+.address-additional-summary::after {
+  content: '▶';
+  transition: transform 0.2s ease;
+  color: var(--primary);
+  font-size: 0.75rem;
+}
+
+.address-additional-info[open] .address-additional-summary::after {
+  transform: rotate(90deg);
+}
+
+.address-additional-fields {
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border);
+}
+
+.address-field-secondary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.address-field-full {
+  grid-column: 1 / -1;
+}
+
+.address-input-secondary {
+  width: 100%;
+  padding: 0.875rem;
+  border: 2px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 16px; /* Previene zoom en iOS */
+  font-family: inherit;
+  transition: all 0.2s ease;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 44px; /* Tamaño mínimo para touch */
+}
+
+.address-input-secondary:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(255, 107, 0, 0.1);
+}
+
+/* Provincia siempre visible y centrada */
+.address-province-display {
+  margin: 1.5rem 0;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+  border: 2px solid var(--primary);
+  border-radius: 0.75rem;
+  text-align: center;
+  scroll-margin-top: 100px; /* Centrar en viewport al hacer scroll */
+}
+
+.province-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin-top: 0.5rem;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Grupo de campos de dirección - estructura mobile-first (legacy, mantener para compatibilidad) */
 .address-group {
   display: flex;
   flex-direction: column;
@@ -211,6 +422,9 @@
   outline: none;
   -webkit-appearance: none;
   appearance: none;
+  min-height: 48px; /* Tamaño mínimo para touch */
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .address-input:focus {
@@ -248,7 +462,28 @@
   display: block;
 }
 
-/* Estilos responsive para address-group */
+/* Estilos responsive para address-main-fields */
+@media (max-width: 768px) {
+  .address-main-fields {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .address-additional-fields {
+    grid-template-columns: 1fr;
+  }
+  
+  .address-province-display {
+    margin: 1rem 0;
+    padding: 1rem;
+  }
+  
+  .province-value {
+    font-size: 1.1rem;
+  }
+}
+
+/* Estilos responsive para address-group (legacy) */
 @media (min-width: 768px) {
   .address-group {
     display: grid;
@@ -262,6 +497,14 @@
   
   .address-group input:nth-child(5) {
     grid-column: 1 / -1; /* Entre calles ocupa toda la fila */
+  }
+  
+  .address-main-fields {
+    grid-template-columns: 2fr 1fr;
+  }
+  
+  .address-additional-fields {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -425,6 +668,16 @@
   .form-input {
     padding: 0.875rem;
     font-size: 16px; /* Importante: previene zoom en iOS */
+    min-height: 48px; /* Tamaño mínimo para touch */
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+  
+  .address-input-primary,
+  .address-input-secondary {
+    min-height: 48px;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 
   /* Scroll suave para campos */

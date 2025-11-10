@@ -43,24 +43,29 @@ export async function syncUserToRealtimeDb(userId: string, isAdmin: boolean, ema
     
     if (snapshot.exists()) {
       const existingData = snapshot.val();
-      // Actualizar solo isAdmin si cambió, preservar otros datos
+      // Actualizar isAdmin si cambió y último login, preservar otros datos
+      const updates: any = {
+        lastSynced: new Date().toISOString(),
+        lastLogin: new Date().toISOString()
+      };
       if (existingData.isAdmin !== isAdmin) {
-        await set(userRef, {
-          ...existingData,
-          isAdmin: isAdmin,
-          lastSynced: new Date().toISOString()
-        });
+        updates.isAdmin = isAdmin;
         console.log('✅ Usuario actualizado en Realtime Database:', userId, 'isAdmin:', isAdmin, '(cambió de', existingData.isAdmin, 'a', isAdmin + ')');
       } else {
         console.log('✅ Usuario ya está sincronizado en Realtime Database:', userId, 'isAdmin:', isAdmin);
       }
+      await set(userRef, {
+        ...existingData,
+        ...updates
+      });
     } else {
       // Crear nuevo registro
       await set(userRef, {
         isAdmin: isAdmin,
         email: email || '',
         username: username || 'Usuario',
-        lastSynced: new Date().toISOString()
+        lastSynced: new Date().toISOString(),
+        lastLogin: new Date().toISOString()
       });
       console.log('✅ Usuario creado en Realtime Database:', userId, 'isAdmin:', isAdmin);
     }
@@ -106,12 +111,21 @@ export function attachAuthListener(onUser: (user: any | null) => void) {
             );
           }
           
+          const isAdmin = userData.role === 'admin' || userData.isAdmin === true;
+          
+          // Asegurar que isAdmin esté sincronizado en Firestore (necesario para reglas de Storage)
+          if (userData.isAdmin !== isAdmin) {
+            updateDoc(userDocRef, { isAdmin: isAdmin }).catch(err => 
+              console.warn('Error actualizando isAdmin en Firestore:', err)
+            );
+          }
+          
           const fullUser = {
             id: firebaseUser.uid,
             email: firebaseUser.email || '',
             username: userData.username || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuario',
             avatar: finalAvatar,
-            isAdmin: userData.role === 'admin' || userData.isAdmin === true,
+            isAdmin: isAdmin,
             dni: userData.dni || '',
             phone: userData.phone || '',
             createdAt: userData.createdAt ? new Date(userData.createdAt) : new Date(),

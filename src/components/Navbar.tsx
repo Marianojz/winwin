@@ -24,9 +24,9 @@ const Navbar = () => {
   // Usar función helper unificada para obtener avatar desde Firebase
   const avatarUrl = getUserAvatarUrl(user);
   
-  // Debug: Log del avatar solo cuando cambia
+  // Debug: Log del avatar solo en modo desarrollo
   useEffect(() => {
-    if (user?.id) {
+    if (import.meta.env.DEV && user?.id) {
       console.log('👤 Avatar del usuario:', {
         userId: user.id,
         username: user.username,
@@ -64,8 +64,10 @@ const Navbar = () => {
     }
   }, [theme]); // Agregar theme como dependencia para recargar cuando cambie
   
-  // Debug: Log de stickers solo cuando cambian (evitar spam)
+  // Debug: Log de stickers solo en modo desarrollo
   useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    
     const allStickers = homeConfig.siteSettings?.logoStickers || [];
     if (allStickers.length > 0) {
       const activeStickers = allStickers.filter((s: any) => s.active);
@@ -153,9 +155,9 @@ const Navbar = () => {
   const getLogoConfig = () => {
     const logoConfig = homeConfig.siteSettings?.logoConfig || {};
     const LOGO_SIZES = {
-      small: { width: '120px', height: 'auto' },
-      medium: { width: '200px', height: 'auto' },
-      large: { width: '300px', height: 'auto' }
+      small: { width: '80px', height: 'auto' },
+      medium: { width: '100px', height: 'auto' },
+      large: { width: '120px', height: 'auto' }
     };
     
     const size = logoConfig.size || 'medium';
@@ -204,34 +206,27 @@ const Navbar = () => {
                   style={{
                     ...logoConfig.sizeStyles,
                     maxWidth: '100%',
-                    height: 'auto'
+                    height: 'auto',
+                    opacity: 0,
+                    transition: 'opacity 0.5s ease-in-out'
                   }}
                   onError={(e) => {
-                    console.warn('⚠️ Error cargando logo desde:', getLogoUrl());
+                    if (import.meta.env.DEV) {
+                      console.warn('⚠️ Error cargando logo desde:', getLogoUrl());
+                    }
                     setLogoError(true);
                     (e.target as HTMLImageElement).style.display = 'none';
                   }}
-                  onLoad={() => {
+                  onLoad={(e) => {
                     setLogoError(false);
+                    // Carga suave del logo
+                    (e.target as HTMLImageElement).style.opacity = '1';
                   }}
                 />
               ) : (
                 // Logo placeholder temporal mientras se sube el logo real
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #2563EB, #06B6D4)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontWeight: 700,
-                  fontSize: '1.25rem',
-                  flexShrink: 0
-                }} title="Logo de Clikio">
-                  C
-                </div>
+                // Eliminado logo de emergencia (C) - solo mostrar nombre del sitio
+                null
               )}
               {/* Mostrar stickers activos - SIEMPRE visible si están activos */}
               {(() => {
@@ -251,9 +246,6 @@ const Navbar = () => {
                   
                   return true; // Si está activo, mostrarlo siempre
                 });
-                
-                // Debug: Log para verificar stickers (solo una vez cuando cambian)
-                // Los logs se movieron a un useEffect para evitar spam
                 
                 return activeStickers.map(sticker => (
                   <StickerRenderer key={sticker.id} sticker={sticker} />

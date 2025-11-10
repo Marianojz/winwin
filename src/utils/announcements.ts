@@ -163,21 +163,32 @@ export const getUserAnnouncements = async (userId: string): Promise<Announcement
     const userAnnouncementsSnapshot = await get(userAnnouncementsRef);
     
     const userAnnouncements: { [key: string]: UserAnnouncement } = userAnnouncementsSnapshot.val() || {};
-    const announcementIds = Object.keys(userAnnouncements).filter(
-      id => !userAnnouncements[id].dismissed
-    );
+    const nowDate = new Date();
+    
+    // Filtrar anuncios descartados - NUNCA volver a mostrar anuncios cerrados por el usuario
+    const announcementIds = Object.keys(userAnnouncements).filter(id => {
+      const userAnn = userAnnouncements[id];
+      // Si el anuncio fue descartado, excluirlo permanentemente
+      if (userAnn.dismissed) return false;
+      // Solo incluir anuncios no descartados
+      return true;
+    });
     
     // Obtener anuncios activos para todos los usuarios
     const allAnnouncementsRef = ref(realtimeDb, 'announcements');
     const allAnnouncementsSnapshot = await get(allAnnouncementsRef);
     const allAnnouncements: { [key: string]: any } = allAnnouncementsSnapshot.val() || {};
     
-    // Filtrar anuncios activos y no expirados
-    const now = new Date();
+    // Filtrar anuncios activos y no expirados, excluyendo los que el usuario ha descartado
     const activeAnnouncements = Object.values(allAnnouncements)
       .filter((ann: any) => {
         if (ann.status !== 'active') return false;
-        if (ann.expiresAt && new Date(ann.expiresAt) < now) return false;
+        if (ann.expiresAt && new Date(ann.expiresAt) < nowDate) return false;
+        
+        // Verificar si el usuario descartó este anuncio - si lo descartó, excluirlo
+        const userAnn = userAnnouncements[ann.id];
+        if (userAnn && userAnn.dismissed) return false;
+        
         if (ann.targetUsers === 'all_users') return true;
         if (Array.isArray(ann.targetUsers)) {
           return ann.targetUsers.includes(userId);
@@ -259,7 +270,7 @@ export const markAnnouncementAsRead = async (
   }
 };
 
-// Descartar anuncio
+// Descartar anuncio - una vez descartado, nunca volverá a aparecer para ese usuario
 export const dismissAnnouncement = async (
   userId: string,
   announcementId: string
@@ -272,13 +283,16 @@ export const dismissAnnouncement = async (
       await set(userAnnouncementRef, {
         ...snapshot.val(),
         dismissed: true,
+        dismissedAt: new Date().toISOString(),
         interactedAt: new Date().toISOString()
       });
     } else {
+      // Crear entrada nueva marcando como descartado permanentemente
       await set(userAnnouncementRef, {
         read: false,
         dismissed: true,
         receivedAt: new Date().toISOString(),
+        dismissedAt: new Date().toISOString(),
         interactedAt: new Date().toISOString()
       });
     }

@@ -1,7 +1,7 @@
 import { Mail, MapPin, FileText, Award, ShoppingBag, Gavel, LogOut, Send, MessageSquare, Camera, Settings, LayoutDashboard, TrendingUp, Bell, HelpCircle, Phone } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { auth, db } from '../config/firebase';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getUserConversations, getMessages, saveMessage, markMessagesAsRead, getUnreadCount, createMessage, watchConversationStatus } from '../utils/messages';
 import { Message } from '../types';
@@ -109,19 +109,29 @@ const Perfil = () => {
     return <div style={{ padding: '3rem', textAlign: 'center' }}>Debes iniciar sesión</div>;
   }
 
-  const myBids = auctions.filter(a => a.bids.some(b => b.userId === user.id));
-  const wonAuctions = auctions.filter(a => 
-    a.status === 'ended' && 
-    a.bids.length > 0 && 
-    a.bids[a.bids.length - 1].userId === user.id
+  // Memoizar cálculos costosos para evitar re-renders innecesarios
+  const myBids = useMemo(() => 
+    auctions.filter(a => a.bids.some(b => b.userId === user?.id)), 
+    [auctions, user?.id]
   );
-  const activeBids = myBids.filter(a => a.status === 'active');
+  const wonAuctions = useMemo(() => 
+    auctions.filter(a => 
+      a.status === 'ended' && 
+      a.bids.length > 0 && 
+      a.bids[a.bids.length - 1].userId === user?.id
+    ), 
+    [auctions, user?.id]
+  );
+  const activeBids = useMemo(() => 
+    myBids.filter(a => a.status === 'active'), 
+    [myBids]
+  );
 
   // Usar función helper unificada para obtener avatar desde Firebase
   const avatarUrl = getUserAvatarUrl(user);
 
-  // Preparar métricas para el dashboard
-  const dashboardMetrics: DashboardMetric[] = [
+  // Preparar métricas para el dashboard - memoizar para evitar recálculos
+  const dashboardMetrics: DashboardMetric[] = useMemo(() => [
     {
       label: 'Subastas Participadas',
       value: myBids.length,
@@ -147,10 +157,10 @@ const Perfil = () => {
       trend: unreadCount > 0 ? 'up' : 'neutral',
       trendValue: unreadCount > 0 ? `${unreadCount} nuevo${unreadCount > 1 ? 's' : ''}` : undefined
     }
-  ];
+  ], [myBids.length, activeBids.length, wonAuctions.length, unreadCount]);
 
-  // Acciones rápidas
-  const quickActions: QuickAction[] = [
+  // Acciones rápidas - memoizar para evitar recreación en cada render
+  const quickActions: QuickAction[] = useMemo(() => [
     {
       label: 'Ver Subastas',
       icon: <Gavel size={18} />,
@@ -178,10 +188,10 @@ const Perfil = () => {
       },
       variant: unreadCount > 0 ? 'warning' : 'secondary'
     }
-  ];
+  ], [navigate, unreadCount, setActiveTab, setSearchParams]);
 
-  // Tarjetas del dashboard
-  const dashboardCards: DashboardCard[] = [
+  // Tarjetas del dashboard - memoizar para evitar recreación
+  const dashboardCards: DashboardCard[] = useMemo(() => [
     {
       title: 'Resumen de Cuenta',
       content: (
@@ -266,9 +276,9 @@ const Perfil = () => {
       ),
       className: 'special-card'
     }
-  ];
+  ], [myBids, user]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
       await auth.signOut();
       const { clearNotifications } = useStore.getState();
@@ -282,9 +292,9 @@ const Perfil = () => {
       useStore.getState().setUser(null);
       window.location.href = '/';
     }
-  };
+  }, []);
 
-  const handleAvatarSelect = async (avatarUrl: string) => {
+  const handleAvatarSelect = useCallback(async (avatarUrl: string) => {
     if (!user) return;
 
     setUpdatingAvatar(true);
@@ -308,7 +318,7 @@ const Perfil = () => {
     } finally {
       setUpdatingAvatar(false);
     }
-  };
+  }, [user]);
 
   return (
     <div style={{ minHeight: 'calc(100vh - 80px)', padding: isMobile ? '1.5rem 0' : '3rem 0' }}>
@@ -491,21 +501,33 @@ const Perfil = () => {
                 position: 'absolute',
                 bottom: 0,
                 right: 0,
-                width: isMobile ? '32px' : '40px',
-                height: isMobile ? '32px' : '40px',
+                width: isMobile ? '36px' : '44px',
+                height: isMobile ? '36px' : '44px',
                 borderRadius: '50%',
                 padding: 0,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 border: '3px solid var(--bg-secondary)',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                cursor: 'pointer'
+                background: 'var(--primary)',
+                color: 'white',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                zIndex: 10
               }}
-              title="Cambiar avatar"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.1)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+              }}
+              title="Editar foto de perfil"
               disabled={updatingAvatar}
             >
-              <Camera size={isMobile ? 16 : 20} />
+              <Camera size={isMobile ? 18 : 22} />
             </button>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -807,12 +829,12 @@ const Perfil = () => {
               >
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                    Escribí tu mensaje:
+                    Respondé al administrador:
                   </label>
                   <textarea
                     value={newMessageContent}
                     onChange={(e) => setNewMessageContent(e.target.value)}
-                    placeholder="Escribí tu mensaje al administrador aquí..."
+                    placeholder="Respondé al administrador aquí..."
                     rows={isMobile ? 2 : 3}
                     disabled={conversationStatus !== 'open'}
                     style={{ 

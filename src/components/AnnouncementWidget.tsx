@@ -122,7 +122,12 @@ const AnnouncementWidget = () => {
         device: isMobile ? 'mobile' : 'desktop'
       });
       
+      // Remover del estado local
       setAnnouncements(prev => prev.filter(ann => ann.id !== announcementId));
+      
+      // Limpiar cache para forzar recarga y asegurar que no vuelva a aparecer
+      const { clearAnnouncementsCache } = await import('../utils/announcements');
+      clearAnnouncementsCache(user.id);
       
       // Ajustar índice si es necesario
       if (currentIndex >= announcements.length - 1) {

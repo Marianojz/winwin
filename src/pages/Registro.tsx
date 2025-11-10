@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, User, MapPin, FileText, Loader, Phone, Eye, EyeOff } from 'lucide-react';
-import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { Mail, Lock, User, MapPin, FileText, Loader, Phone, Eye, EyeOff, CheckCircle, X } from 'lucide-react';
+import { createUserWithEmailAndPassword, sendEmailVerification, User as FirebaseUser } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
-import MapPicker from '../components/MapPicker';
+import GoogleAddressPicker, { AddressData } from '../components/GoogleAddressPicker';
+import { GOOGLE_MAPS_CONFIG } from '../config/googleMaps';
+import EmailVerificationModal from '../components/EmailVerificationModal';
 
 const Registro = () => {
   const navigate = useNavigate();
@@ -14,6 +16,9 @@ const Registro = () => {
   const [success, setSuccess] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [registeredUser, setRegisteredUser] = useState<FirebaseUser | null>(null);
+  const [addressData, setAddressData] = useState<AddressData | null>(null);
 
   const [formData, setFormData] = useState({
     email: '',
@@ -31,6 +36,25 @@ const Registro = () => {
     termsAccepted: false
   });
 
+  // Estados de validación en tiempo real
+  const [fieldValidation, setFieldValidation] = useState<{
+    username: 'valid' | 'invalid' | 'neutral';
+    dni: 'valid' | 'invalid' | 'neutral';
+    phone: 'valid' | 'invalid' | 'neutral';
+    email: 'valid' | 'invalid' | 'neutral';
+    password: 'valid' | 'invalid' | 'neutral';
+    confirmPassword: 'valid' | 'invalid' | 'neutral';
+    address: 'valid' | 'invalid' | 'neutral';
+  }>({
+    username: 'neutral',
+    dni: 'neutral',
+    phone: 'neutral',
+    email: 'neutral',
+    password: 'neutral',
+    confirmPassword: 'neutral',
+    address: 'neutral'
+  });
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     setFormData(prev => ({
@@ -39,12 +63,85 @@ const Registro = () => {
     }));
   };
 
-  const handleLocationSelect = (lat: number, lng: number, address: string) => {
+  // Validación en tiempo real
+  useEffect(() => {
+    // Validar nombre
+    if (formData.username.trim()) {
+      setFieldValidation(prev => ({ ...prev, username: formData.username.trim().length >= 2 ? 'valid' : 'invalid' }));
+    } else {
+      setFieldValidation(prev => ({ ...prev, username: 'neutral' }));
+    }
+
+    // Validar DNI
+    if (formData.dni.trim()) {
+      setFieldValidation(prev => ({ ...prev, dni: formData.dni.length >= 7 && formData.dni.length <= 8 ? 'valid' : 'invalid' }));
+    } else {
+      setFieldValidation(prev => ({ ...prev, dni: 'neutral' }));
+    }
+
+    // Validar teléfono
+    if (formData.phone.trim()) {
+      const phoneRegex = /^[\d\s\-\+\(\)]+$/;
+      const digits = formData.phone.replace(/\D/g, '');
+      setFieldValidation(prev => ({ 
+        ...prev, 
+        phone: phoneRegex.test(formData.phone) && digits.length >= 10 ? 'valid' : 'invalid' 
+      }));
+    } else {
+      setFieldValidation(prev => ({ ...prev, phone: 'neutral' }));
+    }
+
+    // Validar email
+    if (formData.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const emailParts = formData.email.split('@');
+      const isValid = emailRegex.test(formData.email) && 
+                      emailParts.length === 2 && 
+                      emailParts[1].includes('.') && 
+                      emailParts[1].split('.')[1]?.length >= 2;
+      setFieldValidation(prev => ({ ...prev, email: isValid ? 'valid' : 'invalid' }));
+    } else {
+      setFieldValidation(prev => ({ ...prev, email: 'neutral' }));
+    }
+
+    // Validar contraseña
+    if (formData.password) {
+      setFieldValidation(prev => ({ ...prev, password: formData.password.length >= 6 ? 'valid' : 'invalid' }));
+    } else {
+      setFieldValidation(prev => ({ ...prev, password: 'neutral' }));
+    }
+
+    // Validar confirmación de contraseña
+    if (formData.confirmPassword) {
+      setFieldValidation(prev => ({ 
+        ...prev, 
+        confirmPassword: formData.password === formData.confirmPassword && formData.confirmPassword.length >= 6 ? 'valid' : 'invalid' 
+      }));
+    } else {
+      setFieldValidation(prev => ({ ...prev, confirmPassword: 'neutral' }));
+    }
+
+    // Validar dirección
+    if (addressData) {
+      const hasRequired = addressData.components.street && addressData.components.streetNumber;
+      const { lat, lng } = addressData.coordinates;
+      const inRange = lat >= -55 && lat <= -21 && lng >= -73 && lng <= -53;
+      setFieldValidation(prev => ({ ...prev, address: hasRequired && inRange ? 'valid' : 'invalid' }));
+    } else {
+      setFieldValidation(prev => ({ ...prev, address: 'neutral' }));
+    }
+  }, [formData, addressData]);
+
+  const handleAddressSelect = (address: AddressData) => {
+    setAddressData(address);
     setFormData(prev => ({
       ...prev,
-      latitude: lat,
-      longitude: lng,
-      mapAddress: address
+      address: address.formatted,
+      locality: address.components.locality || '',
+      province: address.components.province || '',
+      latitude: address.coordinates.lat,
+      longitude: address.coordinates.lng,
+      mapAddress: address.formatted
     }));
   };
 
@@ -66,8 +163,16 @@ const Registro = () => {
       return false;
     }
 
-    if (!formData.email.includes('@')) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
       setError('Email inválido');
+      return false;
+    }
+    
+    // Validar que el email tenga un dominio válido
+    const emailParts = formData.email.split('@');
+    if (emailParts.length !== 2 || !emailParts[1].includes('.') || emailParts[1].split('.')[1]?.length < 2) {
+      setError('Email inválido: dominio no válido');
       return false;
     }
 
@@ -81,8 +186,15 @@ const Registro = () => {
       return false;
     }
 
-    if (!formData.address.trim() || !formData.locality.trim() || !formData.province) {
-      setError('Completá todos los campos de dirección');
+    if (!addressData || !addressData.components.street || !addressData.components.streetNumber) {
+      setError('Por favor, seleccioná una dirección válida usando el buscador');
+      return false;
+    }
+    
+    // Validar coordenadas dentro de rangos geográficos permitidos (Argentina)
+    const { lat, lng } = addressData.coordinates;
+    if (lat < -55 || lat > -21 || lng < -73 || lng > -53) {
+      setError('La dirección debe estar dentro de Argentina');
       return false;
     }
 
@@ -95,8 +207,8 @@ const Registro = () => {
   };
 
   const validateStep2 = () => {
-    if (formData.latitude === 0 || formData.longitude === 0) {
-      setError('Por favor, marcá tu ubicación en el mapa');
+    if (!addressData || fieldValidation.address !== 'valid') {
+      setError('Por favor, verificá que la dirección sea válida');
       return false;
     }
     return true;
@@ -135,7 +247,9 @@ const Registro = () => {
 
       const user = userCredential.user;
 
-      await sendEmailVerification(user);
+      // Preparar datos de dirección
+      const addressComponents = addressData?.components || {};
+      const fullAddress = addressData?.formatted || formData.address;
 
       await setDoc(doc(db, 'users', user.uid), {
         username: formData.username,
@@ -143,12 +257,24 @@ const Registro = () => {
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.username)}&size=200&background=FF6B00&color=fff&bold=true`,
         dni: formData.dni,
         phone: formData.phone,
-        address: formData.address,
-        locality: formData.locality,
-        province: formData.province,
-        latitude: formData.latitude,
-        longitude: formData.longitude,
-        mapAddress: formData.mapAddress,
+        address: fullAddress,
+        addressDetails: addressData ? {
+          street: addressComponents.street || '',
+          streetNumber: addressComponents.streetNumber || '',
+          floor: addressComponents.floor || '',
+          apartment: addressComponents.apartment || '',
+          crossStreets: addressComponents.crossStreets || '',
+          locality: addressComponents.locality || '',
+          province: addressComponents.province || '',
+          postalCode: addressComponents.postalCode || '',
+          country: addressComponents.country || 'Argentina'
+        } : undefined,
+        locality: formData.locality || addressComponents.locality || '',
+        province: formData.province || addressComponents.province || '',
+        latitude: formData.latitude || addressData?.coordinates.lat || 0,
+        longitude: formData.longitude || addressData?.coordinates.lng || 0,
+        mapAddress: formData.mapAddress || fullAddress,
+        placeId: addressData?.placeId,
         createdAt: new Date().toISOString(),
         emailVerified: false,
         role: 'user',
@@ -156,12 +282,24 @@ const Registro = () => {
         active: true
       });
 
-      setSuccess('¡Cuenta creada exitosamente! Te enviamos un email de verificación.');
-      setStep(3);
-
-      setTimeout(() => {
-        navigate('/login');
-      }, 3000);
+      // Enviar email de verificación
+      try {
+        await sendEmailVerification(user, {
+          url: `${window.location.origin}/login?verified=true`,
+          handleCodeInApp: false
+        });
+        
+        // Mostrar modal de verificación
+        setRegisteredUser(user);
+        setShowVerificationModal(true);
+        setSuccess('¡Cuenta creada exitosamente! Verificá tu email para activar tu cuenta.');
+      } catch (verificationError: any) {
+        console.error('Error enviando email de verificación:', verificationError);
+        // Aún así mostrar el modal, el usuario puede reenviar
+        setRegisteredUser(user);
+        setShowVerificationModal(true);
+        setError('Cuenta creada, pero hubo un problema al enviar el email. Podés reenviarlo desde el modal.');
+      }
 
     } catch (err: any) {
       console.error('Error en registro:', err);
@@ -219,30 +357,58 @@ const Registro = () => {
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
                   <User size={18} /> Nombre Completo
                 </label>
-                <input 
-                  name="username" 
-                  type="text" 
-                  placeholder="Juan Pérez" 
-                  value={formData.username} 
-                  onChange={handleChange} 
-                  required 
-                  style={{ width: '100%', padding: '0.875rem 1.25rem', borderRadius: '0.75rem' }} 
-                />
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    name="username" 
+                    type="text" 
+                    placeholder="Juan Pérez" 
+                    value={formData.username} 
+                    onChange={handleChange} 
+                    required 
+                    style={{ 
+                      width: '100%', 
+                      padding: '0.875rem 1.25rem', 
+                      paddingRight: fieldValidation.username !== 'neutral' ? '2.75rem' : '1.25rem',
+                      borderRadius: '0.75rem',
+                      border: `2px solid ${fieldValidation.username === 'valid' ? 'var(--success)' : fieldValidation.username === 'invalid' ? 'var(--error)' : 'var(--border)'}`
+                    }} 
+                  />
+                  {fieldValidation.username === 'valid' && (
+                    <CheckCircle size={18} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--success)' }} />
+                  )}
+                  {fieldValidation.username === 'invalid' && formData.username.trim() && (
+                    <X size={18} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--error)' }} />
+                  )}
+                </div>
               </div>
               <div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
                   <FileText size={18} /> DNI
                 </label>
-                <input 
-                  name="dni" 
-                  type="text" 
-                  placeholder="12345678" 
-                  value={formData.dni} 
-                  onChange={handleChange} 
-                  required 
-                  maxLength={8}
-                  style={{ width: '100%', padding: '0.875rem 1.25rem', borderRadius: '0.75rem' }} 
-                />
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    name="dni" 
+                    type="text" 
+                    placeholder="12345678" 
+                    value={formData.dni} 
+                    onChange={handleChange} 
+                    required 
+                    maxLength={8}
+                    style={{ 
+                      width: '100%', 
+                      padding: '0.875rem 1.25rem',
+                      paddingRight: fieldValidation.dni !== 'neutral' ? '2.75rem' : '1.25rem',
+                      borderRadius: '0.75rem',
+                      border: `2px solid ${fieldValidation.dni === 'valid' ? 'var(--success)' : fieldValidation.dni === 'invalid' ? 'var(--error)' : 'var(--border)'}`
+                    }} 
+                  />
+                  {fieldValidation.dni === 'valid' && (
+                    <CheckCircle size={18} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--success)' }} />
+                  )}
+                  {fieldValidation.dni === 'invalid' && formData.dni.trim() && (
+                    <X size={18} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--error)' }} />
+                  )}
+                </div>
               </div>
             </div>
 
@@ -251,29 +417,57 @@ const Registro = () => {
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
                   <Mail size={18} /> Email
                 </label>
-                <input 
-                  name="email" 
-                  type="email" 
-                  placeholder="tu@email.com" 
-                  value={formData.email} 
-                  onChange={handleChange} 
-                  required 
-                  style={{ width: '100%', padding: '0.875rem 1.25rem', borderRadius: '0.75rem' }} 
-                />
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    name="email" 
+                    type="email" 
+                    placeholder="tu@email.com" 
+                    value={formData.email} 
+                    onChange={handleChange} 
+                    required 
+                    style={{ 
+                      width: '100%', 
+                      padding: '0.875rem 1.25rem',
+                      paddingRight: fieldValidation.email !== 'neutral' ? '2.75rem' : '1.25rem',
+                      borderRadius: '0.75rem',
+                      border: `2px solid ${fieldValidation.email === 'valid' ? 'var(--success)' : fieldValidation.email === 'invalid' ? 'var(--error)' : 'var(--border)'}`
+                    }} 
+                  />
+                  {fieldValidation.email === 'valid' && (
+                    <CheckCircle size={18} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--success)' }} />
+                  )}
+                  {fieldValidation.email === 'invalid' && formData.email.trim() && (
+                    <X size={18} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--error)' }} />
+                  )}
+                </div>
               </div>
               <div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
                   <Phone size={18} /> Teléfono *
                 </label>
-                <input 
-                  name="phone" 
-                  type="tel" 
-                  placeholder="11 1234-5678" 
-                  value={formData.phone} 
-                  onChange={handleChange} 
-                  required 
-                  style={{ width: '100%', padding: '0.875rem 1.25rem', borderRadius: '0.75rem' }} 
-                />
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    name="phone" 
+                    type="tel" 
+                    placeholder="11 1234-5678" 
+                    value={formData.phone} 
+                    onChange={handleChange} 
+                    required 
+                    style={{ 
+                      width: '100%', 
+                      padding: '0.875rem 1.25rem',
+                      paddingRight: fieldValidation.phone !== 'neutral' ? '2.75rem' : '1.25rem',
+                      borderRadius: '0.75rem',
+                      border: `2px solid ${fieldValidation.phone === 'valid' ? 'var(--success)' : fieldValidation.phone === 'invalid' ? 'var(--error)' : 'var(--border)'}`
+                    }} 
+                  />
+                  {fieldValidation.phone === 'valid' && (
+                    <CheckCircle size={18} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--success)' }} />
+                  )}
+                  {fieldValidation.phone === 'invalid' && formData.phone.trim() && (
+                    <X size={18} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--error)' }} />
+                  )}
+                </div>
               </div>
             </div>
 
@@ -290,29 +484,38 @@ const Registro = () => {
                     value={formData.password} 
                     onChange={handleChange} 
                     required 
-                    style={{ width: '100%', padding: '0.875rem 3rem 0.875rem 1.25rem', borderRadius: '0.75rem' }} 
+                    style={{ 
+                      width: '100%', 
+                      padding: '0.875rem 3.5rem 0.875rem 1.25rem', 
+                      borderRadius: '0.75rem',
+                      border: `2px solid ${fieldValidation.password === 'valid' ? 'var(--success)' : fieldValidation.password === 'invalid' ? 'var(--error)' : 'var(--border)'}`
+                    }} 
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    style={{
-                      position: 'absolute',
-                      right: '0.75rem',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '0.25rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--text-secondary)'
-                    }}
-                    title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                  >
-                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                  </button>
+                  <div style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {fieldValidation.password === 'valid' && (
+                      <CheckCircle size={18} style={{ color: 'var(--success)' }} />
+                    )}
+                    {fieldValidation.password === 'invalid' && formData.password && (
+                      <X size={18} style={{ color: 'var(--error)' }} />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '0.25rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--text-secondary)'
+                      }}
+                      title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
                 </div>
               </div>
               <div>
@@ -327,29 +530,38 @@ const Registro = () => {
                     value={formData.confirmPassword} 
                     onChange={handleChange} 
                     required 
-                    style={{ width: '100%', padding: '0.875rem 3rem 0.875rem 1.25rem', borderRadius: '0.75rem' }} 
+                    style={{ 
+                      width: '100%', 
+                      padding: '0.875rem 3.5rem 0.875rem 1.25rem', 
+                      borderRadius: '0.75rem',
+                      border: `2px solid ${fieldValidation.confirmPassword === 'valid' ? 'var(--success)' : fieldValidation.confirmPassword === 'invalid' ? 'var(--error)' : 'var(--border)'}`
+                    }} 
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    style={{
-                      position: 'absolute',
-                      right: '0.75rem',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '0.25rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--text-secondary)'
-                    }}
-                    title={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                  >
-                    {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                  </button>
+                  <div style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {fieldValidation.confirmPassword === 'valid' && (
+                      <CheckCircle size={18} style={{ color: 'var(--success)' }} />
+                    )}
+                    {fieldValidation.confirmPassword === 'invalid' && formData.confirmPassword && (
+                      <X size={18} style={{ color: 'var(--error)' }} />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '0.25rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--text-secondary)'
+                      }}
+                      title={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    >
+                      {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -358,59 +570,36 @@ const Registro = () => {
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
                 <MapPin size={18} /> Dirección
               </label>
-              <input 
-                name="address" 
-                type="text" 
-                placeholder="Av. Corrientes 1234" 
-                value={formData.address} 
-                onChange={handleChange} 
-                required 
-                style={{ width: '100%', padding: '0.875rem 1.25rem', borderRadius: '0.75rem', marginBottom: '0.5rem' }} 
+              <GoogleAddressPicker
+                onAddressSelect={handleAddressSelect}
+                apiKey={GOOGLE_MAPS_CONFIG.apiKey}
+                countryRestriction={GOOGLE_MAPS_CONFIG.countryRestriction}
+                className="address-picker-desktop"
+                showAddressFields={false}
+                showMap={false}
               />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                <input 
-                  name="locality" 
-                  type="text" 
-                  placeholder="Localidad" 
-                  value={formData.locality} 
-                  onChange={handleChange} 
-                  required 
-                  style={{ padding: '0.875rem 1.25rem', borderRadius: '0.75rem' }} 
-                />
-                <select 
-                  name="province" 
-                  value={formData.province} 
-                  onChange={handleChange} 
-                  required 
-                  style={{ padding: '0.875rem 1.25rem', borderRadius: '0.75rem' }}
-                >
-                  <option value="">Provincia</option>
-                  <option value="Buenos Aires">Buenos Aires</option>
-                  <option value="CABA">CABA</option>
-                  <option value="Catamarca">Catamarca</option>
-                  <option value="Chaco">Chaco</option>
-                  <option value="Chubut">Chubut</option>
-                  <option value="Córdoba">Córdoba</option>
-                  <option value="Corrientes">Corrientes</option>
-                  <option value="Entre Ríos">Entre Ríos</option>
-                  <option value="Formosa">Formosa</option>
-                  <option value="Jujuy">Jujuy</option>
-                  <option value="La Pampa">La Pampa</option>
-                  <option value="La Rioja">La Rioja</option>
-                  <option value="Mendoza">Mendoza</option>
-                  <option value="Misiones">Misiones</option>
-                  <option value="Neuquén">Neuquén</option>
-                  <option value="Río Negro">Río Negro</option>
-                  <option value="Salta">Salta</option>
-                  <option value="San Juan">San Juan</option>
-                  <option value="San Luis">San Luis</option>
-                  <option value="Santa Cruz">Santa Cruz</option>
-                  <option value="Santa Fe">Santa Fe</option>
-                  <option value="Santiago del Estero">Santiago del Estero</option>
-                  <option value="Tierra del Fuego">Tierra del Fuego</option>
-                  <option value="Tucumán">Tucumán</option>
-                </select>
-              </div>
+              {addressData && (
+                <div style={{ 
+                  marginTop: '1rem', 
+                  padding: '1rem', 
+                  background: 'var(--bg-secondary)', 
+                  borderRadius: '0.75rem',
+                  border: `2px solid ${fieldValidation.address === 'valid' ? 'var(--success)' : 'var(--border)'}`
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <strong>Dirección seleccionada:</strong>
+                    {fieldValidation.address === 'valid' && <CheckCircle size={18} style={{ color: 'var(--success)' }} />}
+                  </div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                    {addressData.formatted}
+                  </div>
+                  {addressData.components.province && (
+                    <div style={{ marginTop: '0.5rem', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem', textAlign: 'center' }}>
+                      <strong>Provincia:</strong> {addressData.components.province}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
@@ -442,18 +631,23 @@ const Registro = () => {
         {step === 2 && (
           <div>
             <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
-              <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>📍 Ubicación de tu Domicilio</h3>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>📍 Verificar Ubicación en el Mapa</h3>
               <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: 0 }}>
-                Por favor, marcá en el mapa la ubicación exacta de tu domicilio. Esto nos ayuda a calcular costos de envío.
+                Verificá que la ubicación en el mapa sea correcta. Podés arrastrar el marcador para ajustarla.
               </p>
             </div>
 
-            <MapPicker 
-  onLocationSelect={handleLocationSelect}
-  initialPosition={[-34.6037, -58.3816]}
-  locality={formData.locality}
-  province={formData.province}
-/>
+            {addressData && (
+              <GoogleAddressPicker
+                onAddressSelect={handleAddressSelect}
+                initialAddress={addressData}
+                apiKey={GOOGLE_MAPS_CONFIG.apiKey}
+                countryRestriction={GOOGLE_MAPS_CONFIG.countryRestriction}
+                className="address-picker-desktop"
+                showAddressFields={false}
+                showMap={true}
+              />
+            )}
 
             <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
               <button 
@@ -470,7 +664,7 @@ const Registro = () => {
                 onClick={handleNextStep}
                 className="btn btn-primary" 
                 style={{ flex: 1 }}
-                disabled={loading || formData.latitude === 0}
+                disabled={loading || !addressData || fieldValidation.address !== 'valid'}
               >
                 {loading ? (
                   <>
@@ -494,11 +688,21 @@ const Registro = () => {
             </p>
             <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
               Por favor, verificá tu email antes de iniciar sesión.
-              <br />
-              Serás redirigido al login en unos segundos...
             </p>
           </div>
         )}
+
+        {/* Modal de Verificación de Email */}
+        <EmailVerificationModal
+          isOpen={showVerificationModal}
+          onClose={() => {
+            setShowVerificationModal(false);
+            navigate('/login');
+          }}
+          user={registeredUser}
+          userEmail={formData.email}
+          platformName="Clikio"
+        />
 
         {step === 1 && (
           <div style={{ marginTop: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>

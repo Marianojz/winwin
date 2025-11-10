@@ -80,9 +80,9 @@ const EmailVerificationModal = ({
             <Mail size={48} />
           </div>
 
-          {/* Título */}
+          {/* Título prominente */}
           <h2 className="modal-title">
-            Verifica tu email para activar tu cuenta
+            ¡Registro exitoso! Verifica tu email para activar tu cuenta
           </h2>
 
           {/* Mensaje principal */}
@@ -92,10 +92,10 @@ const EmailVerificationModal = ({
           <p className="modal-email">
             <strong>{userEmail}</strong>
           </p>
-
-          {/* Advertencia sobre spam */}
-          <div className="modal-warning">
-            <AlertCircle size={18} />
+          
+          {/* Mensaje destacado sobre spam */}
+          <div className="modal-highlight">
+            <AlertCircle size={20} />
             <span>Revisá tu bandeja de entrada y carpeta de spam</span>
           </div>
 

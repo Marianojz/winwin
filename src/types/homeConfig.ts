@@ -71,6 +71,7 @@ export interface LogoConfig {
   position?: 'left' | 'center' | 'right';
   opacity?: number;
   hoverEffect?: boolean;
+  faviconUrl?: string; // URL del favicon generado desde el logo
 }
 
 export interface SiteSettings {

@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation 
 import { ref, onValue } from 'firebase/database';
 import { realtimeDb, auth } from './config/firebase';
 import { getRedirectResult, onAuthStateChanged } from 'firebase/auth';
+import { generateMultipleFavicons, updateAllFavicons, updateFavicon } from './utils/imageOptimizer';
 import { HomeConfig, defaultHomeConfig } from './types/homeConfig';
 import { useStore } from './store/useStore';
 import { processGoogleAuthResult } from './utils/googleAuthHelper';
@@ -26,6 +27,58 @@ import Carrito from './pages/Carrito';
 import Notificaciones from './pages/Notificaciones';
 import Perfil from './pages/Perfil';
 import AdminPanel from './pages/AdminPanel';
+
+// Componente Footer condicional
+const Footer = () => {
+  const location = useLocation();
+  const isHomePage = location.pathname === '/';
+  
+  if (isHomePage) {
+    // Footer completo en página principal
+    return (
+      <footer className="footer">
+        <div className="container">
+          <div className="footer-content">
+            <div className="footer-section">
+              <h3>Clikio</h3>
+              <p>La plataforma líder de subastas y ventas online en Argentina</p>
+            </div>
+            <div className="footer-section">
+              <h4>Enlaces</h4>
+              <ul>
+                <li><Link to="/subastas">Subastas</Link></li>
+                <li><Link to="/tienda">Tienda</Link></li>
+                <li><Link to="/terminos">Términos y Condiciones</Link></li>
+              </ul>
+            </div>
+            <div className="footer-section">
+              <h4>Soporte</h4>
+              <ul>
+                <li><Link to="/ayuda">Centro de Ayuda</Link></li>
+                <li><Link to="/contacto">Contacto</Link></li>
+                <li><Link to="/preguntas">Preguntas Frecuentes</Link></li>
+              </ul>
+            </div>
+          </div>
+          <div className="footer-bottom">
+            <p>© 2025 Clikio. Todos los derechos reservados.</p>
+          </div>
+        </div>
+      </footer>
+    );
+  } else {
+    // Footer minimalista en otras páginas
+    return (
+      <footer className="footer" style={{ padding: '1.5rem 0', background: 'var(--bg-secondary)' }}>
+        <div className="container" style={{ textAlign: 'center' }}>
+          <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+            © 2025 Clikio. Todos los derechos reservados.
+          </p>
+        </div>
+      </footer>
+    );
+  }
+};
 
 // Componente interno para manejar redirect result (debe estar dentro de Router)
 function RedirectHandler() {
@@ -427,6 +480,16 @@ function App() {
           };
           setHomeConfig(config);
           applyThemeColors(config, theme);
+          
+          // Actualizar favicon si existe en la configuración
+          // Nota: No intentamos generar favicons desde Firebase Storage por problemas de CORS
+          // Los favicons se generan automáticamente cuando se sube un logo nuevo
+          if (config.siteSettings?.logoConfig?.faviconUrl) {
+            // Si ya hay un favicon guardado (data URL), usarlo
+            if (config.siteSettings.logoConfig.faviconUrl.startsWith('data:')) {
+              updateFavicon(config.siteSettings.logoConfig.faviconUrl);
+            }
+          }
         }
       }, (error) => {
         console.error('Error cargando homeConfig en App:', error);
@@ -552,35 +615,7 @@ function App() {
             />
           </Routes>
         </main>
-        <footer className="footer">
-          <div className="container">
-            <div className="footer-content">
-              <div className="footer-section">
-                <h3>Clikio</h3>
-                <p>La plataforma líder de subastas y ventas online en Argentina</p>
-              </div>
-              <div className="footer-section">
-                <h4>Enlaces</h4>
-                <ul>
-                  <li><Link to="/subastas">Subastas</Link></li>
-                  <li><Link to="/tienda">Tienda</Link></li>
-                  <li><Link to="/terminos">Términos y Condiciones</Link></li>
-                </ul>
-              </div>
-              <div className="footer-section">
-                <h4>Soporte</h4>
-                <ul>
-                  <li><Link to="/ayuda">Centro de Ayuda</Link></li>
-                  <li><Link to="/contacto">Contacto</Link></li>
-                  <li><Link to="/preguntas">Preguntas Frecuentes</Link></li>
-                </ul>
-              </div>
-            </div>
-            <div className="footer-bottom">
-              <p>© 2025 Clikio. Todos los derechos reservados.</p>
-            </div>
-          </div>
-        </footer>
+        <Footer />
       </div>
     </Router>
   );

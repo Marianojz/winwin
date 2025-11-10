@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Upload, X, Eye, Settings, Image as ImageIcon, CheckCircle, AlertCircle, Save, Camera } from 'lucide-react';
 import { uploadImage } from '../utils/imageUpload';
+import { optimizeImage, generateMultipleFavicons, updateAllFavicons } from '../utils/imageOptimizer';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import './LogoManager.css';
 
@@ -24,9 +25,9 @@ interface LogoManagerProps {
 }
 
 const LOGO_SIZES = {
-  small: { width: '120px', height: 'auto' },
-  medium: { width: '200px', height: 'auto' },
-  large: { width: '300px', height: 'auto' }
+  small: { width: '80px', height: 'auto' },
+  medium: { width: '100px', height: 'auto' },
+  large: { width: '120px', height: 'auto' }
 };
 
 const LogoManager = ({ 
@@ -111,12 +112,37 @@ const LogoManager = ({
     };
     reader.readAsDataURL(file);
 
-    // Subir a Firebase
+    // Subir a Firebase con optimización de calidad
     setUploading(true);
     try {
-      const uploadedUrl = await uploadImage(file, 'logo');
+      // Optimizar imagen manteniendo alta calidad (máximo 2048px para logos grandes)
+      let optimizedFile: File | Blob = file;
+      
+      // Solo optimizar si no es SVG (SVG no necesita optimización)
+      if (file.type !== 'image/svg+xml') {
+        const optimizedBlob = await optimizeImage(file, 2048, 2048, 0.95);
+        optimizedFile = new File([optimizedBlob], file.name, { type: file.type });
+      }
+      
+      // Subir imagen optimizada
+      const uploadedUrl = await uploadImage(optimizedFile, 'logo');
       setConfig(prev => ({ ...prev, url: uploadedUrl }));
       onLogoChange(uploadedUrl);
+      
+      // Generar y actualizar favicon automáticamente
+      try {
+        const favicons = await generateMultipleFavicons(uploadedUrl, [16, 32, 180]);
+        updateAllFavicons(favicons);
+        
+        // Guardar URL del favicon en Firebase para persistencia
+        if (onConfigChange) {
+          onConfigChange({ faviconUrl: favicons[32] || uploadedUrl });
+        }
+      } catch (faviconError) {
+        console.warn('Error generando favicon:', faviconError);
+        // No bloquear el proceso si falla el favicon
+      }
+      
       setPreview(null); // Limpiar preview local
       setError(null);
     } catch (err: any) {
@@ -188,9 +214,34 @@ const LogoManager = ({
 
       setUploading(true);
       try {
-        const uploadedUrl = await uploadImage(file, 'logo');
+        // Optimizar imagen manteniendo alta calidad
+        let optimizedFile: File | Blob = file;
+        
+        // Solo optimizar si no es SVG
+        if (file.type !== 'image/svg+xml') {
+          const optimizedBlob = await optimizeImage(file, 2048, 2048, 0.95);
+          optimizedFile = new File([optimizedBlob], file.name, { type: file.type });
+        }
+        
+        // Subir imagen optimizada
+        const uploadedUrl = await uploadImage(optimizedFile, 'logo');
         setConfig(prev => ({ ...prev, url: uploadedUrl }));
         onLogoChange(uploadedUrl);
+        
+        // Generar y actualizar favicon automáticamente
+        try {
+          const favicons = await generateMultipleFavicons(uploadedUrl, [16, 32, 180]);
+          updateAllFavicons(favicons);
+          
+          // Guardar URL del favicon en Firebase para persistencia
+          if (onConfigChange) {
+            onConfigChange({ faviconUrl: favicons[32] || uploadedUrl });
+          }
+        } catch (faviconError) {
+          console.warn('Error generando favicon:', faviconError);
+          // No bloquear el proceso si falla el favicon
+        }
+        
         setPreview(null);
         setError(null);
       } catch (err: any) {

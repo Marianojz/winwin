@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { useStore } from '../store/useStore';
@@ -80,8 +80,18 @@ const GoogleSignIn = () => {
     }
   }, [location.pathname, setUser, navigate]);
 
-  const handleGoogleSignIn = async () => {
-    console.log('🖱️ [GOOGLE SIGN-IN] Botón clickeado, iniciando proceso...');
+  const handleGoogleSignIn = useCallback(async () => {
+    // Prevenir múltiples intentos simultáneos
+    if (loading) {
+      if (import.meta.env.DEV) {
+        console.log('⚠️ [GOOGLE SIGN-IN] Ya hay un intento en proceso, ignorando...');
+      }
+      return;
+    }
+    
+    if (import.meta.env.DEV) {
+      console.log('🖱️ [GOOGLE SIGN-IN] Botón clickeado, iniciando proceso...');
+    }
     setLoading(true);
     setError('');
     setStatusMessage('');
@@ -90,50 +100,68 @@ const GoogleSignIn = () => {
       const provider = createGoogleProvider();
       const isMobile = isMobileDevice();
       
-      console.log('🔐 [GOOGLE SIGN-IN] Iniciando proceso...', { 
-        isMobile,
-        authDomain: auth.app.options.authDomain,
-        currentUser: auth.currentUser?.uid
-      });
+      if (import.meta.env.DEV) {
+        console.log('🔐 [GOOGLE SIGN-IN] Iniciando proceso...', { 
+          isMobile,
+          authDomain: auth.app.options.authDomain,
+          currentUser: auth.currentUser?.uid
+        });
+      }
       
       // En móvil, usar popup directamente (más confiable que redirect)
       // Redirect se pierde en muchos navegadores móviles
       if (isMobile) {
-        console.log('📱 [GOOGLE SIGN-IN] Móvil detectado, usando popup directamente');
+        if (import.meta.env.DEV) {
+          console.log('📱 [GOOGLE SIGN-IN] Móvil detectado, usando popup directamente');
+        }
         setStatusMessage('Abriendo ventana de Google...');
         toast.info('Abriendo ventana de Google', 3000);
         // Continuar con popup (no usar redirect en móvil)
       } else {
-        console.log('💻 [GOOGLE SIGN-IN] Desktop detectado, usando popup');
+        if (import.meta.env.DEV) {
+          console.log('💻 [GOOGLE SIGN-IN] Desktop detectado, usando popup');
+        }
       }
 
       // En desktop o si redirect falló, usar popup
-      console.log('🪟 [GOOGLE SIGN-IN] Intentando con popup...');
+      if (import.meta.env.DEV) {
+        console.log('🪟 [GOOGLE SIGN-IN] Intentando con popup...');
+      }
       try {
         const result = await signInWithPopup(auth, provider);
-        console.log('✅ [GOOGLE SIGN-IN] Popup exitoso, procesando usuario...', result.user.uid);
+        if (import.meta.env.DEV) {
+          console.log('✅ [GOOGLE SIGN-IN] Popup exitoso, procesando usuario...', result.user.uid);
+        }
         
         const { fullUser, needsCompleteProfile } = await processGoogleAuthResult(result.user);
         
-        console.log('👤 [GOOGLE SIGN-IN] Usuario procesado:', {
-          id: fullUser.id,
-          email: fullUser.email,
-          isAdmin: fullUser.isAdmin,
-          needsCompleteProfile
-        });
+        if (import.meta.env.DEV) {
+          console.log('👤 [GOOGLE SIGN-IN] Usuario procesado:', {
+            id: fullUser.id,
+            email: fullUser.email,
+            isAdmin: fullUser.isAdmin,
+            needsCompleteProfile
+          });
+        }
         
         setUser(fullUser);
         toast.success('¡Inicio de sesión exitoso!', 2000);
 
         // Redirigir según si necesita completar perfil
         if (needsCompleteProfile) {
-          console.log('📝 [GOOGLE SIGN-IN] Redirigiendo a completar perfil...');
+          if (import.meta.env.DEV) {
+            console.log('📝 [GOOGLE SIGN-IN] Redirigiendo a completar perfil...');
+          }
           navigate('/completar-perfil', { replace: true });
         } else if (fullUser.isAdmin) {
-          console.log('👑 [GOOGLE SIGN-IN] Redirigiendo a admin...');
+          if (import.meta.env.DEV) {
+            console.log('👑 [GOOGLE SIGN-IN] Redirigiendo a admin...');
+          }
           navigate('/admin', { replace: true });
         } else {
-          console.log('🏠 [GOOGLE SIGN-IN] Redirigiendo a home...');
+          if (import.meta.env.DEV) {
+            console.log('🏠 [GOOGLE SIGN-IN] Redirigiendo a home...');
+          }
           navigate('/', { replace: true });
         }
       } catch (popupError: any) {
@@ -145,7 +173,9 @@ const GoogleSignIn = () => {
         
         // Solo intentar redirect si el popup fue bloqueado y sessionStorage está disponible
         if (isPopupBlocked && isSessionStorageAvailable()) {
-          console.warn('⚠️ [GOOGLE SIGN-IN] Popup bloqueado, intentando redirect como último recurso...');
+          if (import.meta.env.DEV) {
+            console.warn('⚠️ [GOOGLE SIGN-IN] Popup bloqueado, intentando redirect como último recurso...');
+          }
           setStatusMessage('Redirigiendo a Google...');
           toast.info('Redirigiendo a Google', 3000);
           try {
@@ -153,20 +183,26 @@ const GoogleSignIn = () => {
             return;
           } catch (redirectError: any) {
             // Si redirect también falla, lanzar el error original
-            console.error('❌ [GOOGLE SIGN-IN] Redirect también falló:', redirectError);
+            if (import.meta.env.DEV) {
+              console.error('❌ [GOOGLE SIGN-IN] Redirect también falló:', redirectError);
+            }
             throw popupError;
           }
         }
         throw popupError;
       }
     } catch (error: any) {
-      console.error('Error con Google Sign-In:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error con Google Sign-In:', error);
+      }
       
       // Manejar error específico de sessionStorage/missing initial state
       if (error.message?.includes('missing initial state') || 
           error.message?.includes('sessionStorage') ||
           error.message?.includes('storage-partitioned')) {
-        console.warn('⚠️ Error de sessionStorage detectado, intentando con popup...');
+        if (import.meta.env.DEV) {
+          console.warn('⚠️ Error de sessionStorage detectado, intentando con popup...');
+        }
         setStatusMessage('Intentando método alternativo...');
         toast.warning('Problema con almacenamiento, usando método alternativo', 3000);
         
@@ -189,7 +225,9 @@ const GoogleSignIn = () => {
           return; // Salir exitosamente
         } catch (popupError: any) {
           // Si popup también falla, mostrar error
-          console.error('Popup también falló:', popupError);
+          if (import.meta.env.DEV) {
+            console.error('Popup también falló:', popupError);
+          }
           error = popupError; // Continuar con el manejo de error normal
         }
       }
@@ -212,7 +250,7 @@ const GoogleSignIn = () => {
       setLoading(false);
       setStatusMessage('');
     }
-  };
+  }, [loading, setUser, navigate]);
 
   return (
     <div style={{ width: '100%' }}>
@@ -306,4 +344,5 @@ const GoogleSignIn = () => {
   );
 };
 
-export default GoogleSignIn;
+// Memoizar componente para evitar re-renders innecesarios
+export default memo(GoogleSignIn);

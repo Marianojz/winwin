@@ -79,12 +79,17 @@ const Login = () => {
       const userDocCheck = await getDoc(doc(db, 'users', user.uid));
       const userExists = userDocCheck.exists();
       
-      // Solo bloquear si es usuario nuevo y no tiene email verificado
+      // Hacer obligatoria la verificación de email para usuarios nuevos (excepto Google)
       if (!user.emailVerified && !userExists && !user.providerData?.some((provider: any) => provider.providerId === 'google.com')) {
-        setError('Por favor, verificá tu email antes de iniciar sesión. Revisá tu bandeja de entrada.');
+        setError('Por favor, verificá tu email antes de iniciar sesión. Revisá tu bandeja de entrada y spam.');
         await auth.signOut();
         setLoading(false);
         return;
+      }
+      
+      // Para usuarios existentes sin email verificado, mostrar recordatorio pero permitir login
+      if (!user.emailVerified && userExists && !user.providerData?.some((provider: any) => provider.providerId === 'google.com')) {
+        toast.warning('Tu email no está verificado. Te recomendamos verificarlo para mayor seguridad.', 5000);
       }
 
       // Esperar un momento para asegurar que Firebase está listo
@@ -168,6 +173,19 @@ const Login = () => {
         fullUser.email,
         fullUser.username
       );
+      
+      // Actualizar último login en Realtime Database
+      try {
+        const { ref: dbRef, set: dbSet } = await import('firebase/database');
+        const { realtimeDb } = await import('../config/firebase');
+        const userRef = dbRef(realtimeDb, `users/${fullUser.id}`);
+        await dbSet(userRef, {
+          ...(await import('firebase/database')).get(userRef).then(s => s.exists() ? s.val() : {}),
+          lastLogin: new Date().toISOString()
+        });
+      } catch (err) {
+        console.warn('Error actualizando último login:', err);
+      }
       
       // Establecer usuario - Firebase es la fuente de verdad
       setUser(fullUser);

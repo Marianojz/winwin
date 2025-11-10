@@ -248,7 +248,7 @@ const ChatWidget = ({ onContactClick, onHelpCenterClick }: ChatWidgetProps) => {
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder="Escribí tu mensaje..."
+                    placeholder="Respondé al administrador..."
                     rows={1}
                     disabled={sending || !conversationExists || conversationStatus !== 'open'}
                   />

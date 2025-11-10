@@ -12,7 +12,7 @@ import {
   MousePointerClick, Image as ImageIcon, Save, Store, Mail, Send,
   CheckCircle, Truck, FileText, Calendar, User, CreditCard,
   ArrowRight, ArrowDown, ArrowUp, Download, Trash, HelpCircle, Ticket as TicketIcon,
-  MessageSquare
+  MessageSquare, Palette, Shuffle
 } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -29,7 +29,7 @@ import { logOrderStatusChange, loadOrderTransactions } from '../utils/orderTrans
 import { storage } from '../config/firebase';
 import { ref as storageRef, listAll, deleteObject } from 'firebase/storage';
 import { uploadImage } from '../utils/imageUpload';
-import { HomeConfig, defaultHomeConfig, LogoSticker } from '../types/homeConfig';
+import { HomeConfig, defaultHomeConfig, LogoSticker, ThemeColors } from '../types/homeConfig';
 import { specialEvents, getCurrentSpecialEvents, getStickerForEvent } from '../utils/dateSpecialEvents';
 import { 
   getAllConversations, 
@@ -200,6 +200,66 @@ const AdminPanel = (): React.ReactElement => {
   const [homeConfig, setHomeConfig] = useState<HomeConfig>(defaultHomeConfig);
   // Estado para modo activo en editor de colores
   const [activeColorMode, setActiveColorMode] = useState<'light' | 'dark' | 'experimental'>('light');
+  
+  // Función para generar colores aleatorios complementarios
+  const generateComplementaryColors = (): ThemeColors => {
+    // Generar un color base aleatorio (hue entre 0-360)
+    const baseHue = Math.floor(Math.random() * 360);
+    
+    // Calcular el color complementario (180 grados de diferencia)
+    const complementaryHue = (baseHue + 180) % 360;
+    
+    // Función helper para convertir HSL a HEX
+    const hslToHex = (h: number, s: number, l: number): string => {
+      l /= 100;
+      const a = s * Math.min(l, 1 - l) / 100;
+      const f = (n: number) => {
+        const k = (n + h / 30) % 12;
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        return Math.round(255 * color).toString(16).padStart(2, '0');
+      };
+      return `#${f(0)}${f(8)}${f(4)}`;
+    };
+    
+    // Generar variaciones de saturación y luminosidad para crear una paleta armoniosa
+    const primary = hslToHex(baseHue, 70 + Math.random() * 20, 45 + Math.random() * 15);
+    const primaryHover = hslToHex(baseHue, 75 + Math.random() * 15, 35 + Math.random() * 10);
+    const secondary = hslToHex(complementaryHue, 60 + Math.random() * 20, 50 + Math.random() * 15);
+    
+    // Fondos: usar colores más neutros pero relacionados
+    const background = hslToHex(baseHue, 10 + Math.random() * 10, 95 + Math.random() * 3);
+    const backgroundSecondary = hslToHex(baseHue, 15 + Math.random() * 10, 90 + Math.random() * 5);
+    const backgroundTertiary = hslToHex(complementaryHue, 20 + Math.random() * 10, 85 + Math.random() * 5);
+    
+    // Textos: usar colores oscuros pero con matiz del color base
+    const textPrimary = hslToHex(baseHue, 30 + Math.random() * 20, 15 + Math.random() * 10);
+    const textSecondary = hslToHex(baseHue, 25 + Math.random() * 15, 40 + Math.random() * 15);
+    
+    // Bordes: tono intermedio
+    const border = hslToHex(baseHue, 20 + Math.random() * 15, 70 + Math.random() * 15);
+    
+    // Estados: usar colores complementarios y análogos
+    const success = hslToHex((baseHue + 120) % 360, 60 + Math.random() * 20, 45 + Math.random() * 15);
+    const warning = hslToHex((baseHue + 60) % 360, 70 + Math.random() * 20, 50 + Math.random() * 15);
+    const error = hslToHex((baseHue + 0) % 360, 70 + Math.random() * 20, 45 + Math.random() * 15);
+    const info = hslToHex((baseHue + 240) % 360, 65 + Math.random() * 20, 50 + Math.random() * 15);
+    
+    return {
+      primary,
+      primaryHover,
+      secondary,
+      background,
+      backgroundSecondary,
+      backgroundTertiary,
+      textPrimary,
+      textSecondary,
+      border,
+      success,
+      warning,
+      error,
+      info
+    };
+  };
   
   // Cargar homeConfig desde Firebase
   useEffect(() => {
@@ -6446,7 +6506,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
 
               return (
                 <>
-                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                     {(Object.keys(modeLabels) as Array<'light' | 'dark' | 'experimental'>).map(mode => (
                       <button
                         key={mode}
@@ -6470,6 +6530,49 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                         <span>{modeLabels[mode].label}</span>
                       </button>
                     ))}
+                    {activeColorMode === 'experimental' && (
+                      <button
+                        onClick={() => {
+                          const newColors = generateComplementaryColors();
+                          const newColorSets = {
+                            ...themeColorSets,
+                            experimental: newColors
+                          };
+                          setHomeConfig({ 
+                            ...homeConfig, 
+                            themeColorSets: newColorSets
+                          });
+                        }}
+                        style={{
+                          padding: '0.75rem 1.5rem',
+                          borderRadius: '0.5rem',
+                          border: '2px solid var(--primary)',
+                          background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+                          color: 'white',
+                          cursor: 'pointer',
+                          fontSize: '0.9375rem',
+                          fontWeight: 600,
+                          transition: 'all 0.3s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                          marginLeft: 'auto'
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.05)';
+                          (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 16px rgba(0,0,0,0.2)';
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
+                          (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                        }}
+                        title="Generar paleta de colores complementarios aleatorios"
+                      >
+                        <Shuffle size={18} />
+                        <span>Colores Aleatorios</span>
+                      </button>
+                    )}
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1.5rem' }}>
