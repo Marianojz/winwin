@@ -183,7 +183,7 @@ const Home = () => {
               </h2>
               <p>Lo mejor de subastas y tienda</p>
             </div>
-            <div className="featured-content" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', alignItems: 'stretch', maxWidth: '1200px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+            <div className="featured-content">
               {featuredAuction && (
                 <div 
                   className="featured-auction-wrapper featured-section-auction"
@@ -519,15 +519,22 @@ const Home = () => {
         }
 
         .featured-content {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 1.25rem;
-          align-items: stretch;
-          max-width: 1200px;
-          margin: 0 auto;
-          position: relative;
-          z-index: 1;
-        }
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  align-items: stretch;
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 768px) {
+  .featured-content {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
 
         .featured-auction-wrapper {
           display: flex !important;
