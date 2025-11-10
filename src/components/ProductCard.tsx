@@ -170,9 +170,9 @@ const ProductCard = ({ product }: ProductCardProps) => {
 
         .product-badge {
           position: absolute;
-          top: 0.75rem;
-          right: 0.75rem;
-          font-size: 0.75rem;
+          top: 0.5rem;
+          right: 0.5rem;
+          font-size: 0.6875rem;
           padding: 0.25rem 0.5rem;
           border-radius: 0.375rem;
           font-weight: 600;
@@ -233,8 +233,9 @@ const ProductCard = ({ product }: ProductCardProps) => {
 
         .product-card-price {
           display: flex;
-          justify-content: space-between;
+          flex-direction: column;
           align-items: center;
+          gap: 0.25rem;
           margin-top: auto;
           padding-top: 0.5rem;
           border-top: 1px solid var(--border);
@@ -245,16 +246,18 @@ const ProductCard = ({ product }: ProductCardProps) => {
           font-weight: 700;
           color: var(--primary);
           font-family: 'Poppins', sans-serif;
+          text-align: center;
         }
 
         .product-stock {
           font-size: 0.75rem;
           color: var(--text-secondary);
+          text-align: center;
         }
 
         .product-card-actions {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: 1fr 1.5fr;
           gap: 0.5rem;
         }
 
@@ -265,6 +268,35 @@ const ProductCard = ({ product }: ProductCardProps) => {
           align-items: center;
           justify-content: center;
           gap: 0.375rem;
+        }
+
+        .btn-outline {
+          background: transparent;
+          border: 1px solid var(--border);
+          color: var(--text-primary);
+        }
+
+        .btn-primary {
+          background: var(--primary);
+          border: 1px solid var(--primary);
+          color: white;
+        }
+
+        /* Stickers más pequeños */
+        .product-card-image > div:first-child {
+          top: 0.5rem !important;
+          left: 0.5rem !important;
+          gap: 0.25rem !important;
+        }
+
+        .product-card-image > div:first-child > div {
+          padding: 0.25rem 0.375rem !important;
+          font-size: 0.6875rem !important;
+          border-radius: 0.375rem !important;
+        }
+
+        .product-card-image > div:first-child > div span:first-child {
+          font-size: 0.875rem !important;
         }
 
         @media (max-width: 768px) {
@@ -282,8 +314,41 @@ const ProductCard = ({ product }: ProductCardProps) => {
           }
           
           .product-card-actions .btn {
-            padding: 0.4375rem 0.625rem;
+            padding: 0.5rem 0.625rem;
             font-size: 0.75rem;
+          }
+
+          .product-card-actions {
+            grid-template-columns: 1fr 2fr;
+          }
+
+          /* Ocultar "X disponibles" en móvil */
+          .product-stock {
+            display: none;
+          }
+
+          /* Badge más pequeño en móvil */
+          .product-badge {
+            font-size: 0.625rem;
+            padding: 0.1875rem 0.375rem;
+            top: 0.375rem;
+            right: 0.375rem;
+          }
+
+          /* Stickers aún más pequeños en móvil */
+          .product-card-image > div:first-child {
+            top: 0.375rem !important;
+            left: 0.375rem !important;
+            gap: 0.1875rem !important;
+          }
+
+          .product-card-image > div:first-child > div {
+            padding: 0.1875rem 0.25rem !important;
+            font-size: 0.625rem !important;
+          }
+
+          .product-card-image > div:first-child > div span:first-child {
+            font-size: 0.75rem !important;
           }
         }
 
@@ -294,6 +359,12 @@ const ProductCard = ({ product }: ProductCardProps) => {
           
           .product-card-actions {
             gap: 0.375rem;
+            grid-template-columns: 1fr 2fr;
+          }
+
+          .product-card-actions .btn {
+            padding: 0.4375rem 0.5rem;
+            font-size: 0.6875rem;
           }
         }
       `}</style>
