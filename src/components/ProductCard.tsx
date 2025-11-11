@@ -113,15 +113,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
         </div>
 
         <div className="product-card-actions">
-          <button
-            onClick={handleAddToCart}
-            className="btn btn-outline"
-            disabled={product.stock === 0}
-          >
-            <ShoppingCart size={18} />
-            Agregar
-          </button>
-          <button className="btn btn-primary">
+          <button className="btn btn-primary" style={{ width: '100%' }}>
             Ver Detalles
           </button>
         </div>
@@ -256,8 +248,8 @@ const ProductCard = ({ product }: ProductCardProps) => {
         }
 
         .product-card-actions {
-          display: grid;
-          grid-template-columns: 1fr 1.5fr;
+          display: flex;
+          width: 100%;
           gap: 0.5rem;
         }
 
@@ -319,7 +311,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
           }
 
           .product-card-actions {
-            grid-template-columns: 1fr 2fr;
+            width: 100%;
           }
 
           /* Ocultar "X disponibles" en móvil */
@@ -359,7 +351,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
           
           .product-card-actions {
             gap: 0.375rem;
-            grid-template-columns: 1fr 2fr;
+            width: 100%;
           }
 
           .product-card-actions .btn {

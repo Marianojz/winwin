@@ -112,7 +112,7 @@ const Home = () => {
                   Ir a la Tienda
                 </Link>
               </div>
-              <div className="hero-stats">
+              <div className="hero-stats" style={{ marginTop: '1.5rem' }}>
                 <div className="stat-item">
                   <span className="stat-number">{auctions.length}</span>
                   <span className="stat-label">Subastas Activas</span>
@@ -195,35 +195,12 @@ const Home = () => {
                     background: 'var(--bg-secondary)',
                     borderRadius: '0.75rem',
                     transition: 'all 0.3s ease',
-                    border: '2px solid transparent',
+                    border: 'none',
                     position: 'relative',
                     overflow: 'hidden',
                     height: '100%'
                   }}
                 >
-                  <div 
-                    className="featured-badge featured-badge-auction"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.5rem 0.875rem',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      marginBottom: '0.75rem',
-                      width: 'fit-content',
-                      position: 'relative',
-                      zIndex: 1,
-                      background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
-                      color: 'white',
-                      boxShadow: '0 4px 12px rgba(255, 107, 0, 0.3)',
-                      transition: 'all 0.3s ease'
-                    }}
-                  >
-                    <Gavel size={18} />
-                    Subasta Destacada
-                  </div>
                   <div className="featured-card-content" style={{ flex: 1, display: 'flex', alignItems: 'stretch', position: 'relative', zIndex: 1, minHeight: 0 }}>
                     <AuctionCard auction={featuredAuction} />
                   </div>
@@ -352,8 +329,8 @@ const Home = () => {
 
         .hero {
           background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
-          padding: 4rem 0;
-          margin-bottom: 4rem;
+          padding: 3rem 0;
+          margin-bottom: 2rem;
         }
 
         .hero-content {
@@ -389,7 +366,7 @@ const Home = () => {
         .hero-buttons {
           display: flex;
           gap: 1rem;
-          margin-bottom: 3rem;
+          margin-bottom: 1.5rem;
           flex-wrap: wrap;
         }
 
@@ -400,24 +377,27 @@ const Home = () => {
 
         .hero-stats {
           display: flex;
-          gap: 3rem;
+          gap: 1.5rem;
+          flex-wrap: wrap;
         }
 
         .stat-item {
           display: flex;
           flex-direction: column;
           gap: 0.25rem;
+          flex: 1;
+          min-width: 100px;
         }
 
         .stat-number {
-          font-size: 2.5rem;
+          font-size: clamp(1.5rem, 4vw, 2rem);
           font-weight: 700;
           color: var(--primary);
           font-family: 'Poppins', sans-serif;
         }
 
         .stat-label {
-          font-size: 0.875rem;
+          font-size: clamp(0.75rem, 2vw, 0.8125rem);
           color: var(--text-secondary);
         }
 
@@ -500,7 +480,7 @@ const Home = () => {
           background: var(--bg-secondary) !important;
           border-radius: 0.75rem !important;
           transition: all 0.3s ease !important;
-          border: 2px solid transparent !important;
+          border: none !important;
           position: relative !important;
           overflow: hidden !important;
           height: 100% !important;
@@ -513,7 +493,7 @@ const Home = () => {
           left: -50%;
           width: 200%;
           height: 200%;
-          background: radial-gradient(circle, rgba(255, 107, 0, 0.15) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(255, 107, 0, 0.1) 0%, transparent 70%);
           opacity: 0;
           transition: opacity 0.3s ease;
           pointer-events: none;
@@ -522,9 +502,7 @@ const Home = () => {
 
         .featured-auction-wrapper:hover {
           transform: translateY(-4px) !important;
-          border-color: var(--primary) !important;
-          box-shadow: 0 8px 24px rgba(255, 107, 0, 0.4),
-                      0 0 40px rgba(255, 107, 0, 0.3) !important;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
         }
 
         .featured-auction-wrapper:hover::before {
@@ -708,7 +686,7 @@ const Home = () => {
 
         /* Features Compacto con Efectos Neon */
         .features-compact {
-          padding: 2.5rem 0;
+          padding: 1.5rem 0;
           background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
           position: relative;
           overflow: hidden;
@@ -732,23 +710,23 @@ const Home = () => {
 
         .features-compact-title {
           text-align: center;
-          font-size: clamp(1.5rem, 3vw, 1.875rem);
-          margin-bottom: 2rem;
+          font-size: clamp(1.25rem, 3vw, 1.5rem);
+          margin-bottom: 1.25rem;
           color: var(--text-primary);
           font-weight: 600;
         }
 
         .features-compact-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-          gap: 1.25rem;
+          grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+          gap: 0.875rem;
           max-width: 900px;
           margin: 0 auto;
         }
 
         .feature-compact-card {
           text-align: center;
-          padding: 1.5rem 1rem;
+          padding: 1rem 0.75rem;
           background: var(--bg-secondary);
           border-radius: 0.75rem;
           transition: all 0.3s ease;
@@ -782,11 +760,11 @@ const Home = () => {
 
         .feature-compact-icon {
           display: inline-flex;
-          padding: 0.75rem;
+          padding: 0.625rem;
           background: linear-gradient(135deg, var(--primary), var(--secondary));
           border-radius: 0.5rem;
           color: white;
-          margin-bottom: 0.75rem;
+          margin-bottom: 0.5rem;
           position: relative;
           z-index: 1;
           box-shadow: 0 4px 12px rgba(255, 107, 0, 0.3);
@@ -800,8 +778,8 @@ const Home = () => {
         }
 
         .feature-compact-card h3 {
-          font-size: 1rem;
-          margin-bottom: 0.5rem;
+          font-size: 0.875rem;
+          margin-bottom: 0.375rem;
           position: relative;
           z-index: 1;
           word-wrap: break-word;
@@ -810,8 +788,8 @@ const Home = () => {
 
         .feature-compact-card p {
           color: var(--text-secondary);
-          font-size: 0.875rem;
-          line-height: 1.5;
+          font-size: 0.75rem;
+          line-height: 1.4;
           position: relative;
           z-index: 1;
           word-wrap: break-word;
@@ -834,7 +812,7 @@ const Home = () => {
         }
 
         .how-it-works {
-          padding: 2.5rem 0;
+          padding: 1.5rem 0;
           background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
           position: relative;
           overflow: hidden;
@@ -854,9 +832,9 @@ const Home = () => {
 
         .steps {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 1.25rem;
-          margin-top: 2rem;
+          grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+          gap: 0.875rem;
+          margin-top: 1.25rem;
           max-width: 900px;
           margin-left: auto;
           margin-right: auto;
@@ -866,7 +844,7 @@ const Home = () => {
 
         .step {
           text-align: center;
-          padding: 1.5rem 1rem;
+          padding: 1rem 0.75rem;
           background: var(--bg-secondary);
           border-radius: 0.75rem;
           transition: all 0.3s ease;
@@ -902,16 +880,16 @@ const Home = () => {
 
         .step-number {
           display: inline-flex;
-          width: 50px;
-          height: 50px;
+          width: 40px;
+          height: 40px;
           align-items: center;
           justify-content: center;
           background: linear-gradient(135deg, var(--primary), var(--secondary));
           color: white;
           border-radius: 50%;
-          font-size: 1.25rem;
+          font-size: 1rem;
           font-weight: 700;
-          margin-bottom: 1rem;
+          margin-bottom: 0.75rem;
           font-family: 'Poppins', sans-serif;
           box-shadow: 0 4px 12px rgba(255, 107, 0, 0.3);
           transition: all 0.3s ease;
@@ -926,8 +904,8 @@ const Home = () => {
         }
 
         .step h3 {
-          font-size: clamp(1rem, 2vw, 1.125rem);
-          margin-bottom: 0.5rem;
+          font-size: clamp(0.875rem, 2vw, 1rem);
+          margin-bottom: 0.375rem;
           position: relative;
           z-index: 1;
           word-wrap: break-word;
@@ -936,8 +914,8 @@ const Home = () => {
 
         .step p {
           color: var(--text-secondary);
-          line-height: 1.6;
-          font-size: clamp(0.875rem, 1.5vw, 0.9375rem);
+          line-height: 1.5;
+          font-size: clamp(0.75rem, 1.5vw, 0.8125rem);
           position: relative;
           z-index: 1;
           word-wrap: break-word;

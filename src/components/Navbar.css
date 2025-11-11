@@ -345,17 +345,33 @@
 
 .navbar-mobile-item:hover {
   color: var(--primary);
-  transform: translateY(-3px);
+  transform: translateY(-4px) scale(1.05);
+  box-shadow: 0 4px 12px rgba(255, 107, 0, 0.2);
 }
 
 .navbar-mobile-item--active {
   color: var(--primary);
   background: var(--bg-tertiary);
-  transform: translateY(-2px);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 2px 8px rgba(255, 107, 0, 0.15);
 }
 
 .navbar-mobile-item--active::before {
-  opacity: 0.08;
+  opacity: 0.12;
+}
+
+.navbar-mobile-item--admin {
+  color: var(--warning);
+}
+
+.navbar-mobile-item--admin:hover {
+  color: var(--warning);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.navbar-mobile-item--admin.navbar-mobile-item--active {
+  background: rgba(245, 158, 11, 0.1);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
 }
 
 /* Icono con efecto de flotación */

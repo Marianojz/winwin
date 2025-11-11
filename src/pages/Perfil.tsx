@@ -18,8 +18,8 @@ const Perfil = () => {
   const { user, auctions } = useStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'messages' | 'settings'>(
-    tabParam === 'messages' ? 'messages' : tabParam === 'settings' ? 'settings' : tabParam === 'profile' ? 'profile' : 'dashboard'
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'messages' | 'settings'>(
+    tabParam === 'messages' ? 'messages' : tabParam === 'settings' ? 'settings' : 'dashboard'
   );
   const navigate = useNavigate();
   
@@ -29,8 +29,6 @@ const Perfil = () => {
       setActiveTab('messages');
     } else if (tabParam === 'settings') {
       setActiveTab('settings');
-    } else if (tabParam === 'profile') {
-      setActiveTab('profile');
     } else {
       setActiveTab('dashboard');
     }
@@ -105,21 +103,18 @@ const Perfil = () => {
     }
   }, [userMessages.length]);
 
-  if (!user) {
-    return <div style={{ padding: '3rem', textAlign: 'center' }}>Debes iniciar sesión</div>;
-  }
-
   // Memoizar cálculos costosos para evitar re-renders innecesarios
+  // IMPORTANTE: Estos hooks deben ejecutarse SIEMPRE, antes de cualquier return
   const myBids = useMemo(() => 
-    auctions.filter(a => a.bids.some(b => b.userId === user?.id)), 
+    user ? auctions.filter(a => a.bids.some(b => b.userId === user.id)) : [], 
     [auctions, user?.id]
   );
   const wonAuctions = useMemo(() => 
-    auctions.filter(a => 
+    user ? auctions.filter(a => 
       a.status === 'ended' && 
       a.bids.length > 0 && 
-      a.bids[a.bids.length - 1].userId === user?.id
-    ), 
+      a.bids[a.bids.length - 1].userId === user.id
+    ) : [], 
     [auctions, user?.id]
   );
   const activeBids = useMemo(() => 
@@ -128,7 +123,7 @@ const Perfil = () => {
   );
 
   // Usar función helper unificada para obtener avatar desde Firebase
-  const avatarUrl = getUserAvatarUrl(user);
+  const avatarUrl = user ? getUserAvatarUrl(user) : '';
 
   // Preparar métricas para el dashboard - memoizar para evitar recálculos
   const dashboardMetrics: DashboardMetric[] = useMemo(() => [
@@ -203,13 +198,13 @@ const Perfil = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
             <span style={{ color: 'var(--text-secondary)' }}>Miembro desde:</span>
             <strong style={{ color: 'var(--text-primary)' }}>
-              {user.createdAt ? new Date(user.createdAt).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' }) : 'Reciente'}
+              {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' }) : 'Reciente'}
             </strong>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ color: 'var(--text-secondary)' }}>Email verificado:</span>
-            <strong style={{ color: (user as any).emailVerified ? 'var(--success)' : 'var(--warning)' }}>
-              {(user as any).emailVerified ? '✓ Sí' : '✗ No'}
+            <strong style={{ color: (user as any)?.emailVerified ? 'var(--success)' : 'var(--warning)' }}>
+              {(user as any)?.emailVerified ? '✓ Sí' : '✗ No'}
             </strong>
           </div>
         </div>
@@ -235,7 +230,7 @@ const Perfil = () => {
                       {auction.title}
                     </div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                      ${auction.bids.find(b => b.userId === user.id)?.amount.toLocaleString() || '0'}
+                      ${auction.bids.find(b => b.userId === user?.id)?.amount.toLocaleString() || '0'}
                     </div>
                   </div>
                   <span className={`badge ${auction.status === 'active' ? 'badge-success' : 'badge-secondary'}`} style={{ flexShrink: 0 }}>
@@ -320,6 +315,11 @@ const Perfil = () => {
     }
   }, [user]);
 
+  // Early return DESPUÉS de todos los hooks (regla de hooks de React)
+  if (!user) {
+    return <div style={{ padding: '3rem', textAlign: 'center' }}>Debes iniciar sesión</div>;
+  }
+
   return (
     <div style={{ minHeight: 'calc(100vh - 80px)', padding: isMobile ? '1.5rem 0' : '3rem 0' }}>
       <div className="container" style={{ maxWidth: '1000px', padding: isMobile ? '0 1rem' : undefined }}>
@@ -345,29 +345,7 @@ const Perfil = () => {
             }}
           >
             <LayoutDashboard size={18} />
-            Dashboard
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('profile');
-              setSearchParams({ tab: 'profile' });
-            }}
-            className="btn"
-            style={{
-              background: activeTab === 'profile' ? 'var(--primary)' : 'var(--bg-secondary)',
-              color: activeTab === 'profile' ? 'white' : 'var(--text-primary)',
-              padding: '0.875rem 1.5rem',
-              borderRadius: '0.75rem',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            <FileText size={18} />
-            Perfil
+            Mi Perfil
           </button>
           <button
             onClick={() => {
@@ -435,17 +413,8 @@ const Perfil = () => {
             <div style={{ marginBottom: '2rem' }}>
               <AnnouncementWidget />
             </div>
-            
-            <DashboardCompact
-              metrics={dashboardMetrics}
-              quickActions={quickActions}
-              cards={dashboardCards}
-            />
-          </div>
-        )}
 
-        {activeTab === 'profile' && (
-          <>
+            {/* Información del Perfil */}
             <div style={{ 
               background: 'var(--bg-secondary)', 
               padding: isMobile ? '1.5rem' : '2rem', 
@@ -456,170 +425,195 @@ const Perfil = () => {
               alignItems: isMobile ? 'flex-start' : 'center',
               flexDirection: isMobile ? 'column' : 'row'
             }}>
-          <div style={{ position: 'relative', flexShrink: 0 }}>
-            {!avatarError && avatarUrl ? (
-              <img 
-                src={avatarUrl} 
-                alt={user.username} 
-                style={{ 
-                  width: isMobile ? '80px' : '120px', 
-                  height: isMobile ? '80px' : '120px', 
-                  borderRadius: '50%', 
-                  objectFit: 'cover', 
-                  border: '4px solid var(--primary)',
-                  flexShrink: 0
-                }}
-                onError={() => {
-                  setAvatarError(true);
-                }}
-                onLoad={() => {
-                  setAvatarError(false);
-                }}
-              />
-            ) : (
-              <div style={{
-                width: isMobile ? '80px' : '120px',
-                height: isMobile ? '80px' : '120px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #FF6B00, #FF8C42)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontWeight: 700,
-                fontSize: isMobile ? '2rem' : '3rem',
-                border: '4px solid var(--primary)',
-                flexShrink: 0
-              }}>
-                {(user.username || user.email || 'U')[0].toUpperCase()}
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                {!avatarError && avatarUrl ? (
+                  <img 
+                    src={avatarUrl} 
+                    alt={user.username} 
+                    style={{ 
+                      width: isMobile ? '80px' : '120px', 
+                      height: isMobile ? '80px' : '120px', 
+                      borderRadius: '50%', 
+                      objectFit: 'cover', 
+                      border: '4px solid var(--primary)',
+                      flexShrink: 0
+                    }}
+                    onError={() => {
+                      setAvatarError(true);
+                    }}
+                    onLoad={() => {
+                      setAvatarError(false);
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    width: isMobile ? '80px' : '120px',
+                    height: isMobile ? '80px' : '120px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #FF6B00, #FF8C42)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontWeight: 700,
+                    fontSize: isMobile ? '2rem' : '3rem',
+                    border: '4px solid var(--primary)',
+                    flexShrink: 0
+                  }}>
+                    {(user.username || user.email || 'U')[0].toUpperCase()}
+                  </div>
+                )}
+                <button
+                  onClick={() => setShowAvatarGallery(true)}
+                  className="btn btn-primary"
+                  style={{
+                    position: 'absolute',
+                    bottom: isMobile ? '-4px' : '0',
+                    right: isMobile ? '-4px' : '0',
+                    width: isMobile ? '32px' : '44px',
+                    height: isMobile ? '32px' : '44px',
+                    borderRadius: '50%',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: isMobile ? '2px solid var(--bg-secondary)' : '3px solid var(--bg-secondary)',
+                    background: 'var(--primary)',
+                    color: 'white',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    zIndex: 10
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isMobile) {
+                      e.currentTarget.style.transform = 'scale(1.1)';
+                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isMobile) {
+                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                    }
+                  }}
+                  onTouchStart={(e) => {
+                    if (isMobile) {
+                      e.currentTarget.style.transform = 'scale(0.95)';
+                    }
+                  }}
+                  onTouchEnd={(e) => {
+                    if (isMobile) {
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }
+                  }}
+                  title="Editar foto de perfil"
+                  disabled={updatingAvatar}
+                >
+                  <Camera size={isMobile ? 16 : 22} />
+                </button>
               </div>
-            )}
-            <button
-              onClick={() => setShowAvatarGallery(true)}
-              className="btn btn-primary"
-              style={{
-                position: 'absolute',
-                bottom: 0,
-                right: 0,
-                width: isMobile ? '36px' : '44px',
-                height: isMobile ? '36px' : '44px',
-                borderRadius: '50%',
-                padding: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '3px solid var(--bg-secondary)',
-                background: 'var(--primary)',
-                color: 'white',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                zIndex: 10
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'scale(1.1)';
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-              }}
-              title="Editar foto de perfil"
-              disabled={updatingAvatar}
-            >
-              <Camera size={isMobile ? 18 : 22} />
-            </button>
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h1 style={{ marginBottom: '0.5rem', fontSize: isMobile ? '1.25rem' : '1.5rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{user.username}</h1>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', color: 'var(--text-secondary)', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                <Mail size={18} style={{ flexShrink: 0, marginTop: '0.125rem' }} />
-                <span style={{ wordBreak: 'break-word' }}>{user.email}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h1 style={{ marginBottom: '0.5rem', fontSize: isMobile ? '1.25rem' : '1.5rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{user.username}</h1>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', color: 'var(--text-secondary)', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                    <Mail size={18} style={{ flexShrink: 0, marginTop: '0.125rem' }} />
+                    <span style={{ wordBreak: 'break-word' }}>{user.email}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                    <FileText size={18} style={{ flexShrink: 0, marginTop: '0.125rem' }} />
+                    <span style={{ wordBreak: 'break-word' }}>DNI: {user.dni}</span>
+                  </div>
+                  {user.address && (
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                      <MapPin size={18} style={{ flexShrink: 0, marginTop: '0.125rem' }} />
+                      <span style={{ wordBreak: 'break-word' }}>{user.address.street}, {user.address.locality}, {user.address.province}</span>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                <FileText size={18} style={{ flexShrink: 0, marginTop: '0.125rem' }} />
-                <span style={{ wordBreak: 'break-word' }}>DNI: {user.dni}</span>
-              </div>
-              {user.address && (
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                  <MapPin size={18} style={{ flexShrink: 0, marginTop: '0.125rem' }} />
-                  <span style={{ wordBreak: 'break-word' }}>{user.address.street}, {user.address.locality}, {user.address.province}</span>
+              {user.isAdmin && (
+                <div style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, var(--primary), var(--secondary))', color: 'white', borderRadius: '0.75rem', fontWeight: 600 }}>
+                  <Award size={20} style={{ display: 'inline', marginRight: '0.5rem' }} />
+                  Administrador
                 </div>
               )}
             </div>
-          </div>
-          {user.isAdmin && (
-            <div style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, var(--primary), var(--secondary))', color: 'white', borderRadius: '0.75rem', fontWeight: 600 }}>
-              <Award size={20} style={{ display: 'inline', marginRight: '0.5rem' }} />
-              Administrador
+
+            {/* Métricas Compactas */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', 
+              gap: isMobile ? '0.75rem' : '1.5rem', 
+              marginBottom: '1.5rem' 
+            }}>
+              <div style={{ background: 'var(--bg-secondary)', padding: isMobile ? '1rem' : '1.5rem', borderRadius: '1rem', textAlign: 'center' }}>
+                <Gavel size={isMobile ? 24 : 32} color="var(--primary)" style={{ margin: '0 auto 0.5rem' }} />
+                <div style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.25rem' }}>{myBids.length}</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>Subastas Participadas</div>
+              </div>
+              <div style={{ background: 'var(--bg-secondary)', padding: isMobile ? '1rem' : '1.5rem', borderRadius: '1rem', textAlign: 'center' }}>
+                <ShoppingBag size={isMobile ? 24 : 32} color="var(--success)" style={{ margin: '0 auto 0.5rem' }} />
+                <div style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 700, color: 'var(--success)', marginBottom: '0.25rem' }}>0</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>Compras Realizadas</div>
+              </div>
+              <div style={{ background: 'var(--bg-secondary)', padding: isMobile ? '1rem' : '1.5rem', borderRadius: '1rem', textAlign: 'center', gridColumn: isMobile ? 'span 2' : 'auto' }}>
+                <Award size={isMobile ? 24 : 32} color="var(--warning)" style={{ margin: '0 auto 0.5rem' }} />
+                <div style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 700, color: 'var(--warning)', marginBottom: '0.25rem' }}>{wonAuctions.length}</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>Subastas Ganadas</div>
+              </div>
             </div>
-          )}
-        </div>
+            
+            {/* Dashboard Compact con métricas y acciones */}
+            <DashboardCompact
+              metrics={dashboardMetrics}
+              quickActions={quickActions}
+              cards={dashboardCards}
+            />
 
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', 
-          gap: isMobile ? '1rem' : '1.5rem', 
-          marginBottom: '2rem' 
-        }}>
-          <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', textAlign: 'center' }}>
-            <Gavel size={32} color="var(--primary)" style={{ margin: '0 auto 0.75rem' }} />
-            <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.25rem' }}>{myBids.length}</div>
-            <div style={{ color: 'var(--text-secondary)' }}>Subastas Participadas</div>
-          </div>
-          <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', textAlign: 'center' }}>
-            <ShoppingBag size={32} color="var(--success)" style={{ margin: '0 auto 0.75rem' }} />
-            <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--success)', marginBottom: '0.25rem' }}>0</div>
-            <div style={{ color: 'var(--text-secondary)' }}>Compras Realizadas</div>
-          </div>
-          <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem', textAlign: 'center' }}>
-            <Award size={32} color="var(--warning)" style={{ margin: '0 auto 0.75rem' }} />
-            <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--warning)', marginBottom: '0.25rem' }}>0</div>
-            <div style={{ color: 'var(--text-secondary)' }}>Subastas Ganadas</div>
-          </div>
-        </div>
-
-        <div style={{ background: 'var(--bg-secondary)', padding: isMobile ? '1.5rem' : '2rem', borderRadius: '1rem' }}>
-          <h2 style={{ marginBottom: '1.5rem', fontSize: isMobile ? '1.25rem' : '1.5rem' }}>Mis Ofertas Recientes</h2>
-          {myBids.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {myBids.map(auction => (
-                <div key={auction.id} style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <h4>{auction.title}</h4>
-                    <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                      Mi oferta: ${auction.bids.find(b => b.userId === user.id)?.amount.toLocaleString()}
-                    </p>
-                  </div>
-                  <span className="badge badge-success">Activa</span>
+            {/* Ofertas Recientes */}
+            <div style={{ background: 'var(--bg-secondary)', padding: isMobile ? '1.25rem' : '2rem', borderRadius: '1rem', marginTop: '2rem' }}>
+              <h2 style={{ marginBottom: isMobile ? '1rem' : '1.5rem', fontSize: isMobile ? '1.125rem' : '1.5rem' }}>Mis Ofertas Recientes</h2>
+              {myBids.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {myBids.map(auction => (
+                    <div key={auction.id} style={{ padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <h4>{auction.title}</h4>
+                        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                          Mi oferta: ${auction.bids.find(b => b.userId === user.id)?.amount.toLocaleString()}
+                        </p>
+                      </div>
+                      <span className="badge badge-success">Activa</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : (
+                <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
+                  No has participado en ninguna subasta aún
+                </p>
+              )}
             </div>
-          ) : (
-            <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
-              No has participado en ninguna subasta aún
-            </p>
-          )}
-        </div>
 
-        {/* Sección de Cerrar Sesión */}
-        <div style={{ background: 'var(--bg-secondary)', padding: isMobile ? '1.5rem' : '2rem', borderRadius: '1rem', marginTop: '2rem' }}>
-          <h2 style={{ marginBottom: '1rem', fontSize: isMobile ? '1.25rem' : '1.5rem' }}>Cerrar Sesión</h2>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-            Cerrar tu sesión te desconectará de la plataforma de forma segura.
-          </p>
-          <button 
-            onClick={handleLogout}
-            className="btn btn-danger"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-          >
-            <LogOut size={18} />
-            Cerrar Sesión
-          </button>
-        </div>
-          </>
+            {/* Sección de Cerrar Sesión */}
+            <div style={{ background: 'var(--bg-secondary)', padding: isMobile ? '1.25rem' : '2rem', borderRadius: '1rem', marginTop: isMobile ? '1.5rem' : '2rem' }}>
+              <h2 style={{ marginBottom: isMobile ? '0.75rem' : '1rem', fontSize: isMobile ? '1.125rem' : '1.5rem' }}>Cerrar Sesión</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: isMobile ? '1rem' : '1.5rem', fontSize: isMobile ? '0.875rem' : '1rem' }}>
+                Cerrar tu sesión te desconectará de la plataforma de forma segura.
+              </p>
+              <button 
+                onClick={handleLogout}
+                className="btn btn-danger"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: isMobile ? '100%' : 'auto', padding: isMobile ? '0.875rem 1.25rem' : undefined }}
+              >
+                <LogOut size={isMobile ? 16 : 18} />
+                Cerrar Sesión
+              </button>
+            </div>
+          </div>
         )}
+
+
       
       {activeTab === 'messages' && (
         <div style={{ background: 'var(--bg-secondary)', padding: isMobile ? '1.5rem' : '2rem', borderRadius: '1.5rem' }}>

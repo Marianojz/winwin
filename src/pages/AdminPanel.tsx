@@ -1035,7 +1035,7 @@ const [auctionForm, setAuctionForm] = useState({
     badges: product.badges || [],
     stickers: product.stickers || [],
     active: product.active !== undefined ? product.active : true,
-    featured: product.featured || false
+    featured: product.featured === true
   });
   setActiveTab('edit-product');
 };

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, Bell, Home, Store, Gavel, MessageSquare } from 'lucide-react';
+import { ShoppingCart, Bell, Home, Store, Gavel, MessageSquare, Shield } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { realtimeDb } from '../config/firebase';
 import { ref, onValue } from 'firebase/database';
@@ -293,6 +293,13 @@ const Navbar = () => {
                 <ThemeToggle />
                 <SoundToggle />
 
+                {/* Botón de Admin para usuarios administradores */}
+                {user?.isAdmin && (
+                  <Link to="/admin" className="navbar-icon-btn" title="Panel de Administración" style={{ color: 'var(--warning)' }}>
+                    <Shield size={20} />
+                  </Link>
+                )}
+
                 {/* Avatar del usuario */}
                 {user && (
                   <AvatarMenu
@@ -343,6 +350,16 @@ const Navbar = () => {
           <Store size={24} />
           <span>Tienda</span>
         </Link>
+        
+        {user?.isAdmin && (
+          <Link 
+            to="/admin" 
+            className={`navbar-mobile-item navbar-mobile-item--admin ${isActive('/admin') ? 'navbar-mobile-item--active' : ''}`}
+          >
+            <Shield size={24} />
+            <span>Admin</span>
+          </Link>
+        )}
       </nav>
     </>
   );

@@ -57,8 +57,8 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
       style={{
         animationDelay: `${Math.random() * 0.2}s`,
         ...(auction.featured && {
-          border: '3px solid var(--primary)',
-          boxShadow: '0 8px 24px rgba(255, 107, 0, 0.3)',
+          border: 'none',
+          boxShadow: '0 2px 12px var(--shadow)',
         }),
         ...(auction.isFlash && {
           background: 'linear-gradient(135deg, var(--bg-secondary) 0%, rgba(255, 107, 0, 0.1) 100%)',
@@ -72,6 +72,52 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
       <div className="auction-card-image">
         <img src={auction.images[0]} alt={auction.title} loading="lazy" />
 
+        {/* Stickers de subasta destacada - Solo iconos pequeños en esquinas */}
+        {auction.featured && isActive && (
+          <>
+            <div style={{
+              position: 'absolute',
+              top: '0.5rem',
+              left: '0.5rem',
+              width: '28px',
+              height: '28px',
+              borderRadius: '50%',
+              background: 'rgba(255, 215, 0, 0.9)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1rem',
+              boxShadow: '0 2px 10px rgba(255, 215, 0, 0.8), 0 0 20px rgba(255, 215, 0, 0.4)',
+              zIndex: 20,
+              backdropFilter: 'blur(6px)',
+              border: '2px solid rgba(255, 255, 255, 0.5)',
+              animation: 'pulse 2s ease-in-out infinite'
+            }}>
+              ⭐
+            </div>
+            <div style={{
+              position: 'absolute',
+              bottom: '0.5rem',
+              right: '0.5rem',
+              width: '28px',
+              height: '28px',
+              borderRadius: '50%',
+              background: 'rgba(255, 107, 0, 0.9)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1rem',
+              boxShadow: '0 2px 10px rgba(255, 107, 0, 0.8), 0 0 20px rgba(255, 107, 0, 0.4)',
+              zIndex: 20,
+              backdropFilter: 'blur(6px)',
+              border: '2px solid rgba(255, 255, 255, 0.5)',
+              animation: 'pulse 2s ease-in-out infinite 1s'
+            }}>
+              🔥
+            </div>
+          </>
+        )}
+
         <div style={{
           position: 'absolute',
           top: '0.75rem',
@@ -81,8 +127,8 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
           gap: '0.5rem',
           zIndex: 10
         }}>
-          {/* Stickers/Emojis */}
-          {auction.stickers && auction.stickers.length > 0 && (
+          {/* Stickers/Emojis - Ocultar si es destacada */}
+          {auction.stickers && auction.stickers.length > 0 && !auction.featured && (
             <div style={{
               display: 'flex',
               flexWrap: 'wrap',
@@ -145,24 +191,6 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
               gap: '0.25rem'
             }}>
               ✅ VENDIDA
-            </div>
-          )}
-
-          {auction.featured && isActive && (
-            <div style={{
-              background: 'linear-gradient(135deg, #FFD700, #FFA500)',
-              color: '#000',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '0.5rem',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.25rem',
-              boxShadow: '0 4px 12px rgba(255, 215, 0, 0.5)',
-              animation: 'shine 3s infinite'
-            }}>
-              ⭐ DESTACADA
             </div>
           )}
           
