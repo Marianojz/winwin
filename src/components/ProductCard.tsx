@@ -39,42 +39,85 @@ const ProductCard = ({ product }: ProductCardProps) => {
       <div className="product-card-image">
         <img src={product.images[0]} alt={product.name} loading="lazy" />
         
-        {/* Stickers/Emojis */}
+        {/* Stickers/Emojis - Uno arriba, uno abajo, más pequeños y con fondo transparente */}
         {product.stickers && product.stickers.length > 0 && (
-          <div style={{
-            position: 'absolute',
-            top: '0.75rem',
-            left: '0.75rem',
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '0.5rem',
-            zIndex: 10
-          }}>
-            {product.stickers.map((stickerId) => {
-              const sticker = getStickerById(stickerId);
+          <>
+            {/* Sticker superior */}
+            {product.stickers[0] && (() => {
+              const sticker = getStickerById(product.stickers[0]);
               if (!sticker) return null;
               return (
                 <div
-                  key={stickerId}
                   style={{
-                    background: 'rgba(0, 0, 0, 0.7)',
-                    color: '#fff',
-                    padding: '0.375rem 0.625rem',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
+                    position: 'absolute',
+                    top: '0.5rem',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    zIndex: 10,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.25rem',
-                    backdropFilter: 'blur(4px)'
+                    justifyContent: 'center'
                   }}
                 >
-                  <span style={{ fontSize: '1rem' }}>{sticker.icon}</span>
-                  <span>{sticker.label.split(' ')[1] || sticker.label}</span>
+                  <div
+                    style={{
+                      background: 'transparent',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.625rem',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      textShadow: '0 1px 3px rgba(0,0,0,0.5), 0 0 8px rgba(0,0,0,0.3)',
+                      filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))'
+                    }}
+                  >
+                    <span style={{ fontSize: '0.875rem', lineHeight: 1 }}>{sticker.icon}</span>
+                    <span style={{ color: '#fff' }}>{sticker.label.split(' ')[1] || sticker.label}</span>
+                  </div>
                 </div>
               );
-            })}
-          </div>
+            })()}
+            
+            {/* Sticker inferior */}
+            {product.stickers[1] && (() => {
+              const sticker = getStickerById(product.stickers[1]);
+              if (!sticker) return null;
+              return (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '0.5rem',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    zIndex: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <div
+                    style={{
+                      background: 'transparent',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.625rem',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      textShadow: '0 1px 3px rgba(0,0,0,0.5), 0 0 8px rgba(0,0,0,0.3)',
+                      filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))'
+                    }}
+                  >
+                    <span style={{ fontSize: '0.875rem', lineHeight: 1 }}>{sticker.icon}</span>
+                    <span style={{ color: '#fff' }}>{sticker.label.split(' ')[1] || sticker.label}</span>
+                  </div>
+                </div>
+              );
+            })()}
+          </>
         )}
         
         {product.stock < 5 && product.stock > 0 && (
@@ -168,6 +211,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
           padding: 0.25rem 0.5rem;
           border-radius: 0.375rem;
           font-weight: 600;
+          z-index: 11;
         }
 
         .badge-warning {
@@ -274,21 +318,9 @@ const ProductCard = ({ product }: ProductCardProps) => {
           color: white;
         }
 
-        /* Stickers más pequeños */
-        .product-card-image > div:first-child {
-          top: 0.5rem !important;
-          left: 0.5rem !important;
-          gap: 0.25rem !important;
-        }
-
-        .product-card-image > div:first-child > div {
-          padding: 0.25rem 0.375rem !important;
-          font-size: 0.6875rem !important;
-          border-radius: 0.375rem !important;
-        }
-
-        .product-card-image > div:first-child > div span:first-child {
-          font-size: 0.875rem !important;
+        /* Stickers más pequeños con fondo transparente */
+        .product-card-image > div[style*="position: absolute"] {
+          pointer-events: none;
         }
 
         @media (max-width: 768px) {
@@ -327,19 +359,16 @@ const ProductCard = ({ product }: ProductCardProps) => {
             right: 0.375rem;
           }
 
-          /* Stickers aún más pequeños en móvil */
-          .product-card-image > div:first-child {
-            top: 0.375rem !important;
-            left: 0.375rem !important;
-            gap: 0.1875rem !important;
+          /* Stickers más pequeños en móvil */
+          .product-card-image > div[style*="position: absolute"] {
+            font-size: 0.5625rem !important;
           }
-
-          .product-card-image > div:first-child > div {
-            padding: 0.1875rem 0.25rem !important;
-            font-size: 0.625rem !important;
+          
+          .product-card-image > div[style*="position: absolute"] > div {
+            padding: 0.1875rem 0.375rem !important;
           }
-
-          .product-card-image > div:first-child > div span:first-child {
+          
+          .product-card-image > div[style*="position: absolute"] span:first-child {
             font-size: 0.75rem !important;
           }
         }

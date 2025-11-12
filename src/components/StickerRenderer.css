@@ -1,5 +1,11 @@
 /* Sticker Renderer - Efectos de Animación */
 
+/* Wrapper para el posicionamiento (offset) */
+.sticker-renderer-wrapper {
+  display: inline-block;
+  line-height: 1;
+}
+
 .sticker-renderer {
   display: inline-block;
   transition: all 0.3s ease;
@@ -8,6 +14,7 @@
 /* Floating - Levitación suave continua mejorado */
 .sticker-renderer.floating {
   animation: floating 3s ease-in-out infinite;
+  transform-origin: center;
 }
 
 @keyframes floating {
@@ -25,10 +32,7 @@
   }
 }
 
-.sticker-renderer.floating.sticky {
-  position: sticky;
-  animation: floating 3s ease-in-out infinite;
-}
+/* Las animaciones se aplican al elemento interno, no al wrapper */
 
 /* Pulse - Pulsación rítmica de atención mejorado */
 .sticker-renderer.pulse {
@@ -48,10 +52,7 @@
   }
 }
 
-.sticker-renderer.pulse.sticky {
-  position: sticky;
-  animation: pulse 2s ease-in-out infinite;
-}
+/* Las animaciones se aplican al elemento interno, no al wrapper */
 
 /* FadeInOut - Aparición/desaparición gradual mejorado */
 .sticker-renderer.fadeInOut {
@@ -83,10 +84,7 @@
   }
 }
 
-.sticker-renderer.fadeInOut.sticky {
-  position: sticky;
-  animation: fadeInOut 3s ease-in-out infinite;
-}
+/* Las animaciones se aplican al elemento interno, no al wrapper */
 
 /* Bounce - Rebote al interactuar */
 .sticker-renderer.bounce {
@@ -108,10 +106,7 @@
   }
 }
 
-.sticker-renderer.bounce.sticky {
-  position: sticky;
-  animation: bounce 2s ease-in-out infinite;
-}
+/* Las animaciones se aplican al elemento interno, no al wrapper */
 
 /* SlideIn - Deslizamiento desde bordes mejorado */
 .sticker-renderer.slideIn {
@@ -140,10 +135,7 @@
   }
 }
 
-.sticker-renderer.slideIn.sticky {
-  position: sticky;
-  animation: slideIn 1s ease-out, slideInIdle 3s ease-in-out 1s infinite;
-}
+/* Las animaciones se aplican al elemento interno, no al wrapper */
 
 /* None - Sin animación */
 .sticker-renderer.none {
@@ -151,11 +143,17 @@
 }
 
 /* Sticky positioning - Comportamiento scroll corregido */
-.sticker-renderer.sticky {
+.sticker-renderer-wrapper {
+  position: absolute;
+}
+
+.sticker-renderer-wrapper.sticky {
   position: sticky;
   top: 0;
-  z-index: 10;
-  will-change: transform;
+}
+
+.sticker-renderer.sticky {
+  position: relative;
 }
 
 /* Mejora para scroll suave */
@@ -182,21 +180,13 @@
 /* Transiciones suaves de entrada/salida */
 .sticker-renderer {
   transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-/* Posicionamiento relativo al viewport */
-.sticker-renderer {
-  position: absolute;
-}
-
-.sticker-renderer.sticky {
-  position: sticky;
-}
-
-/* Mejoras de rendimiento */
-.sticker-renderer {
   will-change: transform, opacity;
   backface-visibility: hidden;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Asegurar que el contenedor del logo tenga position relative para que los stickers se posicionen correctamente */
+.navbar-logo > div[style*="position: relative"] {
+  position: relative !important;
 }
 

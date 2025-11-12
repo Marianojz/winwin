@@ -16,11 +16,11 @@
   max-width: 1400px;
   margin: 0 auto;
   padding: 0.5rem 1.5rem;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  display: flex;
   align-items: center;
-  gap: 2rem;
+  gap: 1.5rem;
   min-height: 60px;
+  flex-wrap: wrap;
 }
 
 /* ============================================
@@ -427,14 +427,37 @@
     overflow: visible !important;
   }
 
-  /* Logo más pequeño en móvil */
+  /* Logo más pequeño en móvil para que quepa todo */
   .navbar-logo-img {
-    height: 32px !important;
+    height: 24px !important;
+    max-width: 24px !important;
   }
 
-  /* Ocultar texto del logo en móvil */
+  /* Nombre del sitio visible en móvil (no se oculta) */
   .navbar-logo-text {
-    display: none !important;
+    display: block !important;
+  }
+  
+  /* Asegurar que el avatar sea visible en móvil */
+  .navbar-container > div:last-child,
+  .navbar-container > a:last-child {
+    flex-shrink: 0 !important;
+    margin-left: auto !important;
+    min-width: fit-content !important;
+    overflow: visible !important;
+  }
+  
+  /* Asegurar que el AvatarMenu sea visible */
+  .navbar-container > div:last-child > div {
+    flex-shrink: 0 !important;
+    overflow: visible !important;
+  }
+  
+  /* Asegurar que el botón del avatar no se corte */
+  .navbar-container .avatar-menu-button {
+    flex-shrink: 0 !important;
+    min-width: fit-content !important;
+    overflow: visible !important;
   }
 
   /* Ocultar menú de navegación en móvil */
@@ -466,42 +489,55 @@
   /* CRÍTICO: Mantener acciones SIEMPRE visibles */
   .navbar-actions {
     display: flex !important;
-    gap: 0.5rem !important;
+    gap: 0.25rem !important;
     align-items: center !important;
     flex-shrink: 0 !important;
+    overflow: visible !important;
+    max-width: 100% !important;
   }
 
   /* CRÍTICO: Botón de login SIEMPRE visible y legible */
   .navbar-actions .btn {
     display: flex !important;
-    padding: 0.5rem 1rem !important;
-    font-size: 0.875rem !important;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.8125rem !important;
     white-space: nowrap !important;
     min-width: auto !important;
   }
 
   /* Iconos más pequeños en móvil */
   .navbar-icon-btn {
-    padding: 0.5rem !important;
+    padding: 0.4rem !important;
+    min-width: 32px !important;
+    max-width: 32px !important;
   }
 
   /* Avatar más pequeño */
   .navbar-avatar-img {
-    width: 28px !important;
-    height: 28px !important;
+    width: 26px !important;
+    height: 26px !important;
   }
 
   /* Badges más pequeños */
   .navbar-badge {
-    font-size: 0.65rem !important;
-    padding: 0.1rem 0.3rem !important;
-    min-width: 16px !important;
+    font-size: 0.6rem !important;
+    padding: 0.1rem 0.25rem !important;
+    min-width: 14px !important;
+    top: 0 !important;
+    right: 0 !important;
   }
 
   /* Dropdown del usuario ajustado */
   .navbar-dropdown {
     min-width: 220px !important;
     right: 0 !important;
+  }
+
+  /* Ocultar algunos iconos menos importantes en pantallas muy pequeñas */
+  @media (max-width: 360px) {
+    .navbar-actions .navbar-icon-btn:nth-child(n+4):not(:last-child) {
+      display: none !important;
+    }
   }
 }
 

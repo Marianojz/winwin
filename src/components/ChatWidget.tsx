@@ -21,6 +21,7 @@ const ChatWidget = ({ onContactClick, onHelpCenterClick }: ChatWidgetProps) => {
   const { user } = useStore();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isHidden, setIsHidden] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -111,22 +112,35 @@ const ChatWidget = ({ onContactClick, onHelpCenterClick }: ChatWidgetProps) => {
 
   const unreadCount = messages.filter(m => m.toUserId === user?.id && !m.read).length;
 
-  if (!user) return null;
+  if (!user || isHidden) return null;
 
   return (
     <>
       {/* Botón flotante */}
       {!isOpen && (
-        <button
-          className="chat-widget-button"
-          onClick={() => setIsOpen(true)}
-          aria-label="Abrir chat"
-        >
-          <MessageSquare size={24} />
-          {unreadCount > 0 && (
-            <span className="chat-widget-badge">{unreadCount}</span>
-          )}
-        </button>
+        <div className="chat-widget-button-wrapper">
+          <button
+            className={`chat-widget-button ${unreadCount > 0 ? 'has-messages' : ''}`}
+            onClick={() => setIsOpen(true)}
+            aria-label="Abrir chat"
+          >
+            <MessageSquare size={24} />
+            {unreadCount > 0 && (
+              <span className="chat-widget-badge">{unreadCount}</span>
+            )}
+          </button>
+          <button
+            className="chat-widget-close-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsHidden(true);
+            }}
+            aria-label="Cerrar chat widget"
+            title="Cerrar"
+          >
+            <X size={10} />
+          </button>
+        </div>
       )}
 
       {/* Widget de chat */}

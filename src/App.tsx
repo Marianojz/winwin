@@ -13,6 +13,7 @@ import Navbar from './components/Navbar';
 import AuctionManager from './utils/AuctionManager';
 import OrderManager from './utils/OrderManager';
 import DataCleanupManager from './utils/DataCleanupManager';
+import BotManager from './utils/BotManager';
 import ScrollToTop from './components/ScrollToTop';
 import LoadingSpinner from './components/LoadingSpinner';
 import Hreflang from './components/Hreflang';
@@ -28,6 +29,7 @@ import Carrito from './pages/Carrito';
 import Notificaciones from './pages/Notificaciones';
 import Perfil from './pages/Perfil';
 import AdminPanel from './pages/AdminPanel';
+import Blog from './pages/Blog';
 
 // Componente Footer condicional
 const Footer = () => {
@@ -421,10 +423,11 @@ const Preguntas = lazy(() => import('./pages/Preguntas'));
 const Ayuda = lazy(() => import('./pages/Ayuda'));
 const Contacto = lazy(() => import('./pages/Contacto'));
 import ToastContainer from './components/ToastContainer';
+import ChatWidget from './components/ChatWidget';
 
 function App() {
   useSyncFirebase();
-  const { user, loadUserNotifications, theme } = useStore();
+  const { user, loadUserNotifications, theme, loadBots } = useStore();
   const [homeConfig, setHomeConfig] = useState<HomeConfig>(defaultHomeConfig);
 
   // Función para aplicar colores según el modo activo
@@ -525,6 +528,14 @@ function App() {
     cleanExpiredCache();
   }, []);
 
+  // Cargar bots automáticamente al iniciar la app (sin importar si hay usuario logueado)
+  useEffect(() => {
+    if (loadBots) {
+      console.log('🤖 Cargando bots automáticamente...');
+      loadBots();
+    }
+  }, [loadBots]);
+
   // Configurar viewport para móviles
   useEffect(() => {
     const isMobile = window.innerWidth <= 768;
@@ -543,10 +554,11 @@ function App() {
         <AuctionManager />
         <OrderManager />
         <DataCleanupManager />
-        {/* BotManager desactivado - Los bots ahora funcionan desde Cloud Functions (24/7) */}
-        {/* <BotManager /> */}
+        {/* BotManager - Ejecuta bots automáticamente (funciona sin usuario logueado) */}
+        <BotManager />
         <ScrollToTop />
         <ToastContainer />
+        <ChatWidget />
         <main className="main-content">
           <Routes>
             <Route path="/" element={<Home />} />
@@ -599,6 +611,7 @@ function App() {
               } 
             />
             <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/blog" element={<Blog />} />
             <Route 
               path="/completar-perfil" 
               element={

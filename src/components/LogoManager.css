@@ -204,6 +204,9 @@
   display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .logo-manager-radio {
@@ -219,6 +222,8 @@
   transition: all 0.2s ease;
   flex: 1;
   min-width: 100px;
+  max-width: 100%;
+  box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -508,10 +513,13 @@
 
   .logo-manager-radio-group:not(.mobile-size-buttons) {
     flex-direction: column;
+    width: 100%;
   }
 
   .logo-manager-radio:not(.mobile-size-button) {
     min-width: auto;
+    width: 100%;
+    max-width: 100%;
   }
 
   .logo-manager-config {

@@ -12,6 +12,8 @@ import ThemeToggle from './ThemeToggle';
 import SoundToggle from './SoundToggle';
 import AvatarMenu from './AvatarMenu';
 import StickerRenderer from './StickerRenderer';
+import CategoriesDropdown from './CategoriesDropdown';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import './Navbar.css';
 
 const Navbar = () => {
@@ -20,6 +22,7 @@ const Navbar = () => {
   const cartItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
   const [homeConfig, setHomeConfig] = useState<HomeConfig>(defaultHomeConfig);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const isMobile = useIsMobile();
 
   // Usar función helper unificada para obtener avatar desde Firebase
   const avatarUrl = getUserAvatarUrl(user);
@@ -183,14 +186,28 @@ const Navbar = () => {
     <>
       {/* Navbar Superior (Desktop) */}
       <nav className="navbar">
-        <div className="navbar-container">
+        <div className="navbar-container" style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: isMobile ? '0.125rem' : '1.5rem',
+          flexWrap: isMobile ? 'nowrap' : 'wrap',
+          overflowX: isMobile ? 'visible' : 'visible',
+          overflowY: 'hidden',
+          WebkitOverflowScrolling: 'touch',
+          width: '100%',
+          justifyContent: isMobile ? 'space-between' : 'flex-start',
+          paddingRight: isMobile ? '0.5rem' : '0',
+          boxSizing: 'border-box'
+        }}>
+          {/* 1. Logo */}
           <Link to="/" className="navbar-logo" style={{ 
             position: 'relative', 
             display: 'flex', 
             alignItems: 'center', 
-            gap: '0.75rem',
-            justifyContent: logoConfig.position === 'center' ? 'center' : 
-                           logoConfig.position === 'right' ? 'flex-end' : 'flex-start'
+            gap: isMobile ? '0.25rem' : '0.75rem',
+            textDecoration: 'none',
+            flexShrink: 0,
+            minWidth: isMobile ? 'auto' : 'auto'
           }}>
             <div style={{ 
               position: 'relative', 
@@ -208,7 +225,12 @@ const Navbar = () => {
                     maxWidth: '100%',
                     height: 'auto',
                     opacity: 0,
-                    transition: 'opacity 0.5s ease-in-out'
+                    transition: 'opacity 0.5s ease-in-out',
+                    ...(isMobile && {
+                      height: '24px',
+                      maxWidth: '24px',
+                      width: '24px'
+                    })
                   }}
                   onError={(e) => {
                     if (import.meta.env.DEV) {
@@ -224,108 +246,193 @@ const Navbar = () => {
                   }}
                 />
               ) : (
-                // Logo placeholder temporal mientras se sube el logo real
-                // Eliminado logo de emergencia (C) - solo mostrar nombre del sitio
                 null
               )}
-              {/* Mostrar stickers activos - SIEMPRE visible si están activos */}
+              {/* Mostrar stickers activos */}
               {(() => {
                 const allStickers = homeConfig.siteSettings?.logoStickers || [];
                 const activeStickers = allStickers.filter(sticker => {
-                  // Si está marcado como activo, mostrarlo siempre (ignorar fechas para testing)
-                  // Las fechas solo son informativas, no restrictivas cuando active: true
                   if (!sticker.active) return false;
-                  
-                  // Opcional: Si quieres que las fechas sean restrictivas, descomenta esto:
-                  // if (sticker.startDate && sticker.endDate) {
-                  //   const now = new Date();
-                  //   const start = new Date(sticker.startDate);
-                  //   const end = new Date(sticker.endDate);
-                  //   return now >= start && now <= end;
-                  // }
-                  
-                  return true; // Si está activo, mostrarlo siempre
+                  return true;
                 });
                 
-                return activeStickers.map(sticker => (
-                  <StickerRenderer key={sticker.id} sticker={sticker} />
-                ));
+                const stickersByPosition: Record<string, typeof activeStickers> = {};
+                activeStickers.forEach(sticker => {
+                  const pos = sticker.position;
+                  if (!stickersByPosition[pos]) {
+                    stickersByPosition[pos] = [];
+                  }
+                  stickersByPosition[pos].push(sticker);
+                });
+                
+                return activeStickers.map((sticker, index) => {
+                  const samePositionStickers = stickersByPosition[sticker.position] || [];
+                  const positionIndex = samePositionStickers.findIndex(s => s.id === sticker.id);
+                  const totalInPosition = samePositionStickers.length;
+                  
+                  return (
+                    <StickerRenderer 
+                      key={sticker.id} 
+                      sticker={sticker}
+                      positionIndex={positionIndex}
+                      totalInPosition={totalInPosition}
+                    />
+                  );
+                });
               })()}
             </div>
-            <span className="navbar-logo-text">{getSiteName()}</span>
           </Link>
 
-          <div className="navbar-menu">
-            <Link to="/" className="navbar-link" title="Inicio">
-              <Home size={20} />
-            </Link>
-            <Link to="/subastas" className="navbar-link" title="Subastas">
-              <Gavel size={20} />
-            </Link>
-            <Link to="/tienda" className="navbar-link" title="Tienda">
-              <Store size={20} />
-            </Link>
+          {/* 2. Menú desplegable de categorías */}
+          <div style={{ 
+            transform: isMobile ? 'scale(0.7)' : 'scale(1)',
+            transformOrigin: 'center',
+            flexShrink: 0
+          }}>
+            <CategoriesDropdown />
           </div>
 
-          <div className="navbar-actions">
-            {isAuthenticated ? (
-              <>
-                {/* Acciones principales del usuario */}
-                <Link to="/carrito" className="navbar-icon-btn" title="Carrito">
-                  <ShoppingCart size={20} />
-                  {cartItemsCount > 0 && <span className="navbar-badge">{cartItemsCount}</span>}
-                </Link>
-                
-                <Link to="/notificaciones" className="navbar-icon-btn" title="Notificaciones">
-                  <Bell size={20} />
-                  {unreadCount > 0 && <span className="navbar-badge">{unreadCount}</span>}
-                </Link>
-                
-                <Link to="/perfil?tab=messages" className="navbar-icon-btn" title="Mensajería">
-                  <MessageSquare size={20} />
-                  {unreadMessagesCount > 0 && <span className="navbar-badge">{unreadMessagesCount}</span>}
-                </Link>
+          {/* 3. Nombre del sitio llamativo */}
+          <Link to="/" style={{ 
+            textDecoration: 'none',
+            flexGrow: isMobile ? 1 : 1,
+            flexShrink: 1,
+            flexBasis: isMobile ? '0%' : '0%',
+            minWidth: isMobile ? '30px' : '150px',
+            maxWidth: isMobile ? 'none' : 'none',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            marginRight: isMobile ? '0.125rem' : '0'
+          }}>
+            <span className="navbar-logo-text" style={{
+              fontSize: isMobile ? '0.6875rem' : '1.5rem',
+              fontWeight: 700,
+              background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              display: 'block',
+              textAlign: 'left',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              lineHeight: '1.2'
+            }}>
+              {getSiteName()}
+            </span>
+          </Link>
 
-                {/* Separador visual */}
-                <div style={{ width: '1px', height: '24px', background: 'var(--border)', margin: '0 0.25rem' }} />
-
-                {/* Configuración */}
-                <ThemeToggle />
-                <SoundToggle />
-
-                {/* Botón de Admin para usuarios administradores */}
-                {user?.isAdmin && (
-                  <Link to="/admin" className="navbar-icon-btn" title="Panel de Administración" style={{ color: 'var(--warning)' }}>
-                    <Shield size={20} />
-                  </Link>
-                )}
-
-                {/* Avatar del usuario */}
-                {user && (
-                  <AvatarMenu
-                    user={user}
-                    avatarUrl={avatarUrl}
-                    getUserInitial={() => getUserInitial(user)}
-                  />
-                )}
-              </>
-            ) : (
-              <>
-                {/* Configuración para usuarios no autenticados */}
-                <ThemeToggle />
-                <SoundToggle />
-                
-                {/* Botón de login */}
-                <Link to="/login" className="btn btn-primary">
-                  Iniciar Sesión
-                </Link>
-              </>
-            )}
+          {/* 4. Modos de colores - Achicado en móvil */}
+          <div style={{ 
+            transform: isMobile ? 'scale(0.6)' : 'scale(1)',
+            transformOrigin: 'center',
+            flexShrink: 0
+          }}>
+            <ThemeToggle />
           </div>
+
+          {/* 5. Sonido pequeño - Achicado en móvil */}
+          <div style={{ 
+            transform: isMobile ? 'scale(0.6)' : 'scale(1)',
+            transformOrigin: 'center',
+            flexShrink: 0
+          }}>
+            <SoundToggle />
+          </div>
+
+          {/* 6. Carrito - Achicado en móvil */}
+          {isAuthenticated && (
+            <Link 
+              to="/carrito" 
+              className="navbar-icon-btn" 
+              title="Carrito"
+              style={{
+                padding: isMobile ? '0.2rem' : '0.5rem',
+                minWidth: isMobile ? '22px' : '36px',
+                maxWidth: isMobile ? '22px' : '36px',
+                flexShrink: 0
+              }}
+            >
+              <ShoppingCart size={isMobile ? 12 : 20} />
+              {cartItemsCount > 0 && (
+                <span className="navbar-badge" style={{
+                  fontSize: isMobile ? '0.35rem' : '0.6rem',
+                  padding: isMobile ? '0.05rem 0.08rem' : '0.1rem 0.25rem',
+                  minWidth: isMobile ? '9px' : '14px',
+                  lineHeight: isMobile ? '1' : '1.2'
+                }}>
+                  {cartItemsCount}
+                </span>
+              )}
+            </Link>
+          )}
+
+          {/* 7. Notificaciones - Achicado en móvil */}
+          {isAuthenticated && (
+            <Link 
+              to="/notificaciones" 
+              className="navbar-icon-btn" 
+              title="Notificaciones"
+              style={{
+                padding: isMobile ? '0.2rem' : '0.5rem',
+                minWidth: isMobile ? '22px' : '36px',
+                maxWidth: isMobile ? '22px' : '36px',
+                flexShrink: 0
+              }}
+            >
+              <Bell size={isMobile ? 12 : 20} />
+              {unreadCount > 0 && (
+                <span className="navbar-badge" style={{
+                  fontSize: isMobile ? '0.35rem' : '0.6rem',
+                  padding: isMobile ? '0.05rem 0.08rem' : '0.1rem 0.25rem',
+                  minWidth: isMobile ? '9px' : '14px',
+                  lineHeight: isMobile ? '1' : '1.2'
+                }}>
+                  {unreadCount}
+                </span>
+              )}
+            </Link>
+          )}
+
+          {/* 8. Perfil - Siempre visible a la derecha */}
+          {isAuthenticated ? (
+            /* Avatar del usuario - Tamaño normal, siempre visible */
+            user ? (
+              <div style={{ 
+                flexShrink: 0,
+                marginLeft: isMobile ? '0.125rem' : 'auto',
+                minWidth: 'fit-content',
+                position: 'relative',
+                zIndex: 10
+              }}>
+                <AvatarMenu
+                  user={user}
+                  avatarUrl={avatarUrl}
+                  getUserInitial={() => getUserInitial(user)}
+                />
+              </div>
+            ) : null
+          ) : (
+            <Link 
+              to="/login" 
+              className="btn btn-primary" 
+              style={{ 
+                padding: isMobile ? '0.4rem 0.75rem' : '0.625rem 1.25rem',
+                fontSize: isMobile ? '0.75rem' : '0.9375rem',
+                flexShrink: 0,
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {isMobile ? 'Entrar' : 'Iniciar Sesión'}
+            </Link>
+          )}
         </div>
       </nav>
 
       {/* Navbar Inferior (Mobile) - ¡ESTE ES EL NUEVO! */}
+      {/* Ocultar navbar móvil en el panel de admin para evitar superposición */}
+      {location.pathname !== '/admin' && (
       <nav className="navbar-mobile">
         <Link 
           to="/" 
@@ -361,6 +468,7 @@ const Navbar = () => {
           </Link>
         )}
       </nav>
+      )}
     </>
   );
 };

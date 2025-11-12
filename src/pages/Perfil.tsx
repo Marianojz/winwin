@@ -1,16 +1,15 @@
-import { Mail, MapPin, FileText, Award, ShoppingBag, Gavel, LogOut, Send, MessageSquare, Camera, Settings, LayoutDashboard, TrendingUp, Bell, HelpCircle, Phone } from 'lucide-react';
+import { Mail, MapPin, FileText, Award, ShoppingBag, Gavel, LogOut, Send, MessageSquare, Camera, Settings, LayoutDashboard, TrendingUp, Bell, HelpCircle, Phone, Target, DollarSign, ShoppingCart, Clock } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { auth, db } from '../config/firebase';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getUserConversations, getMessages, saveMessage, markMessagesAsRead, getUnreadCount, createMessage, watchConversationStatus } from '../utils/messages';
 import { Message } from '../types';
-import { formatTimeAgo } from '../utils/helpers';
+import { formatTimeAgo, formatCurrency } from '../utils/helpers';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { doc, updateDoc } from 'firebase/firestore';
 import { getUserAvatarUrl } from '../utils/avatarHelper';
 import AvatarGallery from '../components/AvatarGallery';
-import ChatWidget from '../components/ChatWidget';
 import DashboardCompact, { DashboardMetric, QuickAction, DashboardCard } from '../components/DashboardCompact';
 import AnnouncementWidget from '../components/AnnouncementWidget';
 
@@ -125,6 +124,22 @@ const Perfil = () => {
   // Usar función helper unificada para obtener avatar desde Firebase
   const avatarUrl = user ? getUserAvatarUrl(user) : '';
 
+  // Calcular métricas adicionales
+  const totalSpent = useMemo(() => {
+    return wonAuctions.reduce((total, auction) => {
+      const userBid = auction.bids.find(b => b.userId === user?.id);
+      return total + (userBid?.amount || 0);
+    }, 0);
+  }, [wonAuctions, user?.id]);
+
+  const totalBids = useMemo(() => {
+    return myBids.reduce((total, auction) => {
+      return total + auction.bids.filter(b => b.userId === user?.id).length;
+    }, 0);
+  }, [myBids, user?.id]);
+
+  const { cart, cartTotal } = useStore();
+
   // Preparar métricas para el dashboard - memoizar para evitar recálculos
   const dashboardMetrics: DashboardMetric[] = useMemo(() => [
     {
@@ -146,13 +161,38 @@ const Perfil = () => {
       trend: wonAuctions.length > 0 ? 'up' : 'neutral'
     },
     {
+      label: 'Ofertas Totales',
+      value: totalBids,
+      icon: <Target size={20} />,
+      trend: totalBids > 0 ? 'up' : 'neutral'
+    },
+    {
+      label: 'Total Gastado',
+      value: formatCurrency(totalSpent),
+      icon: <DollarSign size={20} />,
+      trend: totalSpent > 0 ? 'up' : 'neutral'
+    },
+    {
+      label: 'Items en Carrito',
+      value: cart.length,
+      icon: <ShoppingCart size={20} />,
+      trend: cart.length > 0 ? 'up' : 'neutral',
+      trendValue: cart.length > 0 ? formatCurrency(cartTotal) : undefined
+    },
+    {
       label: 'Mensajes Sin Leer',
       value: unreadCount,
       icon: <Bell size={20} />,
       trend: unreadCount > 0 ? 'up' : 'neutral',
       trendValue: unreadCount > 0 ? `${unreadCount} nuevo${unreadCount > 1 ? 's' : ''}` : undefined
+    },
+    {
+      label: 'Subastas Finalizadas',
+      value: myBids.filter(a => a.status === 'ended').length,
+      icon: <Clock size={20} />,
+      trend: 'neutral'
     }
-  ], [myBids.length, activeBids.length, wonAuctions.length, unreadCount]);
+  ], [myBids, activeBids.length, wonAuctions, unreadCount, totalSpent, totalBids, cart.length, cartTotal]);
 
   // Acciones rápidas - memoizar para evitar recreación en cada render
   const quickActions: QuickAction[] = useMemo(() => [
@@ -540,30 +580,6 @@ const Perfil = () => {
               )}
             </div>
 
-            {/* Métricas Compactas */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', 
-              gap: isMobile ? '0.75rem' : '1.5rem', 
-              marginBottom: '1.5rem' 
-            }}>
-              <div style={{ background: 'var(--bg-secondary)', padding: isMobile ? '1rem' : '1.5rem', borderRadius: '1rem', textAlign: 'center' }}>
-                <Gavel size={isMobile ? 24 : 32} color="var(--primary)" style={{ margin: '0 auto 0.5rem' }} />
-                <div style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.25rem' }}>{myBids.length}</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>Subastas Participadas</div>
-              </div>
-              <div style={{ background: 'var(--bg-secondary)', padding: isMobile ? '1rem' : '1.5rem', borderRadius: '1rem', textAlign: 'center' }}>
-                <ShoppingBag size={isMobile ? 24 : 32} color="var(--success)" style={{ margin: '0 auto 0.5rem' }} />
-                <div style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 700, color: 'var(--success)', marginBottom: '0.25rem' }}>0</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>Compras Realizadas</div>
-              </div>
-              <div style={{ background: 'var(--bg-secondary)', padding: isMobile ? '1rem' : '1.5rem', borderRadius: '1rem', textAlign: 'center', gridColumn: isMobile ? 'span 2' : 'auto' }}>
-                <Award size={isMobile ? 24 : 32} color="var(--warning)" style={{ margin: '0 auto 0.5rem' }} />
-                <div style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 700, color: 'var(--warning)', marginBottom: '0.25rem' }}>{wonAuctions.length}</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>Subastas Ganadas</div>
-              </div>
-            </div>
-            
             {/* Dashboard Compact con métricas y acciones */}
             <DashboardCompact
               metrics={dashboardMetrics}
@@ -787,113 +803,141 @@ const Perfil = () => {
             </button>
           </div>
 
-          {/* Input para enviar mensaje - Solo si la conversación existe y está abierta */}
-          {conversationExists && conversationStatus === 'open' ? (
-            <>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  if (!newMessageContent.trim() || !user || !conversationExists || conversationStatus !== 'open') {
-                    if (!conversationExists) {
-                      alert('⚠️ No podés enviar mensajes hasta que el administrador inicie la conversación.');
-                    }
-                    return;
-                  }
+          {/* Input para enviar mensaje - Solo si hay mensajes del admin y la conversación está abierta */}
+          {(() => {
+            // Verificar si hay al menos un mensaje del admin
+            const hasAdminMessages = userMessages.some(msg => msg.fromUserId === 'admin');
+            const shouldShowForm = conversationExists && conversationStatus === 'open' && hasAdminMessages;
+            
+            if (shouldShowForm) {
+              return (
+                <>
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!newMessageContent.trim() || !user || !conversationExists || conversationStatus !== 'open') {
+                        return;
+                      }
 
-                  try {
-                    const message = createMessage(
-                      user.id,
-                      user.username,
-                      'admin',
-                      newMessageContent.trim()
-                    );
-                    
-                    // Guardar mensaje en Firebase (se actualizará automáticamente por el listener)
-                    await saveMessage(message);
-                    setNewMessageContent('');
-                    
-                    // El mensaje aparecerá automáticamente gracias al listener en tiempo real
-                    console.log('✅ Mensaje enviado correctamente');
-                  } catch (error) {
-                    console.error('❌ Error enviando mensaje:', error);
-                    alert('❌ Error al enviar el mensaje. Por favor, intentá nuevamente.');
-                  }
-                }}
-                style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end' }}
-              >
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                    Respondé al administrador:
-                  </label>
-                  <textarea
-                    value={newMessageContent}
-                    onChange={(e) => setNewMessageContent(e.target.value)}
-                    placeholder="Respondé al administrador aquí..."
-                    rows={isMobile ? 2 : 3}
-                    disabled={conversationStatus !== 'open'}
-                    style={{ 
-                      width: '100%',
-                      padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem', 
-                      borderRadius: '0.75rem', 
-                      border: '2px solid var(--border)',
-                      fontSize: isMobile ? '0.875rem' : '0.9375rem',
-                      background: conversationStatus === 'open' ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
-                      color: 'var(--text-primary)',
-                      wordWrap: 'break-word',
-                      overflowWrap: 'break-word',
-                      resize: 'vertical',
-                      minHeight: isMobile ? '60px' : '80px',
-                      fontFamily: 'inherit',
-                      opacity: conversationStatus === 'open' ? 1 : 0.6,
-                      cursor: conversationStatus === 'open' ? 'text' : 'not-allowed'
+                      try {
+                        const message = createMessage(
+                          user.id,
+                          user.username,
+                          'admin',
+                          newMessageContent.trim()
+                        );
+                        
+                        // Guardar mensaje en Firebase (se actualizará automáticamente por el listener)
+                        await saveMessage(message);
+                        setNewMessageContent('');
+                        
+                        // El mensaje aparecerá automáticamente gracias al listener en tiempo real
+                        console.log('✅ Mensaje enviado correctamente');
+                      } catch (error) {
+                        console.error('❌ Error enviando mensaje:', error);
+                        alert('❌ Error al enviar el mensaje. Por favor, intentá nuevamente.');
+                      }
                     }}
-                  />
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                    {newMessageContent.length > 0 && `${newMessageContent.length} caracteres`}
-                  </div>
-                </div>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  style={{ 
-                    padding: '0.875rem 1.5rem', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '0.5rem',
-                    height: 'fit-content',
-                    whiteSpace: 'nowrap',
-                    fontWeight: 600
-                  }}
-                  disabled={!newMessageContent.trim() || conversationStatus !== 'open'}
-                >
-                  <Send size={18} />
-                  Enviar Mensaje
-                </button>
-              </form>
+                    style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end' }}
+                  >
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <textarea
+                        value={newMessageContent}
+                        onChange={(e) => setNewMessageContent(e.target.value)}
+                        placeholder="Respondé al administrador aquí..."
+                        rows={isMobile ? 4 : 5}
+                        disabled={conversationStatus !== 'open'}
+                        style={{ 
+                          width: '100%',
+                          padding: isMobile ? '1rem 1.25rem' : '1.125rem 1.5rem', 
+                          borderRadius: '0.75rem', 
+                          border: '2px solid var(--border)',
+                          fontSize: isMobile ? '0.9375rem' : '1rem',
+                          background: conversationStatus === 'open' ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
+                          color: 'var(--text-primary)',
+                          wordWrap: 'break-word',
+                          overflowWrap: 'break-word',
+                          resize: 'vertical',
+                          minHeight: isMobile ? '120px' : '150px',
+                          fontFamily: 'inherit',
+                          opacity: conversationStatus === 'open' ? 1 : 0.6,
+                          cursor: conversationStatus === 'open' ? 'text' : 'not-allowed',
+                          lineHeight: '1.5'
+                        }}
+                      />
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        {newMessageContent.length > 0 && `${newMessageContent.length} caracteres`}
+                      </div>
+                    </div>
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      style={{ 
+                        padding: isMobile ? '1rem 1.25rem' : '1.125rem 1.5rem', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '0.5rem',
+                        height: 'fit-content',
+                        whiteSpace: 'nowrap',
+                        fontWeight: 600,
+                        fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                      }}
+                      disabled={!newMessageContent.trim() || conversationStatus !== 'open'}
+                    >
+                      <Send size={isMobile ? 16 : 18} />
+                      {isMobile ? 'Enviar' : 'Enviar Mensaje'}
+                    </button>
+                  </form>
 
-              <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'var(--info-light)', borderRadius: '0.75rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                💡 <strong>Tip:</strong> Cuando ganás una subasta o realizás una compra, te enviamos automáticamente un mensaje. Podés responder aquí para coordinar el pago y entrega.
-              </div>
-            </>
-          ) : !conversationExists ? (
-            <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center', border: '1px solid var(--border)' }}>
-              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9375rem', fontWeight: 600 }}>
-                💬 Esperando que el administrador inicie la conversación
-              </p>
-              <p style={{ margin: '0.75rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                Solo el administrador puede iniciar conversaciones. Podés usar el botón de <strong>Contacto</strong> para solicitar ayuda.
-              </p>
-            </div>
-          ) : (
-            <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center', border: '1px solid var(--border)' }}>
-              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>
-                ⚠️ Esta conversación está cerrada. Solo podés leer los mensajes anteriores.
-              </p>
-              <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                El administrador puede reabrir la conversación cuando sea necesario.
-              </p>
-            </div>
-          )}
+                  <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'var(--info-light)', borderRadius: '0.75rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    💡 <strong>Tip:</strong> Cuando ganás una subasta o realizás una compra, te enviamos automáticamente un mensaje. Podés responder aquí para coordinar el pago y entrega.
+                  </div>
+                </>
+              );
+            }
+            
+            if (!conversationExists) {
+              return (
+                <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center', border: '1px solid var(--border)' }}>
+                  <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9375rem', fontWeight: 600 }}>
+                    💬 Esperando que el administrador inicie la conversación
+                  </p>
+                  <p style={{ margin: '0.75rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    Solo el administrador puede iniciar conversaciones. Podés usar el botón de <strong>Contacto</strong> para solicitar ayuda.
+                  </p>
+                </div>
+              );
+            }
+            
+            if (conversationStatus === 'closed') {
+              return (
+                <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center', border: '1px solid var(--border)' }}>
+                  <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>
+                    ⚠️ Esta conversación está cerrada. Solo podés leer los mensajes anteriores.
+                  </p>
+                  <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    El administrador puede reabrir la conversación cuando sea necesario.
+                  </p>
+                </div>
+              );
+            }
+            
+            // Si la conversación existe y está abierta pero no hay mensajes del admin
+            if (conversationExists && conversationStatus === 'open' && !hasAdminMessages) {
+              return (
+                <div style={{ padding: '1.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem', textAlign: 'center', border: '1px solid var(--border)' }}>
+                  <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9375rem', fontWeight: 600 }}>
+                    💬 Esperando el primer mensaje del administrador
+                  </p>
+                  <p style={{ margin: '0.75rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    Podrás responder cuando el administrador te envíe un mensaje.
+                  </p>
+                </div>
+              );
+            }
+            
+            return null;
+          })()}
         </div>
       )}
 
@@ -953,12 +997,6 @@ const Perfil = () => {
         </div>
       )}
 
-      {/* Widget de Chat - Solo visible en tab de mensajes */}
-      {activeTab === 'messages' && (
-        <div style={{ position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 1000 }}>
-          <ChatWidget />
-        </div>
-      )}
 
       {/* Galería de Avatares */}
       {showAvatarGallery && (

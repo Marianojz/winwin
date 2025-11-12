@@ -24,12 +24,12 @@ const BotManager = () => {
 
   useEffect(() => {
     // Solo ejecutar si hay bots activos
-    const activeBots = bots.filter(bot => bot.isActive);
+    const activeBots = bots.filter(bot => bot.isActive && bot.balance > 0);
     
     // Crear un set con los IDs de bots activos actuales
     const currentActiveBotIds = new Set(activeBots.map(bot => bot.id));
     
-    // Verificar si los bots activos cambiaron (se agregaron, eliminaron o cambiaron su estado)
+    // Verificar si los bots activos cambiaron (se agregaron, eliminados o cambiaron su estado)
     const botsChanged = 
       activeBotsRef.current.size !== currentActiveBotIds.size ||
       Array.from(currentActiveBotIds).some(id => !activeBotsRef.current.has(id)) ||
@@ -45,11 +45,11 @@ const BotManager = () => {
       activeBotsRef.current = currentActiveBotIds;
       
       if (activeBots.length === 0) {
-        console.log('🤖 No hay bots activos');
+        console.log('🤖 No hay bots activos con balance suficiente');
         return;
       }
 
-      console.log(`🤖 Iniciando ${activeBots.length} bot(s) activo(s)`);
+      console.log(`🤖 Iniciando ${activeBots.length} bot(s) activo(s) (funcionando sin usuario logueado)`);
 
       // Programar cada bot individualmente
       activeBots.forEach(bot => {

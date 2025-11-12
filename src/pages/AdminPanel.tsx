@@ -112,6 +112,7 @@ const AdminPanel = (): React.ReactElement => {
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [refreshKey, setRefreshKey] = useState(0); // Para forzar re-render sin recargar
   const [clearedActivityTimestamp, setClearedActivityTimestamp] = useState<number>(0); // Timestamp de actividad limpiada
+  const [republishModal, setRepublishModal] = useState<{ show: boolean; auction: Auction | null }>({ show: false, auction: null });
   
   // Cargar bots desde Firebase al montar el componente
   useEffect(() => {
@@ -1331,47 +1332,58 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     }
   };
 
-  // Función para republicar subasta
+  // Función para abrir modal de republicar
   const handleRepublishAuction = (auction: Auction) => {
-    const option = window.confirm(
-      `¿Cómo deseas republicar "${auction.title}"?\n\n` +
-      `Aceptar = Editar antes de republicar\n` +
-      `Cancelar = Republicar tal como está`
-    );
+    setRepublishModal({ show: true, auction });
+  };
 
-    if (option) {
-      // Editar antes de republicar
-      handleEditAuction(auction);
-    } else {
-      // Republicar tal como está - preservar todas las propiedades importantes
-      const now = new Date();
-      const endTime = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 días desde ahora
-      
-      const republishedAuction: Auction = {
-        ...auction,
-        id: `auction_${Date.now()}`, // Nuevo ID
-        status: 'active',
-        startTime: now,
-        endTime: endTime,
-        bids: [], // Limpiar ofertas
-        winnerId: undefined,
-        currentPrice: auction.startingPrice,
-        createdAt: now,
-        // Preservar explícitamente propiedades importantes
-        featured: auction.featured || false,
-        isFlash: auction.isFlash || false,
-        stickers: auction.stickers || [],
-        images: auction.images || [],
-        description: auction.description,
-        categoryId: auction.categoryId,
-        condition: auction.condition || 'new'
-      };
-
-      const updatedAuctions = [...auctions, republishedAuction];
-      setAuctions(updatedAuctions);
-      logAuctionAction('Subasta republicada', republishedAuction.id, user?.id, user?.username, { title: auction.title });
-      alert('✅ Subasta republicada correctamente');
+  // Función para editar antes de republicar
+  const handleRepublishWithEdit = () => {
+    if (republishModal.auction) {
+      handleEditAuction(republishModal.auction);
+      setRepublishModal({ show: false, auction: null });
     }
+  };
+
+  // Función para republicar sin cambios
+  const handleRepublishWithoutChanges = () => {
+    if (!republishModal.auction) return;
+    
+    const auction = republishModal.auction;
+    // Republicar tal como está - preservar todas las propiedades importantes
+    const now = new Date();
+    const endTime = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 días desde ahora
+    
+    const republishedAuction: Auction = {
+      ...auction,
+      id: `auction_${Date.now()}`, // Nuevo ID
+      status: 'active',
+      startTime: now,
+      endTime: endTime,
+      bids: [], // Limpiar ofertas
+      winnerId: undefined,
+      currentPrice: auction.startingPrice,
+      createdAt: now,
+      // Preservar explícitamente propiedades importantes
+      featured: auction.featured || false,
+      isFlash: auction.isFlash || false,
+      stickers: auction.stickers || [],
+      images: auction.images || [],
+      description: auction.description,
+      categoryId: auction.categoryId,
+      condition: auction.condition || 'new'
+    };
+
+    const updatedAuctions = [...auctions, republishedAuction];
+    setAuctions(updatedAuctions);
+    logAuctionAction('Subasta republicada', republishedAuction.id, user?.id, user?.username, { title: auction.title });
+    alert('✅ Subasta republicada correctamente');
+    setRepublishModal({ show: false, auction: null });
+  };
+
+  // Función para cancelar republicar
+  const handleCancelRepublish = () => {
+    setRepublishModal({ show: false, auction: null });
   };
 
   // Funciones para Bots
@@ -1968,22 +1980,28 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     });
   };
 
-  const handleImageDrop = async (e: React.DragEvent<HTMLDivElement>, setImageUrl: (url: string) => void, uploadToStorage: boolean = false, folder: string = 'images') => {
+  const handleImageDrop = async (e: React.DragEvent<HTMLDivElement>, setImageUrl: (url: string) => void, uploadToStorage: boolean = false, folder: string = 'images', allowVideo: boolean = false) => {
     e.preventDefault();
     e.stopPropagation();
     
     const file = e.dataTransfer.files[0];
     if (!file) return;
 
-    // Validar que sea una imagen
-    if (!file.type.startsWith('image/')) {
-      alert('⚠️ Solo se permiten archivos de imagen');
+    // Validar que sea una imagen o video (si está permitido)
+    const isImage = file.type.startsWith('image/');
+    const isVideo = allowVideo && file.type.startsWith('video/');
+    const isGif = file.name.toLowerCase().endsWith('.gif') || file.type === 'image/gif';
+    
+    if (!isImage && !isVideo && !isGif) {
+      alert('⚠️ Solo se permiten archivos de imagen, GIF animado o video');
       return;
     }
 
-    // Validar tamaño (máximo 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert('⚠️ La imagen no puede superar los 5MB');
+    // Validar tamaño (máximo 5MB para imágenes, 10MB para videos)
+    const maxSize = isVideo ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      const maxSizeMB = isVideo ? 10 : 5;
+      alert(`⚠️ El archivo no puede superar los ${maxSizeMB}MB`);
       return;
     }
 
@@ -2005,20 +2023,26 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     }
   };
 
-  const handleImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, setImageUrl: (url: string) => void, uploadToStorage: boolean = false, folder: string = 'images') => {
+  const handleImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, setImageUrl: (url: string) => void, uploadToStorage: boolean = false, folder: string = 'images', allowVideo: boolean = false) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validar que sea una imagen
-    if (!file.type.startsWith('image/')) {
-      alert('⚠️ Solo se permiten archivos de imagen');
+    // Validar que sea una imagen, GIF animado o video (si está permitido)
+    const isImage = file.type.startsWith('image/');
+    const isVideo = allowVideo && file.type.startsWith('video/');
+    const isGif = file.name.toLowerCase().endsWith('.gif') || file.type === 'image/gif';
+    
+    if (!isImage && !isVideo && !isGif) {
+      alert('⚠️ Solo se permiten archivos de imagen, GIF animado o video');
       e.target.value = '';
       return;
     }
 
-    // Validar tamaño (máximo 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert('⚠️ La imagen no puede superar los 5MB');
+    // Validar tamaño (máximo 5MB para imágenes, 10MB para videos)
+    const maxSize = isVideo ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      const maxSizeMB = isVideo ? 10 : 5;
+      alert(`⚠️ El archivo no puede superar los ${maxSizeMB}MB`);
       e.target.value = '';
       return;
     }
@@ -2294,66 +2318,67 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         </p>
       </div>
 
-      {/* Tabs Navigation - Optimizado para móvil */}
-      <div className={isMobile ? '' : ''} style={{
-        display: 'flex',
-        gap: isMobile ? '0.25rem' : '0.5rem',
-        marginBottom: isMobile ? '1rem' : '2rem',
-        overflowX: 'auto',
-        paddingBottom: '0.5rem',
-        borderBottom: '2px solid var(--border)',
-        scrollbarWidth: 'thin',
-        WebkitOverflowScrolling: 'touch',
-        padding: isMobile ? '0 1rem' : '0'
-      }}>
-        {tabs.map(tab => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: isMobile ? '0.625rem 0.875rem' : '0.75rem 1.5rem',
-                background: isActive ? 'var(--primary)' : 'transparent',
-                color: isActive ? 'white' : 'var(--text-secondary)',
-                border: `1px solid ${isActive ? 'var(--primary)' : 'var(--border)'}`,
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-                fontSize: isMobile ? '0.8125rem' : '0.875rem',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: isMobile ? '0.375rem' : '0.5rem',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.2s',
-                position: 'relative',
-                flexShrink: 0
-              }}
-            >
-              <Icon size={isMobile ? 16 : 18} />
-              {isMobile ? (tab.label.length > 8 ? tab.label.substring(0, 8) + '...' : tab.label) : tab.label}
-              {tab.badge && (
-                <span style={{
-                  background: 'var(--error)',
-                  color: 'white',
-                  borderRadius: '50%',
-                  width: '20px',
-                  height: '20px',
+      {/* Tabs Navigation - Solo visible en desktop */}
+      {!isMobile && (
+        <div style={{
+          display: 'flex',
+          gap: '0.5rem',
+          marginBottom: '2rem',
+          overflowX: 'auto',
+          paddingBottom: '0.5rem',
+          borderBottom: '2px solid var(--border)',
+          scrollbarWidth: 'thin',
+          WebkitOverflowScrolling: 'touch'
+        }}>
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: isActive ? 'var(--primary)' : 'transparent',
+                  color: isActive ? 'white' : 'var(--text-secondary)',
+                  border: `1px solid ${isActive ? 'var(--primary)' : 'var(--border)'}`,
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  marginLeft: '0.25rem'
-                }}>
-                  {tab.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+                  gap: '0.5rem',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s',
+                  position: 'relative',
+                  flexShrink: 0
+                }}
+              >
+                <Icon size={18} />
+                {tab.label}
+                {tab.badge && (
+                  <span style={{
+                    background: 'var(--error)',
+                    color: 'white',
+                    borderRadius: '50%',
+                    width: '20px',
+                    height: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    marginLeft: '0.25rem'
+                  }}>
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Main Content */}
       <div className={isMobile ? 'admin-main-content-mobile' : ''} style={{
@@ -4050,67 +4075,301 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
             </button>
           </div>
 
-          {/* Estadísticas rápidas */}
+          {/* Estadísticas rápidas - Grid compacto en móvil */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '1rem',
-            marginBottom: '2rem'
+            gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: isMobile ? '0.5rem' : '1rem',
+            marginBottom: '2rem',
+            width: '100%',
+            maxWidth: '100%',
+            boxSizing: 'border-box'
           }}>
             <div style={{
               background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-              padding: '1.5rem',
-              borderRadius: '1rem',
-              color: 'white'
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                <Clock size={24} />
-                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Pendientes</span>
-              </div>
-              <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+              <Clock size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>Pendientes</span>
+              <div style={{ fontSize: isMobile ? '1.125rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>
                 {orders.filter((o: Order) => o.status === 'pending_payment').length}
               </div>
             </div>
             <div style={{
               background: 'linear-gradient(135deg, #10b981, #059669)',
-              padding: '1.5rem',
-              borderRadius: '1rem',
-              color: 'white'
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                <CheckCircle size={24} />
-                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Confirmados</span>
-              </div>
-              <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+              <CheckCircle size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>Confirmados</span>
+              <div style={{ fontSize: isMobile ? '1.125rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>
                 {orders.filter((o: Order) => o.status === 'payment_confirmed').length}
               </div>
             </div>
             <div style={{
               background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-              padding: '1.5rem',
-              borderRadius: '1rem',
-              color: 'white'
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                <Truck size={24} />
-                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>En Tránsito</span>
-              </div>
-              <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+              <Truck size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>En Tránsito</span>
+              <div style={{ fontSize: isMobile ? '1.125rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>
                 {orders.filter((o: Order) => ['in_transit', 'shipped'].includes(o.status)).length}
               </div>
             </div>
             <div style={{
               background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
-              padding: '1.5rem',
-              borderRadius: '1rem',
-              color: 'white'
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                <ShoppingBag size={24} />
-                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Entregados</span>
-              </div>
-              <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+              <ShoppingBag size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>Entregados</span>
+              <div style={{ fontSize: isMobile ? '1.125rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>
                 {orders.filter((o: Order) => o.status === 'delivered').length}
+              </div>
+            </div>
+            <div style={{
+              background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <AlertTriangle size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>Con Demora</span>
+              <div style={{ fontSize: isMobile ? '1.125rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>
+                {orders.filter((o: Order) => {
+                  if (!['in_transit', 'shipped', 'processing', 'preparing'].includes(o.status)) return false;
+                  const orderDate = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+                  const daysSince = (Date.now() - orderDate) / (1000 * 60 * 60 * 24);
+                  return daysSince > 5; // Más de 5 días
+                }).length}
+              </div>
+            </div>
+            <div style={{
+              background: 'linear-gradient(135deg, #f97316, #ea580c)',
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <Package size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>Sin Stock</span>
+              <div style={{ fontSize: isMobile ? '1.125rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>
+                {orders.filter((o: Order) => {
+                  // Pedidos que están en procesamiento pero tienen problemas de stock
+                  // Podemos detectar esto por pedidos que llevan mucho tiempo en processing sin avanzar
+                  if (o.status !== 'processing' && o.status !== 'payment_confirmed') return false;
+                  const orderDate = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+                  const daysSince = (Date.now() - orderDate) / (1000 * 60 * 60 * 24);
+                  return daysSince > 3 && o.status === 'processing'; // Más de 3 días en processing
+                }).length}
+              </div>
+            </div>
+            <div style={{
+              background: 'linear-gradient(135deg, #dc2626, #b91c1c)',
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <AlertCircle size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>Con Problemas</span>
+              <div style={{ fontSize: isMobile ? '1.125rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>
+                {orders.filter((o: Order) => {
+                  // Pedidos cancelados o expirados
+                  return ['cancelled', 'expired', 'payment_expired'].includes(o.status);
+                }).length}
+              </div>
+            </div>
+            <div style={{
+              background: 'linear-gradient(135deg, #06b6d4, #0891b2)',
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <FileText size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>En Revisión</span>
+              <div style={{ fontSize: isMobile ? '1.125rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>
+                {orders.filter((o: Order) => {
+                  // Pedidos que están en payment_confirmed pero no han avanzado a processing
+                  // después de cierto tiempo (necesitan revisión)
+                  if (o.status !== 'payment_confirmed') return false;
+                  const orderDate = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+                  const daysSince = (Date.now() - orderDate) / (1000 * 60 * 60 * 24);
+                  return daysSince > 1 && daysSince <= 3; // Entre 1 y 3 días en confirmado
+                }).length}
+              </div>
+            </div>
+            <div style={{
+              background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <Package size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>De Externo</span>
+              <div style={{ fontSize: isMobile ? '1.125rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>
+                {orders.filter((o: Order) => {
+                  // Pedidos que tienen productType 'auction' o alguna marca de externo
+                  // Por ahora, podemos usar pedidos de subastas como "externos"
+                  return o.productType === 'auction' || (o as any).external === true;
+                }).length}
               </div>
             </div>
           </div>
@@ -4173,26 +4432,166 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
             </div>
           </div>
 
-          {/* Lista de Pedidos - Tabla Profesional */}
-          <div className={isMobile ? 'mobile-table-container' : ''} style={{ 
-            background: 'var(--bg-secondary)', 
-            borderRadius: '1rem', 
-            border: '1px solid var(--border)',
-            overflow: isMobile ? 'auto' : 'hidden'
-          }}>
-            {filteredOrders.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '4rem 2rem',
-                color: 'var(--text-secondary)'
-              }}>
-                <ShoppingCart size={64} style={{ marginBottom: '1rem', opacity: 0.5 }} />
-                <h3 style={{ margin: '0 0 0.5rem', color: 'var(--text-primary)' }}>No se encontraron pedidos</h3>
-                <p>Intenta ajustar los filtros de búsqueda</p>
-              </div>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table className={isMobile ? 'mobile-table' : ''} style={{ width: '100%', borderCollapse: 'collapse' }}>
+          {/* Lista de Pedidos - Tabla Profesional (Desktop) / Grid Compacto (Mobile) */}
+          {isMobile ? (
+            // Vista móvil: Grid tipo tablero de ajedrez
+            <div style={{ 
+              background: 'var(--bg-secondary)', 
+              borderRadius: '1rem', 
+              border: '1px solid var(--border)',
+              padding: '1rem'
+            }}>
+              {filteredOrders.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '4rem 2rem',
+                  color: 'var(--text-secondary)'
+                }}>
+                  <ShoppingCart size={64} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+                  <h3 style={{ margin: '0 0 0.5rem', color: 'var(--text-primary)' }}>No se encontraron pedidos</h3>
+                  <p>Intenta ajustar los filtros de búsqueda</p>
+                </div>
+              ) : (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: '0.75rem'
+                }}>
+                  {filteredOrders.map((order: Order, index: number) => {
+                    const statusBadge = getStatusBadge(order.status);
+                    const orderDate = order.createdAt ? new Date(order.createdAt).toLocaleDateString('es-AR', { 
+                      day: '2-digit', 
+                      month: 'short'
+                    }) : 'N/A';
+                    
+                    // Colores según estado (tipo tablero de ajedrez alternando)
+                    const statusColors: Record<string, { bg: string; text: string }> = {
+                      pending_payment: { bg: 'linear-gradient(135deg, #f59e0b, #d97706)', text: 'white' },
+                      payment_confirmed: { bg: 'linear-gradient(135deg, #10b981, #059669)', text: 'white' },
+                      processing: { bg: 'linear-gradient(135deg, #3b82f6, #2563eb)', text: 'white' },
+                      in_transit: { bg: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', text: 'white' },
+                      shipped: { bg: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', text: 'white' },
+                      delivered: { bg: 'linear-gradient(135deg, #06b6d4, #0891b2)', text: 'white' },
+                      cancelled: { bg: 'linear-gradient(135deg, #ef4444, #dc2626)', text: 'white' },
+                      expired: { bg: 'linear-gradient(135deg, #6b7280, #4b5563)', text: 'white' },
+                      payment_expired: { bg: 'linear-gradient(135deg, #6b7280, #4b5563)', text: 'white' },
+                      preparing: { bg: 'linear-gradient(135deg, #f97316, #ea580c)', text: 'white' }
+                    };
+                    
+                    const colors = statusColors[order.status] || { bg: 'var(--bg-tertiary)', text: 'var(--text-primary)' };
+                    
+                    return (
+                      <div
+                        key={`order-${order.id}-${index}`}
+                        onClick={() => setSelectedOrder(order)}
+                        style={{
+                          background: colors.bg,
+                          color: colors.text,
+                          borderRadius: '0.75rem',
+                          padding: '0.875rem',
+                          aspectRatio: '1',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                          position: 'relative',
+                          overflow: 'hidden'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'scale(1.05)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.25)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.15)';
+                        }}
+                      >
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          <div style={{ 
+                            fontSize: '0.625rem', 
+                            opacity: 0.9, 
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}>
+                            {order.orderNumber ? `#${order.orderNumber.slice(-6)}` : `#${order.id.slice(-6).toUpperCase()}`}
+                          </div>
+                          <div style={{ 
+                            fontSize: '0.75rem', 
+                            fontWeight: 700,
+                            lineHeight: '1.2',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical'
+                          }}>
+                            {order.productName || 'Producto'}
+                          </div>
+                        </div>
+                        <div style={{ 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          gap: '0.25rem',
+                          marginTop: '0.5rem'
+                        }}>
+                          <div style={{ 
+                            fontSize: '0.875rem', 
+                            fontWeight: 700,
+                            textShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                          }}>
+                            {formatCurrency(order.amount)}
+                          </div>
+                          <div style={{ 
+                            fontSize: '0.625rem', 
+                            opacity: 0.9,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                          }}>
+                            <Calendar size={10} />
+                            {orderDate}
+                          </div>
+                        </div>
+                        <div style={{
+                          position: 'absolute',
+                          top: '0.5rem',
+                          right: '0.5rem',
+                          fontSize: '0.625rem',
+                          opacity: 0.8,
+                          fontWeight: 600
+                        }}>
+                          {statusBadge.text.split(' ')[0]}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            // Vista desktop: Tabla tradicional
+            <div className={isMobile ? 'mobile-table-container' : ''} style={{ 
+              background: 'var(--bg-secondary)', 
+              borderRadius: '1rem', 
+              border: '1px solid var(--border)',
+              overflow: isMobile ? 'auto' : 'hidden'
+            }}>
+              {filteredOrders.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '4rem 2rem',
+                  color: 'var(--text-secondary)'
+                }}>
+                  <ShoppingCart size={64} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+                  <h3 style={{ margin: '0 0 0.5rem', color: 'var(--text-primary)' }}>No se encontraron pedidos</h3>
+                  <p>Intenta ajustar los filtros de búsqueda</p>
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className={isMobile ? 'mobile-table' : ''} style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ 
                       background: 'var(--bg-primary)', 
@@ -4422,6 +4821,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               </div>
             )}
           </div>
+          )}
 
           {/* Resumen de totales */}
           {filteredOrders.length > 0 && (
@@ -6811,7 +7211,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                     e.currentTarget.style.borderColor = 'var(--border)';
                     e.currentTarget.style.background = 'var(--bg-primary)';
                   }}
-                  onDrop={(e) => handleImageDrop(e, (url) => setHomeConfig({ ...homeConfig, heroImageUrl: url }))}
+                  onDrop={(e) => handleImageDrop(e, (url) => setHomeConfig({ ...homeConfig, heroImageUrl: url }), false, 'images', true)}
                   style={{
                     border: '2px dashed var(--border)',
                     borderRadius: '0.5rem',
@@ -6823,14 +7223,14 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 >
                   <input
                     type="file"
-                    accept="image/*"
-                    onChange={(e) => handleImageFileSelect(e, (url) => setHomeConfig({ ...homeConfig, heroImageUrl: url }))}
+                    accept="image/*,video/*,.gif"
+                    onChange={(e) => handleImageFileSelect(e, (url) => setHomeConfig({ ...homeConfig, heroImageUrl: url }), false, 'images', true)}
                     style={{ display: 'none' }}
                     id="hero-image-input"
                   />
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
                     <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
-                      📸 Arrastrá una imagen aquí o hacé clic para seleccionar
+                      📸🎬 Arrastrá una imagen, GIF animado o video aquí o hacé clic para seleccionar
                     </div>
                     <label
                       htmlFor="hero-image-input"
@@ -6842,10 +7242,10 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                         display: 'inline-block'
                       }}
                     >
-                      Seleccionar Imagen
+                      Seleccionar Archivo
                     </label>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                      También podés pegar una URL abajo
+                      También podés pegar una URL abajo (imágenes, GIFs animados o videos)
                     </div>
                   </div>
                 </div>
@@ -6877,6 +7277,120 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                     />
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+
+          {/* Editor de Estadísticas del Header */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: isMobile ? '1.5rem' : '2rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            marginBottom: '2rem'
+          }}>
+            <h3 style={{ 
+              margin: 0, 
+              marginBottom: '1.5rem', 
+              color: 'var(--text-primary)',
+              fontSize: isMobile ? '1.25rem' : '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <TrendingUp size={24} />
+              Estadísticas del Header
+            </h3>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+              Personalizá los números que se muestran en la sección principal. Dejá vacío para usar los valores automáticos.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Subastas Activas
+                </label>
+                <input
+                  type="text"
+                  value={homeConfig.siteSettings?.heroStats?.auctions || ''}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    siteSettings: { 
+                      ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
+                      heroStats: {
+                        ...(homeConfig.siteSettings?.heroStats || {}),
+                        auctions: e.target.value
+                      }
+                    } 
+                  })}
+                  placeholder="Ej: 2 (dejar vacío para usar valor automático)"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '1rem'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Productos en Tienda
+                </label>
+                <input
+                  type="text"
+                  value={homeConfig.siteSettings?.heroStats?.products || ''}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    siteSettings: { 
+                      ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
+                      heroStats: {
+                        ...(homeConfig.siteSettings?.heroStats || {}),
+                        products: e.target.value
+                      }
+                    } 
+                  })}
+                  placeholder="Ej: 3 (dejar vacío para usar valor automático)"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '1rem'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Usuarios Activos
+                </label>
+                <input
+                  type="text"
+                  value={homeConfig.siteSettings?.heroStats?.users || ''}
+                  onChange={(e) => setHomeConfig({ 
+                    ...homeConfig, 
+                    siteSettings: { 
+                      ...(homeConfig.siteSettings || defaultHomeConfig.siteSettings), 
+                      heroStats: {
+                        ...(homeConfig.siteSettings?.heroStats || {}),
+                        users: e.target.value
+                      }
+                    } 
+                  })}
+                  placeholder="Ej: 1000+ (dejar vacío para usar valor automático)"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '1rem'
+                  }}
+                />
               </div>
             </div>
           </div>
@@ -9095,6 +9609,122 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Republicar Subasta */}
+      {republishModal.show && republishModal.auction && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: isMobile ? '1rem' : '2rem'
+        }}>
+          <div style={{
+            background: 'var(--bg-primary)',
+            borderRadius: '1rem',
+            padding: isMobile ? '1.5rem' : '2rem',
+            maxWidth: '500px',
+            width: '100%',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
+            border: '1px solid var(--border)'
+          }}>
+            <h3 style={{
+              margin: '0 0 1rem 0',
+              fontSize: isMobile ? '1.25rem' : '1.5rem',
+              color: 'var(--text-primary)',
+              fontWeight: 600
+            }}>
+              Republicar Subasta
+            </h3>
+            <p style={{
+              margin: '0 0 1.5rem 0',
+              fontSize: isMobile ? '0.9375rem' : '1rem',
+              color: 'var(--text-secondary)',
+              lineHeight: '1.5'
+            }}>
+              ¿Cómo deseas republicar <strong>"{republishModal.auction.title}"</strong>?
+            </p>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.75rem'
+            }}>
+              <button
+                onClick={handleRepublishWithEdit}
+                style={{
+                  padding: '0.875rem 1.25rem',
+                  background: 'var(--primary)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontSize: isMobile ? '0.9375rem' : '1rem',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'var(--secondary)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'var(--primary)'}
+              >
+                ✏️ Editar antes de republicar
+              </button>
+              <button
+                onClick={handleRepublishWithoutChanges}
+                style={{
+                  padding: '0.875rem 1.25rem',
+                  background: 'var(--success)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontSize: isMobile ? '0.9375rem' : '1rem',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.opacity = '0.9'}
+                onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
+              >
+                🔄 Republicar sin cambios
+              </button>
+              <button
+                onClick={handleCancelRepublish}
+                style={{
+                  padding: '0.875rem 1.25rem',
+                  background: 'var(--bg-tertiary)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontSize: isMobile ? '0.9375rem' : '1rem',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'var(--bg-tertiary)'}
+              >
+                ❌ Cancelar
+              </button>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Image, Palette, Sparkles, Smile, Briefcase, X, Check, Loader, RotateCcw, Zap, Music, Sparkles as SparklesIcon, Shirt } from 'lucide-react';
+import { Upload, Image, Palette, Sparkles, Smile, Briefcase, X, Check, Loader, RotateCcw, Zap, Music, Sparkles as SparklesIcon, Shirt, Crown } from 'lucide-react';
 import { uploadImage } from '../utils/imageUpload';
 import { auth } from '../config/firebase';
 import { compressAvatar, supportsWebP } from '../utils/imageCompression';
@@ -24,6 +24,17 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
   const [selectedAvatar, setSelectedAvatar] = useState<AvatarOption | null>(null);
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentAvatar || null);
+  const localUrlRef = useRef<string | null>(null);
+  
+  // Limpiar URLs locales al desmontar el componente
+  useEffect(() => {
+    return () => {
+      if (localUrlRef.current) {
+        URL.revokeObjectURL(localUrlRef.current);
+        localUrlRef.current = null;
+      }
+    };
+  }, []);
   
   // Editor de avatares - estados
   const [editorConfig, setEditorConfig] = useState({
@@ -51,44 +62,44 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
   
   const [editorInitials, setEditorInitials] = useState(getUserInitials());
 
-  // Galería de avatares prediseñados (15 total: 5 serios, 5 felices, 5 bizarros)
-  // Usando DiceBear API para avatares ilustrados en lugar de solo letras
+  // Galería de avatares prediseñados - Todos con estilo Ape NFT (adventurer)
+  // Usando DiceBear API con estilo adventurer para todos los avatares
   const avatarGallery = {
     serios: [
       {
         id: 's1',
         name: 'Ejecutivo Profesional',
         description: 'Avatar corporativo formal para perfiles profesionales',
-        style: 'minimalista profesional',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Ejecutivo&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf&size=200`
+        style: 'ape nft profesional',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Ejecutivo&backgroundColor=2c3e50&size=200`
       },
       {
         id: 's2',
         name: 'Especialista Técnico',
         description: 'Diseño técnico con elementos de especialización',
-        style: 'tecnológico serio',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Tecnico&backgroundColor=0044aa&size=200`
+        style: 'ape nft tecnico',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Tecnico&backgroundColor=34495e&size=200`
       },
       {
         id: 's3',
         name: 'Perfil Corporativo',
         description: 'Avatar neutro para entornos corporativos',
-        style: 'corporativo neutro',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Corporativo&backgroundColor=666666&size=200`
+        style: 'ape nft corporativo',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Corporativo&backgroundColor=5d6d7e&size=200`
       },
       {
         id: 's4',
         name: 'Industria Especializada',
         description: 'Silueta profesional con elementos de industria específica',
-        style: 'industrial profesional',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Industria&backgroundColor=2c2c2c&size=200`
+        style: 'ape nft industrial',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Industria&backgroundColor=1c2833&size=200`
       },
       {
         id: 's5',
         name: 'Seguridad y Confianza',
         description: 'Diseño que transmite seguridad y confiabilidad',
-        style: 'seguro confiable',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Seguro&backgroundColor=1a5f1a&size=200`
+        style: 'ape nft seguro',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Seguro&backgroundColor=1b4f72&size=200`
       }
     ],
     felices: [
@@ -96,36 +107,36 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
         id: 'f1',
         name: 'Sonrisa de Bienvenida',
         description: 'Avatar acogedor para generar buena primera impresión',
-        style: 'amigable acogedor',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Sonrisa&backgroundColor=ff6b00&size=200`
+        style: 'ape nft alegre',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Sonrisa&backgroundColor=ff6b00&size=200`
       },
       {
         id: 'f2',
         name: 'Comunidad Alegre',
         description: 'Diseño que fomenta sentido de comunidad',
-        style: 'comunitario alegre',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Comunidad&backgroundColor=ffb800&size=200`
+        style: 'ape nft comunitario',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Comunidad&backgroundColor=ffb800&size=200`
       },
       {
         id: 'f3',
         name: 'Herramientas Interactivas',
         description: 'Personaje alegre interactuando con herramientas de plataforma',
-        style: 'interactivo positivo',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Interactivo&backgroundColor=00c853&size=200`
+        style: 'ape nft interactivo',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Interactivo&backgroundColor=00c853&size=200`
       },
       {
         id: 'f4',
         name: 'Conexión Positiva',
         description: 'Avatar que simboliza conexión y comunicación efectiva',
-        style: 'conectado comunicativo',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Conexion&backgroundColor=9d4edd&size=200`
+        style: 'ape nft conectado',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Conexion&backgroundColor=9d4edd&size=200`
       },
       {
         id: 'f5',
         name: 'Energía Vibrante',
         description: 'Diseño lleno de energía y actitud positiva',
-        style: 'energético vibrante',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Energia&backgroundColor=ff006e&size=200`
+        style: 'ape nft energetico',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Energia&backgroundColor=ff006e&size=200`
       }
     ],
     bizarros: [
@@ -133,36 +144,36 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
         id: 'b1',
         name: 'Surrealismo Digital',
         description: 'Avatar onírico con elementos flotantes y colores inesperados',
-        style: 'surrealista digital',
-        imageUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=Surreal&backgroundColor=6a0dad&size=200`
+        style: 'ape nft surreal',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Surreal&backgroundColor=6a0dad&size=200`
       },
       {
         id: 'b2',
         name: 'Steampunk Evolucionado',
         description: 'Fusión steampunk con elementos digitales futuristas',
-        style: 'steampunk futurista',
-        imageUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=Steampunk&backgroundColor=8b4513&size=200`
+        style: 'ape nft steampunk',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Steampunk&backgroundColor=8b4513&size=200`
       },
       {
         id: 'b3',
         name: 'Fantasia Tecnológica',
         description: 'Ser fantástico integrado con tecnología avanzada',
-        style: 'fantasia tecnológica',
-        imageUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=Fantasia&backgroundColor=4b0082&size=200`
+        style: 'ape nft fantasia',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Fantasia&backgroundColor=4b0082&size=200`
       },
       {
         id: 'b4',
         name: 'Abstracción Geométrica Viva',
         description: 'Formas geométricas que parecen tener vida propia',
-        style: 'geométrico animado',
-        imageUrl: `https://api.dicebear.com/7.x/shapes/svg?seed=Geometrico&backgroundColor=00d4ff&size=200`
+        style: 'ape nft geometrico',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Geometrico&backgroundColor=00d4ff&size=200`
       },
       {
         id: 'b5',
         name: 'Fusión Humano-Robótica',
         description: 'Transición estilizada entre humano y máquina',
-        style: 'cyborg estilizado',
-        imageUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=Cyborg&backgroundColor=2a2a2a&size=200`
+        style: 'ape nft cyborg',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Cyborg&backgroundColor=2a2a2a&size=200`
       }
     ],
     cyber: [
@@ -170,43 +181,43 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
         id: 'c1',
         name: 'Cyber Neon Warrior',
         description: 'Guerrero cyberpunk con efectos neon futuristas',
-        style: 'cyber neon',
-        imageUrl: `https://api.dicebear.com/7.x/pixel-art/svg?seed=CyberNeon&backgroundColor=0a0a0a&size=200`
+        style: 'ape nft cyber neon',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=CyberNeon&backgroundColor=0a0a0a&size=200`
       },
       {
         id: 'c2',
         name: 'Matrix Hacker',
         description: 'Avatar estilo Matrix con código digital',
-        style: 'matrix hacker',
-        imageUrl: `https://api.dicebear.com/7.x/pixel-art/svg?seed=Matrix&backgroundColor=00ff00&size=200`
+        style: 'ape nft matrix',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Matrix&backgroundColor=00ff00&size=200`
       },
       {
         id: 'c3',
         name: 'Cyber Glitch',
         description: 'Efecto glitch digital con colores vibrantes',
-        style: 'glitch digital',
-        imageUrl: `https://api.dicebear.com/7.x/pixel-art/svg?seed=Glitch&backgroundColor=ff00ff&size=200`
+        style: 'ape nft glitch',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Glitch&backgroundColor=ff00ff&size=200`
       },
       {
         id: 'c4',
         name: 'Neon Synthwave',
         description: 'Estilo synthwave con paleta de colores retro-futurista',
-        style: 'synthwave neon',
-        imageUrl: `https://api.dicebear.com/7.x/pixel-art/svg?seed=Synthwave&backgroundColor=ff0080&size=200`
+        style: 'ape nft synthwave',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Synthwave&backgroundColor=ff0080&size=200`
       },
       {
         id: 'c5',
         name: 'Digital Ghost',
         description: 'Avatar etéreo con efectos de partículas digitales',
-        style: 'ghost digital',
-        imageUrl: `https://api.dicebear.com/7.x/pixel-art/svg?seed=Ghost&backgroundColor=00ffff&size=200`
+        style: 'ape nft ghost',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Ghost&backgroundColor=00ffff&size=200`
       },
       {
         id: 'c6',
         name: 'Cyber Samurai',
         description: 'Samurai futurista con elementos tecnológicos',
-        style: 'cyber samurai',
-        imageUrl: `https://api.dicebear.com/7.x/pixel-art/svg?seed=Samurai&backgroundColor=1a1a2e&size=200`
+        style: 'ape nft samurai',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Samurai&backgroundColor=1a1a2e&size=200`
       }
     ],
     punk: [
@@ -214,73 +225,80 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
         id: 'p1',
         name: 'Punk Rock Rebel',
         description: 'Avatar rebelde con estilo punk rock clásico',
-        style: 'punk rock',
-        imageUrl: `https://api.dicebear.com/7.x/personas/svg?seed=PunkRock&backgroundColor=000000&size=200`
+        style: 'ape nft punk rock',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=PunkRock&backgroundColor=000000&size=200`
       },
       {
         id: 'p2',
         name: 'Street Punk',
         description: 'Estilo street punk con actitud urbana',
-        style: 'street punk',
-        imageUrl: `https://api.dicebear.com/7.x/personas/svg?seed=StreetPunk&backgroundColor=1a1a1a&size=200`
+        style: 'ape nft street punk',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=StreetPunk&backgroundColor=1a1a1a&size=200`
       },
       {
         id: 'p3',
         name: 'Punk Attitude',
         description: 'Avatar con actitud punk y colores vibrantes',
-        style: 'punk attitude',
-        imageUrl: `https://api.dicebear.com/7.x/personas/svg?seed=Attitude&backgroundColor=ff0000&size=200`
+        style: 'ape nft attitude',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Attitude&backgroundColor=ff0000&size=200`
       },
       {
         id: 'p4',
         name: 'Alternative Punk',
         description: 'Estilo alternativo punk con elementos únicos',
-        style: 'alternative punk',
-        imageUrl: `https://api.dicebear.com/7.x/personas/svg?seed=Alternative&backgroundColor=8b008b&size=200`
+        style: 'ape nft alternative',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Alternative&backgroundColor=8b008b&size=200`
       },
       {
         id: 'p5',
         name: 'Punk Fashion',
         description: 'Moda punk con accesorios característicos',
-        style: 'punk fashion',
-        imageUrl: `https://api.dicebear.com/7.x/personas/svg?seed=Fashion&backgroundColor=2d2d2d&size=200`
+        style: 'ape nft fashion',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Fashion&backgroundColor=2d2d2d&size=200`
       }
     ],
     monkey: [
       {
         id: 'm1',
-        name: 'Cool Monkey',
-        description: 'Mono con estilo moderno y actitud cool',
-        style: 'cool monkey',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=MonkeyCool&backgroundColor=ff6b00&size=200`
+        name: 'Bored Ape Classic',
+        description: 'Estilo NFT clásico inspirado en Bored Ape Yacht Club',
+        style: 'ape nft classic',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=BoredApe1&backgroundColor=ffd700&size=200`
       },
       {
         id: 'm2',
-        name: 'Cyber Monkey',
-        description: 'Mono futurista con elementos tecnológicos',
-        style: 'cyber monkey',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=CyberMonkey&backgroundColor=00d4ff&size=200`
+        name: 'Golden Ape',
+        description: 'Ape dorado con estilo premium NFT',
+        style: 'ape nft golden',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=GoldenApe&backgroundColor=ffb800&size=200`
       },
       {
         id: 'm3',
-        name: 'Funky Monkey',
-        description: 'Mono con estilo funky y colores vibrantes',
-        style: 'funky monkey',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=FunkyMonkey&backgroundColor=ff00ff&size=200`
+        name: 'Cyber Ape',
+        description: 'Ape futurista con elementos tecnológicos NFT',
+        style: 'ape nft cyber',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=CyberApe&backgroundColor=00d4ff&size=200`
       },
       {
         id: 'm4',
-        name: 'Street Monkey',
-        description: 'Mono urbano con estilo street',
-        style: 'street monkey',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=StreetMonkey&backgroundColor=9d4edd&size=200`
+        name: 'Royal Ape',
+        description: 'Ape con estilo real y exclusivo NFT',
+        style: 'ape nft royal',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=RoyalApe&backgroundColor=9d4edd&size=200`
       },
       {
         id: 'm5',
-        name: 'Monkey Business',
-        description: 'Mono divertido con personalidad única',
-        style: 'monkey business',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Business&backgroundColor=ffb800&size=200`
+        name: 'Street Ape',
+        description: 'Ape urbano con actitud streetwear NFT',
+        style: 'ape nft street',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=StreetApe&backgroundColor=ff1493&size=200`
+      },
+      {
+        id: 'm6',
+        name: 'Diamond Ape',
+        description: 'Ape exclusivo con estilo diamante NFT',
+        style: 'ape nft diamond',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=DiamondApe&backgroundColor=00ffff&size=200`
       }
     ],
     modernos: [
@@ -288,43 +306,43 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
         id: 'mod1',
         name: 'Minimalista Moderno',
         description: 'Diseño minimalista y elegante estilo 2024',
-        style: 'minimalista',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Minimal&backgroundColor=f5f5f5&size=200`
+        style: 'ape nft minimalista',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Minimal&backgroundColor=f5f5f5&size=200`
       },
       {
         id: 'mod2',
         name: 'Fashion Forward',
         description: 'Avatar con estilo de moda contemporánea',
-        style: 'fashion forward',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Fashion&backgroundColor=ffffff&size=200`
+        style: 'ape nft fashion',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Fashion&backgroundColor=ffffff&size=200`
       },
       {
         id: 'mod3',
         name: 'Trendy Urban',
         description: 'Estilo urbano trendy y actual',
-        style: 'trendy urban',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Trendy&backgroundColor=e0e0e0&size=200`
+        style: 'ape nft trendy',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Trendy&backgroundColor=e0e0e0&size=200`
       },
       {
         id: 'mod4',
         name: 'Contemporary Style',
         description: 'Diseño contemporáneo con toques modernos',
-        style: 'contemporary',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Contemporary&backgroundColor=f0f0f0&size=200`
+        style: 'ape nft contemporary',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Contemporary&backgroundColor=f0f0f0&size=200`
       },
       {
         id: 'mod5',
         name: 'Modern Elegance',
         description: 'Elegancia moderna con líneas limpias',
-        style: 'modern elegance',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Elegance&backgroundColor=d4d4d4&size=200`
+        style: 'ape nft elegance',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Elegance&backgroundColor=d4d4d4&size=200`
       },
       {
         id: 'mod6',
         name: 'Chic Modern',
         description: 'Estilo chic y sofisticado',
-        style: 'chic modern',
-        imageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=Chic&backgroundColor=cccccc&size=200`
+        style: 'ape nft chic',
+        imageUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=Chic&backgroundColor=cccccc&size=200`
       }
     ]
   };
@@ -332,6 +350,13 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
   const handleAvatarSelect = (avatar: AvatarOption) => {
     setSelectedAvatar(avatar);
     if (avatar.imageUrl) {
+      // Limpiar URL local anterior si existe (blob URL)
+      if (localUrlRef.current) {
+        URL.revokeObjectURL(localUrlRef.current);
+        localUrlRef.current = null;
+      }
+      // Usar URL externa de DiceBear (no es local, es una API externa)
+      // Esta URL se guardará en Firestore cuando se confirme
       setPreviewUrl(avatar.imageUrl);
     }
   };
@@ -352,6 +377,7 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
     }
 
     setUploading(true);
+    let localUrl: string | null = null;
 
     try {
       // Comprimir imagen a WebP si es soportado
@@ -368,18 +394,29 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
         }
       }
 
-      // Crear preview local
-      const localUrl = URL.createObjectURL(fileToUpload);
+      // Crear preview local temporal (solo para mostrar mientras se sube)
+      localUrl = URL.createObjectURL(fileToUpload);
+      localUrlRef.current = localUrl;
       setPreviewUrl(localUrl);
 
-      // Subir a Firebase Storage
+      // Subir a Firebase Storage (esto guarda en la base de datos)
       const userId = auth.currentUser?.uid;
       if (!userId) {
         throw new Error('Usuario no autenticado');
       }
 
       const uploadedUrl = await uploadImage(fileToUpload, `avatars/${userId}`);
+      
+      // Limpiar URL local antes de usar la URL de Firebase
+      if (localUrl) {
+        URL.revokeObjectURL(localUrl);
+        localUrlRef.current = null;
+        localUrl = null;
+      }
+      
+      // Usar URL de Firebase (conectada a la base de datos)
       setPreviewUrl(uploadedUrl);
+      // onSelect guardará en Firestore a través de handleAvatarSelect en Perfil.tsx
       onSelect(uploadedUrl);
       
       // Limpiar input
@@ -389,6 +426,10 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
       alert(`Error al subir imagen: ${error.message}`);
       setPreviewUrl(currentAvatar || null);
     } finally {
+      // Limpiar URL local si aún existe
+      if (localUrl) {
+        URL.revokeObjectURL(localUrl);
+      }
       setUploading(false);
     }
   };
@@ -396,6 +437,13 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
   const handleGoogleAvatar = () => {
     const user = auth.currentUser;
     if (user?.photoURL) {
+      // Limpiar URL local anterior si existe (blob URL)
+      if (localUrlRef.current) {
+        URL.revokeObjectURL(localUrlRef.current);
+        localUrlRef.current = null;
+      }
+      // Usar URL de Google (no es local, es una URL externa de Google)
+      // onSelect guardará en Firestore a través de handleAvatarSelect en Perfil.tsx
       setPreviewUrl(user.photoURL);
       onSelect(user.photoURL);
     } else {
@@ -465,10 +513,15 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
     ctx.textBaseline = 'middle';
     ctx.fillText(initials, center, center);
 
-    // Convertir canvas a URL para preview
+    // Convertir canvas a URL para preview (temporal, se reemplazará con URL de Firebase al confirmar)
     canvas.toBlob((blob) => {
       if (blob) {
+        // Limpiar URL anterior si existe
+        if (localUrlRef.current) {
+          URL.revokeObjectURL(localUrlRef.current);
+        }
         const url = URL.createObjectURL(blob);
+        localUrlRef.current = url;
         setPreviewUrl(url);
       }
     }, 'image/png');
@@ -483,27 +536,57 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
 
   const handleConfirm = () => {
     if (previewUrl) {
-      // Si estamos en el editor, convertir canvas a imagen y subir
+      // Si estamos en el editor, convertir canvas a imagen y subir a Firebase
       if (activeTab === 'editor' && canvasRef.current) {
         canvasRef.current.toBlob(async (blob) => {
           if (blob && auth.currentUser) {
             setUploading(true);
+            let localUrl: string | null = null;
             try {
+              // Crear preview temporal
+              localUrl = URL.createObjectURL(blob);
+              localUrlRef.current = localUrl;
+              setPreviewUrl(localUrl);
+              
+              // Subir a Firebase Storage (conectado a la base de datos)
               const file = new File([blob], 'avatar.png', { type: 'image/png' });
               const userId = auth.currentUser.uid;
               const uploadedUrl = await uploadImage(file, `avatars/${userId}`);
+              
+              // Limpiar URL local antes de usar la URL de Firebase
+              if (localUrl) {
+                URL.revokeObjectURL(localUrl);
+                localUrlRef.current = null;
+                localUrl = null;
+              }
+              
+              // Usar URL de Firebase (conectada a la base de datos)
               setPreviewUrl(uploadedUrl);
+              // onSelect guardará en Firestore a través de handleAvatarSelect en Perfil.tsx
               onSelect(uploadedUrl);
               onClose?.();
             } catch (error: any) {
               console.error('Error al subir avatar del editor:', error);
               alert(`Error al subir avatar: ${error.message}`);
             } finally {
+              // Limpiar URL local si aún existe
+              if (localUrl) {
+                URL.revokeObjectURL(localUrl);
+              }
               setUploading(false);
             }
           }
         }, 'image/png');
       } else {
+        // Para avatares de la galería (DiceBear) o Google, usar directamente la URL
+        // Estas URLs ya son externas (no locales), pero onSelect las guardará en Firestore
+        // Limpiar URL local si existe (blob URL)
+        if (localUrlRef.current) {
+          URL.revokeObjectURL(localUrlRef.current);
+          localUrlRef.current = null;
+        }
+        // onSelect guardará en Firestore a través de handleAvatarSelect en Perfil.tsx
+        // handleAvatarSelect actualiza Firestore con updateDoc
         onSelect(previewUrl);
         onClose?.();
       }
@@ -525,6 +608,38 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
         </div>
 
         <div className="avatar-gallery-content">
+          {/* Vista previa - Movida arriba para móvil */}
+          <div className="avatar-preview-section">
+            <h3>Vista Previa</h3>
+            <div className="preview-container">
+              {previewUrl ? (
+                <img src={previewUrl} alt="Preview" className="preview-image" />
+              ) : (
+                <div className="preview-placeholder">
+                  <Image size={32} />
+                  <span>Seleccioná un avatar</span>
+                </div>
+              )}
+            </div>
+            <button
+              className="btn-confirm"
+              onClick={handleConfirm}
+              disabled={!previewUrl || uploading}
+            >
+              {uploading ? (
+                <>
+                  <Loader className="animate-spin" size={18} />
+                  Subiendo...
+                </>
+              ) : (
+                <>
+                  <Check size={18} />
+                  Confirmar Avatar
+                </>
+              )}
+            </button>
+          </div>
+
           {/* Tabs */}
           <div className="avatar-tabs">
             <button
@@ -566,8 +681,8 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
               className={`tab ${activeTab === 'monkey' ? 'active' : ''}`}
               onClick={() => setActiveTab('monkey')}
             >
-              <SparklesIcon size={18} />
-              Monkey
+              <Crown size={18} />
+              Ape NFT
             </button>
             <button
               className={`tab ${activeTab === 'modernos' ? 'active' : ''}`}
@@ -876,38 +991,6 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Vista previa */}
-          <div className="avatar-preview-section">
-            <h3>Vista Previa</h3>
-            <div className="preview-container">
-              {previewUrl ? (
-                <img src={previewUrl} alt="Preview" className="preview-image" />
-              ) : (
-                <div className="preview-placeholder">
-                  <Image size={48} />
-                  <span>Seleccioná un avatar para ver la vista previa</span>
-                </div>
-              )}
-            </div>
-            <button
-              className="btn-confirm"
-              onClick={handleConfirm}
-              disabled={!previewUrl || uploading}
-            >
-              {uploading ? (
-                <>
-                  <Loader className="animate-spin" size={18} />
-                  Subiendo...
-                </>
-              ) : (
-                <>
-                  <Check size={18} />
-                  Confirmar Avatar
-                </>
-              )}
-            </button>
           </div>
         </div>
       </div>

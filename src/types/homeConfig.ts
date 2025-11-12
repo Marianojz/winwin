@@ -87,6 +87,11 @@ export interface SiteSettings {
   faviconUrl?: string;
   footerText?: string;
   logoStickers?: LogoSticker[];
+  heroStats?: {
+    auctions?: string; // Valor personalizado para "Subastas Activas"
+    products?: string; // Valor personalizado para "Productos en Tienda"
+    users?: string; // Valor personalizado para "Usuarios Activos"
+  };
 }
 
 export interface SectionTitles {

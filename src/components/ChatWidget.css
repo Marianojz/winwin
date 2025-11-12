@@ -1,9 +1,13 @@
 /* Chat Widget - Componente flotante para usuarios */
 
-.chat-widget-button {
+.chat-widget-button-wrapper {
   position: fixed;
   bottom: 1.5rem;
   right: 1.5rem;
+  z-index: 1000;
+}
+
+.chat-widget-button {
   width: 56px;
   height: 56px;
   border-radius: 50%;
@@ -15,17 +19,85 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
   transition: all 0.3s ease;
   -webkit-tap-highlight-color: transparent;
+  position: relative;
+  animation: pulse 3s ease-in-out infinite;
 }
 
 .chat-widget-button:hover {
   transform: scale(1.1);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  animation: none;
 }
 
 .chat-widget-button:active {
+  transform: scale(0.95);
+  animation: none;
+}
+
+/* Animación de pulsación periódica */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  }
+}
+
+/* Animación de salto cuando hay mensajes */
+.chat-widget-button.has-messages {
+  animation: pulse 3s ease-in-out infinite, bounce 2s ease-in-out infinite;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  25% {
+    transform: translateY(-8px);
+  }
+  50% {
+    transform: translateY(0);
+  }
+  75% {
+    transform: translateY(-4px);
+  }
+}
+
+.chat-widget-close-btn {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  z-index: 1001;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+  padding: 0;
+  opacity: 0.7;
+}
+
+.chat-widget-close-btn:hover {
+  transform: scale(1.2);
+  background: rgba(0, 0, 0, 0.6);
+  opacity: 1;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.chat-widget-close-btn:active {
   transform: scale(0.95);
 }
 
@@ -42,6 +114,16 @@
   min-width: 1.25rem;
   text-align: center;
   border: 2px solid var(--bg-primary);
+  animation: badgePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
 }
 
 /* Container del widget */
@@ -339,19 +421,31 @@
 @media (max-width: 768px) {
   .chat-widget-container {
     width: calc(100vw - 1rem);
-    height: calc(100vh - 1rem);
-    bottom: 0.5rem;
+    height: calc(100vh - 6rem);
+    bottom: 5.5rem;
     right: 0.5rem;
     left: 0.5rem;
     max-width: none;
     max-height: none;
   }
 
+  .chat-widget-button-wrapper {
+    bottom: 5.5rem;
+    right: 0.75rem;
+  }
+
   .chat-widget-button {
-    bottom: 1rem;
-    right: 1rem;
-    width: 52px;
-    height: 52px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .chat-widget-button svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .chat-widget-close-btn {
+    display: none;
   }
 }
 

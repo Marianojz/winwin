@@ -46,7 +46,7 @@
   overflow-x: auto;
   overflow-y: hidden;
   padding: 0.5rem;
-  z-index: 1000;
+  z-index: 1001; /* Mayor que navbar-mobile (1000) para estar por encima */
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
   scrollbar-width: thin;
   -webkit-overflow-scrolling: touch;

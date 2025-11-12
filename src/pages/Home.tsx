@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Gavel, Store, TrendingUp, Shield, Clock, Award } from 'lucide-react';
+import { Gavel, Store, TrendingUp, Shield, Clock, Award, BookOpen, Gift, ArrowRight, Star, Zap } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import AuctionCard from '../components/AuctionCard';
 import ProductCard from '../components/ProductCard';
@@ -9,10 +9,12 @@ import { HomeConfig, defaultHomeConfig } from '../types/homeConfig';
 import { useEffect, useState } from 'react';
 import { ref, onValue } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 const Home = () => {
   const { auctions, products } = useStore();
   const [homeConfig, setHomeConfig] = useState<HomeConfig>(defaultHomeConfig);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     try {
@@ -112,17 +114,17 @@ const Home = () => {
                   Ir a la Tienda
                 </Link>
               </div>
-              <div className="hero-stats" style={{ marginTop: '1.5rem' }}>
+              <div className="hero-stats" style={{ marginTop: '0.75rem' }}>
                 <div className="stat-item">
-                  <span className="stat-number">{auctions.length}</span>
+                  <span className="stat-number">{homeConfig.siteSettings?.heroStats?.auctions || auctions.length}</span>
                   <span className="stat-label">Subastas Activas</span>
                 </div>
                 <div className="stat-item">
-                  <span className="stat-number">{products.length}</span>
+                  <span className="stat-number">{homeConfig.siteSettings?.heroStats?.products || products.length}</span>
                   <span className="stat-label">Productos en Tienda</span>
                 </div>
                 <div className="stat-item">
-                  <span className="stat-number">1000+</span>
+                  <span className="stat-number">{homeConfig.siteSettings?.heroStats?.users || '1000+'}</span>
                   <span className="stat-label">Usuarios Activos</span>
                 </div>
               </div>
@@ -138,15 +140,155 @@ const Home = () => {
       </section>
 
       {/* Widget de Anuncios */}
-      <section className="announcements-section" style={{ padding: '1.5rem 0' }}>
+      <section className="announcements-section" style={{ padding: '0.75rem 0' }}>
         <div className="container">
           <AnnouncementWidget />
         </div>
       </section>
 
+      {/* Banner del Blog */}
+      <section style={{ padding: '2rem 0', background: 'linear-gradient(135deg, rgba(255, 107, 0, 0.05), rgba(255, 159, 64, 0.05))' }}>
+        <div className="container">
+          <Link 
+            to="/blog"
+            style={{
+              display: 'block',
+              textDecoration: 'none',
+              position: 'relative',
+              overflow: 'hidden',
+              borderRadius: '1.5rem',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+              transition: 'transform 0.3s, box-shadow 0.3s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-4px)';
+              e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.2)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)';
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '2rem',
+              padding: '2rem',
+              background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              {/* Decoración de fondo */}
+              <div style={{
+                position: 'absolute',
+                top: '-50%',
+                right: '-10%',
+                width: '300px',
+                height: '300px',
+                background: 'rgba(255,255,255,0.1)',
+                borderRadius: '50%',
+                filter: 'blur(40px)'
+              }} />
+              <div style={{
+                position: 'absolute',
+                bottom: '-30%',
+                left: '-5%',
+                width: '200px',
+                height: '200px',
+                background: 'rgba(255,255,255,0.1)',
+                borderRadius: '50%',
+                filter: 'blur(30px)'
+              }} />
+              
+              {/* Contenido */}
+              <div style={{ 
+                flex: 1, 
+                position: 'relative', 
+                zIndex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem'
+              }}>
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.5rem 1rem',
+                  background: 'rgba(255,255,255,0.2)',
+                  borderRadius: '2rem',
+                  width: 'fit-content',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  backdropFilter: 'blur(10px)'
+                }}>
+                  <BookOpen size={18} />
+                  <span>Nuevo Artículo</span>
+                </div>
+                <h2 style={{
+                  margin: 0,
+                  fontSize: isMobile ? '1.5rem' : '2rem',
+                  fontWeight: 700,
+                  lineHeight: '1.2',
+                  textShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                }}>
+                  ¿Qué regalar esta Navidad?
+                </h2>
+                <p style={{
+                  margin: 0,
+                  fontSize: isMobile ? '0.9375rem' : '1.125rem',
+                  opacity: 0.95,
+                  lineHeight: '1.5',
+                  maxWidth: '600px'
+                }}>
+                  Descubrí las mejores ideas de regalos para esta temporada navideña. Guía completa con opciones para todos los gustos y presupuestos.
+                </p>
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  marginTop: '0.5rem',
+                  padding: '0.75rem 1.5rem',
+                  background: 'rgba(255,255,255,0.2)',
+                  borderRadius: '2rem',
+                  width: 'fit-content',
+                  fontWeight: 600,
+                  backdropFilter: 'blur(10px)',
+                  transition: 'all 0.2s'
+                }}>
+                  <span>Leer artículo</span>
+                  <ArrowRight size={18} />
+                </div>
+              </div>
+              
+              {/* Imagen decorativa */}
+              <div style={{
+                position: 'relative',
+                zIndex: 1,
+                display: isMobile ? 'none' : 'block'
+              }}>
+                <div style={{
+                  width: '200px',
+                  height: '200px',
+                  background: 'rgba(255,255,255,0.15)',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backdropFilter: 'blur(10px)',
+                  border: '2px solid rgba(255,255,255,0.3)'
+                }}>
+                  <Gift size={80} style={{ color: 'white', filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))' }} />
+                </div>
+              </div>
+            </div>
+          </Link>
+        </div>
+      </section>
+
       {/* Banners Publicitarios */}
       {homeConfig.banners.filter(b => b.active).length > 0 && (
-        <section className="banners" style={{ padding: '2rem 0', background: 'var(--bg-secondary)' }}>
+        <section className="banners" style={{ padding: '1rem 0', background: 'var(--bg-secondary)' }}>
           <div className="container">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
               {homeConfig.banners.filter(b => b.active).map(banner => (
@@ -176,12 +318,42 @@ const Home = () => {
       {(featuredAuction || featuredProducts.length > 0) && (
         <section className="featured-section">
           <div className="container">
-            <div className="section-header">
-              <h2>
-                <Gavel size={28} />
-                Destacados
-              </h2>
-              <p>Lo mejor de subastas y tienda</p>
+            <div className="section-header" style={{ 
+              textAlign: 'center', 
+              marginBottom: '2rem',
+              position: 'relative',
+              paddingBottom: '1.5rem'
+            }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '2rem',
+                boxShadow: '0 4px 16px rgba(255, 107, 0, 0.3)',
+                marginBottom: '0.75rem'
+              }}>
+                <Gavel size={24} style={{ color: 'white' }} />
+                <h2 style={{ 
+                  margin: 0, 
+                  fontSize: '1.5rem',
+                  fontWeight: 700,
+                  color: 'white',
+                  textShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                }}>
+                  Destacados
+                </h2>
+              </div>
+              <p style={{ 
+                margin: 0, 
+                fontSize: '0.9375rem',
+                color: 'var(--text-secondary)',
+                fontWeight: 500,
+                letterSpacing: '0.5px'
+              }}>
+                Lo mejor de subastas y tienda
+              </p>
             </div>
             <div className="featured-content">
               {featuredAuction && (
@@ -260,34 +432,185 @@ const Home = () => {
       <section className="features-compact">
         <div className="container">
           <h2 className="features-compact-title">¿Por qué elegirnos?</h2>
-          <div className="features-compact-grid">
-            <div className="feature-compact-card">
-              <div className="feature-compact-icon">
-                <Shield size={24} />
+          <div 
+            className="features-compact-grid"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: isMobile ? '0.5rem' : '0.875rem',
+              maxWidth: isMobile ? '100%' : '900px',
+              margin: '0 auto',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}
+          >
+            <div className="feature-compact-card" style={{
+              aspectRatio: isMobile ? '1' : 'auto',
+              padding: isMobile ? '0.625rem 0.5rem' : '1rem 0.75rem',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <div className="feature-compact-icon" style={{
+                padding: isMobile ? '0.5rem' : '0.625rem',
+                marginBottom: isMobile ? '0.375rem' : '0.5rem'
+              }}>
+                <Shield size={isMobile ? 18 : 24} />
               </div>
-              <h3>Seguro</h3>
-              <p>Transacciones protegidas</p>
+              <h3 style={{
+                fontSize: isMobile ? '0.6875rem' : '0.875rem',
+                marginBottom: isMobile ? '0.25rem' : '0.375rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>Seguro</h3>
+              <p style={{
+                fontSize: isMobile ? '0.5625rem' : '0.75rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>Transacciones protegidas</p>
             </div>
-            <div className="feature-compact-card">
-              <div className="feature-compact-icon">
-                <Clock size={24} />
+            <div className="feature-compact-card" style={{
+              aspectRatio: isMobile ? '1' : 'auto',
+              padding: isMobile ? '0.625rem 0.5rem' : '1rem 0.75rem',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <div className="feature-compact-icon" style={{
+                padding: isMobile ? '0.5rem' : '0.625rem',
+                marginBottom: isMobile ? '0.375rem' : '0.5rem'
+              }}>
+                <Clock size={isMobile ? 18 : 24} />
               </div>
-              <h3>Tiempo Real</h3>
-              <p>Subastas en vivo</p>
+              <h3 style={{
+                fontSize: isMobile ? '0.6875rem' : '0.875rem',
+                marginBottom: isMobile ? '0.25rem' : '0.375rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>Tiempo Real</h3>
+              <p style={{
+                fontSize: isMobile ? '0.5625rem' : '0.75rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>Subastas en vivo</p>
             </div>
-            <div className="feature-compact-card">
-              <div className="feature-compact-icon">
-                <TrendingUp size={24} />
+            <div className="feature-compact-card" style={{
+              aspectRatio: isMobile ? '1' : 'auto',
+              padding: isMobile ? '0.625rem 0.5rem' : '1rem 0.75rem',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <div className="feature-compact-icon" style={{
+                padding: isMobile ? '0.5rem' : '0.625rem',
+                marginBottom: isMobile ? '0.375rem' : '0.5rem'
+              }}>
+                <TrendingUp size={isMobile ? 18 : 24} />
               </div>
-              <h3>Mejores Precios</h3>
-              <p>Ofertas increíbles</p>
+              <h3 style={{
+                fontSize: isMobile ? '0.6875rem' : '0.875rem',
+                marginBottom: isMobile ? '0.25rem' : '0.375rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>Mejores Precios</h3>
+              <p style={{
+                fontSize: isMobile ? '0.5625rem' : '0.75rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>Ofertas increíbles</p>
             </div>
-            <div className="feature-compact-card">
-              <div className="feature-compact-icon">
-                <Award size={24} />
+            <div className="feature-compact-card" style={{
+              aspectRatio: isMobile ? '1' : 'auto',
+              padding: isMobile ? '0.625rem 0.5rem' : '1rem 0.75rem',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <div className="feature-compact-icon" style={{
+                padding: isMobile ? '0.5rem' : '0.625rem',
+                marginBottom: isMobile ? '0.375rem' : '0.5rem'
+              }}>
+                <Award size={isMobile ? 18 : 24} />
               </div>
-              <h3>Verificado</h3>
-              <p>Productos garantizados</p>
+              <h3 style={{
+                fontSize: isMobile ? '0.6875rem' : '0.875rem',
+                marginBottom: isMobile ? '0.25rem' : '0.375rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>Verificado</h3>
+              <p style={{
+                fontSize: isMobile ? '0.5625rem' : '0.75rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>Productos garantizados</p>
+            </div>
+            <div className="feature-compact-card" style={{
+              aspectRatio: isMobile ? '1' : 'auto',
+              padding: isMobile ? '0.625rem 0.5rem' : '1rem 0.75rem',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <div className="feature-compact-icon" style={{
+                padding: isMobile ? '0.5rem' : '0.625rem',
+                marginBottom: isMobile ? '0.375rem' : '0.5rem'
+              }}>
+                <Star size={isMobile ? 18 : 24} />
+              </div>
+              <h3 style={{
+                fontSize: isMobile ? '0.6875rem' : '0.875rem',
+                marginBottom: isMobile ? '0.25rem' : '0.375rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>Calidad</h3>
+              <p style={{
+                fontSize: isMobile ? '0.5625rem' : '0.75rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>Productos seleccionados</p>
+            </div>
+            <div className="feature-compact-card" style={{
+              aspectRatio: isMobile ? '1' : 'auto',
+              padding: isMobile ? '0.625rem 0.5rem' : '1rem 0.75rem',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <div className="feature-compact-icon" style={{
+                padding: isMobile ? '0.5rem' : '0.625rem',
+                marginBottom: isMobile ? '0.375rem' : '0.5rem'
+              }}>
+                <Zap size={isMobile ? 18 : 24} />
+              </div>
+              <h3 style={{
+                fontSize: isMobile ? '0.6875rem' : '0.875rem',
+                marginBottom: isMobile ? '0.25rem' : '0.375rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>Rápido</h3>
+              <p style={{
+                fontSize: isMobile ? '0.5625rem' : '0.75rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>Entrega eficiente</p>
             </div>
           </div>
         </div>
@@ -297,26 +620,199 @@ const Home = () => {
       <section className="how-it-works">
         <div className="container">
           <h2 className="section-title">¿Cómo Funciona?</h2>
-          <div className="steps">
-            <div className="step">
-              <div className="step-number">1</div>
-              <h3>Registrate</h3>
-              <p>Creá tu cuenta con tu email y validá tu identidad con DNI</p>
+          <div 
+            className="steps"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(auto-fit, minmax(160px, 1fr))',
+              gap: isMobile ? '0.5rem' : '0.875rem',
+              marginTop: '1.25rem',
+              maxWidth: isMobile ? '100%' : '900px',
+              marginLeft: 'auto',
+              marginRight: 'auto',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}
+          >
+            <div className="step" style={{
+              aspectRatio: isMobile ? '1' : 'auto',
+              padding: isMobile ? '0.625rem 0.5rem' : '1rem 0.75rem',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <div className="step-number" style={{
+                width: isMobile ? '28px' : '40px',
+                height: isMobile ? '28px' : '40px',
+                fontSize: isMobile ? '0.75rem' : '1rem',
+                marginBottom: isMobile ? '0.375rem' : '0.75rem'
+              }}>1</div>
+              <h3 style={{
+                fontSize: isMobile ? '0.6875rem' : 'clamp(0.875rem, 2vw, 1rem)',
+                marginBottom: isMobile ? '0.25rem' : '0.375rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>Registrate</h3>
+              <p style={{
+                fontSize: isMobile ? '0.5625rem' : '0.875rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: '-webkit-box',
+                WebkitLineClamp: isMobile ? 2 : 3,
+                WebkitBoxOrient: 'vertical'
+              }}>Creá tu cuenta con tu email y validá tu identidad con DNI</p>
             </div>
-            <div className="step">
-              <div className="step-number">2</div>
-              <h3>Explorá y Ofertá</h3>
-              <p>Navegá por las subastas y productos, ofertá en las que te interesen</p>
+            <div className="step" style={{
+              aspectRatio: isMobile ? '1' : 'auto',
+              padding: isMobile ? '0.625rem 0.5rem' : '1rem 0.75rem',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <div className="step-number" style={{
+                width: isMobile ? '28px' : '40px',
+                height: isMobile ? '28px' : '40px',
+                fontSize: isMobile ? '0.75rem' : '1rem',
+                marginBottom: isMobile ? '0.375rem' : '0.75rem'
+              }}>2</div>
+              <h3 style={{
+                fontSize: isMobile ? '0.6875rem' : 'clamp(0.875rem, 2vw, 1rem)',
+                marginBottom: isMobile ? '0.25rem' : '0.375rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>Explorá y Ofertá</h3>
+              <p style={{
+                fontSize: isMobile ? '0.5625rem' : '0.875rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: '-webkit-box',
+                WebkitLineClamp: isMobile ? 2 : 3,
+                WebkitBoxOrient: 'vertical'
+              }}>Navegá por las subastas y productos, ofertá en las que te interesen</p>
             </div>
-            <div className="step">
-              <div className="step-number">3</div>
-              <h3>Ganás y Pagás</h3>
-              <p>Si ganás la subasta, tenés 48hs para pagar con MercadoPago</p>
+            <div className="step" style={{
+              aspectRatio: isMobile ? '1' : 'auto',
+              padding: isMobile ? '0.625rem 0.5rem' : '1rem 0.75rem',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <div className="step-number" style={{
+                width: isMobile ? '28px' : '40px',
+                height: isMobile ? '28px' : '40px',
+                fontSize: isMobile ? '0.75rem' : '1rem',
+                marginBottom: isMobile ? '0.375rem' : '0.75rem'
+              }}>3</div>
+              <h3 style={{
+                fontSize: isMobile ? '0.6875rem' : 'clamp(0.875rem, 2vw, 1rem)',
+                marginBottom: isMobile ? '0.25rem' : '0.375rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>Ganás y Pagás</h3>
+              <p style={{
+                fontSize: isMobile ? '0.5625rem' : '0.875rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: '-webkit-box',
+                WebkitLineClamp: isMobile ? 2 : 3,
+                WebkitBoxOrient: 'vertical'
+              }}>Si ganás la subasta, tenés 48hs para pagar con MercadoPago</p>
             </div>
-            <div className="step">
-              <div className="step-number">4</div>
-              <h3>Recibís tu Producto</h3>
-              <p>Coordinamos el envío o retiro de tu producto ganado</p>
+            <div className="step" style={{
+              aspectRatio: isMobile ? '1' : 'auto',
+              padding: isMobile ? '0.625rem 0.5rem' : '1rem 0.75rem',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <div className="step-number" style={{
+                width: isMobile ? '28px' : '40px',
+                height: isMobile ? '28px' : '40px',
+                fontSize: isMobile ? '0.75rem' : '1rem',
+                marginBottom: isMobile ? '0.375rem' : '0.75rem'
+              }}>4</div>
+              <h3 style={{
+                fontSize: isMobile ? '0.6875rem' : 'clamp(0.875rem, 2vw, 1rem)',
+                marginBottom: isMobile ? '0.25rem' : '0.375rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>Recibís tu Producto</h3>
+              <p style={{
+                fontSize: isMobile ? '0.5625rem' : '0.875rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: '-webkit-box',
+                WebkitLineClamp: isMobile ? 2 : 3,
+                WebkitBoxOrient: 'vertical'
+              }}>Coordinamos el envío o retiro de tu producto ganado</p>
+            </div>
+            <div className="step" style={{
+              aspectRatio: isMobile ? '1' : 'auto',
+              padding: isMobile ? '0.625rem 0.5rem' : '1rem 0.75rem',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <div className="step-number" style={{
+                width: isMobile ? '28px' : '40px',
+                height: isMobile ? '28px' : '40px',
+                fontSize: isMobile ? '0.75rem' : '1rem',
+                marginBottom: isMobile ? '0.375rem' : '0.75rem'
+              }}>5</div>
+              <h3 style={{
+                fontSize: isMobile ? '0.6875rem' : 'clamp(0.875rem, 2vw, 1rem)',
+                marginBottom: isMobile ? '0.25rem' : '0.375rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>Disfrutá</h3>
+              <p style={{
+                fontSize: isMobile ? '0.5625rem' : '0.875rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: '-webkit-box',
+                WebkitLineClamp: isMobile ? 2 : 3,
+                WebkitBoxOrient: 'vertical'
+              }}>Disfrutá de tu producto y seguí participando</p>
+            </div>
+            <div className="step" style={{
+              aspectRatio: isMobile ? '1' : 'auto',
+              padding: isMobile ? '0.625rem 0.5rem' : '1rem 0.75rem',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <div className="step-number" style={{
+                width: isMobile ? '28px' : '40px',
+                height: isMobile ? '28px' : '40px',
+                fontSize: isMobile ? '0.75rem' : '1rem',
+                marginBottom: isMobile ? '0.375rem' : '0.75rem'
+              }}>6</div>
+              <h3 style={{
+                fontSize: isMobile ? '0.6875rem' : 'clamp(0.875rem, 2vw, 1rem)',
+                marginBottom: isMobile ? '0.25rem' : '0.375rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>Calificá</h3>
+              <p style={{
+                fontSize: isMobile ? '0.5625rem' : '0.875rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: '-webkit-box',
+                WebkitLineClamp: isMobile ? 2 : 3,
+                WebkitBoxOrient: 'vertical'
+              }}>Compartí tu experiencia y ayudá a otros</p>
             </div>
           </div>
         </div>
@@ -377,8 +873,10 @@ const Home = () => {
 
         .hero-stats {
           display: flex;
-          gap: 1.5rem;
+          gap: 1rem;
           flex-wrap: wrap;
+          margin-top: 0.75rem;
+          padding: 0.5rem 0;
         }
 
         .stat-item {
@@ -386,19 +884,22 @@ const Home = () => {
           flex-direction: column;
           gap: 0.25rem;
           flex: 1;
-          min-width: 100px;
+          min-width: 80px;
         }
 
         .stat-number {
-          font-size: clamp(1.5rem, 4vw, 2rem);
+          font-size: clamp(1.125rem, 3vw, 1.5rem);
           font-weight: 700;
           color: var(--primary);
           font-family: 'Poppins', sans-serif;
+          line-height: 1.2;
         }
 
         .stat-label {
-          font-size: clamp(0.75rem, 2vw, 0.8125rem);
+          font-size: clamp(0.6875rem, 1.5vw, 0.75rem);
           color: var(--text-secondary);
+          text-align: center;
+          line-height: 1.3;
         }
 
         .hero-image {
@@ -840,6 +1341,8 @@ const Home = () => {
           margin-right: auto;
           position: relative;
           z-index: 1;
+          width: 100%;
+          box-sizing: border-box;
         }
 
         .step {
@@ -1032,17 +1535,19 @@ const Home = () => {
           }
 
           .hero-stats {
-            gap: 1rem;
+            gap: 0.75rem;
             flex-wrap: wrap;
             justify-content: center;
+            margin-top: 0.75rem;
+            padding: 0.5rem 0;
           }
 
           .stat-number {
-            font-size: 1.75rem;
+            font-size: 1.125rem;
           }
 
           .stat-label {
-            font-size: 0.75rem;
+            font-size: 0.6875rem;
           }
 
           .hero-buttons {
@@ -1071,12 +1576,13 @@ const Home = () => {
           }
 
           .features-compact-grid {
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1rem;
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 0.5rem !important;
           }
 
           .feature-compact-card {
-            padding: 1.25rem 0.75rem;
+            padding: 0.625rem 0.5rem !important;
+            aspect-ratio: 1 !important;
           }
 
           .products-grid {
@@ -1085,12 +1591,29 @@ const Home = () => {
           }
 
           .steps {
-            grid-template-columns: 1fr;
-            gap: 1.25rem;
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 0.5rem !important;
           }
 
           .step {
-            padding: 1.25rem;
+            padding: 0.625rem 0.5rem !important;
+            aspect-ratio: 1 !important;
+          }
+          
+          .step-number {
+            width: 28px !important;
+            height: 28px !important;
+            font-size: 0.75rem !important;
+            margin-bottom: 0.375rem !important;
+          }
+          
+          .step h3 {
+            font-size: 0.6875rem !important;
+            margin-bottom: 0.25rem !important;
+          }
+          
+          .step p {
+            font-size: 0.5625rem !important;
           }
         }
 
@@ -1104,20 +1627,46 @@ const Home = () => {
           }
 
           .hero-stats {
-            gap: 0.75rem;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            padding: 0.375rem 0;
           }
 
           .stat-number {
-            font-size: 1.5rem;
+            font-size: 1rem;
+          }
+
+          .stat-label {
+            font-size: 0.625rem;
           }
 
           .features-compact-grid {
-            grid-template-columns: 1fr;
-            gap: 1rem;
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 0.5rem !important;
           }
 
           .feature-compact-card {
-            padding: 1rem 0.75rem;
+            padding: 0.625rem 0.5rem !important;
+            aspect-ratio: 1 !important;
+          }
+          
+          .feature-compact-card h3 {
+            font-size: 0.6875rem !important;
+            margin-bottom: 0.25rem !important;
+          }
+          
+          .feature-compact-card p {
+            font-size: 0.5625rem !important;
+          }
+          
+          .feature-compact-icon {
+            padding: 0.5rem !important;
+            margin-bottom: 0.375rem !important;
+          }
+          
+          .feature-compact-icon svg {
+            width: 18px !important;
+            height: 18px !important;
           }
 
           .featured-content {
