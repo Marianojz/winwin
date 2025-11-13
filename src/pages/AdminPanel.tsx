@@ -103,6 +103,7 @@ const AdminPanel = (): React.ReactElement => {
   const { 
     user, auctions, products, bots, orders, theme,
     addBot, updateBot, deleteBot, setProducts, setAuctions, setBots, setOrders, updateOrderStatus, loadBots,
+    addAuction, updateAuction, deleteAuction,
     addNotification
   } = useStore();
   
@@ -727,10 +728,10 @@ const newAuction: Auction = {
   createdAt: new Date()  // ← AGREGAR createdAt
 };
 
-      // Guardar en Firebase
+      // Guardar en Firebase usando la función del store
       try {
         console.log('🔥 Guardando subasta en Firebase...');
-        await update(dbRef(realtimeDb, `auctions/${newAuction.id}`), newAuction);
+        await addAuction(newAuction);
         console.log('✅ Subasta guardada en Firebase correctamente');
       } catch (error) {
         console.error('❌ Error guardando en Firebase:', error);
@@ -740,10 +741,8 @@ const newAuction: Auction = {
         } else {
           alert('Error guardando en Firebase: Error desconocido');
         }
+        return; // Salir si falla el guardado
       }
-
-      // Actualizar estado local
-      setAuctions([...auctions, newAuction]);
       logAuctionAction('Subasta creada', newAuction.id, user?.id, user?.username, { title: auctionForm.title });
 
       // Mensaje de éxito
@@ -1274,7 +1273,7 @@ const [auctionForm, setAuctionForm] = useState({
     setActiveTab('edit-auction');
   };
 
-  const handleSaveAuction = () => {
+  const handleSaveAuction = async () => {
     if (!editingAuction) return;
 
     // Validar formulario (reutilizamos la misma validación de crear)
@@ -1318,17 +1317,45 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       return a;
     });
     
-    setAuctions(updatedAuctions);
-    alert('✅ Subasta actualizada correctamente');
+    // Guardar cambios en Firebase
+    try {
+      const auctionToUpdate = updatedAuctions.find(a => a.id === editingAuction.id);
+      if (auctionToUpdate) {
+        await updateAuction(editingAuction.id, {
+          title: auctionToUpdate.title,
+          description: auctionToUpdate.description,
+          startingPrice: auctionToUpdate.startingPrice,
+          currentPrice: auctionToUpdate.currentPrice,
+          buyNowPrice: auctionToUpdate.buyNowPrice,
+          categoryId: auctionToUpdate.categoryId,
+          images: auctionToUpdate.images,
+          stickers: auctionToUpdate.stickers,
+          condition: auctionToUpdate.condition,
+          featured: auctionToUpdate.featured,
+          endTime: auctionToUpdate.endTime,
+          isFlash: auctionToUpdate.isFlash
+        });
+      }
+      setAuctions(updatedAuctions);
+      alert('✅ Subasta actualizada correctamente');
+    } catch (error) {
+      console.error('❌ Error actualizando subasta:', error);
+      alert('❌ Error al actualizar la subasta. Por favor intenta nuevamente.');
+    }
+    
     setEditingAuction(null);
     setActiveTab('auctions');
   };
-  const handleDeleteAuction = (auctionId: string) => {
+  const handleDeleteAuction = async (auctionId: string) => {
     const auction = auctions.find((a: { id: string; }) => a.id === auctionId);
     if (window.confirm(`¿Estás seguro de eliminar "${auction?.title}"?\n\nSe perderán todas las ofertas asociadas.`)) {
-      const updatedAuctions = auctions.filter((a: { id: string; }) => a.id !== auctionId);
-      setAuctions(updatedAuctions);
-      alert('🗑️ Subasta eliminada correctamente');
+      try {
+        await deleteAuction(auctionId);
+        alert('🗑️ Subasta eliminada correctamente');
+      } catch (error) {
+        console.error('❌ Error eliminando subasta:', error);
+        alert('❌ Error al eliminar la subasta. Por favor intenta nuevamente.');
+      }
     }
   };
 
@@ -1346,7 +1373,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
   };
 
   // Función para republicar sin cambios
-  const handleRepublishWithoutChanges = () => {
+  const handleRepublishWithoutChanges = async () => {
     if (!republishModal.auction) return;
     
     const auction = republishModal.auction;
@@ -1374,10 +1401,16 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       condition: auction.condition || 'new'
     };
 
-    const updatedAuctions = [...auctions, republishedAuction];
-    setAuctions(updatedAuctions);
-    logAuctionAction('Subasta republicada', republishedAuction.id, user?.id, user?.username, { title: auction.title });
-    alert('✅ Subasta republicada correctamente');
+    // Guardar en Firebase usando la función del store
+    try {
+      await addAuction(republishedAuction);
+      logAuctionAction('Subasta republicada', republishedAuction.id, user?.id, user?.username, { title: auction.title });
+      alert('✅ Subasta republicada correctamente');
+    } catch (error) {
+      console.error('❌ Error republicando subasta:', error);
+      alert('❌ Error al republicar la subasta. Por favor intenta nuevamente.');
+    }
+    
     setRepublishModal({ show: false, auction: null });
   };
 
@@ -1387,7 +1420,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
   };
 
   // Funciones para Bots
-  const handleAddBot = () => {
+  const handleAddBot = async () => {
     if (!botForm.name || !botForm.name.trim()) {
       alert('⚠️ Por favor ingresa un nombre para el bot');
       return;
@@ -1421,7 +1454,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         targetAuctions: botForm.targetAuctions || []
       };
       
-      addBot(newBot);
+      await addBot(newBot);
       logAdminAction(`Bot creado: ${newBot.name}`, user?.id, user?.username);
       
       setBotForm({

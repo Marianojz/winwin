@@ -1,9 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, Bell, Home, Store, Gavel, MessageSquare, Shield } from 'lucide-react';
+import { ShoppingCart, Bell, Home, Store, Gavel, MessageSquare, Shield, User } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { realtimeDb } from '../config/firebase';
 import { ref, onValue } from 'firebase/database';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { HomeConfig, defaultHomeConfig } from '../types/homeConfig';
 import { specialEvents } from '../utils/dateSpecialEvents';
 import { getUnreadCount } from '../utils/messages';
@@ -27,17 +27,22 @@ const Navbar = () => {
   // Usar función helper unificada para obtener avatar desde Firebase
   const avatarUrl = getUserAvatarUrl(user);
   
-  // Debug: Log del avatar solo en modo desarrollo
+  // Debug: Log del avatar solo en modo desarrollo - optimizado para evitar logs repetitivos
+  const lastLoggedAvatar = useRef<string | null>(null);
   useEffect(() => {
     if (import.meta.env.DEV && user?.id) {
-      console.log('👤 Avatar del usuario:', {
-        userId: user.id,
-        username: user.username,
-        avatar: user.avatar || 'No hay avatar',
-        avatarUrl: avatarUrl,
-        tieneAvatar: !!user.avatar,
-        esUrlValida: user.avatar?.startsWith('http') || false
-      });
+      const avatarKey = `${user.id}-${user.avatar || 'no-avatar'}`;
+      if (lastLoggedAvatar.current !== avatarKey) {
+        lastLoggedAvatar.current = avatarKey;
+        console.log('👤 Avatar del usuario:', {
+          userId: user.id,
+          username: user.username,
+          avatar: user.avatar || 'No hay avatar',
+          avatarUrl: avatarUrl,
+          tieneAvatar: !!user.avatar,
+          esUrlValida: user.avatar?.startsWith('http') || false
+        });
+      }
     }
   }, [user?.id, user?.avatar, avatarUrl]);
 
@@ -67,43 +72,53 @@ const Navbar = () => {
     }
   }, [theme]); // Agregar theme como dependencia para recargar cuando cambie
   
-  // Debug: Log de stickers solo en modo desarrollo
+  // Debug: Log de stickers solo en modo desarrollo - optimizado para evitar logs repetitivos
+  const lastLoggedStickers = useRef<string>('');
+  const stickersKey = useMemo(() => {
+    const stickers = homeConfig.siteSettings?.logoStickers || [];
+    return JSON.stringify(stickers.map((s: any) => ({ id: s.id, active: s.active, startDate: s.startDate, endDate: s.endDate })));
+  }, [homeConfig.siteSettings?.logoStickers]);
+  
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     
+    // Solo loggear si los stickers realmente cambiaron
+    if (lastLoggedStickers.current === stickersKey) return;
+    lastLoggedStickers.current = stickersKey;
+    
     const allStickers = homeConfig.siteSettings?.logoStickers || [];
-    if (allStickers.length > 0) {
-      const activeStickers = allStickers.filter((s: any) => s.active);
-      const now = new Date();
+    if (allStickers.length === 0) return;
+    
+    const activeStickers = allStickers.filter((s: any) => s.active);
+    const now = new Date();
+    
+    // Log detallado solo una vez cuando cambian los stickers
+    allStickers.forEach((s: any, index: number) => {
+      const start = s.startDate ? new Date(s.startDate) : null;
+      const end = s.endDate ? new Date(s.endDate) : null;
+      const enRango = start && end ? (now >= start && now <= end) : true;
+      const motivoNoActivo = !s.active 
+        ? '❌ active: false' 
+        : (start && end && !enRango 
+          ? `❌ Fuera de rango (${start.toLocaleDateString()} - ${end.toLocaleDateString()})` 
+          : '✅ OK');
       
-      // Log detallado solo una vez cuando cambian los stickers
-      allStickers.forEach((s: any, index: number) => {
-        const start = s.startDate ? new Date(s.startDate) : null;
-        const end = s.endDate ? new Date(s.endDate) : null;
-        const enRango = start && end ? (now >= start && now <= end) : true;
-        const motivoNoActivo = !s.active 
-          ? '❌ active: false' 
-          : (start && end && !enRango 
-            ? `❌ Fuera de rango (${start.toLocaleDateString()} - ${end.toLocaleDateString()})` 
-            : '✅ OK');
-        
-        console.log(`🎨 Sticker ${index + 1}/${allStickers.length}:`, {
-          id: s.id,
-          tipo: s.type,
-          emoji: s.emoji,
-          activo: s.active ? '✅ SÍ' : '❌ NO',
-          posición: s.position,
-          tamaño: s.size,
-          fechaInicio: s.startDate || 'Sin fecha',
-          fechaFin: s.endDate || 'Sin fecha',
-          enRango: enRango ? '✅ SÍ' : '❌ NO',
-          motivoNoActivo: motivoNoActivo,
-          fechaActual: now.toISOString()
-        });
+      console.log(`🎨 Sticker ${index + 1}/${allStickers.length}:`, {
+        id: s.id,
+        tipo: s.type,
+        emoji: s.emoji,
+        activo: s.active ? '✅ SÍ' : '❌ NO',
+        posición: s.position,
+        tamaño: s.size,
+        fechaInicio: s.startDate || 'Sin fecha',
+        fechaFin: s.endDate || 'Sin fecha',
+        enRango: enRango ? '✅ SÍ' : '❌ NO',
+        motivoNoActivo: motivoNoActivo,
+        fechaActual: now.toISOString()
       });
-      console.log(`📊 Resumen: ${activeStickers.length} de ${allStickers.length} stickers activos`);
-    }
-  }, [homeConfig.siteSettings?.logoStickers]); // Solo cuando cambian los stickers
+    });
+    console.log(`📊 Resumen: ${activeStickers.length} de ${allStickers.length} stickers activos`);
+  }, [stickersKey]);
 
   // Los colores se aplican en App.tsx según el tema activo
   // No necesitamos aplicar colores aquí ya que App.tsx maneja todo
@@ -158,9 +173,9 @@ const Navbar = () => {
   const getLogoConfig = () => {
     const logoConfig = homeConfig.siteSettings?.logoConfig || {};
     const LOGO_SIZES = {
-      small: { width: '80px', height: 'auto' },
-      medium: { width: '100px', height: 'auto' },
-      large: { width: '120px', height: 'auto' }
+      small: { width: '100px', height: 'auto' },
+      medium: { width: '140px', height: 'auto' },
+      large: { width: '180px', height: 'auto' }
     };
     
     const size = logoConfig.size || 'medium';
@@ -191,9 +206,8 @@ const Navbar = () => {
           alignItems: 'center',
           gap: isMobile ? '0.125rem' : '1.5rem',
           flexWrap: isMobile ? 'nowrap' : 'wrap',
-          overflowX: isMobile ? 'visible' : 'visible',
+          overflowX: 'hidden',
           overflowY: 'hidden',
-          WebkitOverflowScrolling: 'touch',
           width: '100%',
           justifyContent: isMobile ? 'space-between' : 'flex-start',
           paddingRight: isMobile ? '0.5rem' : '0',
@@ -227,9 +241,9 @@ const Navbar = () => {
                     opacity: 0,
                     transition: 'opacity 0.5s ease-in-out',
                     ...(isMobile && {
-                      height: '24px',
-                      maxWidth: '24px',
-                      width: '24px'
+                      height: '32px',
+                      maxWidth: '32px',
+                      width: '32px'
                     })
                   }}
                   onError={(e) => {
@@ -287,7 +301,9 @@ const Navbar = () => {
           <div style={{ 
             transform: isMobile ? 'scale(0.7)' : 'scale(1)',
             transformOrigin: 'center',
-            flexShrink: 0
+            flexShrink: 0,
+            position: 'relative',
+            zIndex: 99999
           }}>
             <CategoriesDropdown />
           </div>
@@ -303,17 +319,20 @@ const Navbar = () => {
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
-            marginRight: isMobile ? '0.125rem' : '0'
+            marginRight: isMobile ? '0.125rem' : '0',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center'
           }}>
             <span className="navbar-logo-text" style={{
-              fontSize: isMobile ? '0.6875rem' : '1.5rem',
+              fontSize: isMobile ? '1.125rem' : '2.5rem',
               fontWeight: 700,
               background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
               display: 'block',
-              textAlign: 'left',
+              textAlign: 'center',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -323,25 +342,7 @@ const Navbar = () => {
             </span>
           </Link>
 
-          {/* 4. Modos de colores - Achicado en móvil */}
-          <div style={{ 
-            transform: isMobile ? 'scale(0.6)' : 'scale(1)',
-            transformOrigin: 'center',
-            flexShrink: 0
-          }}>
-            <ThemeToggle />
-          </div>
-
-          {/* 5. Sonido pequeño - Achicado en móvil */}
-          <div style={{ 
-            transform: isMobile ? 'scale(0.6)' : 'scale(1)',
-            transformOrigin: 'center',
-            flexShrink: 0
-          }}>
-            <SoundToggle />
-          </div>
-
-          {/* 6. Carrito - Achicado en móvil */}
+          {/* 4. Carrito - Reordenado */}
           {isAuthenticated && (
             <Link 
               to="/carrito" 
@@ -351,7 +352,8 @@ const Navbar = () => {
                 padding: isMobile ? '0.2rem' : '0.5rem',
                 minWidth: isMobile ? '22px' : '36px',
                 maxWidth: isMobile ? '22px' : '36px',
-                flexShrink: 0
+                flexShrink: 0,
+                marginLeft: isMobile ? '0' : 'auto'
               }}
             >
               <ShoppingCart size={isMobile ? 12 : 20} />
@@ -368,7 +370,7 @@ const Navbar = () => {
             </Link>
           )}
 
-          {/* 7. Notificaciones - Achicado en móvil */}
+          {/* 5. Notificaciones - Reordenado */}
           {isAuthenticated && (
             <Link 
               to="/notificaciones" 
@@ -395,37 +397,59 @@ const Navbar = () => {
             </Link>
           )}
 
-          {/* 8. Perfil - Siempre visible a la derecha */}
-          {isAuthenticated ? (
-            /* Avatar del usuario - Tamaño normal, siempre visible */
-            user ? (
-              <div style={{ 
-                flexShrink: 0,
-                marginLeft: isMobile ? '0.125rem' : 'auto',
-                minWidth: 'fit-content',
-                position: 'relative',
-                zIndex: 10
-              }}>
-                <AvatarMenu
-                  user={user}
-                  avatarUrl={avatarUrl}
-                  getUserInitial={() => getUserInitial(user)}
-                />
-              </div>
-            ) : null
-          ) : (
-            <Link 
-              to="/login" 
-              className="btn btn-primary" 
-              style={{ 
-                padding: isMobile ? '0.4rem 0.75rem' : '0.625rem 1.25rem',
-                fontSize: isMobile ? '0.75rem' : '0.9375rem',
-                flexShrink: 0,
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {isMobile ? 'Entrar' : 'Iniciar Sesión'}
-            </Link>
+          {/* 6. Modos de colores - Reordenado */}
+          <div style={{ 
+            transform: isMobile ? 'scale(0.6)' : 'scale(1)',
+            transformOrigin: 'center',
+            flexShrink: 0
+          }}>
+            <ThemeToggle />
+          </div>
+
+          {/* 7. Sonido - Reordenado */}
+          <div style={{ 
+            transform: isMobile ? 'scale(0.6)' : 'scale(1)',
+            transformOrigin: 'center',
+            flexShrink: 0
+          }}>
+            <SoundToggle />
+          </div>
+
+          {/* 8. Perfil - Solo visible en desktop, oculto en móvil */}
+          {!isMobile && (
+            <>
+              {isAuthenticated ? (
+                user ? (
+                  <div style={{ 
+                    flexShrink: 0,
+                    marginLeft: 'auto',
+                    minWidth: 'fit-content',
+                    position: 'relative',
+                    zIndex: 99999
+                  }}>
+                    <AvatarMenu
+                      user={user}
+                      avatarUrl={avatarUrl}
+                      getUserInitial={() => getUserInitial(user)}
+                    />
+                  </div>
+                ) : null
+              ) : (
+                <Link 
+                  to="/login" 
+                  className="btn btn-primary" 
+                  style={{ 
+                    padding: '0.625rem 1.25rem',
+                    fontSize: '0.9375rem',
+                    flexShrink: 0,
+                    whiteSpace: 'nowrap',
+                    marginLeft: 'auto'
+                  }}
+                >
+                  Iniciar Sesión
+                </Link>
+              )}
+            </>
           )}
         </div>
       </nav>
@@ -465,6 +489,26 @@ const Navbar = () => {
           >
             <Shield size={24} />
             <span>Admin</span>
+          </Link>
+        )}
+
+        {/* Perfil - Agregado a la navbar móvil */}
+        {isAuthenticated && user ? (
+          <div className="navbar-mobile-item navbar-mobile-item--profile">
+            <AvatarMenu
+              user={user}
+              avatarUrl={avatarUrl}
+              getUserInitial={() => getUserInitial(user)}
+            />
+            <span>Perfil</span>
+          </div>
+        ) : (
+          <Link 
+            to="/login" 
+            className={`navbar-mobile-item ${isActive('/login') ? 'navbar-mobile-item--active' : ''}`}
+          >
+            <User size={24} />
+            <span>Entrar</span>
           </Link>
         )}
       </nav>

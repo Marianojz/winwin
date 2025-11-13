@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { User, Settings, MessageSquare, LogOut, X, Loader, LayoutDashboard } from 'lucide-react';
 import { auth } from '../config/firebase';
@@ -28,8 +29,33 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
   const [menuState, setMenuState] = useState<MenuState>('closed');
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Calcular posición del menú cuando se abre o cambia el scroll/ventana
+  useEffect(() => {
+    const updatePosition = () => {
+      if (menuState === 'open' && buttonRef.current) {
+        const rect = buttonRef.current.getBoundingClientRect();
+        setMenuPosition({
+          top: rect.bottom + window.scrollY + 12,
+          right: window.innerWidth - rect.right - window.scrollX
+        });
+      }
+    };
+
+    if (menuState === 'open') {
+      updatePosition();
+      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
+      
+      return () => {
+        window.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+      };
+    }
+  }, [menuState]);
 
   // Cargar contador de mensajes no leídos
   useEffect(() => {
@@ -173,59 +199,25 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
     });
   }
 
-  return (
-    <div className="avatar-menu-container">
-      <button
-        ref={buttonRef}
-        className="avatar-menu-trigger"
-        onClick={toggleMenu}
-        aria-label="Menú de usuario"
-        aria-expanded={menuState === 'open'}
-      >
-        {avatarUrl && avatarUrl.startsWith('http') ? (
-          <>
-            <img
-              src={avatarUrl}
-              alt={user.username}
-              className="avatar-menu-avatar"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                const fallback = target.nextElementSibling as HTMLElement;
-                if (fallback) fallback.style.display = 'flex';
-              }}
-              onLoad={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'block';
-                const fallback = target.nextElementSibling as HTMLElement;
-                if (fallback) fallback.style.display = 'none';
-              }}
-            />
-            <div className="avatar-menu-fallback" style={{ display: 'none' }}>
-              {getUserInitial()}
-            </div>
-          </>
-        ) : (
-          <div className="avatar-menu-fallback" style={{ display: 'flex' }}>
-            {getUserInitial()}
-          </div>
-        )}
-      </button>
+  const overlayPortal = menuState === 'open' ? (
+    <div
+      className="avatar-menu-overlay"
+      onClick={closeMenu}
+    />
+  ) : null;
 
-      {/* Overlay */}
-      {menuState === 'open' && (
-        <div
-          className="avatar-menu-overlay"
-          onClick={closeMenu}
-        />
-      )}
-
-      {/* Menú */}
-      <div
-        ref={menuRef}
-        className={`avatar-menu ${menuState}`}
-        data-state={menuState}
-      >
+  const menuPortal = menuState !== 'closed' ? (
+    <div
+      ref={menuRef}
+      className={`avatar-menu ${menuState}`}
+      data-state={menuState}
+      style={{
+        position: 'fixed',
+        top: `${menuPosition.top}px`,
+        right: `${menuPosition.right}px`,
+        zIndex: 99999
+      }}
+    >
         {/* Header */}
         <div className="avatar-menu-header">
           <div className="avatar-menu-header-avatar">
@@ -329,6 +321,49 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
           })}
         </div>
       </div>
+    ) : null;
+
+  return (
+    <div className="avatar-menu-container">
+      <button
+        ref={buttonRef}
+        className="avatar-menu-trigger"
+        onClick={toggleMenu}
+        aria-label="Menú de usuario"
+        aria-expanded={menuState === 'open'}
+      >
+        {avatarUrl && avatarUrl.startsWith('http') ? (
+          <>
+            <img
+              src={avatarUrl}
+              alt={user.username}
+              className="avatar-menu-avatar"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const fallback = target.nextElementSibling as HTMLElement;
+                if (fallback) fallback.style.display = 'flex';
+              }}
+              onLoad={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'block';
+                const fallback = target.nextElementSibling as HTMLElement;
+                if (fallback) fallback.style.display = 'none';
+              }}
+            />
+            <div className="avatar-menu-fallback" style={{ display: 'none' }}>
+              {getUserInitial()}
+            </div>
+          </>
+        ) : (
+          <div className="avatar-menu-fallback" style={{ display: 'flex' }}>
+            {getUserInitial()}
+          </div>
+        )}
+      </button>
+
+      {overlayPortal && createPortal(overlayPortal, document.body)}
+      {menuPortal && createPortal(menuPortal, document.body)}
     </div>
   );
 };

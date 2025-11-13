@@ -7,9 +7,19 @@
   box-shadow: 0 1px 8px var(--shadow);
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 99999;
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
+  overflow-x: hidden;
+  overflow-y: hidden;
+  /* Ocultar scrollbar horizontal */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE y Edge */
+}
+
+/* Ocultar scrollbar horizontal en WebKit (Chrome, Safari) */
+.navbar::-webkit-scrollbar {
+  display: none;
 }
 
 .navbar-container {
@@ -21,6 +31,18 @@
   gap: 1.5rem;
   min-height: 60px;
   flex-wrap: wrap;
+  position: relative;
+  z-index: 99999;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  /* Ocultar scrollbar horizontal */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE y Edge */
+}
+
+/* Ocultar scrollbar horizontal en WebKit (Chrome, Safari) */
+.navbar-container::-webkit-scrollbar {
+  display: none;
 }
 
 /* ============================================
@@ -42,7 +64,7 @@
 }
 
 .navbar-logo-img {
-  height: 36px;
+  height: 50px;
   width: auto;
   object-fit: contain;
   transition: transform 0.3s ease;
@@ -374,6 +396,74 @@
   box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
 }
 
+/* Estilos para el perfil en navbar móvil */
+.navbar-mobile-item--profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.25rem;
+  cursor: pointer;
+  position: relative;
+}
+
+.navbar-mobile-item--profile .avatar-menu-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.navbar-mobile-item--profile .avatar-menu-trigger {
+  width: 32px;
+  height: 32px;
+}
+
+.navbar-mobile-item--profile .avatar-menu-avatar,
+.navbar-mobile-item--profile .avatar-menu-fallback {
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 0.875rem;
+}
+
+.navbar-mobile-item--profile span {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: all 0.3s ease;
+}
+
+.navbar-mobile-item--profile:hover span {
+  color: var(--primary);
+  transform: scale(1.05);
+}
+
+.navbar-mobile-item--profile.navbar-mobile-item--active span {
+  color: var(--primary);
+}
+
+/* Ajustar posición del menú cuando está en navbar móvil - se abre hacia arriba */
+@media (max-width: 768px) {
+  .navbar-mobile-item--profile .avatar-menu {
+    bottom: calc(100% + 0.75rem) !important;
+    top: auto !important;
+    right: 50% !important;
+    transform: translateX(50%) translateY(0) !important;
+  }
+
+  .navbar-mobile-item--profile .avatar-menu.open {
+    transform: translateX(50%) translateY(0) scale(1) !important;
+  }
+
+  .navbar-mobile-item--profile .avatar-menu.navigating {
+    transform: translateX(50%) translateY(5px) scale(0.98) !important;
+  }
+
+  .navbar-mobile-item--profile .avatar-menu.closed {
+    transform: translateX(50%) translateY(10px) scale(0.95) !important;
+  }
+}
+
 /* Icono con efecto de flotación */
 .navbar-mobile-item svg {
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -424,13 +514,14 @@
     padding: 0.5rem 0.75rem !important;
     gap: 0.5rem !important;
     min-height: 60px !important;
-    overflow: visible !important;
+    overflow-x: hidden !important;
+    overflow-y: hidden !important;
   }
 
   /* Logo más pequeño en móvil para que quepa todo */
   .navbar-logo-img {
-    height: 24px !important;
-    max-width: 24px !important;
+    height: 32px !important;
+    max-width: 32px !important;
   }
 
   /* Nombre del sitio visible en móvil (no se oculta) */

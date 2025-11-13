@@ -16,6 +16,9 @@ interface AppState {
   // Auctions
   auctions: Auction[];
   setAuctions: (auctions: Auction[]) => void;
+  addAuction: (auction: Auction) => Promise<void>;
+  updateAuction: (auctionId: string, updates: Partial<Auction>) => Promise<void>;
+  deleteAuction: (auctionId: string) => Promise<void>;
   addBid: (auctionId: string, amount: number, userId: string, username: string) => void;
 
   // Products
@@ -138,6 +141,113 @@ export const useStore = create<AppState>((set, get) => ({
   setAuctions: (auctions) => {
     // NO guardar en localStorage - TODO debe venir de Firebase
     set({ auctions });
+  },
+  addAuction: async (auction) => {
+    try {
+      // Preparar datos para Firebase (convertir fechas a ISO string)
+      const auctionData: any = {
+        ...auction,
+        startTime: auction.startTime instanceof Date ? auction.startTime.toISOString() : auction.startTime,
+        endTime: auction.endTime instanceof Date ? auction.endTime.toISOString() : auction.endTime,
+        createdAt: auction.createdAt instanceof Date ? auction.createdAt.toISOString() : auction.createdAt,
+        bids: {} // Convertir array de bids a objeto para Firebase
+      };
+      
+      // Convertir bids array a objeto si existe
+      if (auction.bids && Array.isArray(auction.bids)) {
+        auction.bids.forEach((bid: any) => {
+          auctionData.bids[bid.id] = {
+            ...bid,
+            createdAt: bid.createdAt instanceof Date ? bid.createdAt.toISOString() : bid.createdAt
+          };
+        });
+      }
+      
+      // Eliminar campos undefined
+      Object.keys(auctionData).forEach(key => {
+        if (auctionData[key] === undefined) {
+          delete auctionData[key];
+        }
+      });
+      
+      // Guardar en Firebase
+      const auctionRef = ref(realtimeDb, `auctions/${auction.id}`);
+      await firebaseSet(auctionRef, auctionData);
+      
+      // Actualización optimista local
+      const newAuctions = [...get().auctions, auction];
+      set({ auctions: newAuctions });
+      
+      console.log(`✅ Subasta guardada en Firebase: ${auction.id}`);
+    } catch (error) {
+      console.error('❌ Error guardando subasta en Firebase:', error);
+      throw error; // Lanzar error para que el llamador sepa que falló
+    }
+  },
+  updateAuction: async (auctionId, updates) => {
+    try {
+      const auctionRef = ref(realtimeDb, `auctions/${auctionId}`);
+      const updatesToSave: any = { ...updates };
+      
+      // Convertir fechas a ISO string si existen
+      if (updates.startTime) {
+        updatesToSave.startTime = updates.startTime instanceof Date ? updates.startTime.toISOString() : updates.startTime;
+      }
+      if (updates.endTime) {
+        updatesToSave.endTime = updates.endTime instanceof Date ? updates.endTime.toISOString() : updates.endTime;
+      }
+      if (updates.createdAt) {
+        updatesToSave.createdAt = updates.createdAt instanceof Date ? updates.createdAt.toISOString() : updates.createdAt;
+      }
+      
+      // Manejar bids si se actualizan
+      if (updates.bids && Array.isArray(updates.bids)) {
+        const bidsObj: any = {};
+        updates.bids.forEach((bid: any) => {
+          bidsObj[bid.id] = {
+            ...bid,
+            createdAt: bid.createdAt instanceof Date ? bid.createdAt.toISOString() : bid.createdAt
+          };
+        });
+        updatesToSave.bids = bidsObj;
+      }
+      
+      // Eliminar campos undefined
+      Object.keys(updatesToSave).forEach(key => {
+        if (updatesToSave[key] === undefined) {
+          delete updatesToSave[key];
+        }
+      });
+      
+      await update(auctionRef, updatesToSave);
+      
+      // Actualización optimista local
+      const newAuctions = get().auctions.map(a => 
+        a.id === auctionId ? { ...a, ...updates } : a
+      );
+      set({ auctions: newAuctions });
+      
+      console.log(`✅ Subasta actualizada en Firebase: ${auctionId}`);
+    } catch (error) {
+      console.error('❌ Error actualizando subasta en Firebase:', error);
+      throw error;
+    }
+  },
+  deleteAuction: async (auctionId) => {
+    try {
+      // Eliminar de Firebase
+      const auctionRef = ref(realtimeDb, `auctions/${auctionId}`);
+      await remove(auctionRef);
+      
+      // Actualización optimista local
+      const newAuctions = get().auctions.filter(a => a.id !== auctionId);
+      set({ auctions: newAuctions });
+      
+      console.log(`✅ Subasta eliminada de Firebase: ${auctionId}`);
+    } catch (error) {
+      console.error('❌ Error eliminando subasta de Firebase:', error);
+      throw error;
+    }
   },
   addBid: async (auctionId, amount, userId, username) => {
   try {
