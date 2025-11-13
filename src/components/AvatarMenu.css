@@ -120,6 +120,19 @@
   pointer-events: none;
 }
 
+/* Cuando está en navbar móvil, las transformaciones deben ser diferentes */
+.navbar-mobile-item--profile .avatar-menu.open {
+  transform: translateX(-50%) translateY(0) scale(1) !important;
+}
+
+.navbar-mobile-item--profile .avatar-menu.navigating {
+  transform: translateX(-50%) translateY(5px) scale(0.98) !important;
+}
+
+.navbar-mobile-item--profile .avatar-menu.closed {
+  transform: translateX(-50%) translateY(10px) scale(0.95) !important;
+}
+
 /* Header del Menú */
 .avatar-menu-header {
   display: flex;

@@ -442,27 +442,6 @@
   color: var(--primary);
 }
 
-/* Ajustar posición del menú cuando está en navbar móvil - se abre hacia arriba */
-@media (max-width: 768px) {
-  .navbar-mobile-item--profile .avatar-menu {
-    bottom: calc(100% + 0.75rem) !important;
-    top: auto !important;
-    right: 50% !important;
-    transform: translateX(50%) translateY(0) !important;
-  }
-
-  .navbar-mobile-item--profile .avatar-menu.open {
-    transform: translateX(50%) translateY(0) scale(1) !important;
-  }
-
-  .navbar-mobile-item--profile .avatar-menu.navigating {
-    transform: translateX(50%) translateY(5px) scale(0.98) !important;
-  }
-
-  .navbar-mobile-item--profile .avatar-menu.closed {
-    transform: translateX(50%) translateY(10px) scale(0.95) !important;
-  }
-}
 
 /* Icono con efecto de flotación */
 .navbar-mobile-item svg {

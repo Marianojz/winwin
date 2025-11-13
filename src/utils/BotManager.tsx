@@ -23,8 +23,21 @@ const BotManager = () => {
   const activeBotsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    console.log(`🤖 BotManager: Total de bots en store: ${bots.length}`);
+    console.log(`🤖 BotManager: Bots detallados:`, bots.map(b => ({
+      id: b.id,
+      name: b.name,
+      isActive: b.isActive,
+      balance: b.balance,
+      maxBidAmount: b.maxBidAmount,
+      intervalMin: b.intervalMin,
+      intervalMax: b.intervalMax
+    })));
+    
     // Solo ejecutar si hay bots activos
     const activeBots = bots.filter(bot => bot.isActive && bot.balance > 0);
+    
+    console.log(`🤖 BotManager: Bots activos con balance: ${activeBots.length}`);
     
     // Crear un set con los IDs de bots activos actuales
     const currentActiveBotIds = new Set(activeBots.map(bot => bot.id));
@@ -79,14 +92,23 @@ const BotManager = () => {
         // Obtener subastas actuales del store (se actualizan en tiempo real)
         const currentAuctions = useStore.getState().auctions;
         
+        console.log(`🤖 Bot "${bot.name}": Revisando ${currentAuctions.length} subastas disponibles`);
+        
         // Si el bot tiene subastas objetivo, solo actuar en esas
         // Si no tiene subastas objetivo, actuar en todas las subastas activas
+        // Nota: Las subastas pueden no tener status explícito, considerar activas si no tienen status o status es 'active'
         const targetAuctions = bot.targetAuctions && bot.targetAuctions.length > 0
-          ? currentAuctions.filter(a => bot.targetAuctions!.includes(a.id) && a.status === 'active')
-          : currentAuctions.filter(a => a.status === 'active');
+          ? currentAuctions.filter(a => {
+              const isTarget = bot.targetAuctions!.includes(a.id);
+              const isActive = !a.status || a.status === 'active';
+              return isTarget && isActive;
+            })
+          : currentAuctions.filter(a => !a.status || a.status === 'active');
+
+        console.log(`🤖 Bot "${bot.name}": ${targetAuctions.length} subastas objetivo encontradas`);
 
         if (targetAuctions.length === 0) {
-          // Reducir logs - solo loguear si es importante
+          console.log(`🤖 Bot "${bot.name}": No hay subastas objetivo disponibles`);
           return;
         }
 
@@ -105,8 +127,9 @@ const BotManager = () => {
         // Seleccionar una subasta aleatoria de las disponibles y asequibles
         const randomAuction = affordableAuctions[Math.floor(Math.random() * affordableAuctions.length)];
 
-        // Verificar que la subasta esté activa
-        if (randomAuction.status !== 'active') {
+        // Verificar que la subasta esté activa (puede no tener status o ser 'active')
+        if (randomAuction.status && randomAuction.status !== 'active') {
+          console.log(`🤖 Bot "${bot.name}": Subasta "${randomAuction.title}" no está activa (status: ${randomAuction.status})`);
           return;
         }
 
@@ -171,13 +194,15 @@ const BotManager = () => {
         }
 
         // Hacer la oferta usando addBid del store
-        console.log(`🤖 Bot "${bot.name}" ofertando $${bidAmount.toLocaleString()} en "${randomAuction.title}" (precio actual: $${currentPrice.toLocaleString()})`);
+        console.log(`🤖 Bot "${bot.name}" intentando ofertar $${bidAmount.toLocaleString()} en "${randomAuction.title}" (precio actual: $${currentPrice.toLocaleString()})`);
         
-        await addBid(randomAuction.id, bidAmount, bot.id, bot.name);
-
-        // Actualizar el balance del bot (simulado - en producción esto debería venir de un sistema de balance real)
-        // Por ahora solo logueamos
-        console.log(`✅ Bot "${bot.name}" realizó oferta de $${bidAmount.toLocaleString()}`);
+        try {
+          await addBid(randomAuction.id, bidAmount, bot.id, bot.name);
+          console.log(`✅ Bot "${bot.name}" realizó oferta exitosamente de $${bidAmount.toLocaleString()}`);
+        } catch (error) {
+          console.error(`❌ Bot "${bot.name}" error al hacer oferta:`, error);
+          throw error; // Re-lanzar para que se capture en el catch externo
+        }
 
       } catch (error) {
         console.error(`❌ Error ejecutando bot "${bot.name}":`, error);

@@ -29,7 +29,7 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
   const [menuState, setMenuState] = useState<MenuState>('closed');
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
-  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0, bottom: undefined as number | undefined });
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -38,10 +38,28 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
     const updatePosition = () => {
       if (menuState === 'open' && buttonRef.current) {
         const rect = buttonRef.current.getBoundingClientRect();
-        setMenuPosition({
-          top: rect.bottom + window.scrollY + 12,
-          right: window.innerWidth - rect.right - window.scrollX
-        });
+        // Detectar si está en navbar móvil (verificar si el padre tiene la clase navbar-mobile-item--profile)
+        const parentElement = buttonRef.current.closest('.navbar-mobile-item--profile');
+        const isInMobileNavbar = !!parentElement;
+        
+        if (isInMobileNavbar) {
+          // En navbar móvil: abrir hacia arriba
+          // Calcular la distancia desde el bottom de la ventana hasta el top del botón
+          const distanceFromBottom = window.innerHeight - rect.top;
+          const menuHeight = 300; // Altura aproximada del menú
+          setMenuPosition({
+            top: undefined,
+            bottom: distanceFromBottom + 12, // Espacio desde el bottom del botón
+            right: window.innerWidth - rect.right - window.scrollX
+          });
+        } else {
+          // En navbar superior: abrir hacia abajo (comportamiento normal)
+          setMenuPosition({
+            top: rect.bottom + window.scrollY + 12,
+            bottom: undefined,
+            right: window.innerWidth - rect.right - window.scrollX
+          });
+        }
       }
     };
 
@@ -213,8 +231,14 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
       data-state={menuState}
       style={{
         position: 'fixed',
-        top: `${menuPosition.top}px`,
-        right: `${menuPosition.right}px`,
+        ...(menuPosition.bottom !== undefined 
+          ? { bottom: `${menuPosition.bottom}px`, top: 'auto' }
+          : { top: `${menuPosition.top}px`, bottom: 'auto' }
+        ),
+        ...(menuPosition.bottom !== undefined
+          ? { left: '50%', right: 'auto', transform: 'translateX(-50%)' }
+          : { right: `${menuPosition.right}px`, left: 'auto' }
+        ),
         zIndex: 99999
       }}
     >

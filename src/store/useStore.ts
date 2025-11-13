@@ -19,7 +19,7 @@ interface AppState {
   addAuction: (auction: Auction) => Promise<void>;
   updateAuction: (auctionId: string, updates: Partial<Auction>) => Promise<void>;
   deleteAuction: (auctionId: string) => Promise<void>;
-  addBid: (auctionId: string, amount: number, userId: string, username: string) => void;
+  addBid: (auctionId: string, amount: number, userId: string, username: string) => Promise<void>;
 
   // Products
   products: Product[];
@@ -251,17 +251,27 @@ export const useStore = create<AppState>((set, get) => ({
   },
   addBid: async (auctionId, amount, userId, username) => {
   try {
-    console.log('🔥 Intentando guardar oferta en Firebase...');
+    const isBot = userId.startsWith('bot-');
+    console.log(`🔥 ${isBot ? '🤖 BOT' : '👤 USUARIO'} intentando guardar oferta en Firebase...`, {
+      auctionId,
+      amount,
+      userId,
+      username,
+      isBot
+    });
     
     // VERIFICAR SI ES UN BOT (los bots tienen IDs que empiezan con "bot-")
-    const isBot = userId.startsWith('bot-');
     
     // VERIFICAR QUE EL USUARIO NO SEA EL CREADOR DE LA SUBASTA
     const state = get();
     const auction = state.auctions.find(a => a.id === auctionId);
     
     if (auction && auction.createdBy === userId) {
-      console.error('❌ ERROR: No puedes hacer ofertas en tu propia subasta');
+      console.error(`❌ ${isBot ? 'BOT' : 'USUARIO'} no puede hacer ofertas en su propia subasta`, {
+        auctionId,
+        createdBy: auction.createdBy,
+        userId
+      });
       if (!isBot) {
         alert('No puedes hacer ofertas en tu propia subasta');
       }
@@ -270,19 +280,29 @@ export const useStore = create<AppState>((set, get) => ({
     
     // VALIDACIONES DE MÍNIMO Y MÚLTIPLO
     if (!auction) {
+      console.error(`❌ ${isBot ? 'BOT' : 'USUARIO'}: Subasta no encontrada`, { auctionId });
       if (!isBot) {
         alert('Subasta no encontrada');
       }
       return;
     }
-    const currentPrice = auction.currentPrice || 0;
+    const currentPrice = auction.currentPrice || auction.startingPrice || 0;
     if (amount <= currentPrice) {
+      console.error(`❌ ${isBot ? 'BOT' : 'USUARIO'}: Oferta debe ser mayor al precio actual`, {
+        amount,
+        currentPrice,
+        auctionId
+      });
       if (!isBot) {
         alert(`Tu oferta debe ser mayor a ${currentPrice.toLocaleString()}`);
       }
       return;
     }
     if (amount % 500 !== 0) {
+      console.error(`❌ ${isBot ? 'BOT' : 'USUARIO'}: Oferta debe ser múltiplo de $500`, {
+        amount,
+        auctionId
+      });
       if (!isBot) {
         alert('La oferta debe ser múltiplo de $500');
       }
