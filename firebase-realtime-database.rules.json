@@ -28,19 +28,19 @@
       ".read": "auth != null",
       ".write": "auth != null",
       "$conversationId": {
-        ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/))",
-        ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/))",
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/) || $conversationId == ('admin_' + auth.uid))",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/) || $conversationId == ('admin_' + auth.uid))",
         "status": {
-          ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/))",
-          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/))"
+          ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/) || $conversationId == ('admin_' + auth.uid))",
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/) || $conversationId == ('admin_' + auth.uid))"
         },
         "priority": {
-          ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/))",
+          ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/) || $conversationId == ('admin_' + auth.uid))",
           ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
         },
         "type": {
-          ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/))",
-          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/))"
+          ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/) || $conversationId == ('admin_' + auth.uid))",
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/) || $conversationId == ('admin_' + auth.uid))"
         }
       }
     },
@@ -51,13 +51,33 @@
     "notifications": {
       "$userId": {
         ".read": "auth != null && auth.uid == $userId",
-        ".write": "auth != null"
+        ".write": "auth != null && auth.uid == $userId",
+        "$notificationId": {
+          ".read": "auth != null && auth.uid == $userId",
+          ".write": "auth != null && auth.uid == $userId"
+        }
       }
     },
     "users": {
       "$userId": {
         ".read": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
-        ".write": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)"
+        ".write": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+        "avatar": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid == $userId"
+        },
+        "username": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid == $userId"
+        },
+        "email": {
+          ".read": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+          ".write": "auth != null && auth.uid == $userId"
+        },
+        "isAdmin": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+        }
       }
     },
     "bots": {
@@ -134,4 +154,3 @@
     }
   }
 }
-

@@ -339,6 +339,16 @@ const Perfil = () => {
         avatar: avatarUrl
       });
 
+      // Sincronizar con Realtime Database para que esté disponible para todos
+      const { syncUserToRealtimeDb } = await import('../config/firebase');
+      await syncUserToRealtimeDb(
+        user.id,
+        user.isAdmin || false,
+        user.email,
+        user.username,
+        avatarUrl
+      );
+
       // Actualizar en el store - Firebase es la fuente de verdad
       const { setUser } = useStore.getState();
       setUser({

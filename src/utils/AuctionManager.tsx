@@ -12,6 +12,7 @@ const AuctionManager = () => {
   const { auctions, setAuctions, addNotification, addOrder, user } = useStore();
   const previousBidsRef = useRef<Map<string, number>>(new Map());
   const celebratedWinsRef = useRef<Set<string>>(new Set()); // Rastrear victorias ya celebradas
+  const processedEndedAuctionsRef = useRef<Set<string>>(new Set()); // Rastrear subastas ya procesadas al finalizar
 
   useEffect(() => {
     // Cargar victorias ya celebradas desde localStorage
@@ -126,8 +127,8 @@ const AuctionManager = () => {
       console.log('🕐 Chequeando subastas - Hora actual:', now.toISOString());
 
       const updatedAuctions = auctions.map(auction => {
-        // Solo revisar subastas activas
-        if (auction.status === 'active') {
+        // Solo revisar subastas activas que aún no tienen ganador asignado
+        if (auction.status === 'active' && !auction.winnerId) {
           const endTime = new Date(auction.endTime);
           
           console.log(`📊 Subasta "${auction.title}":`, {
@@ -139,8 +140,29 @@ const AuctionManager = () => {
           
           // Si el tiempo de finalización ya pasó
 if (endTime <= now) {
-  console.log(`🔄 Subasta "${auction.title}" finalizó automáticamente`);
+  // Verificar si ya procesamos esta subasta para evitar notificaciones duplicadas
+  if (processedEndedAuctionsRef.current.has(auction.id)) {
+    console.log(`⏭️ Subasta "${auction.title}" (ID: ${auction.id}) ya fue procesada anteriormente, omitiendo...`);
+    return auction;
+  }
+  
+  // Verificar que la subasta realmente esté activa antes de procesarla
+  if (auction.status !== 'active') {
+    console.log(`⚠️ Subasta "${auction.title}" (ID: ${auction.id}) tiene status "${auction.status}", no se procesará`);
+    return auction;
+  }
+  
+  // Verificar que no tenga ganador ya asignado
+  if (auction.winnerId) {
+    console.log(`⚠️ Subasta "${auction.title}" (ID: ${auction.id}) ya tiene ganador asignado: ${auction.winnerId}`);
+    return auction;
+  }
+  
+  console.log(`🔄 Subasta "${auction.title}" (ID: ${auction.id}) finalizó automáticamente (endTime: ${endTime.toISOString()}, now: ${now.toISOString()})`);
   needsUpdate = true;
+  
+  // Marcar como procesada ANTES de crear notificaciones
+  processedEndedAuctionsRef.current.add(auction.id);
   
   // Verificar si hay ganador (OFERTA MÁS ALTA)
   if (auction.bids.length > 0) {
@@ -176,9 +198,10 @@ if (endTime <= now) {
     addOrder(order).catch(err => {
       console.error('❌ Error creando pedido automático:', err);
     });
-    console.log(`📝 Orden creada para ${winnerName}: ${finalPrice}`);
+    console.log(`📝 Orden creada para ${winnerName}: ${finalPrice} (Subasta ID: ${auction.id}, endTime: ${endTime.toISOString()})`);
 
     // Notificar al ganador
+    console.log(`🔔 Creando notificación de victoria para ${winnerName} en subasta "${auction.title}" (ID: ${auction.id}, status: ${auction.status}, endTime: ${endTime.toISOString()})`);
     addNotification({
       userId: winnerId,
       type: 'auction_won',
@@ -244,6 +267,7 @@ if (endTime <= now) {
   }
   
   // Si no hay ofertas, marcar como finalizada sin ganador
+  // (ya está marcada como procesada arriba)
   return {
     ...auction,
     status: 'ended' as const

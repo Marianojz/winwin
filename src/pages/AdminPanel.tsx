@@ -119,29 +119,11 @@ const AdminPanel = (): React.ReactElement => {
   useEffect(() => {
     if (user?.isAdmin) {
       loadBots();
-      console.log('✅ Cargando bots desde Firebase...');
+      // Log silencioso - funcionalidad oculta del admin
     }
   }, [user?.isAdmin, loadBots]);
 
-  // Debug: Log de bots activos solo cuando cambien los bots (no en cada render)
-  useEffect(() => {
-    if (bots.length === 0) return;
-    
-    const uniqueBots = Array.from(
-      new Map(bots.map(bot => [bot.id, bot])).values()
-    );
-    const activeBots = uniqueBots.filter((b: { isActive: any; }) => b.isActive);
-    
-    if (bots.length !== uniqueBots.length) {
-      console.warn(`⚠️ Bots duplicados detectados: ${bots.length} total, ${uniqueBots.length} únicos`);
-    }
-    
-    if (activeBots.length > 0) {
-      console.log(`🤖 Bots activos (${activeBots.length}):`, activeBots.map(b => ({ id: b.id, name: b.name, isActive: b.isActive })));
-    } else {
-      console.log(`🤖 No hay bots activos (${uniqueBots.length} bots total)`);
-    }
-  }, [bots]); // Solo se ejecuta cuando cambia el array de bots
+  // Los bots funcionan silenciosamente - funcionalidad oculta del admin
   
   // Limpiar duplicados de pedidos al montar el componente
   useEffect(() => {
@@ -1468,7 +1450,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       
       alert(`✅ Bot "${newBot.name}" creado correctamente`);
     } catch (error) {
-      console.error('Error creando bot:', error);
+      // Error silencioso - funcionalidad oculta del admin
       alert('❌ Error al crear el bot. Por favor intenta nuevamente.');
     }
   };
@@ -1502,7 +1484,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         // Eliminar bots
         const botsRef = dbRef(realtimeDb, 'bots');
         await remove(botsRef);
-        console.log('✅ Todos los bots eliminados de Firebase');
+        // Log silencioso - funcionalidad oculta del admin
         
         // Eliminar notificaciones de todos los usuarios
         const notificationsRef = dbRef(realtimeDb, 'notifications');

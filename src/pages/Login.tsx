@@ -166,12 +166,13 @@ const Login = () => {
         } : undefined
       };
 
-      // Sincronizar isAdmin a Realtime Database para que las reglas funcionen
+      // Sincronizar isAdmin y avatar a Realtime Database para que las reglas funcionen
       await syncUserToRealtimeDb(
         fullUser.id,
         fullUser.isAdmin,
         fullUser.email,
-        fullUser.username
+        fullUser.username,
+        fullUser.avatar
       );
       
       // Actualizar último login en Realtime Database

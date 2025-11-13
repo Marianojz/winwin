@@ -89,6 +89,17 @@ export const processGoogleAuthResult = async (user: any): Promise<{ fullUser: Us
     await setDoc(userDocRef, newUserData);
     userData = newUserData;
     needsCompleteProfile = true;
+    
+    // Sincronizar avatar con Realtime Database para usuarios nuevos
+    if (newUserData.avatar) {
+      syncUserToRealtimeDb(
+        user.uid,
+        false, // Nuevo usuario no es admin
+        user.email || '',
+        newUserData.username,
+        newUserData.avatar
+      ).catch(err => console.warn('Error sincronizando avatar a Realtime Database:', err));
+    }
   } else {
     // Usuario existente
     userData = userDoc.data();
@@ -102,6 +113,16 @@ export const processGoogleAuthResult = async (user: any): Promise<{ fullUser: Us
     if (Object.keys(updates).length > 0) {
       await setDoc(userDocRef, { ...userData, ...updates }, { merge: true });
       userData = { ...userData, ...updates };
+      // También sincronizar inmediatamente con Realtime Database
+      if (updates.avatar) {
+        syncUserToRealtimeDb(
+          user.uid,
+          userData.role === 'admin' || userData.isAdmin === true,
+          user.email || '',
+          userData.username || user.displayName || 'Usuario',
+          updates.avatar
+        ).catch(err => console.warn('Error sincronizando avatar a Realtime Database:', err));
+      }
     }
     
     // Verificar si necesita completar perfil
@@ -134,12 +155,13 @@ export const processGoogleAuthResult = async (user: any): Promise<{ fullUser: Us
     } : undefined
   };
 
-  // Sincronizar isAdmin a Realtime Database (no esperar, hacer en paralelo)
+  // Sincronizar isAdmin y avatar a Realtime Database (no esperar, hacer en paralelo)
   syncUserToRealtimeDb(
     fullUser.id,
     fullUser.isAdmin,
     fullUser.email,
-    fullUser.username
+    fullUser.username,
+    fullUser.avatar
   ).catch(err => console.warn('Error sincronizando usuario:', err));
 
   return { fullUser, needsCompleteProfile };

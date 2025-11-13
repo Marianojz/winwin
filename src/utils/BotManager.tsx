@@ -23,21 +23,8 @@ const BotManager = () => {
   const activeBotsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    console.log(`🤖 BotManager: Total de bots en store: ${bots.length}`);
-    console.log(`🤖 BotManager: Bots detallados:`, bots.map(b => ({
-      id: b.id,
-      name: b.name,
-      isActive: b.isActive,
-      balance: b.balance,
-      maxBidAmount: b.maxBidAmount,
-      intervalMin: b.intervalMin,
-      intervalMax: b.intervalMax
-    })));
-    
     // Solo ejecutar si hay bots activos
     const activeBots = bots.filter(bot => bot.isActive && bot.balance > 0);
-    
-    console.log(`🤖 BotManager: Bots activos con balance: ${activeBots.length}`);
     
     // Crear un set con los IDs de bots activos actuales
     const currentActiveBotIds = new Set(activeBots.map(bot => bot.id));
@@ -58,11 +45,8 @@ const BotManager = () => {
       activeBotsRef.current = currentActiveBotIds;
       
       if (activeBots.length === 0) {
-        console.log('🤖 No hay bots activos con balance suficiente');
         return;
       }
-
-      console.log(`🤖 Iniciando ${activeBots.length} bot(s) activo(s) (funcionando sin usuario logueado)`);
 
       // Programar cada bot individualmente
       activeBots.forEach(bot => {
@@ -92,8 +76,6 @@ const BotManager = () => {
         // Obtener subastas actuales del store (se actualizan en tiempo real)
         const currentAuctions = useStore.getState().auctions;
         
-        console.log(`🤖 Bot "${bot.name}": Revisando ${currentAuctions.length} subastas disponibles`);
-        
         // Si el bot tiene subastas objetivo, solo actuar en esas
         // Si no tiene subastas objetivo, actuar en todas las subastas activas
         // Nota: Las subastas pueden no tener status explícito, considerar activas si no tienen status o status es 'active'
@@ -105,10 +87,7 @@ const BotManager = () => {
             })
           : currentAuctions.filter(a => !a.status || a.status === 'active');
 
-        console.log(`🤖 Bot "${bot.name}": ${targetAuctions.length} subastas objetivo encontradas`);
-
         if (targetAuctions.length === 0) {
-          console.log(`🤖 Bot "${bot.name}": No hay subastas objetivo disponibles`);
           return;
         }
 
@@ -116,11 +95,12 @@ const BotManager = () => {
         const affordableAuctions = targetAuctions.filter(auction => {
           const currentPrice = auction.currentPrice || auction.startingPrice || 0;
           const minRequired = currentPrice + 500;
-          return currentPrice < bot.maxBidAmount && bot.balance >= minRequired;
+          const canAfford = currentPrice < bot.maxBidAmount && bot.balance >= minRequired;
+          return canAfford;
         });
-
+        
+        // Si no hay subastas asequibles, salir
         if (affordableAuctions.length === 0) {
-          // No loguear si no puede ofertar - es normal
           return;
         }
 
@@ -129,13 +109,11 @@ const BotManager = () => {
 
         // Verificar que la subasta esté activa (puede no tener status o ser 'active')
         if (randomAuction.status && randomAuction.status !== 'active') {
-          console.log(`🤖 Bot "${bot.name}": Subasta "${randomAuction.title}" no está activa (status: ${randomAuction.status})`);
           return;
         }
 
         // Verificar que el bot no sea el creador de la subasta
         if (randomAuction.createdBy === bot.id) {
-          console.log(`🤖 Bot "${bot.name}": No puede hacer ofertas en su propia subasta`);
           return;
         }
 
@@ -157,7 +135,6 @@ const BotManager = () => {
           : null;
 
         if (lastBid && lastBid.userId === bot.id) {
-          console.log(`🤖 Bot "${bot.name}": Ya es el mejor postor en "${randomAuction.title}"`);
           return;
         }
 
@@ -167,45 +144,55 @@ const BotManager = () => {
         
         // Si el mínimo ya es mayor al máximo, no puede ofertar
         if (minBid > maxBid) {
-          console.log(`🤖 Bot "${bot.name}": No puede ofertar (mínimo ${minBid} > máximo ${maxBid})`);
           return;
         }
         
-        // Ofrecer entre minBid y maxBid, pero siempre múltiplo de 500
-        const minMultiples = Math.ceil(minBid / 500);
-        const maxMultiples = Math.floor(maxBid / 500);
+        // Calcular un incremento conservador: entre $500 y máximo $10,000 adicionales
+        // Esto evita que el bot haga ofertas demasiado altas de una vez
+        const maxIncrement = Math.min(10000, maxBid - minBid); // Máximo $10,000 adicionales o lo que quede disponible
         
-        if (minMultiples > maxMultiples) {
-          console.log(`🤖 Bot "${bot.name}": No puede ofertar (múltiplos no válidos)`);
+        // Si no hay espacio para incrementar, usar solo el mínimo
+        if (maxIncrement < 500) {
+          const bidAmountRounded = Math.floor(minBid / 500) * 500;
+          if (bidAmountRounded <= currentPrice) {
+            return;
+          }
+          try {
+            await addBid(randomAuction.id, bidAmountRounded, bot.id, bot.name);
+          } catch (error) {
+            // Error silencioso - funcionalidad oculta del admin
+            throw error;
+          }
           return;
         }
         
-        // Generar un múltiplo aleatorio entre minMultiples y maxMultiples
-        const randomMultiple = Math.floor(
-          Math.random() * (maxMultiples - minMultiples + 1) + minMultiples
-        );
+        const incrementMultiples = Math.floor(maxIncrement / 500); // Número de múltiplos de 500 disponibles
+        const randomMultiple = Math.floor(Math.random() * incrementMultiples) + 1; // Entre 1 y incrementMultiples
+        const increment = randomMultiple * 500; // Incremento en múltiplos de 500
         
-        const bidAmount = randomMultiple * 500;
+        const bidAmount = minBid + increment;
+        
+        // Asegurar que no exceda el máximo permitido
+        const finalBidAmount = Math.min(bidAmount, maxBid);
+        
+        // Redondear al múltiplo de 500 más cercano hacia abajo
+        const bidAmountRounded = Math.floor(finalBidAmount / 500) * 500;
 
         // Verificar que la oferta sea válida
-        if (bidAmount <= currentPrice) {
-          console.log(`🤖 Bot "${bot.name}": Oferta calculada (${bidAmount}) no es mayor al precio actual (${currentPrice})`);
+        if (bidAmountRounded <= currentPrice) {
           return;
         }
 
         // Hacer la oferta usando addBid del store
-        console.log(`🤖 Bot "${bot.name}" intentando ofertar $${bidAmount.toLocaleString()} en "${randomAuction.title}" (precio actual: $${currentPrice.toLocaleString()})`);
-        
         try {
-          await addBid(randomAuction.id, bidAmount, bot.id, bot.name);
-          console.log(`✅ Bot "${bot.name}" realizó oferta exitosamente de $${bidAmount.toLocaleString()}`);
+          await addBid(randomAuction.id, bidAmountRounded, bot.id, bot.name);
         } catch (error) {
-          console.error(`❌ Bot "${bot.name}" error al hacer oferta:`, error);
-          throw error; // Re-lanzar para que se capture en el catch externo
+          // Error silencioso - funcionalidad oculta del admin
+          throw error;
         }
 
       } catch (error) {
-        console.error(`❌ Error ejecutando bot "${bot.name}":`, error);
+        // Error silencioso - funcionalidad oculta del admin
       }
     }
 

@@ -33,7 +33,7 @@ export default app;
 
 // Helper para sincronizar datos del usuario de Firestore a Realtime Database
 // Esto es necesario porque las reglas de Realtime Database verifican isAdmin en Realtime DB
-export async function syncUserToRealtimeDb(userId: string, isAdmin: boolean, email?: string, username?: string) {
+export async function syncUserToRealtimeDb(userId: string, isAdmin: boolean, email?: string, username?: string, avatar?: string) {
   try {
     const userRef = ref(realtimeDb, `users/${userId}`);
     
@@ -43,7 +43,7 @@ export async function syncUserToRealtimeDb(userId: string, isAdmin: boolean, ema
     
     if (snapshot.exists()) {
       const existingData = snapshot.val();
-      // Actualizar isAdmin si cambió y último login, preservar otros datos
+      // Actualizar isAdmin si cambió, avatar si cambió, y último login, preservar otros datos
       const updates: any = {
         lastSynced: new Date().toISOString(),
         lastLogin: new Date().toISOString()
@@ -51,19 +51,31 @@ export async function syncUserToRealtimeDb(userId: string, isAdmin: boolean, ema
       if (existingData.isAdmin !== isAdmin) {
         updates.isAdmin = isAdmin;
         console.log('✅ Usuario actualizado en Realtime Database:', userId, 'isAdmin:', isAdmin, '(cambió de', existingData.isAdmin, 'a', isAdmin + ')');
-      } else {
-        console.log('✅ Usuario ya está sincronizado en Realtime Database:', userId, 'isAdmin:', isAdmin);
+      }
+      if (avatar && existingData.avatar !== avatar) {
+        updates.avatar = avatar;
+        console.log('✅ Avatar actualizado en Realtime Database para usuario:', userId);
+      }
+      if (email && existingData.email !== email) {
+        updates.email = email;
+      }
+      if (username && existingData.username !== username) {
+        updates.username = username;
       }
       await set(userRef, {
         ...existingData,
         ...updates
       });
+      if (!updates.isAdmin && !updates.avatar && !updates.email && !updates.username) {
+        console.log('✅ Usuario ya está sincronizado en Realtime Database:', userId, 'isAdmin:', isAdmin);
+      }
     } else {
       // Crear nuevo registro
       await set(userRef, {
         isAdmin: isAdmin,
         email: email || '',
         username: username || 'Usuario',
+        avatar: avatar || '',
         lastSynced: new Date().toISOString(),
         lastLogin: new Date().toISOString()
       });
@@ -104,11 +116,19 @@ export function attachAuthListener(onUser: (user: any | null) => void) {
           const savedAvatar = userData.avatar || '';
           const finalAvatar = googleAvatar || savedAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username || firebaseUser.displayName || 'U')}&size=200&background=FF6B00&color=fff&bold=true`;
           
-          // Si hay avatar de Google y es diferente al guardado, actualizarlo en Firestore
+          // Si hay avatar de Google y es diferente al guardado, actualizarlo en Firestore y Realtime Database
           if (googleAvatar && googleAvatar !== savedAvatar) {
             updateDoc(userDocRef, { avatar: googleAvatar }).catch(err => 
               console.warn('Error actualizando avatar en Firestore:', err)
             );
+            // También sincronizar inmediatamente con Realtime Database
+            syncUserToRealtimeDb(
+              firebaseUser.uid,
+              userData.role === 'admin' || userData.isAdmin === true,
+              firebaseUser.email || '',
+              userData.username || firebaseUser.displayName || 'Usuario',
+              googleAvatar
+            ).catch(err => console.warn('Error sincronizando avatar a Realtime Database:', err));
           }
           
           const isAdmin = userData.role === 'admin' || userData.isAdmin === true;
@@ -142,12 +162,14 @@ export function attachAuthListener(onUser: (user: any | null) => void) {
           
           console.log('✅ [AUTH LISTENER] Usuario cargado desde Firestore:', { id: fullUser.id, email: fullUser.email, isAdmin: fullUser.isAdmin });
           
-          // Sincronizar isAdmin a Realtime Database para que las reglas funcionen
+          // Sincronizar isAdmin y avatar a Realtime Database para que esté disponible para todos
+          // Esto asegura que el avatar se guarde en Realtime Database para todos los usuarios
           syncUserToRealtimeDb(
             firebaseUser.uid,
             fullUser.isAdmin,
             fullUser.email,
-            fullUser.username
+            fullUser.username,
+            fullUser.avatar
           ).catch(err => console.warn('Error sincronizando usuario:', err));
           
           onUser(fullUser);

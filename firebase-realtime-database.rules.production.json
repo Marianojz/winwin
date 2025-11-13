@@ -22,11 +22,31 @@
       ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
       ".validate": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
       "$conversationId": {
-        ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/))",
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/) || $conversationId == ('admin_' + auth.uid))",
         ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
         "$messageId": {
           ".read": "auth != null && (data.child('fromUserId').val() == auth.uid || data.child('toUserId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
           ".write": "auth != null && (newData.child('fromUserId').val() == auth.uid || newData.child('toUserId').val() == auth.uid || (newData.child('fromUserId').val() == 'admin' && root.child('users').child(auth.uid).child('isAdmin').val() == true) || root.child('users').child(auth.uid).child('isAdmin').val() == true)"
+        }
+      }
+    },
+    "conversations": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$conversationId": {
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/) || $conversationId == ('admin_' + auth.uid))",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/) || $conversationId == ('admin_' + auth.uid))",
+        "status": {
+          ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/) || $conversationId == ('admin_' + auth.uid))",
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/) || $conversationId == ('admin_' + auth.uid))"
+        },
+        "priority": {
+          ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/) || $conversationId == ('admin_' + auth.uid))",
+          ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+        },
+        "type": {
+          ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/) || $conversationId == ('admin_' + auth.uid))",
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/) || $conversationId == ('admin_' + auth.uid))"
         }
       }
     },
@@ -40,13 +60,33 @@
       ".validate": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
       "$userId": {
         ".read": "auth != null && auth.uid == $userId",
-        ".write": "auth != null"
+        ".write": "auth != null && auth.uid == $userId",
+        "$notificationId": {
+          ".read": "auth != null && auth.uid == $userId",
+          ".write": "auth != null && auth.uid == $userId"
+        }
       }
     },
     "users": {
       "$userId": {
         ".read": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
-        ".write": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)"
+        ".write": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+        "avatar": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid == $userId"
+        },
+        "username": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid == $userId"
+        },
+        "email": {
+          ".read": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+          ".write": "auth != null && auth.uid == $userId"
+        },
+        "isAdmin": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+        }
       }
     },
     "bots": {
@@ -104,6 +144,39 @@
       "$messageId": {
         ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
         ".write": true
+      }
+    },
+    "announcements": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      "$announcementId": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+        ".validate": "newData.hasChildren(['title', 'content', 'type', 'status', 'priority', 'createdAt', 'createdBy']) && newData.child('title').isString() && newData.child('content').isString() && newData.child('type').val().matches(/^(text|image|urgent|promotional)$/) && newData.child('status').val().matches(/^(active|expired|draft)$/) && newData.child('priority').val().matches(/^(low|medium|high)$/)"
+      }
+    },
+    "user_announcements": {
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null && auth.uid == $userId",
+        "$announcementId": {
+          ".read": "auth != null && auth.uid == $userId",
+          ".write": "auth != null && auth.uid == $userId",
+          ".validate": "newData.hasChildren(['read', 'dismissed']) && newData.child('read').isBoolean() && newData.child('dismissed').isBoolean()"
+        }
+      }
+    },
+    "announcement_engagement": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      ".write": "auth != null",
+      "$announcementId": {
+        ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+        ".write": "auth != null",
+        "$engagementId": {
+          ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+          ".write": "auth != null && (newData.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.hasChildren(['announcementId', 'userId', 'action', 'timestamp']) && newData.child('action').val().matches(/^(view|click|dismiss|link_click|image_click)$/)"
+        }
       }
     }
   }

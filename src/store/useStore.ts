@@ -252,13 +252,16 @@ export const useStore = create<AppState>((set, get) => ({
   addBid: async (auctionId, amount, userId, username) => {
   try {
     const isBot = userId.startsWith('bot-');
-    console.log(`🔥 ${isBot ? '🤖 BOT' : '👤 USUARIO'} intentando guardar oferta en Firebase...`, {
-      auctionId,
-      amount,
-      userId,
-      username,
-      isBot
-    });
+    
+    // Solo mostrar logs para usuarios, no para bots (funcionalidad oculta del admin)
+    if (!isBot) {
+      console.log(`🔥 👤 USUARIO intentando guardar oferta en Firebase...`, {
+        auctionId,
+        amount,
+        userId,
+        username
+      });
+    }
     
     // VERIFICAR SI ES UN BOT (los bots tienen IDs que empiezan con "bot-")
     
@@ -267,12 +270,12 @@ export const useStore = create<AppState>((set, get) => ({
     const auction = state.auctions.find(a => a.id === auctionId);
     
     if (auction && auction.createdBy === userId) {
-      console.error(`❌ ${isBot ? 'BOT' : 'USUARIO'} no puede hacer ofertas en su propia subasta`, {
-        auctionId,
-        createdBy: auction.createdBy,
-        userId
-      });
       if (!isBot) {
+        console.error(`❌ USUARIO no puede hacer ofertas en su propia subasta`, {
+          auctionId,
+          createdBy: auction.createdBy,
+          userId
+        });
         alert('No puedes hacer ofertas en tu propia subasta');
       }
       return; // Detener la función aquí
@@ -280,30 +283,30 @@ export const useStore = create<AppState>((set, get) => ({
     
     // VALIDACIONES DE MÍNIMO Y MÚLTIPLO
     if (!auction) {
-      console.error(`❌ ${isBot ? 'BOT' : 'USUARIO'}: Subasta no encontrada`, { auctionId });
       if (!isBot) {
+        console.error(`❌ USUARIO: Subasta no encontrada`, { auctionId });
         alert('Subasta no encontrada');
       }
       return;
     }
     const currentPrice = auction.currentPrice || auction.startingPrice || 0;
     if (amount <= currentPrice) {
-      console.error(`❌ ${isBot ? 'BOT' : 'USUARIO'}: Oferta debe ser mayor al precio actual`, {
-        amount,
-        currentPrice,
-        auctionId
-      });
       if (!isBot) {
+        console.error(`❌ USUARIO: Oferta debe ser mayor al precio actual`, {
+          amount,
+          currentPrice,
+          auctionId
+        });
         alert(`Tu oferta debe ser mayor a ${currentPrice.toLocaleString()}`);
       }
       return;
     }
     if (amount % 500 !== 0) {
-      console.error(`❌ ${isBot ? 'BOT' : 'USUARIO'}: Oferta debe ser múltiplo de $500`, {
-        amount,
-        auctionId
-      });
       if (!isBot) {
+        console.error(`❌ USUARIO: Oferta debe ser múltiplo de $500`, {
+          amount,
+          auctionId
+        });
         alert('La oferta debe ser múltiplo de $500');
       }
       return;
@@ -319,8 +322,10 @@ export const useStore = create<AppState>((set, get) => ({
       isBot: isBot // Marcar si es una oferta de bot
     };
 
-    // AGREGÁ ESTE LOG PARA VER LA URL
-    console.log('🔗 URL de Firebase:', `auctions/${auctionId}`);
+    // Solo mostrar logs para usuarios
+    if (!isBot) {
+      console.log('🔗 URL de Firebase:', `auctions/${auctionId}`);
+    }
     
     await update(ref(realtimeDb, `auctions/${auctionId}`), {
       currentPrice: amount,
@@ -328,7 +333,9 @@ export const useStore = create<AppState>((set, get) => ({
       [`bids/${bid.id}`]: bid
     });
 
-    console.log('✅ OFERTA GUARDADA EN FIREBASE EXITOSAMENTE');
+    if (!isBot) {
+      console.log('✅ OFERTA GUARDADA EN FIREBASE EXITOSAMENTE');
+    }
     // Actualización optimista local para que el usuario vea el cambio al instante
     const updatedAuctions = state.auctions.map(a =>
       a.id === auctionId
@@ -500,11 +507,26 @@ export const useStore = create<AppState>((set, get) => ({
         
         if (!data) {
           set({ notifications: [], unreadCount: 0 });
+          const state = get();
+          (state as any)._notificationProcessing = false;
           return;
         }
         
-        // Convertir objeto Firebase a array
-        const notificationsArray = Object.values(data).map((n: any) => normalizeFn(n));
+        // Convertir objeto Firebase a array y normalizar read correctamente
+        const notificationsArray = Object.values(data).map((n: any) => {
+          // Verificar read desde el valor original antes de normalizar
+          const isRead = n.read === true || 
+                        n.read === 'true' || 
+                        String(n.read) === 'true' ||
+                        n.read === 1 ||
+                        n.read === '1' ||
+                        n.readAt !== undefined;
+          const normalized = normalizeFn(n);
+          return {
+            ...normalized,
+            read: Boolean(isRead) // Forzar boolean estricto basado en el valor original
+          };
+        });
         
         // Filtrar notificaciones leídas antiguas (más de 1 día desde que fueron leídas)
         // Y notificaciones no leídas muy antiguas (más de 3 días desde creación)
@@ -572,12 +594,20 @@ export const useStore = create<AppState>((set, get) => ({
         const limited = sorted.slice(0, 200);
         
         // Convertir a objetos Date para el estado y normalizar read
+        // Asegurar que read se respete correctamente desde Firebase
         const notifications = limited.map((n: any) => {
+          // Verificar read desde el valor original antes de normalizar
+          const isRead = n.read === true || 
+                        n.read === 'true' || 
+                        String(n.read) === 'true' ||
+                        n.read === 1 ||
+                        n.read === '1' ||
+                        n.readAt !== undefined;
           const normalized = normalizeFn(n);
           return {
             ...normalized,
             createdAt: new Date(normalized.createdAt),
-            read: Boolean(normalized.read), // Usar el valor normalizado
+            read: Boolean(isRead), // Forzar boolean estricto basado en el valor original
             readAt: normalized.readAt ? new Date(normalized.readAt) : undefined
           };
         });
@@ -740,6 +770,10 @@ export const useStore = create<AppState>((set, get) => ({
     
     const readAt = new Date().toISOString();
     
+    // Marcar que estamos procesando esta notificación para evitar que el listener la sobrescriba
+    const markingKey = `_marking_${notificationId}`;
+    (state as any)[markingKey] = true;
+    
     try {
       // Obtener la notificación completa de Firebase para actualizarla completamente
       const notificationRef = ref(realtimeDb, `notifications/${user.id}/${notificationId}`);
@@ -747,10 +781,23 @@ export const useStore = create<AppState>((set, get) => ({
       
       if (!snapshot.exists()) {
         console.warn(`⚠️ Notificación ${notificationId} no existe en Firebase`);
+        delete (state as any)[markingKey];
         return;
       }
       
       const currentNotification = snapshot.val();
+      
+      // Verificar que no esté ya marcada como leída en Firebase
+      const isReadInFirebase = currentNotification.read === true || 
+                              currentNotification.read === 'true' || 
+                              String(currentNotification.read) === 'true' ||
+                              currentNotification.readAt !== undefined;
+      
+      if (isReadInFirebase) {
+        console.log(`ℹ️ Notificación ${notificationId} ya está marcada como leída en Firebase`);
+        delete (state as any)[markingKey];
+        return;
+      }
       
       // Actualizar en Firebase con set() para garantizar guardado completo
       await firebaseSet(notificationRef, {
@@ -761,7 +808,8 @@ export const useStore = create<AppState>((set, get) => ({
       
       // IMPORTANTE: Esperar un momento para que Firebase procese antes de actualizar estado local
       // Esto evita que el listener de tiempo real sobrescriba con datos antiguos
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Aumentado a 500ms para dar más tiempo a Firebase de procesar el cambio
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Actualización del estado local DESPUÉS de confirmar guardado en Firebase
       const updatedNotifications = state.notifications.map(n => 
@@ -778,8 +826,15 @@ export const useStore = create<AppState>((set, get) => ({
       });
       
       console.log(`✅ Notificación ${notificationId} marcada como leída en Firebase. No leídas restantes: ${newUnreadCount}`);
+      
+      // Limpiar flag después de un delay adicional para asegurar que el listener respete el cambio
+      setTimeout(() => {
+        const state = get();
+        delete (state as any)[markingKey];
+      }, 1000);
     } catch (error) {
       console.error('❌ Error marcando notificación como leída en Firebase:', error);
+      delete (state as any)[markingKey];
       // NO actualizar estado local si falla Firebase - el listener de tiempo real cargará el estado correcto
     }
   },
@@ -825,7 +880,27 @@ export const useStore = create<AppState>((set, get) => ({
       await Promise.all(updatePromises);
       
       // IMPORTANTE: Esperar un momento para que Firebase procese antes de actualizar estado local
-      await new Promise(resolve => setTimeout(resolve, 150));
+      // Aumentado a 500ms para dar más tiempo a Firebase de procesar los cambios
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Verificar que todas las notificaciones se guardaron correctamente en Firebase
+      // Re-cargar desde Firebase para asegurar que tenemos el estado más reciente
+      const verifyPromises = unreadNotifications.map(async (n) => {
+        try {
+          const notificationRef = ref(realtimeDb, `notifications/${user.id}/${n.id}`);
+          const snapshot = await firebaseGet(notificationRef);
+          if (snapshot.exists()) {
+            const notificationData = snapshot.val();
+            return notificationData.read === true || notificationData.read === 'true' || notificationData.readAt !== undefined;
+          }
+          return false;
+        } catch (error) {
+          return false;
+        }
+      });
+      
+      const verificationResults = await Promise.all(verifyPromises);
+      const successfullyMarked = verificationResults.filter(r => r).length;
       
       // Actualización del estado local DESPUÉS de confirmar guardado en Firebase
       const updatedNotifications = state.notifications.map(n => ({
@@ -839,7 +914,7 @@ export const useStore = create<AppState>((set, get) => ({
         unreadCount: 0
       });
       
-      console.log(`✅ ${unreadNotifications.length} notificaciones marcadas como leídas en Firebase. Total: ${updatedNotifications.length}`);
+      console.log(`✅ ${successfullyMarked} de ${unreadNotifications.length} notificaciones marcadas como leídas en Firebase. Total: ${updatedNotifications.length}`);
     } catch (error) {
       console.error('❌ Error marcando todas las notificaciones como leídas en Firebase:', error);
       // NO actualizar estado local si falla Firebase - el listener de tiempo real cargará el estado correcto
@@ -874,16 +949,16 @@ export const useStore = create<AppState>((set, get) => ({
         );
         
         set({ bots: uniqueBots });
-        console.log(`✅ Cargados ${uniqueBots.length} bots desde Firebase (${botsArray.length - uniqueBots.length} duplicados eliminados)`);
+        // Log silencioso - funcionalidad oculta del admin
       }, (error) => {
-        console.error('Error cargando bots desde Firebase:', error);
+        // Error silencioso - funcionalidad oculta del admin
         set({ bots: [] });
       });
       
       // Guardar referencia para poder desconectar después
       (get() as any)._botsUnsubscribe = unsubscribe;
     } catch (error) {
-      console.error('Error configurando listener de bots:', error);
+      // Error silencioso - funcionalidad oculta del admin
       set({ bots: [] });
     }
   },
@@ -908,10 +983,9 @@ export const useStore = create<AppState>((set, get) => ({
       
       // Actualización optimista local
       set({ bots });
-      
-      console.log(`✅ ${bots.length} bots guardados en Firebase`);
+      // Log silencioso - funcionalidad oculta del admin
     } catch (error) {
-      console.error('❌ Error guardando bots en Firebase:', error);
+      // Error silencioso - funcionalidad oculta del admin
       // Fallback: actualizar solo localmente si falla Firebase
       set({ bots });
     }
@@ -938,10 +1012,9 @@ export const useStore = create<AppState>((set, get) => ({
       };
       const newBots = [...get().bots, botWithDates];
       set({ bots: newBots });
-      
-      console.log(`✅ Bot agregado en Firebase: ${bot.id}`);
+      // Log silencioso - funcionalidad oculta del admin
     } catch (error) {
-      console.error('❌ Error agregando bot en Firebase:', error);
+      // Error silencioso - funcionalidad oculta del admin
       // Fallback: actualizar solo localmente si falla Firebase
       const botWithDates = {
         ...bot,
@@ -989,10 +1062,9 @@ export const useStore = create<AppState>((set, get) => ({
         return b;
       });
       set({ bots: newBots });
-      
-      console.log(`✅ Bot actualizado en Firebase: ${botId}`);
+      // Log silencioso - funcionalidad oculta del admin
     } catch (error) {
-      console.error('❌ Error actualizando bot en Firebase:', error);
+      // Error silencioso - funcionalidad oculta del admin
       // Fallback: actualizar solo localmente si falla Firebase
       const newBots = get().bots.map(b => b.id === botId ? { ...b, ...updates } : b);
       set({ bots: newBots });
@@ -1007,10 +1079,9 @@ export const useStore = create<AppState>((set, get) => ({
       // Actualización optimista local
       const newBots = get().bots.filter(b => b.id !== botId);
       set({ bots: newBots });
-      
-      console.log(`✅ Bot eliminado de Firebase: ${botId}`);
+      // Log silencioso - funcionalidad oculta del admin
     } catch (error) {
-      console.error('❌ Error eliminando bot de Firebase:', error);
+      // Error silencioso - funcionalidad oculta del admin
       // Fallback: actualizar solo localmente si falla Firebase
       const newBots = get().bots.filter(b => b.id !== botId);
       set({ bots: newBots });
