@@ -12,7 +12,7 @@ import {
   MousePointerClick, Image as ImageIcon, Save, Store, Mail, Send,
   CheckCircle, Truck, FileText, Calendar, User, CreditCard,
   ArrowRight, ArrowDown, ArrowUp, Download, Trash, HelpCircle, Ticket as TicketIcon,
-  MessageSquare, Palette, Shuffle
+  MessageSquare, Palette, Shuffle, CheckSquare, Square
 } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -821,6 +821,7 @@ const [auctionForm, setAuctionForm] = useState({
   const [filterStatus, setFilterStatus] = useState<OrderStatus | 'all' | 'active' | 'inactive'>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderTransactions, setOrderTransactions] = useState<any[]>([]);
+  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set()); // Para selección masiva
   
   // ============================================
   // FUNCIONES PARA ESTADÍSTICAS DEL DASHBOARD
@@ -1589,14 +1590,27 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
   // Cargar transacciones cuando se selecciona un pedido
   useEffect(() => {
     if (selectedOrder) {
-      const unsubscribe = loadOrderTransactions(selectedOrder.id, (transactions) => {
-        setOrderTransactions(transactions);
-      });
-      return () => unsubscribe();
+      // Solo cargar transacciones si el usuario es admin
+      if (user?.isAdmin) {
+        try {
+          const unsubscribe = loadOrderTransactions(selectedOrder.id, (transactions) => {
+            setOrderTransactions(transactions);
+          });
+          return () => unsubscribe();
+        } catch (error: any) {
+          // Silenciar errores de permisos (esperados si no hay acceso)
+          if (error?.code !== 'PERMISSION_DENIED' && !error?.message?.includes('permission_denied')) {
+            console.error('Error cargando transacciones del pedido:', error);
+          }
+          setOrderTransactions([]);
+        }
+      } else {
+        setOrderTransactions([]);
+      }
     } else {
       setOrderTransactions([]);
     }
-  }, [selectedOrder]);
+  }, [selectedOrder, user?.isAdmin]);
 
   // Filtrar pedidos y eliminar duplicados
   const uniqueOrders = orders.filter((order: Order, index: number, self: Order[]) => 
@@ -3846,37 +3860,176 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       {/* Usuarios Tab */}
       {activeTab === 'users' && (
         <div className={isMobile ? 'user-management-mobile' : ''}>
-          {/* Sticky Search Bar (Mobile) */}
-          {isMobile && (
-            <div className="user-management-search-sticky">
-              <div style={{ position: 'relative' }}>
+          {/* Header con título y descripción (igual que pedidos) */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: '2rem',
+            flexWrap: 'wrap',
+            gap: '1rem',
+            padding: isMobile ? '0 1rem' : '0'
+          }}>
+            <div>
+              <h2 style={{ 
+                margin: 0, 
+                marginBottom: '0.5rem', 
+                color: 'var(--text-primary)', 
+                fontSize: isMobile ? '1.5rem' : '2rem'
+              }}>
+                Gestión de Usuarios
+              </h2>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: isMobile ? '0.875rem' : '1rem' }}>
+                Administrá y gestioná todos los usuarios del sistema
+              </p>
+            </div>
+          </div>
+
+          {/* Estadísticas rápidas - Grid compacto en móvil (igual que pedidos) */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: isMobile ? '0.5rem' : '1rem',
+            marginBottom: '2rem',
+            width: '100%',
+            maxWidth: '100%',
+            boxSizing: 'border-box',
+            padding: isMobile ? '0 1rem' : '0'
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <Users size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>Total</span>
+              <div style={{ fontSize: isMobile ? '1.125rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>
+                {realUsers.length}
+              </div>
+              <div style={{ fontSize: isMobile ? '0.625rem' : '0.75rem', opacity: 0.8, marginTop: isMobile ? '0.25rem' : '0.5rem' }}>
+                usuarios
+              </div>
+            </div>
+            <div style={{
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <CheckCircle size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>Activos</span>
+              <div style={{ fontSize: isMobile ? '1.125rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>
+                {realUsers.filter((u: any) => u.active !== false).length}
+              </div>
+              <div style={{ fontSize: isMobile ? '0.625rem' : '0.75rem', opacity: 0.8, marginTop: isMobile ? '0.25rem' : '0.5rem' }}>
+                usuarios activos
+              </div>
+            </div>
+            <div style={{
+              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
+            }}>
+              <User size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>Admins</span>
+              <div style={{ fontSize: isMobile ? '1.125rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>
+                {realUsers.filter((u: any) => u.isAdmin).length}
+              </div>
+              <div style={{ fontSize: isMobile ? '0.625rem' : '0.75rem', opacity: 0.8, marginTop: isMobile ? '0.25rem' : '0.5rem' }}>
+                administradores
+              </div>
+            </div>
+          </div>
+
+          {/* Filtros mejorados (igual que pedidos) */}
+          <div style={{ 
+            background: 'var(--bg-secondary)', 
+            padding: isMobile ? '1rem' : '1.5rem', 
+            borderRadius: '1rem', 
+            border: '1px solid var(--border)',
+            marginBottom: '1.5rem',
+            margin: isMobile ? '0 1rem 1.5rem' : '0 0 1.5rem'
+          }}>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
                 <Search size={20} style={{ 
                   position: 'absolute', 
-                  left: '1rem', 
+                  left: '0.75rem', 
                   top: '50%', 
                   transform: 'translateY(-50%)',
                   color: 'var(--text-secondary)'
                 }} />
                 <input
                   type="text"
-                  placeholder="Buscar usuarios..."
+                  placeholder="Buscar usuarios por nombre, email o ID..."
                   value={userSearchQuery}
                   onChange={(e) => setUserSearchQuery(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '1rem 1rem 1rem 3rem',
-                    borderRadius: '0.75rem',
+                    padding: '0.875rem 0.875rem 0.875rem 2.75rem',
+                    borderRadius: '0.5rem',
                     border: '1px solid var(--border)',
                     background: 'var(--bg-primary)',
                     color: 'var(--text-primary)',
-                    fontSize: '16px'
+                    fontSize: isMobile ? '16px' : '1rem'
                   }}
                 />
               </div>
             </div>
-          )}
-
-          <h2 style={{ margin: 0, marginBottom: '1.5rem', color: 'var(--text-primary)', padding: isMobile ? '0 1rem' : '0' }}>Gestión de Usuarios</h2>
+          </div>
           {loadingUsers ? (
             <div style={{ textAlign: 'center', padding: '3rem' }}>
               <RefreshCw size={48} style={{ 
@@ -4059,35 +4212,103 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 Administrá y seguí el estado de todos los pedidos
               </p>
             </div>
-            <button
-              onClick={() => {
-                if (window.confirm('¿Eliminar pedidos finalizados (entregados/cancelados) de más de 30 días?\n\nEsta acción no se puede deshacer.')) {
-                  const now = Date.now();
-                  const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
-                  const cleanedOrders = orders.filter((o: Order) => {
-                    if (['delivered', 'cancelled', 'expired'].includes(o.status)) {
-                      const orderDate = o.createdAt ? new Date(o.createdAt).getTime() : 0;
-                      return orderDate > thirtyDaysAgo;
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={async () => {
+                  if (window.confirm('¿Eliminar pedidos finalizados (entregados/cancelados) de más de 30 días?\n\nEsta acción no se puede deshacer.')) {
+                    const now = Date.now();
+                    const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+                    const ordersToDelete = orders.filter((o: Order) => {
+                      if (['delivered', 'cancelled', 'expired', 'payment_expired'].includes(o.status)) {
+                        const orderDate = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+                        return orderDate < thirtyDaysAgo;
+                      }
+                      return false;
+                    });
+                    
+                    let deletedCount = 0;
+                    for (const order of ordersToDelete) {
+                      try {
+                        await remove(dbRef(realtimeDb, `orders/${order.id}`));
+                        deletedCount++;
+                        logOrderAction('Pedido eliminado (limpieza >30 días)', order.id, user?.id, user?.username, { 
+                          status: order.status,
+                          actionType: 'cleanup_old'
+                        });
+                      } catch (error) {
+                        console.error(`Error eliminando pedido ${order.id}:`, error);
+                      }
                     }
-                    return true;
-                  });
-                  setOrders(cleanedOrders);
-                  logAdminAction(`Limpieza de pedidos: ${orders.length - cleanedOrders.length} eliminados`, user?.id, user?.username);
-                  alert(`✅ ${orders.length - cleanedOrders.length} pedidos antiguos eliminados`);
-                }
-              }}
-              className="btn btn-secondary"
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '0.5rem',
-                padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
-                fontSize: isMobile ? '0.875rem' : '0.9375rem'
-              }}
-            >
-              <Trash size={18} />
-              {!isMobile && 'Limpiar Antiguos'}
-            </button>
+                    
+                    const cleanedOrders = orders.filter((o: Order) => !ordersToDelete.find(d => d.id === o.id));
+                    setOrders(cleanedOrders);
+                    logAdminAction(`Limpieza de pedidos: ${deletedCount} eliminados de Firebase`, user?.id, user?.username);
+                    alert(`✅ ${deletedCount} pedidos antiguos eliminados de Firebase`);
+                  }
+                }}
+                className="btn btn-secondary"
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem',
+                  padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
+                  fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                }}
+              >
+                <Trash size={18} />
+                {!isMobile && 'Limpiar >30 días'}
+              </button>
+              <button
+                onClick={async () => {
+                  if (window.confirm('¿Eliminar pedidos finalizados (entregados/cancelados) de menos de 30 días?\n\nEsta acción no se puede deshacer.')) {
+                    const now = Date.now();
+                    const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+                    const ordersToDelete = orders.filter((o: Order) => {
+                      if (['delivered', 'cancelled', 'expired', 'payment_expired'].includes(o.status)) {
+                        const orderDate = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+                        return orderDate >= thirtyDaysAgo && orderDate < now;
+                      }
+                      return false;
+                    });
+                    
+                    if (ordersToDelete.length === 0) {
+                      alert('ℹ️ No hay pedidos finalizados de menos de 30 días para eliminar');
+                      return;
+                    }
+                    
+                    let deletedCount = 0;
+                    for (const order of ordersToDelete) {
+                      try {
+                        await remove(dbRef(realtimeDb, `orders/${order.id}`));
+                        deletedCount++;
+                        logOrderAction('Pedido eliminado (limpieza <30 días)', order.id, user?.id, user?.username, { 
+                          status: order.status,
+                          actionType: 'cleanup_recent'
+                        });
+                      } catch (error) {
+                        console.error(`Error eliminando pedido ${order.id}:`, error);
+                      }
+                    }
+                    
+                    const cleanedOrders = orders.filter((o: Order) => !ordersToDelete.find(d => d.id === o.id));
+                    setOrders(cleanedOrders);
+                    logAdminAction(`Limpieza de pedidos recientes: ${deletedCount} eliminados de Firebase`, user?.id, user?.username);
+                    alert(`✅ ${deletedCount} pedidos recientes eliminados de Firebase`);
+                  }
+                }}
+                className="btn btn-secondary"
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem',
+                  padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
+                  fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                }}
+              >
+                <Trash size={18} />
+                {!isMobile && 'Limpiar <30 días'}
+              </button>
+            </div>
           </div>
 
           {/* Estadísticas rápidas - Grid compacto en móvil */}
@@ -4389,6 +4610,122 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
             </div>
           </div>
 
+          {/* Barra de acciones masivas */}
+          {selectedOrders.size > 0 && (
+            <div style={{
+              background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+              padding: isMobile ? '1rem' : '1.25rem',
+              borderRadius: '1rem',
+              marginBottom: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '1rem',
+              color: 'white'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <CheckSquare size={20} />
+                <span style={{ fontWeight: 600, fontSize: isMobile ? '0.875rem' : '1rem' }}>
+                  {selectedOrders.size} pedido{selectedOrders.size !== 1 ? 's' : ''} seleccionado{selectedOrders.size !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  onClick={async () => {
+                    if (window.confirm(`¿Cancelar ${selectedOrders.size} pedido${selectedOrders.size !== 1 ? 's' : ''} seleccionado${selectedOrders.size !== 1 ? 's' : ''}?`)) {
+                      let cancelledCount = 0;
+                      for (const orderId of selectedOrders) {
+                        try {
+                          await update(dbRef(realtimeDb, `orders/${orderId}`), { status: 'cancelled' });
+                          cancelledCount++;
+                          const order = orders.find(o => o.id === orderId);
+                          if (order) {
+                            logOrderAction('Pedido cancelado (masivo)', orderId, user?.id, user?.username, { 
+                              oldStatus: order.status,
+                              newStatus: 'cancelled',
+                              actionType: 'bulk_cancel'
+                            });
+                          }
+                        } catch (error) {
+                          console.error(`Error cancelando pedido ${orderId}:`, error);
+                        }
+                      }
+                      // Actualizar store para cada pedido cancelado
+                      for (const orderId of selectedOrders) {
+                        updateOrderStatus(orderId, 'cancelled');
+                      }
+                      setSelectedOrders(new Set());
+                      alert(`✅ ${cancelledCount} pedido${cancelledCount !== 1 ? 's' : ''} cancelado${cancelledCount !== 1 ? 's' : ''}`);
+                    }
+                  }}
+                  className="btn"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.25rem',
+                    fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                  }}
+                >
+                  <XCircle size={16} style={{ marginRight: '0.5rem' }} />
+                  Cancelar Seleccionados
+                </button>
+                <button
+                  onClick={async () => {
+                    if (window.confirm(`¿Eliminar permanentemente ${selectedOrders.size} pedido${selectedOrders.size !== 1 ? 's' : ''} seleccionado${selectedOrders.size !== 1 ? 's' : ''}?\n\nEsta acción no se puede deshacer.`)) {
+                      let deletedCount = 0;
+                      for (const orderId of selectedOrders) {
+                        try {
+                          await remove(dbRef(realtimeDb, `orders/${orderId}`));
+                          deletedCount++;
+                          const order = orders.find(o => o.id === orderId);
+                          if (order) {
+                            logOrderAction('Pedido eliminado (masivo)', orderId, user?.id, user?.username, { 
+                              status: order.status,
+                              actionType: 'bulk_delete'
+                            });
+                          }
+                        } catch (error) {
+                          console.error(`Error eliminando pedido ${orderId}:`, error);
+                        }
+                      }
+                      const remainingOrders = orders.filter(o => !selectedOrders.has(o.id));
+                      setOrders(remainingOrders);
+                      setSelectedOrders(new Set());
+                      alert(`✅ ${deletedCount} pedido${deletedCount !== 1 ? 's' : ''} eliminado${deletedCount !== 1 ? 's' : ''} de Firebase`);
+                    }
+                  }}
+                  className="btn"
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.9)',
+                    color: 'white',
+                    border: 'none',
+                    padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.25rem',
+                    fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                  }}
+                >
+                  <Trash2 size={16} style={{ marginRight: '0.5rem' }} />
+                  Eliminar Seleccionados
+                </button>
+                <button
+                  onClick={() => setSelectedOrders(new Set())}
+                  className="btn"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.25rem',
+                    fontSize: isMobile ? '0.875rem' : '0.9375rem'
+                  }}
+                >
+                  <Square size={16} style={{ marginRight: '0.5rem' }} />
+                  Deseleccionar Todo
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Filtros mejorados */}
           <div style={{ 
             background: 'var(--bg-secondary)', 
@@ -4523,6 +4860,117 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                           e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.15)';
                         }}
                       >
+                        {/* Checkbox de selección */}
+                        <div style={{
+                          position: 'absolute',
+                          top: '0.5rem',
+                          left: '0.5rem',
+                          zIndex: 10
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedOrders.has(order.id)}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              const newSelected = new Set(selectedOrders);
+                              if (e.target.checked) {
+                                newSelected.add(order.id);
+                              } else {
+                                newSelected.delete(order.id);
+                              }
+                              setSelectedOrders(newSelected);
+                            }}
+                            style={{ 
+                              cursor: 'pointer', 
+                              width: '18px', 
+                              height: '18px',
+                              accentColor: 'white'
+                            }}
+                          />
+                        </div>
+                        
+                        {/* Botones de acción rápida */}
+                        <div style={{
+                          position: 'absolute',
+                          top: '0.5rem',
+                          right: '0.5rem',
+                          display: 'flex',
+                          gap: '0.25rem',
+                          zIndex: 10
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        >
+                          {order.status !== 'cancelled' && order.status !== 'delivered' && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`¿Cancelar el pedido ${order.orderNumber || `#${order.id.slice(-6)}`}?`)) {
+                                  try {
+                                    await update(dbRef(realtimeDb, `orders/${order.id}`), { status: 'cancelled' });
+                                    updateOrderStatus(order.id, 'cancelled');
+                                    logOrderAction('Pedido cancelado', order.id, user?.id, user?.username, { 
+                                      oldStatus: order.status,
+                                      newStatus: 'cancelled',
+                                      actionType: 'cancel'
+                                    });
+                                    alert('✅ Pedido cancelado');
+                                  } catch (error) {
+                                    console.error('Error cancelando pedido:', error);
+                                    alert('❌ Error al cancelar');
+                                  }
+                                }
+                              }}
+                              style={{
+                                background: 'rgba(255, 255, 255, 0.2)',
+                                border: 'none',
+                                borderRadius: '0.25rem',
+                                padding: '0.25rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                              title="Cancelar"
+                            >
+                              <XCircle size={14} />
+                            </button>
+                          )}
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`¿Eliminar el pedido ${order.orderNumber || `#${order.id.slice(-6)}`}?\n\nEsta acción no se puede deshacer.`)) {
+                                try {
+                                  await remove(dbRef(realtimeDb, `orders/${order.id}`));
+                                  const remainingOrders = orders.filter(o => o.id !== order.id);
+                                  setOrders(remainingOrders);
+                                  logOrderAction('Pedido eliminado', order.id, user?.id, user?.username, { 
+                                    status: order.status,
+                                    actionType: 'delete'
+                                  });
+                                  alert('✅ Pedido eliminado');
+                                } catch (error) {
+                                  console.error('Error eliminando pedido:', error);
+                                  alert('❌ Error al eliminar');
+                                }
+                              }
+                            }}
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.8)',
+                              border: 'none',
+                              borderRadius: '0.25rem',
+                              padding: '0.25rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                            title="Eliminar"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                           <div style={{ 
                             fontSize: '0.625rem', 
@@ -4614,6 +5062,29 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                     }}>
                       <th style={{ 
                         padding: '1rem', 
+                        textAlign: 'center', 
+                        color: 'var(--text-primary)',
+                        fontWeight: 600,
+                        fontSize: isMobile ? '0.875rem' : '0.9375rem',
+                        width: '50px'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={filteredOrders.length > 0 && filteredOrders.every(o => selectedOrders.has(o.id))}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedOrders(new Set(filteredOrders.map(o => o.id)));
+                            } else {
+                              const filteredIds = new Set(filteredOrders.map(o => o.id));
+                              setSelectedOrders(new Set(Array.from(selectedOrders).filter(id => !filteredIds.has(id))));
+                            }
+                          }}
+                          style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </th>
+                      <th style={{ 
+                        padding: '1rem', 
                         textAlign: 'left', 
                         color: 'var(--text-primary)',
                         fontWeight: 600,
@@ -4697,6 +5168,24 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                           onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                           onClick={() => setSelectedOrder(order)}
                         >
+                          <td style={{ padding: '1rem', textAlign: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={selectedOrders.has(order.id)}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                const newSelected = new Set(selectedOrders);
+                                if (e.target.checked) {
+                                  newSelected.add(order.id);
+                                } else {
+                                  newSelected.delete(order.id);
+                                }
+                                setSelectedOrders(newSelected);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                            />
+                          </td>
                           <td style={{ padding: '1rem' }}>
                             <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: isMobile ? '0.875rem' : '0.9375rem' }}>
                               {order.orderNumber || `#${order.id.slice(-8).toUpperCase()}`}
@@ -4826,6 +5315,75 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                                   {!isMobile && 'Siguiente'}
                                 </button>
                               )}
+                              {order.status !== 'cancelled' && order.status !== 'delivered' && (
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    const orderDisplay = order.orderNumber || `#${order.id.slice(-8).toUpperCase()}`;
+                                    if (window.confirm(`¿Cancelar el pedido ${orderDisplay}?\n\nEsta acción cambiará el estado a "Cancelado".`)) {
+                                      try {
+                                        await update(dbRef(realtimeDb, `orders/${order.id}`), { status: 'cancelled' });
+                                        updateOrderStatus(order.id, 'cancelled');
+                                        logOrderAction('Pedido cancelado', order.id, user?.id, user?.username, { 
+                                          oldStatus: order.status,
+                                          newStatus: 'cancelled',
+                                          actionType: 'cancel'
+                                        });
+                                        alert('✅ Pedido cancelado');
+                                      } catch (error) {
+                                        console.error('Error cancelando pedido:', error);
+                                        alert('❌ Error al cancelar el pedido');
+                                      }
+                                    }
+                                  }}
+                                  className="btn btn-secondary"
+                                  style={{ 
+                                    padding: '0.5rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem',
+                                    fontSize: isMobile ? '0.75rem' : '0.8125rem'
+                                  }}
+                                  title="Cancelar pedido"
+                                >
+                                  <XCircle size={14} />
+                                  {!isMobile && 'Cancelar'}
+                                </button>
+                              )}
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  const orderDisplay = order.orderNumber || `#${order.id.slice(-8).toUpperCase()}`;
+                                  if (window.confirm(`¿Eliminar permanentemente el pedido ${orderDisplay}?\n\nEsta acción no se puede deshacer.`)) {
+                                    try {
+                                      await remove(dbRef(realtimeDb, `orders/${order.id}`));
+                                      const remainingOrders = orders.filter(o => o.id !== order.id);
+                                      setOrders(remainingOrders);
+                                      logOrderAction('Pedido eliminado', order.id, user?.id, user?.username, { 
+                                        status: order.status,
+                                        actionType: 'delete'
+                                      });
+                                      alert('✅ Pedido eliminado de Firebase');
+                                    } catch (error) {
+                                      console.error('Error eliminando pedido:', error);
+                                      alert('❌ Error al eliminar el pedido');
+                                    }
+                                  }
+                                }}
+                                className="btn btn-secondary"
+                                style={{ 
+                                  padding: '0.5rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                  fontSize: isMobile ? '0.75rem' : '0.8125rem',
+                                  color: 'var(--error)'
+                                }}
+                                title="Eliminar pedido"
+                              >
+                                <Trash2 size={14} />
+                                {!isMobile && 'Borrar'}
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -4952,78 +5510,141 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
             </div>
           </div>
 
-          {/* Estadísticas de Bots */}
+          {/* Estadísticas rápidas - Grid compacto en móvil (igual que pedidos) */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '1rem',
-            marginBottom: '2rem'
+            gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: isMobile ? '0.5rem' : '1rem',
+            marginBottom: '2rem',
+            width: '100%',
+            maxWidth: '100%',
+            boxSizing: 'border-box'
           }}>
             <div style={{
               background: 'linear-gradient(135deg, #10b981, #059669)',
-              padding: '1.5rem',
-              borderRadius: '1rem',
-              color: 'white'
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                <Bot size={24} />
-                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Activos</span>
-              </div>
-              <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+              <Bot size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>Activos</span>
+              <div style={{ fontSize: isMobile ? '1.125rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>
                 {bots.filter((b: any) => b.isActive).length}
               </div>
-              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>
+              <div style={{ fontSize: isMobile ? '0.625rem' : '0.75rem', opacity: 0.8, marginTop: isMobile ? '0.25rem' : '0.5rem' }}>
                 de {bots.length} total
               </div>
             </div>
             <div style={{
               background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-              padding: '1.5rem',
-              borderRadius: '1rem',
-              color: 'white'
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                <DollarSign size={24} />
-                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Balance Total</span>
-              </div>
-              <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+              <DollarSign size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>Balance Total</span>
+              <div style={{ fontSize: isMobile ? '1rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>
                 {formatCurrency(bots.reduce((sum: number, b: any) => sum + b.balance, 0))}
               </div>
-              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>
+              <div style={{ fontSize: isMobile ? '0.625rem' : '0.75rem', opacity: 0.8, marginTop: isMobile ? '0.25rem' : '0.5rem' }}>
                 Promedio: {formatCurrency(bots.length > 0 ? bots.reduce((sum: number, b: any) => sum + b.balance, 0) / bots.length : 0)}
               </div>
             </div>
             <div style={{
               background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-              padding: '1.5rem',
-              borderRadius: '1rem',
-              color: 'white'
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                <TrendingUp size={24} />
-                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Ofertas Máx</span>
-              </div>
-              <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+              <TrendingUp size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>Ofertas Máx</span>
+              <div style={{ fontSize: isMobile ? '1rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>
                 {formatCurrency(bots.reduce((sum: number, b: any) => sum + b.maxBidAmount, 0))}
               </div>
-              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>
+              <div style={{ fontSize: isMobile ? '0.625rem' : '0.75rem', opacity: 0.8, marginTop: isMobile ? '0.25rem' : '0.5rem' }}>
                 Capacidad total
               </div>
             </div>
             <div style={{
               background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
-              padding: '1.5rem',
-              borderRadius: '1rem',
-              color: 'white'
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                <Activity size={24} />
-                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>En Subastas</span>
-              </div>
-              <div style={{ fontSize: '2rem', fontWeight: 700 }}>
+              <Activity size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>En Subastas</span>
+              <div style={{ fontSize: isMobile ? '1.125rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>
                 {auctions.filter((a: any) => a.status === 'active').length}
               </div>
-              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>
+              <div style={{ fontSize: isMobile ? '0.625rem' : '0.75rem', opacity: 0.8, marginTop: isMobile ? '0.25rem' : '0.5rem' }}>
                 Subastas activas
               </div>
             </div>
@@ -5332,8 +5953,14 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   <p>Crea tu primer bot o ajusta los filtros de búsqueda</p>
                 </div>
               ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div className={isMobile ? 'mobile-table-container' : ''} style={{ 
+                  background: 'var(--bg-secondary)', 
+                  borderRadius: '1rem', 
+                  border: '1px solid var(--border)',
+                  overflow: isMobile ? 'auto' : 'hidden'
+                }}>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className={isMobile ? 'mobile-table' : ''} style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ 
                         background: 'var(--bg-primary)', 
@@ -5538,7 +6165,8 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                         );
                       })}
                     </tbody>
-                  </table>
+                    </table>
+                  </div>
                 </div>
               );
             })()}
@@ -5718,52 +6346,127 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
             </div>
           </div>
 
-          {/* Estadísticas rápidas */}
+          {/* Estadísticas rápidas - Grid compacto en móvil (igual que pedidos) */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)',
-            gap: '1rem',
-            marginBottom: '2rem'
+            gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: isMobile ? '0.5rem' : '1rem',
+            marginBottom: '2rem',
+            width: '100%',
+            maxWidth: '100%',
+            boxSizing: 'border-box'
           }}>
             <div style={{
               background: 'linear-gradient(135deg, #3B82F6, #2563EB)',
-              padding: '1.5rem',
-              borderRadius: '1rem',
-              color: 'white'
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
             }}>
-              <div style={{ fontSize: '0.875rem', opacity: 0.9, marginBottom: '0.5rem' }}>💬 Chat</div>
-              <div style={{ fontSize: '2rem', fontWeight: 700 }}>{unifiedUnreadCounts.chat}</div>
-              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>no leídos</div>
+              <MessageSquare size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>Chat</span>
+              <div style={{ fontSize: isMobile ? '1.125rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>{unifiedUnreadCounts.chat}</div>
+              <div style={{ fontSize: isMobile ? '0.625rem' : '0.75rem', opacity: 0.8, marginTop: isMobile ? '0.25rem' : '0.5rem' }}>no leídos</div>
             </div>
             <div style={{
               background: 'linear-gradient(135deg, #10B981, #059669)',
-              padding: '1.5rem',
-              borderRadius: '1rem',
-              color: 'white'
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
             }}>
-              <div style={{ fontSize: '0.875rem', opacity: 0.9, marginBottom: '0.5rem' }}>📧 Contacto</div>
-              <div style={{ fontSize: '2rem', fontWeight: 700 }}>{unifiedUnreadCounts.contact}</div>
-              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>no leídos</div>
+              <Mail size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>Contacto</span>
+              <div style={{ fontSize: isMobile ? '1.125rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>{unifiedUnreadCounts.contact}</div>
+              <div style={{ fontSize: isMobile ? '0.625rem' : '0.75rem', opacity: 0.8, marginTop: isMobile ? '0.25rem' : '0.5rem' }}>no leídos</div>
             </div>
             <div style={{
               background: 'linear-gradient(135deg, #F59E0B, #D97706)',
-              padding: '1.5rem',
-              borderRadius: '1rem',
-              color: 'white'
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
             }}>
-              <div style={{ fontSize: '0.875rem', opacity: 0.9, marginBottom: '0.5rem' }}>🎫 Ticket</div>
-              <div style={{ fontSize: '2rem', fontWeight: 700 }}>{unifiedUnreadCounts.ticket}</div>
-              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>no leídos</div>
+              <TicketIcon size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>Ticket</span>
+              <div style={{ fontSize: isMobile ? '1.125rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>{unifiedUnreadCounts.ticket}</div>
+              <div style={{ fontSize: isMobile ? '0.625rem' : '0.75rem', opacity: 0.8, marginTop: isMobile ? '0.25rem' : '0.5rem' }}>no leídos</div>
             </div>
             <div style={{
               background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)',
-              padding: '1.5rem',
-              borderRadius: '1rem',
-              color: 'white'
+              padding: isMobile ? '0.625rem' : '1.5rem',
+              borderRadius: isMobile ? '0.75rem' : '1rem',
+              color: 'white',
+              aspectRatio: isMobile ? '1' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              minWidth: 0,
+              overflow: 'hidden'
             }}>
-              <div style={{ fontSize: '0.875rem', opacity: 0.9, marginBottom: '0.5rem' }}>📬 Total</div>
-              <div style={{ fontSize: '2rem', fontWeight: 700 }}>{totalUnreadUnified}</div>
-              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>no leídos</div>
+              <Bell size={isMobile ? 16 : 24} style={{ marginBottom: isMobile ? '0.25rem' : '0.75rem', flexShrink: 0 }} />
+              <span style={{ 
+                fontSize: isMobile ? '0.625rem' : '0.875rem', 
+                opacity: 0.9, 
+                marginBottom: isMobile ? '0.25rem' : '0.5rem',
+                lineHeight: '1.2',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}>Total</span>
+              <div style={{ fontSize: isMobile ? '1.125rem' : '2rem', fontWeight: 700, lineHeight: '1' }}>{totalUnreadUnified}</div>
+              <div style={{ fontSize: isMobile ? '0.625rem' : '0.75rem', opacity: 0.8, marginTop: isMobile ? '0.25rem' : '0.5rem' }}>no leídos</div>
             </div>
           </div>
 
@@ -6867,10 +7570,11 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
             {/* Catálogo de Stickers - Usando StickerManager */}
             <div style={{
               background: 'var(--bg-secondary)',
-              padding: isMobile ? '1.5rem' : '2rem',
+              padding: isMobile ? '1rem' : '2rem',
               borderRadius: '1rem',
               border: '1px solid var(--border)',
-              marginTop: '2rem'
+              marginTop: '2rem',
+              overflow: 'hidden'
             }}>
               <StickerManager
                 stickers={homeConfig.siteSettings?.logoStickers || []}

@@ -19,6 +19,7 @@ import LoadingSpinner from './components/LoadingSpinner';
 import Hreflang from './components/Hreflang';
 import { cleanExpiredCache } from './utils/geolocationCache';
 import { preventZoomOnInput, restoreViewport } from './utils/mobileOptimizations';
+import { initializeLocalStorageCleanup } from './utils/localStorageCleaner';
 import Home from './pages/Home';
 import Subastas from './pages/Subastas';
 import AuctionDetail from './pages/AuctionDetail';
@@ -527,6 +528,20 @@ function App() {
   useEffect(() => {
     cleanExpiredCache();
   }, []);
+
+  // Limpiar datos obsoletos de localStorage al iniciar la aplicación
+  useEffect(() => {
+    console.log('🧹 Iniciando limpieza de localStorage obsoleto...');
+    initializeLocalStorageCleanup(user?.id);
+  }, []); // Solo al montar la aplicación
+
+  // Limpiar datos específicos del usuario cuando cambia el usuario
+  useEffect(() => {
+    if (user?.id) {
+      console.log(`🧹 Limpiando datos obsoletos de localStorage para usuario: ${user.id}`);
+      initializeLocalStorageCleanup(user.id);
+    }
+  }, [user?.id]);
 
   // Cargar bots automáticamente al iniciar la app (sin importar si hay usuario logueado)
   useEffect(() => {

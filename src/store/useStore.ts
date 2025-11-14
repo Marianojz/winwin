@@ -497,10 +497,12 @@ export const useStore = create<AppState>((set, get) => ({
       // Escuchar cambios en tiempo real
       const unsubscribe = onValue(notificationsRef, (snapshot) => {
         const currentState = get();
-        // Evitar procesamiento simultáneo
+        // Evitar procesamiento simultáneo o durante batch updates
         if ((currentState as any)._notificationProcessing) {
-          return;
+          return; // Salir silenciosamente si ya se está procesando
         }
+        
+        // Marcar como procesando inmediatamente para evitar múltiples ejecuciones
         (currentState as any)._notificationProcessing = true;
         const data = snapshot.val();
         const normalizeFn = get()._normalizeNotification;
@@ -858,65 +860,48 @@ export const useStore = create<AppState>((set, get) => ({
     const readAt = new Date().toISOString();
     
     try {
-      // Actualizar todas las notificaciones no leídas en Firebase usando set() para cada una
-      const updatePromises = unreadNotifications.map(async (n) => {
-        try {
-          const notificationRef = ref(realtimeDb, `notifications/${user.id}/${n.id}`);
-          const snapshot = await firebaseGet(notificationRef);
-          
-          if (snapshot.exists()) {
-            const currentNotification = snapshot.val();
-            await firebaseSet(notificationRef, {
-              ...currentNotification,
+      // Marcar flag para evitar que el listener procese durante el batch update
+      (get() as any)._notificationProcessing = true;
+      
+      // Preparar todas las actualizaciones en un solo objeto para batch update
+      const updates: { [key: string]: any } = {};
+      
+      // Obtener todas las notificaciones actuales de Firebase primero
+      const notificationsRef = ref(realtimeDb, `notifications/${user.id}`);
+      const snapshot = await firebaseGet(notificationsRef);
+      
+      if (snapshot.exists()) {
+        const allNotifications = snapshot.val();
+        
+        // Preparar actualizaciones solo para las no leídas
+        unreadNotifications.forEach((n) => {
+          const notificationKey = `notifications/${user.id}/${n.id}`;
+          if (allNotifications[n.id]) {
+            updates[notificationKey] = {
+              ...allNotifications[n.id],
               read: true,
               readAt: readAt
-            });
+            };
           }
-        } catch (error) {
-          console.error(`Error actualizando notificación ${n.id}:`, error);
+        });
+        
+        // Ejecutar todas las actualizaciones en un solo batch usando update()
+        if (Object.keys(updates).length > 0) {
+          await update(ref(realtimeDb, '/'), updates);
+          console.log(`✅ ${Object.keys(updates).length} notificaciones marcadas como leídas en Firebase. Total: ${state.notifications.length}`);
         }
-      });
+      }
       
-      await Promise.all(updatePromises);
-      
-      // IMPORTANTE: Esperar un momento para que Firebase procese antes de actualizar estado local
-      // Aumentado a 500ms para dar más tiempo a Firebase de procesar los cambios
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Verificar que todas las notificaciones se guardaron correctamente en Firebase
-      // Re-cargar desde Firebase para asegurar que tenemos el estado más reciente
-      const verifyPromises = unreadNotifications.map(async (n) => {
-        try {
-          const notificationRef = ref(realtimeDb, `notifications/${user.id}/${n.id}`);
-          const snapshot = await firebaseGet(notificationRef);
-          if (snapshot.exists()) {
-            const notificationData = snapshot.val();
-            return notificationData.read === true || notificationData.read === 'true' || notificationData.readAt !== undefined;
-          }
-          return false;
-        } catch (error) {
-          return false;
-        }
-      });
-      
-      const verificationResults = await Promise.all(verifyPromises);
-      const successfullyMarked = verificationResults.filter(r => r).length;
-      
-      // Actualización del estado local DESPUÉS de confirmar guardado en Firebase
-      const updatedNotifications = state.notifications.map(n => ({
-        ...n,
-        read: true, // Forzar a true
-        readAt: n.readAt || new Date(readAt)
-      }));
-      
-      set({
-        notifications: updatedNotifications,
-        unreadCount: 0
-      });
-      
-      console.log(`✅ ${successfullyMarked} de ${unreadNotifications.length} notificaciones marcadas como leídas en Firebase. Total: ${updatedNotifications.length}`);
+      // Resetear flag después de un delay para permitir que el listener procese los cambios
+      setTimeout(() => {
+        (get() as any)._notificationProcessing = false;
+      }, 1500); // Aumentado a 1.5 segundos para dar más tiempo
     } catch (error) {
       console.error('❌ Error marcando todas las notificaciones como leídas en Firebase:', error);
+      // Resetear flag incluso si hay error
+      setTimeout(() => {
+        (get() as any)._notificationProcessing = false;
+      }, 500);
       // NO actualizar estado local si falla Firebase - el listener de tiempo real cargará el estado correcto
     }
   },

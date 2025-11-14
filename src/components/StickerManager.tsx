@@ -158,53 +158,77 @@ const StickerManager = ({ stickers, onStickersChange }: StickerManagerProps) => 
                 </div>
 
                 {editingSticker?.id === sticker.id ? (
-                  <div className="sticker-manager-edit-form">
+                  <div className={`sticker-manager-edit-form ${isMobile ? 'sticker-manager-edit-form-mobile' : ''}`}>
+                    {/* Preview del sticker en modo edición */}
+                    {isMobile && (
+                      <div className="sticker-manager-edit-preview">
+                        {editingSticker.customImageUrl ? (
+                          <img
+                            src={editingSticker.customImageUrl}
+                            alt="Sticker preview"
+                            style={{ width: '64px', height: '64px', objectFit: 'contain' }}
+                          />
+                        ) : (
+                          <span style={{ fontSize: '3rem', lineHeight: '1' }}>{editingSticker.emoji}</span>
+                        )}
+                      </div>
+                    )}
+                    
                     {/* Posición */}
-                    <select
-                      value={editingSticker.position}
-                      onChange={(e) => setEditingSticker({
-                        ...editingSticker,
-                        position: e.target.value as StickerPosition
-                      })}
-                      className="sticker-manager-select"
-                    >
-                      <option value="top-left">Arriba Izquierda</option>
-                      <option value="top-right">Arriba Derecha</option>
-                      <option value="bottom-left">Abajo Izquierda</option>
-                      <option value="bottom-right">Abajo Derecha</option>
-                      <option value="center">Centro</option>
-                    </select>
+                    <div className="sticker-manager-form-group">
+                      <label className="sticker-manager-form-label">Posición</label>
+                      <select
+                        value={editingSticker.position}
+                        onChange={(e) => setEditingSticker({
+                          ...editingSticker,
+                          position: e.target.value as StickerPosition
+                        })}
+                        className="sticker-manager-select"
+                      >
+                        <option value="top-left">Arriba Izquierda</option>
+                        <option value="top-right">Arriba Derecha</option>
+                        <option value="bottom-left">Abajo Izquierda</option>
+                        <option value="bottom-right">Abajo Derecha</option>
+                        <option value="center">Centro</option>
+                      </select>
+                    </div>
 
                     {/* Tamaño */}
-                    <select
-                      value={editingSticker.size}
-                      onChange={(e) => setEditingSticker({
-                        ...editingSticker,
-                        size: e.target.value as StickerSize
-                      })}
-                      className="sticker-manager-select"
-                    >
-                      <option value="small">Pequeño</option>
-                      <option value="medium">Mediano</option>
-                      <option value="large">Grande</option>
-                    </select>
+                    <div className="sticker-manager-form-group">
+                      <label className="sticker-manager-form-label">Tamaño</label>
+                      <select
+                        value={editingSticker.size}
+                        onChange={(e) => setEditingSticker({
+                          ...editingSticker,
+                          size: e.target.value as StickerSize
+                        })}
+                        className="sticker-manager-select"
+                      >
+                        <option value="small">Pequeño</option>
+                        <option value="medium">Mediano</option>
+                        <option value="large">Grande</option>
+                      </select>
+                    </div>
 
                     {/* Efecto */}
-                    <select
-                      value={editingSticker.effect || 'none'}
-                      onChange={(e) => setEditingSticker({
-                        ...editingSticker,
-                        effect: e.target.value as StickerEffect
-                      })}
-                      className="sticker-manager-select"
-                    >
-                      <option value="none">Sin efecto</option>
-                      <option value="floating">Floating</option>
-                      <option value="pulse">Pulse</option>
-                      <option value="fadeInOut">Fade In/Out</option>
-                      <option value="bounce">Bounce</option>
-                      <option value="slideIn">Slide In</option>
-                    </select>
+                    <div className="sticker-manager-form-group">
+                      <label className="sticker-manager-form-label">Efecto</label>
+                      <select
+                        value={editingSticker.effect || 'none'}
+                        onChange={(e) => setEditingSticker({
+                          ...editingSticker,
+                          effect: e.target.value as StickerEffect
+                        })}
+                        className="sticker-manager-select"
+                      >
+                        <option value="none">Sin efecto</option>
+                        <option value="floating">Floating</option>
+                        <option value="pulse">Pulse</option>
+                        <option value="fadeInOut">Fade In/Out</option>
+                        <option value="bounce">Bounce</option>
+                        <option value="slideIn">Slide In</option>
+                      </select>
+                    </div>
 
                     {/* Sticky */}
                     <label className="sticker-manager-checkbox">

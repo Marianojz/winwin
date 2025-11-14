@@ -3,11 +3,18 @@ import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import { attachAuthListener } from './config/firebase'
 import { useStore } from './store/useStore'
+import { initializeLocalStorageCleanup } from './utils/localStorageCleaner'
 import './index.css'
 
 function Root() {
   const setUser = useStore(s => s.setUser)
   const isMountedRef = React.useRef(true);
+  
+  // Limpiar localStorage obsoleto al iniciar la aplicación
+  React.useEffect(() => {
+    console.log('🧹 [MAIN] Limpiando localStorage obsoleto al iniciar...');
+    initializeLocalStorageCleanup();
+  }, []);
   
   React.useEffect(() => {
     isMountedRef.current = true;

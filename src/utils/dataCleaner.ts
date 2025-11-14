@@ -17,54 +17,29 @@ const DEFAULT_CONFIG: CleanupConfig = {
 
 /**
  * Limpia notificaciones antiguas
- * - Notificaciones NO leídas: se mantienen por el tiempo configurado (default: 7 días)
- * - Notificaciones LEÍDAS: se eliminan después de 2 días desde que fueron leídas
+ * NOTA: Las notificaciones ahora se guardan en Firebase Realtime Database, no en localStorage.
+ * Esta función está obsoleta pero se mantiene por compatibilidad.
+ * La limpieza de notificaciones se maneja directamente en Firebase desde useStore.ts
+ * 
+ * @deprecated Las notificaciones ya no se guardan en localStorage
  */
 export const cleanOldNotifications = (userId: string, config: CleanupConfig = DEFAULT_CONFIG): number => {
+  // Las notificaciones ahora están en Firebase, no en localStorage
+  // Limpiar cualquier dato obsoleto que pueda quedar en localStorage
   try {
     const storageKey = `notifications_${userId}`;
     const saved = localStorage.getItem(storageKey);
     
-    if (!saved) return 0;
-    
-    const parsed = JSON.parse(saved);
-    const now = Date.now();
-    const unreadCutoffDate = now - (config.notificationsDaysOld! * 24 * 60 * 60 * 1000); // X días para no leídas
-    const readCutoffDate = now - (1 * 24 * 60 * 60 * 1000); // 1 día para leídas (más agresivo)
-    
-    // Filtrar notificaciones
-    const filtered = parsed.filter((n: any) => {
-      const createdAt = new Date(n.createdAt).getTime();
-      const isRead = n.read === true || n.read === 'true';
-      const readAt = n.readAt ? new Date(n.readAt).getTime() : null;
-      
-      // Si está leída, verificar si fue leída hace más de 2 días
-      if (isRead && readAt) {
-        if (readAt < readCutoffDate) {
-          return false; // Eliminar notificación leída hace más de 2 días
-        }
-        return true; // Mantener notificación leída recientemente
-      }
-      
-      // Si no está leída, verificar si es muy antigua (más de 7 días)
-      if (!isRead && createdAt < unreadCutoffDate) {
-        return false; // Eliminar notificación no leída muy antigua
-      }
-      
-      // Mantener notificaciones recientes no leídas
-      return true;
-    });
-    
-    if (filtered.length < parsed.length) {
-      localStorage.setItem(storageKey, JSON.stringify(filtered));
-      const removed = parsed.length - filtered.length;
-      console.log(`🧹 Limpieza: ${removed} notificaciones eliminadas para usuario ${userId} (${filtered.filter((n: any) => !n.read || n.read === false).length} no leídas restantes)`);
-      return removed;
+    if (saved) {
+      // Eliminar datos obsoletos de localStorage
+      localStorage.removeItem(storageKey);
+      console.log(`🧹 Eliminados datos obsoletos de notificaciones de localStorage para usuario ${userId}`);
+      return 1;
     }
     
     return 0;
   } catch (error) {
-    console.error('Error limpiando notificaciones:', error);
+    console.error('Error limpiando notificaciones obsoletas de localStorage:', error);
     return 0;
   }
 };
@@ -229,7 +204,8 @@ export const runCleanup = (userId: string | null, auctions: any[], orders: any[]
   
   console.log('🧹 Iniciando limpieza automática de datos antiguos...');
   
-  // Limpiar notificaciones
+  // Limpiar notificaciones obsoletas de localStorage (si existen)
+  // NOTA: Las notificaciones ahora están en Firebase, esta función solo limpia datos antiguos
   const notificationsCleaned = cleanOldNotifications(userId, config);
   
   // Limpiar subastas (retorna información para actualizar el store)
@@ -242,7 +218,7 @@ export const runCleanup = (userId: string | null, auctions: any[], orders: any[]
   
   if (total > 0) {
     console.log(`✅ Limpieza completada: ${total} elementos eliminados`);
-    console.log(`   - Notificaciones: ${notificationsCleaned}`);
+    console.log(`   - Notificaciones obsoletas de localStorage: ${notificationsCleaned}`);
     console.log(`   - Subastas: ${auctionsCleanup.cleaned}`);
     console.log(`   - Pedidos: ${ordersCleanup.cleaned}`);
   } else {

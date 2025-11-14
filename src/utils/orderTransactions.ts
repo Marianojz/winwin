@@ -160,8 +160,12 @@ export function loadOrderTransactions(
     } else {
       callback([]);
     }
-  }, (error) => {
-    console.error('Error cargando transacciones:', error);
+  }, (error: any) => {
+    // Solo mostrar error si no es un error de permisos (que es esperado para usuarios no admin)
+    if (error?.code !== 'PERMISSION_DENIED' && !error?.message?.includes('permission_denied')) {
+      console.error('Error cargando transacciones:', error);
+    }
+    // Siempre devolver array vacío en caso de error
     callback([]);
   });
   

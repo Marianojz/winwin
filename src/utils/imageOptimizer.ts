@@ -1,6 +1,16 @@
 /**
  * Utilidades para optimizar imágenes manteniendo alta calidad
+ * 
+ * Este módulo proporciona funciones para optimizar imágenes y generar favicons
+ * usando Canvas API del navegador.
+ * 
+ * @module imageOptimizer
  */
+
+// Verificar que estamos en un entorno con DOM (navegador)
+if (typeof window === 'undefined' || typeof document === 'undefined') {
+  console.warn('imageOptimizer: Este módulo requiere un entorno de navegador');
+}
 
 /**
  * Optimiza una imagen usando Canvas manteniendo alta calidad
