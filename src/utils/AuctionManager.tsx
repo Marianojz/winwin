@@ -13,6 +13,7 @@ const AuctionManager = () => {
   const previousBidsRef = useRef<Map<string, number>>(new Map());
   const celebratedWinsRef = useRef<Set<string>>(new Set()); // Rastrear victorias ya celebradas
   const processedEndedAuctionsRef = useRef<Set<string>>(new Set()); // Rastrear subastas ya procesadas al finalizar
+  const waitingAuthLoggedRef = useRef<boolean>(false); // Para evitar logs repetidos
 
   useEffect(() => {
     // Cargar victorias ya celebradas desde localStorage
@@ -46,6 +47,19 @@ const AuctionManager = () => {
   }, [auctions, user]);
 
   useEffect(() => {
+    // Verificar usuario temprano para evitar ejecuciones innecesarias
+    if (!user) {
+      // Solo imprimir el mensaje una vez
+      if (!waitingAuthLoggedRef.current) {
+        console.log('⏳ Esperando autenticación del usuario antes de procesar subastas...');
+        waitingAuthLoggedRef.current = true;
+      }
+      return; // Salir temprano si no hay usuario
+    }
+    
+    // Resetear el flag cuando hay usuario
+    waitingAuthLoggedRef.current = false;
+    
     // ✅ NUEVO: LIMPIAR SUBASTAS CORRUPTAS
     const cleanCorruptedAuctions = () => {
       const corruptedAuctions = auctions.filter(auction => 
@@ -120,8 +134,7 @@ const AuctionManager = () => {
 
       // Verificar que el usuario esté autenticado antes de procesar
       if (!user) {
-        console.log('⏳ Esperando autenticación del usuario antes de procesar subastas...');
-        return;
+        return; // Ya se verificó arriba, solo salir silenciosamente
       }
 
       console.log('🕐 Chequeando subastas - Hora actual:', now.toISOString());

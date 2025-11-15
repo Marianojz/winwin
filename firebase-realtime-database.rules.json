@@ -14,7 +14,7 @@
     },
     "messages": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
-      ".write": "auth != null",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
       "$conversationId": {
         ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || $conversationId.matches(/^admin_.*/))",
         ".write": "auth != null",
@@ -49,12 +49,14 @@
       ".write": "auth != null && (auth.uid == 'admin' || root.child('users').child(auth.uid).child('isAdmin').val() == true)"
     },
     "notifications": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
       "$userId": {
-        ".read": "auth != null && auth.uid == $userId",
-        ".write": "auth != null && auth.uid == $userId",
+        ".read": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+        ".write": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
         "$notificationId": {
-          ".read": "auth != null && auth.uid == $userId",
-          ".write": "auth != null && auth.uid == $userId"
+          ".read": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+          ".write": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)"
         }
       }
     },
@@ -95,6 +97,18 @@
     "tracking_searches": {
       ".read": true,
       ".write": true
+    },
+    "orderTransactions": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+    },
+    "orderTransactionsByOrder": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+    },
+    "orderSequences": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
     },
     "adminSettings": {
       "$userId": {
