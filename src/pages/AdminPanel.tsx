@@ -1768,8 +1768,9 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
   };
 
   // Calcular estadísticas (después de definir las funciones)
-  const enhancedStats = getEnhancedStats();
-  const orderStats = getTotalStats();
+  // Usar useMemo para recalcular cuando cambien los datos o refreshKey
+  const enhancedStats = useMemo(() => getEnhancedStats(), [auctions, orders, refreshKey]);
+  const orderStats = useMemo(() => getTotalStats(), [orders, refreshKey]);
 
   // Debug: verificar que las estadísticas se calculan
   useEffect(() => {
@@ -2717,6 +2718,8 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                       if (window.confirm('¿Estás seguro de que querés eliminar todas las búsquedas registradas?')) {
                         try {
                           await trackingSystem.clearSearches();
+                          // Forzar re-render actualizando el refreshKey
+                          setRefreshKey(prev => prev + 1);
                           alert('✅ Búsquedas eliminadas correctamente');
                           logAdminAction('Búsquedas de tracking eliminadas', user?.id, user?.username);
                         } catch (error) {
@@ -2802,6 +2805,8 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                       if (window.confirm('¿Estás seguro de que querés eliminar todos los clicks registrados?')) {
                         try {
                           await trackingSystem.clearClicks();
+                          // Forzar re-render actualizando el refreshKey
+                          setRefreshKey(prev => prev + 1);
                           alert('✅ Clicks eliminados correctamente');
                           logAdminAction('Clicks de tracking eliminados', user?.id, user?.username);
                         } catch (error) {

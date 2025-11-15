@@ -286,9 +286,16 @@ class TrackingSystem {
    */
   async clearClicks(): Promise<void> {
     try {
+      // Limpiar estado local primero para actualización inmediata
+      this.clicks = [];
+      
+      // Eliminar de Firebase
       const clicksRef = ref(realtimeDb, 'tracking_clicks');
       await remove(clicksRef);
-      this.clicks = [];
+      
+      // Esperar un momento para que Firebase procese y el listener se actualice
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       console.log('✅ Todos los clicks eliminados de Firebase');
     } catch (error) {
       console.error('❌ Error eliminando clicks de Firebase:', error);
@@ -301,9 +308,16 @@ class TrackingSystem {
    */
   async clearSearches(): Promise<void> {
     try {
+      // Limpiar estado local primero para actualización inmediata
+      this.searches = [];
+      
+      // Eliminar de Firebase
       const searchesRef = ref(realtimeDb, 'tracking_searches');
       await remove(searchesRef);
-      this.searches = [];
+      
+      // Esperar un momento para que Firebase procese y el listener se actualice
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       console.log('✅ Todas las búsquedas eliminadas de Firebase');
     } catch (error) {
       console.error('❌ Error eliminando búsquedas de Firebase:', error);
