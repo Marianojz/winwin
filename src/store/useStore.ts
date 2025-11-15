@@ -477,6 +477,53 @@ export const useStore = create<AppState>((set, get) => ({
       return;
     }
 
+    // Verificar si se acaba de hacer un reset del sistema
+    const resetTimestamp = localStorage.getItem('_systemResetTimestamp');
+    const resetTime = resetTimestamp ? parseInt(resetTimestamp, 10) : 0;
+    const timeSinceReset = Date.now() - resetTime;
+    const wasRecentReset = resetTime > 0 && timeSinceReset < 15000; // Menos de 15 segundos desde el reset
+    
+    if (wasRecentReset) {
+      console.log('⏸️ Reset reciente detectado, esperando antes de cargar notificaciones...');
+      // Limpiar estado y no cargar nada todavía
+      set({ notifications: [], unreadCount: 0 });
+      // Programar verificación después de un delay
+      setTimeout(() => {
+        const currentResetTime = localStorage.getItem('_systemResetTimestamp');
+        const currentTime = Date.now();
+        const resetTime = currentResetTime ? parseInt(currentResetTime, 10) : 0;
+        // Solo verificar si ya pasó suficiente tiempo desde el reset (más de 10 segundos)
+        if (!currentResetTime || (currentTime - resetTime) > 10000) {
+          console.log('✅ Tiempo suficiente transcurrido después del reset, verificando notificaciones...');
+          // Limpiar el flag
+          localStorage.removeItem('_systemResetTimestamp');
+          // Verificar si realmente hay notificaciones antes de crear el listener
+          const currentUser = get().user;
+          if (currentUser) {
+            const checkRef = ref(realtimeDb, `notifications/${currentUser.id}`);
+            firebaseGet(checkRef).then((snapshot) => {
+              if (!snapshot.exists() || !snapshot.val()) {
+                console.log('✅ Confirmado: No hay notificaciones después del reset');
+                set({ notifications: [], unreadCount: 0 });
+              } else {
+                // Si hay datos (no debería pasar después de un reset), cargar normalmente
+                console.log('⚠️ Se encontraron notificaciones después del reset, cargando...');
+                // Continuar con la carga normal llamando a loadUserNotifications de nuevo
+                // pero sin el flag de reset
+                get().loadUserNotifications();
+              }
+            }).catch((error) => {
+              console.warn('⚠️ Error verificando notificaciones después del reset:', error);
+              set({ notifications: [], unreadCount: 0 });
+            });
+          }
+        } else {
+          console.log('⏸️ Aún muy pronto después del reset, esperando más...');
+        }
+      }, 5000);
+      return;
+    }
+
     try {
       // Desconectar listener anterior si existe para evitar múltiples listeners
       const existingUnsubscribe = (get() as any)._notificationUnsubscribe;
@@ -663,16 +710,32 @@ export const useStore = create<AppState>((set, get) => ({
   
   clearNotifications: () => {
     const user = get().user;
-    if (user) {
-      // Desconectar listener de Firebase
-      const unsubscribe = (get() as any)._notificationUnsubscribe;
-      if (unsubscribe) {
-        const notificationsRef = ref(realtimeDb, `notifications/${user.id}`);
-        off(notificationsRef);
-        delete (get() as any)._notificationUnsubscribe;
+    
+    // Desconectar listener de Firebase (usar tanto unsubscribe como off para asegurar desconexión)
+    const unsubscribe = (get() as any)._notificationUnsubscribe;
+    if (unsubscribe) {
+      try {
+        // Llamar a la función unsubscribe si existe
+        if (typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
+        // También desconectar usando off por si acaso
+        if (user) {
+          const notificationsRef = ref(realtimeDb, `notifications/${user.id}`);
+          off(notificationsRef);
+        }
+        console.log('🔌 Listener de notificaciones desconectado');
+      } catch (error) {
+        console.warn('⚠️ Error al desconectar listener de notificaciones:', error);
       }
+      delete (get() as any)._notificationUnsubscribe;
     }
+    
+    // Limpiar estado
     set({ notifications: [], unreadCount: 0 });
+    (get() as any)._notificationProcessing = false;
+    (get() as any)._lastNotificationCount = 0;
+    (get() as any)._notificationLogged = false;
   },
   
   addNotification: async (notification) => {

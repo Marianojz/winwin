@@ -514,11 +514,25 @@ function App() {
   // NOTA: Se carga una sola vez al iniciar, las páginas individuales pueden recargar si es necesario
   useEffect(() => {
     if (user && loadUserNotifications) {
-      // Pequeño delay para asegurar que el store esté inicializado
+      // Verificar si se acaba de hacer un reset del sistema
+      const resetTimestamp = localStorage.getItem('_systemResetTimestamp');
+      const resetTime = resetTimestamp ? parseInt(resetTimestamp, 10) : 0;
+      const timeSinceReset = Date.now() - resetTime;
+      const wasRecentReset = resetTime > 0 && timeSinceReset < 10000; // Menos de 10 segundos desde el reset
+      
+      // Si fue un reset reciente, esperar más tiempo y limpiar el flag
+      const delay = wasRecentReset ? 5000 : 1000; // 5 segundos después de reset, 1 segundo normal
+      
       const timer = setTimeout(() => {
-        console.log('🔄 Cargando notificaciones al iniciar app para usuario:', user.username);
+        // Limpiar el flag de reset si existe
+        if (wasRecentReset) {
+          localStorage.removeItem('_systemResetTimestamp');
+          console.log('🧹 Flag de reset limpiado, cargando notificaciones después del reset...');
+        } else {
+          console.log('🔄 Cargando notificaciones al iniciar app para usuario:', user.username);
+        }
         loadUserNotifications();
-      }, 1000); // Aumentado para evitar conflictos con otros componentes
+      }, delay);
       
       return () => clearTimeout(timer);
     }

@@ -1,5 +1,5 @@
 // Firebase Realtime Database imports
-import { ref as dbRef, update, remove, onValue, off, set as firebaseSet } from 'firebase/database';
+import { ref as dbRef, update, remove, onValue, off, set as firebaseSet, get } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
 
 // Otras importaciones de Lucide, React, etc.
@@ -104,7 +104,7 @@ const AdminPanel = (): React.ReactElement => {
     user, auctions, products, bots, orders, theme,
     addBot, updateBot, deleteBot, setProducts, setAuctions, setBots, setOrders, updateOrderStatus, loadBots,
     addAuction, updateAuction, deleteAuction,
-    addNotification
+    addNotification, clearNotifications
   } = useStore();
   
   // Estados principales
@@ -1472,6 +1472,10 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       
       // 🔥 ELIMINAR TODO DE FIREBASE REALTIME DATABASE
       try {
+        // PRIMERO: Limpiar estado y desconectar listeners de notificaciones
+        console.log('🧹 Limpiando estado de notificaciones y desconectando listeners...');
+        clearNotifications();
+        
         // Eliminar subastas
         const auctionsRef = dbRef(realtimeDb, 'auctions');
         await remove(auctionsRef);
@@ -1488,9 +1492,32 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         // Log silencioso - funcionalidad oculta del admin
         
         // Eliminar notificaciones de todos los usuarios
+        // Primero verificar si existen notificaciones y eliminarlas por usuario también
         const notificationsRef = dbRef(realtimeDb, 'notifications');
+        const notificationsSnapshot = await get(notificationsRef);
+        
+        if (notificationsSnapshot.exists()) {
+          const notificationsData = notificationsSnapshot.val();
+          // Eliminar notificaciones por cada usuario para asegurar eliminación completa
+          if (notificationsData && typeof notificationsData === 'object') {
+            const deletePromises = Object.keys(notificationsData).map(userId => {
+              const userNotificationsRef = dbRef(realtimeDb, `notifications/${userId}`);
+              return remove(userNotificationsRef).catch(err => {
+                console.warn(`⚠️ Error eliminando notificaciones de usuario ${userId}:`, err);
+                return null;
+              });
+            });
+            await Promise.all(deletePromises);
+            console.log(`✅ Notificaciones eliminadas de ${Object.keys(notificationsData).length} usuarios`);
+          }
+        }
+        
+        // Eliminar también la raíz por si acaso
         await remove(notificationsRef);
-        console.log('✅ Todas las notificaciones eliminadas de Firebase');
+        console.log('✅ Todas las notificaciones eliminadas de Firebase (raíz y por usuario)');
+        
+        // Esperar un momento para asegurar que Firebase procese la eliminación
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Eliminar mensajes de todas las conversaciones
         const messagesRef = dbRef(realtimeDb, 'messages');
@@ -1561,7 +1588,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       localStorage.removeItem('cart');
       localStorage.removeItem('orders');
       
-      // Limpiar estado de la app
+      // Limpiar estado de la app (las notificaciones ya se limpiaron arriba con clearNotifications)
       setAuctions([]);
       setProducts([]);
       setBots([]);
@@ -1570,17 +1597,20 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       // Registrar acción en log
       logAdminAction('Sistema reseteado completamente (solo usuarios preservados)', user?.id, user?.username);
       
+      // Marcar en localStorage que se acaba de hacer un reset (para evitar cargar notificaciones inmediatamente)
+      localStorage.setItem('_systemResetTimestamp', Date.now().toString());
+      
       // Mostrar resultado
       if (errors.length > 0) {
         alert(`⚠️ Reset completado con algunos errores:\n\n${errors.join('\n')}\n\n✅ Usuarios registrados preservados\n\nRevisa la consola para más detalles.`);
       } else {
-        alert('✅ Sistema reseteado completamente.\n\n✅ Usuarios registrados preservados\n✅ Todos los demás datos eliminados de Firebase\n\nLa página se recargará en 2 segundos...');
+        alert('✅ Sistema reseteado completamente.\n\n✅ Usuarios registrados preservados\n✅ Todos los demás datos eliminados de Firebase\n\nLa página se recargará en 3 segundos...');
       }
       
-      // Recargar para aplicar cambios SIN perder sesión
+      // Recargar para aplicar cambios SIN perder sesión (aumentado a 3 segundos para dar tiempo a Firebase)
       setTimeout(() => {
         window.location.reload();
-      }, 2000);
+      }, 3000);
     } catch (error) {
       console.error('Error en reset:', error);
       alert('❌ Error crítico al resetear datos. Revisa la consola para más detalles.');
