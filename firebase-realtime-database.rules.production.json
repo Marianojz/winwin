@@ -59,11 +59,11 @@
       ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
       ".validate": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
       "$userId": {
-        ".read": "auth != null && auth.uid == $userId",
-        ".write": "auth != null && auth.uid == $userId",
+        ".read": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+        ".write": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
         "$notificationId": {
-          ".read": "auth != null && auth.uid == $userId",
-          ".write": "auth != null && auth.uid == $userId"
+          ".read": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+          ".write": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)"
         }
       }
     },
@@ -94,15 +94,15 @@
       ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
     },
     "action_logs": {
-      ".read": "auth != null",
+      ".read": true,
       ".write": "auth != null"
     },
     "tracking_clicks": {
-      ".read": "auth != null",
+      ".read": true,
       ".write": "auth != null"
     },
     "tracking_searches": {
-      ".read": "auth != null",
+      ".read": true,
       ".write": "auth != null"
     },
     "adminSettings": {

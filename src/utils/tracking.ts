@@ -3,7 +3,7 @@
  * Registra todas las acciones de usuario con fecha e ID único
  */
 
-import { ref, push, query, orderByKey, limitToLast, onValue, off } from 'firebase/database';
+import { ref, push, query, orderByKey, limitToLast, onValue, off, remove } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
 import { actionLogger } from './actionLogger';
 
@@ -279,6 +279,36 @@ class TrackingSystem {
     }
 
     return { clicksRemoved, searchesRemoved };
+  }
+
+  /**
+   * Limpia todos los clicks de Firebase y localmente
+   */
+  async clearClicks(): Promise<void> {
+    try {
+      const clicksRef = ref(realtimeDb, 'tracking_clicks');
+      await remove(clicksRef);
+      this.clicks = [];
+      console.log('✅ Todos los clicks eliminados de Firebase');
+    } catch (error) {
+      console.error('❌ Error eliminando clicks de Firebase:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Limpia todas las búsquedas de Firebase y localmente
+   */
+  async clearSearches(): Promise<void> {
+    try {
+      const searchesRef = ref(realtimeDb, 'tracking_searches');
+      await remove(searchesRef);
+      this.searches = [];
+      console.log('✅ Todas las búsquedas eliminadas de Firebase');
+    } catch (error) {
+      console.error('❌ Error eliminando búsquedas de Firebase:', error);
+      throw error;
+    }
   }
 
   /**

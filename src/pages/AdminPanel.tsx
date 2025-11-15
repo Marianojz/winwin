@@ -850,11 +850,23 @@ const [auctionForm, setAuctionForm] = useState({
     const inTransit = orders.filter((o: { status: string; }) => o.status === 'in_transit').length;
     const delivered = orders.filter((o: { status: string; }) => o.status === 'delivered').length;
     
-    // Ingresos
+    // Ingresos - incluir pedidos de tienda y subastas
+    // Ingresos de pedidos de tienda (delivered)
+    const storeOrdersRevenue = orders
+      .filter((o: { status: string; type?: string; }) => o.status === 'delivered' && o.type === 'store')
+      .reduce((sum: any, o: { amount: any; }) => sum + (o.amount || 0), 0);
+    
+    // Ingresos de subastas (pedidos de subastas entregados)
+    const auctionOrdersRevenue = orders
+      .filter((o: { status: string; type?: string; }) => o.status === 'delivered' && o.type === 'auction')
+      .reduce((sum: any, o: { amount: any; }) => sum + (o.amount || 0), 0);
+    
+    // Ingresos totales (pedidos confirmados/pagados)
     const totalRevenue = orders
       .filter((o: { status: string; }) => ['payment_confirmed', 'processing', 'in_transit', 'delivered'].includes(o.status))
-      .reduce((sum: any, o: { amount: any; }) => sum + o.amount, 0);
+      .reduce((sum: any, o: { amount: any; }) => sum + (o.amount || 0), 0);
     
+    // Ingresos del mes
     const monthRevenue = orders
       .filter((o: { createdAt: string | number | Date; status: string; }) => {
         const orderDate = new Date(o.createdAt);
@@ -863,7 +875,7 @@ const [auctionForm, setAuctionForm] = useState({
                orderDate.getFullYear() === now.getFullYear() &&
                ['payment_confirmed', 'processing', 'in_transit', 'delivered'].includes(o.status);
       })
-      .reduce((sum: any, o: { amount: any; }) => sum + o.amount, 0);
+      .reduce((sum: any, o: { amount: any; }) => sum + (o.amount || 0), 0);
     
     // Bots - Eliminar duplicados antes de calcular
     const uniqueBots = Array.from(
@@ -887,7 +899,7 @@ const [auctionForm, setAuctionForm] = useState({
       auctions: { active: activeAuctions, ended: endedAuctions, totalBids },
       products: { total: totalProducts, active: activeProducts, lowStock: lowStockProducts, outOfStock: outOfStockProducts },
       orders: { total: totalOrders, pendingPayment, processing, inTransit, delivered },
-      revenue: { total: totalRevenue, month: monthRevenue },
+      revenue: { total: totalRevenue, month: monthRevenue, store: storeOrdersRevenue, auctions: auctionOrdersRevenue },
       bots: { active: activeBots.length, total: uniqueBots.length, totalBalance: totalBotsBalance },
       tickets: { total: totalTickets, pending: pendingTickets, inReview: inReviewTickets, resolved: resolvedTickets },
       contactMessages: { total: totalContactMessages, unread: unreadContactMessages }
@@ -1708,9 +1720,19 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
 
   // Estadísticas mejoradas: ingresos por subastas y tienda, más buscado, más cliqueado
   const getEnhancedStats = () => {
-    // Ingresos por subastas (ventas ganadas)
+    // Ingresos por subastas (ventas ganadas) - usar la oferta ganadora real
     const auctionsWithWinner = getAuctionsWithWinner(auctions);
-    const auctionRevenue = auctionsWithWinner.reduce((sum: number, a: Auction) => sum + (a.currentPrice || 0), 0);
+    const auctionRevenue = auctionsWithWinner.reduce((sum: number, a: Auction) => {
+      // Si hay ofertas, usar la oferta más alta (ganadora)
+      if (a.bids && a.bids.length > 0) {
+        const winningBid = a.bids.reduce((highest, current) => 
+          current.amount > highest.amount ? current : highest
+        );
+        return sum + winningBid.amount;
+      }
+      // Si no hay ofertas pero hay currentPrice, usar ese
+      return sum + (a.currentPrice || 0);
+    }, 0);
 
     // Ingresos por tienda (pedidos entregados)
     const storeRevenue = orders
@@ -2682,11 +2704,45 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               borderRadius: '1rem',
               border: '1px solid var(--border)'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                <Search size={20} />
-                <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  Más Buscado
-                </h3>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Search size={20} />
+                  <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Más Buscado
+                  </h3>
+                </div>
+                {enhancedStats.mostSearched.length > 0 && (
+                  <button
+                    onClick={async () => {
+                      if (window.confirm('¿Estás seguro de que querés eliminar todas las búsquedas registradas?')) {
+                        try {
+                          await trackingSystem.clearSearches();
+                          alert('✅ Búsquedas eliminadas correctamente');
+                          logAdminAction('Búsquedas de tracking eliminadas', user?.id, user?.username);
+                        } catch (error) {
+                          console.error('Error eliminando búsquedas:', error);
+                          alert('❌ Error al eliminar búsquedas. Revisa la consola.');
+                        }
+                      }
+                    }}
+                    style={{
+                      padding: '0.375rem 0.75rem',
+                      background: 'var(--error)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem'
+                    }}
+                  >
+                    <Trash2 size={14} />
+                    Limpiar
+                  </button>
+                )}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {enhancedStats.mostSearched.length === 0 ? (
@@ -2733,11 +2789,45 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               borderRadius: '1rem',
               border: '1px solid var(--border)'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                <MousePointerClick size={20} />
-                <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  Más Cliqueado
-                </h3>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <MousePointerClick size={20} />
+                  <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Más Cliqueado
+                  </h3>
+                </div>
+                {enhancedStats.mostClicked.length > 0 && (
+                  <button
+                    onClick={async () => {
+                      if (window.confirm('¿Estás seguro de que querés eliminar todos los clicks registrados?')) {
+                        try {
+                          await trackingSystem.clearClicks();
+                          alert('✅ Clicks eliminados correctamente');
+                          logAdminAction('Clicks de tracking eliminados', user?.id, user?.username);
+                        } catch (error) {
+                          console.error('Error eliminando clicks:', error);
+                          alert('❌ Error al eliminar clicks. Revisa la consola.');
+                        }
+                      }
+                    }}
+                    style={{
+                      padding: '0.375rem 0.75rem',
+                      background: 'var(--error)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem'
+                    }}
+                  >
+                    <Trash2 size={14} />
+                    Limpiar
+                  </button>
+                )}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {enhancedStats.mostClicked.length === 0 ? (
