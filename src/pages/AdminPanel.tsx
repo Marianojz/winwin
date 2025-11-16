@@ -3,7 +3,7 @@ import { ref as dbRef, update, remove, onValue, off, set as firebaseSet, get } f
 import { realtimeDb } from '../config/firebase';
 
 // Otras importaciones de Lucide, React, etc.
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Eye, Edit, Trash2, Users, Clock, AlertCircle, Activity, RefreshCw,
   Gavel, Package, Bot, DollarSign, Plus, XCircle,
@@ -12,7 +12,7 @@ import {
   MousePointerClick, Image as ImageIcon, Save, Store, Mail, Send,
   CheckCircle, Truck, FileText, Calendar, User, CreditCard,
   ArrowRight, ArrowDown, ArrowUp, Download, Trash, HelpCircle, Ticket as TicketIcon,
-  MessageSquare, Palette, Shuffle, CheckSquare, Square
+  MessageSquare, Palette, Shuffle, CheckSquare, Square, BookOpen, Upload
 } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -115,6 +115,17 @@ const AdminPanel = (): React.ReactElement => {
   const [clearedActivityTimestamp, setClearedActivityTimestamp] = useState<number>(0); // Timestamp de actividad limpiada
   const [republishModal, setRepublishModal] = useState<{ show: boolean; auction: Auction | null }>({ show: false, auction: null });
   
+  // Estados para gestión de blog
+  const [blogPosts, setBlogPosts] = useState<any[]>([]);
+  const [selectedBlogPost, setSelectedBlogPost] = useState<any>(null);
+  const [isEditingBlogPost, setIsEditingBlogPost] = useState(false);
+  const [blogSearchTerm, setBlogSearchTerm] = useState('');
+  const [blogFilterCategory, setBlogFilterCategory] = useState<string>('all');
+  const [blogCategories, setBlogCategories] = useState<string[]>([]);
+  
+  // Referencia para hacer scroll al inicio cuando cambia la pestaña
+  const panelHeaderRef = useRef<HTMLDivElement>(null);
+  
   // Cargar bots desde Firebase al montar el componente
   useEffect(() => {
     if (user?.isAdmin) {
@@ -143,34 +154,36 @@ const AdminPanel = (): React.ReactElement => {
     if (user?.id) {
       const timestampRef = dbRef(realtimeDb, `adminSettings/${user.id}/clearedActivityTimestamp`);
       const unsubscribe = onValue(timestampRef, (snapshot) => {
-        const timestamp = snapshot.val();
-        if (timestamp) {
-          const timestampNum = typeof timestamp === 'string' ? parseInt(timestamp) : timestamp;
-          setClearedActivityTimestamp(timestampNum);
-          // También guardar en localStorage para compatibilidad
-          localStorage.setItem(`clearedActivityTimestamp_${user.id}`, timestampNum.toString());
-        } else {
-          // Si no hay en Firebase, intentar desde localStorage
+        try {
+          const timestamp = snapshot.val();
+          if (timestamp) {
+            const timestampNum = typeof timestamp === 'string' ? parseInt(timestamp) : timestamp;
+            setClearedActivityTimestamp(timestampNum);
+            // También guardar en localStorage para compatibilidad
+            localStorage.setItem(`clearedActivityTimestamp_${user.id}`, timestampNum.toString());
+          } else {
+            // Si no hay en Firebase, intentar desde localStorage
+            const localTimestamp = localStorage.getItem(`clearedActivityTimestamp_${user.id}`) || 
+                                   localStorage.getItem('clearedActivityTimestamp');
+            if (localTimestamp) {
+              const timestampNum = parseInt(localTimestamp);
+              setClearedActivityTimestamp(timestampNum);
+            }
+          }
+        } catch (error: any) {
+          // Si hay error de permisos, solo usar localStorage (no es crítico)
+          if (error?.code === 'PERMISSION_DENIED') {
+            console.log('ℹ️ No hay permisos para adminSettings, usando localStorage');
+          } else {
+            console.error('Error cargando timestamp de actividad:', error);
+          }
+          // Fallback a localStorage
           const localTimestamp = localStorage.getItem(`clearedActivityTimestamp_${user.id}`) || 
                                  localStorage.getItem('clearedActivityTimestamp');
           if (localTimestamp) {
             const timestampNum = parseInt(localTimestamp);
             setClearedActivityTimestamp(timestampNum);
           }
-        }
-      }, (error: any) => {
-        // Si hay error de permisos, solo usar localStorage (no es crítico)
-        if (error?.code === 'PERMISSION_DENIED') {
-          console.log('ℹ️ No hay permisos para adminSettings, usando localStorage');
-        } else {
-          console.error('Error cargando timestamp de actividad:', error);
-        }
-        // Fallback a localStorage
-        const localTimestamp = localStorage.getItem(`clearedActivityTimestamp_${user.id}`) || 
-                               localStorage.getItem('clearedActivityTimestamp');
-        if (localTimestamp) {
-          const timestampNum = parseInt(localTimestamp);
-          setClearedActivityTimestamp(timestampNum);
         }
       });
       
@@ -179,6 +192,44 @@ const AdminPanel = (): React.ReactElement => {
       };
     }
   }, [user?.id]);
+  
+  // Scroll al inicio cuando cambia la pestaña activa
+  useEffect(() => {
+    if (panelHeaderRef.current) {
+      panelHeaderRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      // Fallback: scroll al inicio de la página
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [activeTab]);
+  
+  // Cargar posts del blog desde Firebase
+  useEffect(() => {
+    if (user?.isAdmin && activeTab === 'blog') {
+      const blogRef = dbRef(realtimeDb, 'blog');
+      const unsubscribe = onValue(blogRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data && Object.keys(data).length > 0) {
+          const postsArray = Object.keys(data).map(key => ({
+            id: key,
+            ...data[key]
+          }));
+          setBlogPosts(postsArray);
+          
+          // Extraer categorías únicas
+          const categories = [...new Set(postsArray.map((post: any) => post.category).filter(Boolean))];
+          setBlogCategories(categories);
+        } else {
+          setBlogPosts([]);
+          setBlogCategories([]);
+        }
+      });
+      
+      return () => {
+        off(blogRef);
+      };
+    }
+  }, [user?.isAdmin, activeTab]);
   
   // Estado para configuración del inicio
   const [homeConfig, setHomeConfig] = useState<HomeConfig>(defaultHomeConfig);
@@ -2332,6 +2383,401 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     }
   };
 
+  // Función para crear el artículo de Navidad
+  const createNavidadPost = async () => {
+    if (!user) return;
+    
+    const navidadPostId = 'blog_navidad_2024';
+    
+    // Verificar si ya existe
+    try {
+      const existingPostRef = dbRef(realtimeDb, `blog/${navidadPostId}`);
+      const snapshot = await get(existingPostRef);
+      if (snapshot.exists()) {
+        alert('ℹ️ El artículo de Navidad ya existe. Puedes editarlo desde la lista.');
+        return;
+      }
+    } catch (error) {
+      console.error('Error verificando artículo existente:', error);
+    }
+    const navidadPost = {
+      id: navidadPostId,
+      title: '¿Qué regalar esta Navidad? Guía completa de regalería en Argentina',
+      excerpt: 'La Navidad se acerca y con ella la oportunidad de sorprender a tus seres queridos. Te traemos las mejores ideas de regalos para esta temporada, con opciones para todos los gustos y presupuestos.',
+      category: 'Regalería',
+      bannerImage: 'https://images.unsplash.com/photo-1482517967863-00e15c9b44be?w=1200&q=80',
+      featuredImage: 'https://images.unsplash.com/photo-1482517967863-00e15c9b44be?w=1200&q=80',
+      author: 'Equipo Clikio',
+      published: true,
+      createdAt: new Date('2024-12-20').toISOString(),
+      updatedAt: new Date('2024-12-20').toISOString(),
+      tags: ['navidad', 'regalos', 'guía'],
+      views: 0,
+      content: `<section style="margin-bottom: 3rem;">
+  <p style="margin-bottom: 1.5rem;">
+    La Navidad en Argentina es una época especial llena de tradiciones, encuentros familiares y, por supuesto, 
+    la búsqueda del regalo perfecto. Este año, las tendencias en regalería combinan lo tradicional con lo moderno, 
+    ofreciendo opciones para todos los gustos y presupuestos.
+  </p>
+  <p style="margin-bottom: 1.5rem;">
+    Desde productos gourmet típicos argentinos hasta tecnología de última generación, pasando por experiencias 
+    únicas y regalos personalizados, hay un mundo de posibilidades esperándote. En esta guía completa, te ayudamos 
+    a encontrar el regalo ideal para cada persona especial en tu vida.
+  </p>
+</section>
+
+<section style="margin-bottom: 3rem;">
+  <h2 style="font-size: 2rem; font-weight: 700; margin-bottom: 1.5rem; color: var(--text-primary);">
+    Regalos Tradicionales Argentinos
+  </h2>
+  
+  <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
+    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border);">
+      <img src="https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=600&q=80" alt="Pan Dulce" style="width: 100%; height: 200px; object-fit: cover; border-radius: 0.75rem; margin-bottom: 1rem;" />
+      <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Pan Dulce Artesanal</h3>
+      <p style="font-size: 0.9375rem; color: var(--text-secondary); line-height: 1.6;">
+        Este clásico de la mesa navideña es un pan esponjoso relleno de frutas secas y confitadas. 
+        Un regalo que nunca pasa de moda y que todos disfrutan. Podés encontrar versiones artesanales 
+        con ingredientes premium en panaderías especializadas.
+      </p>
+    </div>
+
+    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border);">
+      <img src="https://images.unsplash.com/photo-1603532648955-039310d9ed75?w=600&q=80" alt="Alfajores" style="width: 100%; height: 200px; object-fit: cover; border-radius: 0.75rem; margin-bottom: 1rem;" />
+      <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Alfajores Artesanales</h3>
+      <p style="font-size: 0.9375rem; color: var(--text-secondary); line-height: 1.6;">
+        Los alfajores rellenos de dulce de leche y bañados en chocolate son una delicia que representa 
+        la dulzura de la Navidad argentina. Marcas artesanales ofrecen versiones gourmet con ingredientes 
+        de primera calidad.
+      </p>
+    </div>
+  </div>
+
+  <div style="padding: 1.5rem; background: linear-gradient(135deg, rgba(255, 107, 0, 0.1), rgba(255, 159, 64, 0.1)); border-radius: 1rem; border: 1px solid var(--primary); margin-top: 1.5rem;">
+    <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--primary);">
+      Vinos Argentinos Premium
+    </h3>
+    <p style="margin-bottom: 1rem; line-height: 1.6;">
+      Una botella de Malbec o Torrontés de alguna bodega reconocida es un obsequio elegante y apreciado 
+      por los amantes del buen vino. Las bodegas de Mendoza, San Juan y Salta ofrecen opciones excepcionales 
+      que van desde los $5.000 hasta ediciones limitadas premium.
+    </p>
+    <img src="https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=800&q=80" alt="Vinos Argentinos" style="width: 100%; height: 250px; object-fit: cover; border-radius: 0.75rem;" />
+  </div>
+</section>
+
+<section style="margin-bottom: 3rem;">
+  <h2 style="font-size: 2rem; font-weight: 700; margin-bottom: 1.5rem; color: var(--text-primary);">
+    Regalos Tecnológicos
+  </h2>
+  
+  <p style="margin-bottom: 1.5rem;">
+    La tecnología sigue siendo una de las categorías más populares en la lista de deseos navideños. 
+    Según estudios recientes, estos son los regalos tecnológicos más buscados en Argentina:
+  </p>
+
+  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
+    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border); text-align: center;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">Parlantes Portátiles</h3>
+      <p style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6;">
+        Ideales para quienes disfrutan de la música en cualquier lugar. Precios desde $15.000.
+      </p>
+    </div>
+
+    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border); text-align: center;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">Auriculares Inalámbricos</h3>
+      <p style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6;">
+        Perfectos para los que buscan comodidad y calidad de sonido. Desde $8.000.
+      </p>
+    </div>
+
+    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border); text-align: center;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">Smartwatches</h3>
+      <p style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6;">
+        Para aquellos interesados en tecnología y seguimiento de actividad física. Desde $25.000.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section style="margin-bottom: 3rem;">
+  <h2 style="font-size: 2rem; font-weight: 700; margin-bottom: 1.5rem; color: var(--text-primary);">
+    Regalos Personalizados y Artesanales
+  </h2>
+  
+  <p style="margin-bottom: 1.5rem;">
+    Un regalo hecho a mano o personalizado demuestra dedicación y cariño. Estas son algunas ideas que 
+    podés encontrar en emprendimientos argentinos:
+  </p>
+
+  <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
+    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border);">
+      <img src="https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=600&q=80" alt="Tazas Personalizadas" style="width: 100%; height: 200px; object-fit: cover; border-radius: 0.75rem; margin-bottom: 1rem;" />
+      <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Tazas Personalizadas</h3>
+      <p style="font-size: 0.9375rem; color: var(--text-secondary); line-height: 1.6;">
+        Con mensajes o imágenes que tengan un significado especial para la persona que lo recibe. 
+        Podés personalizarlas con fotos, frases o diseños únicos.
+      </p>
+    </div>
+
+    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border);">
+      <img src="https://images.unsplash.com/photo-1512820790803-83ca750daaf4?w=600&q=80" alt="Velas Aromáticas" style="width: 100%; height: 200px; object-fit: cover; border-radius: 0.75rem; margin-bottom: 1rem;" />
+      <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Velas Aromáticas Artesanales</h3>
+      <p style="font-size: 0.9375rem; color: var(--text-secondary); line-height: 1.6;">
+        Con fragancias que evocan recuerdos o sensaciones agradables. Emprendimientos locales ofrecen 
+        opciones con cera de soja y esencias naturales.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section style="margin-bottom: 3rem;">
+  <h2 style="font-size: 2rem; font-weight: 700; margin-bottom: 1.5rem; color: var(--text-primary);">
+    Experiencias como Regalo
+  </h2>
+  
+  <p style="margin-bottom: 1.5rem;">
+    Regalar experiencias se ha convertido en una tendencia creciente. Algunas opciones que podés considerar:
+  </p>
+
+  <div style="padding: 2rem; background: linear-gradient(135deg, rgba(255, 107, 0, 0.05), rgba(255, 159, 64, 0.05)); border-radius: 1rem; border: 1px solid var(--border); margin-bottom: 1.5rem;">
+    <ul style="list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+      <li style="display: flex; align-items: flex-start; gap: 0.75rem;">
+        <span style="color: var(--primary); font-size: 1.5rem;">✓</span>
+        <div>
+          <strong style="display: block; margin-bottom: 0.25rem;">Cenas en Restaurantes Temáticos</strong>
+          <span style="font-size: 0.875rem; color: var(--text-secondary);">Ofrece una noche especial en un lugar único</span>
+        </div>
+      </li>
+      <li style="display: flex; align-items: flex-start; gap: 0.75rem;">
+        <span style="color: var(--primary); font-size: 1.5rem;">✓</span>
+        <div>
+          <strong style="display: block; margin-bottom: 0.25rem;">Clases de Cocina o Arte</strong>
+          <span style="font-size: 0.875rem; color: var(--text-secondary);">Para quienes disfrutan aprendiendo nuevas habilidades</span>
+        </div>
+      </li>
+      <li style="display: flex; align-items: flex-start; gap: 0.75rem;">
+        <span style="color: var(--primary); font-size: 1.5rem;">✓</span>
+        <div>
+          <strong style="display: block; margin-bottom: 0.25rem;">Entradas para Espectáculos</strong>
+          <span style="font-size: 0.875rem; color: var(--text-secondary);">Conciertos, obras de teatro o eventos deportivos</span>
+        </div>
+      </li>
+      <li style="display: flex; align-items: flex-start; gap: 0.75rem;">
+        <span style="color: var(--primary); font-size: 1.5rem;">✓</span>
+        <div>
+          <strong style="display: block; margin-bottom: 0.25rem;">Días de Spa y Bienestar</strong>
+          <span style="font-size: 0.875rem; color: var(--text-secondary);">Sesiones de masajes, tratamientos faciales o relajación</span>
+        </div>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<section style="margin-bottom: 3rem;">
+  <h2 style="font-size: 2rem; font-weight: 700; margin-bottom: 1.5rem; color: var(--text-primary);">
+    Regalos Sostenibles
+  </h2>
+  
+  <p style="margin-bottom: 1.5rem;">
+    Para aquellos comprometidos con el medio ambiente, los regalos sostenibles son una excelente opción. 
+    Emprendimientos argentinos ofrecen productos ecológicos y responsables:
+  </p>
+
+  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;">
+    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border); text-align: center;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">Bolsas de Tela Reutilizables</h3>
+      <p style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6;">
+        Para reducir el uso de plásticos. Diseños únicos de emprendedores locales.
+      </p>
+    </div>
+
+    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border); text-align: center;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">Productos de Higiene Ecológicos</h3>
+      <p style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6;">
+        Como jabones artesanales o champús sólidos, libres de químicos dañinos.
+      </p>
+    </div>
+
+    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border); text-align: center;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">Libros sobre Sostenibilidad</h3>
+      <p style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6;">
+        Para fomentar prácticas más amigables con el planeta.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section style="padding: 2rem; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 1rem; color: white; margin-bottom: 3rem;">
+  <h2 style="font-size: 2rem; font-weight: 700; margin-bottom: 1.5rem; color: white;">
+    Consejos para Elegir el Regalo Perfecto
+  </h2>
+  
+  <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 1rem;">
+    <li style="display: flex; align-items: flex-start; gap: 0.75rem;">
+      <span style="font-size: 1.5rem;">💡</span>
+      <div>
+        <strong style="display: block; margin-bottom: 0.25rem;">Conocé los Gustos del Destinatario</strong>
+        <span style="font-size: 0.9375rem; opacity: 0.9;">Observá sus intereses y necesidades para elegir un regalo que realmente aprecie.</span>
+      </div>
+    </li>
+    <li style="display: flex; align-items: flex-start; gap: 0.75rem;">
+      <span style="font-size: 1.5rem;">⭐</span>
+      <div>
+        <strong style="display: block; margin-bottom: 0.25rem;">Optá por la Calidad</strong>
+        <span style="font-size: 0.9375rem; opacity: 0.9;">Un regalo bien hecho y duradero siempre será valorado.</span>
+      </div>
+    </li>
+    <li style="display: flex; align-items: flex-start; gap: 0.75rem;">
+      <span style="font-size: 1.5rem;">🎁</span>
+      <div>
+        <strong style="display: block; margin-bottom: 0.25rem;">Considerá Experiencias</strong>
+        <span style="font-size: 0.9375rem; opacity: 0.9;">A veces, un momento especial compartido es más significativo que un objeto material.</span>
+      </div>
+    </li>
+    <li style="display: flex; align-items: flex-start; gap: 0.75rem;">
+      <span style="font-size: 1.5rem;">🇦🇷</span>
+      <div>
+        <strong style="display: block; margin-bottom: 0.25rem;">Apoyá lo Local</strong>
+        <span style="font-size: 0.9375rem; opacity: 0.9;">Elegí productos de emprendedores y artesanos argentinos para fomentar la economía local.</span>
+      </div>
+    </li>
+  </ul>
+</section>
+
+<div style="padding: 2rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border); text-align: center; margin-bottom: 3rem;">
+  <p style="font-size: 1.25rem; line-height: 1.8; margin-bottom: 1rem; font-weight: 500;">
+    Recordá que lo más importante es el gesto y el cariño con el que se entrega el regalo. 
+    ¡Que esta Navidad sea una oportunidad para compartir y celebrar con tus seres queridos!
+  </p>
+  <p style="font-size: 1rem; color: var(--text-secondary); font-style: italic;">
+    Desde Clikio, te deseamos una Feliz Navidad llena de alegría, amor y buenos momentos. 🎄✨
+  </p>
+</div>`
+    };
+    
+    try {
+      const postRef = dbRef(realtimeDb, `blog/${navidadPostId}`);
+      await firebaseSet(postRef, navidadPost);
+      alert('✅ Artículo de Navidad creado correctamente');
+      logAdminAction('Artículo de Navidad creado', user.id, user.username, { postId: navidadPostId });
+    } catch (error) {
+      console.error('Error creando artículo de Navidad:', error);
+      alert('❌ Error al crear el artículo de Navidad');
+    }
+  };
+
+  // Funciones para gestión del blog
+  const handleCreateBlogPost = () => {
+    setSelectedBlogPost({
+      id: `blog_${Date.now()}`,
+      title: '',
+      content: '',
+      excerpt: '',
+      category: '',
+      bannerImage: '',
+      featuredImage: '',
+      author: user?.username || 'Admin',
+      published: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      tags: [],
+      views: 0
+    });
+    setIsEditingBlogPost(true);
+  };
+
+  const handleEditBlogPost = (post: any) => {
+    setSelectedBlogPost({ ...post });
+    setIsEditingBlogPost(true);
+  };
+
+  const handleSaveBlogPost = async () => {
+    if (!selectedBlogPost || !user) return;
+    
+    if (!selectedBlogPost.title || !selectedBlogPost.content) {
+      alert('❌ Por favor completa el título y el contenido');
+      return;
+    }
+
+    try {
+      const postData = {
+        ...selectedBlogPost,
+        updatedAt: new Date().toISOString(),
+        author: user.username || 'Admin',
+        authorId: user.id
+      };
+
+      const postRef = dbRef(realtimeDb, `blog/${selectedBlogPost.id}`);
+      await firebaseSet(postRef, postData);
+      
+      alert('✅ Entrada de blog guardada correctamente');
+      setIsEditingBlogPost(false);
+      setSelectedBlogPost(null);
+      logAdminAction('Entrada de blog guardada', user.id, user.username, { postId: selectedBlogPost.id, title: selectedBlogPost.title });
+    } catch (error) {
+      console.error('Error guardando entrada de blog:', error);
+      alert('❌ Error al guardar la entrada de blog');
+    }
+  };
+
+  const handleDeleteBlogPost = async (postId: string) => {
+    if (!user) return;
+    
+    if (!window.confirm('¿Eliminar permanentemente esta entrada del blog?\n\nEsta acción no se puede deshacer.')) {
+      return;
+    }
+
+    try {
+      const postRef = dbRef(realtimeDb, `blog/${postId}`);
+      await remove(postRef);
+      alert('✅ Entrada de blog eliminada');
+      logAdminAction('Entrada de blog eliminada', user.id, user.username, { postId });
+    } catch (error) {
+      console.error('Error eliminando entrada de blog:', error);
+      alert('❌ Error al eliminar la entrada de blog');
+    }
+  };
+
+  const handleUploadBlogImage = async (file: File, type: 'banner' | 'featured') => {
+    if (!user) return;
+    
+    try {
+      const imageRef = storageRef(storage, `blog/${selectedBlogPost?.id || Date.now()}/${type}_${file.name}`);
+      const uploadResult = await uploadImage(file, imageRef);
+      
+      if (uploadResult && selectedBlogPost) {
+        if (type === 'banner') {
+          setSelectedBlogPost({ ...selectedBlogPost, bannerImage: uploadResult });
+        } else {
+          setSelectedBlogPost({ ...selectedBlogPost, featuredImage: uploadResult });
+        }
+        alert('✅ Imagen subida correctamente');
+      }
+    } catch (error) {
+      console.error('Error subiendo imagen:', error);
+      alert('❌ Error al subir la imagen');
+    }
+  };
+
+  // Filtrar posts del blog
+  const filteredBlogPosts = useMemo(() => {
+    return blogPosts.filter((post: any) => {
+      const matchesSearch = !blogSearchTerm || 
+        post.title?.toLowerCase().includes(blogSearchTerm.toLowerCase()) ||
+        post.content?.toLowerCase().includes(blogSearchTerm.toLowerCase()) ||
+        post.excerpt?.toLowerCase().includes(blogSearchTerm.toLowerCase());
+      
+      const matchesCategory = blogFilterCategory === 'all' || post.category === blogFilterCategory;
+      
+      return matchesSearch && matchesCategory;
+    }).sort((a: any, b: any) => {
+      const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      return dateB - dateA;
+    });
+  }, [blogPosts, blogSearchTerm, blogFilterCategory]);
+
   // Calcular contadores para bandeja unificada
   const unifiedUnreadCounts = getUnreadCountsByType(unifiedMessages);
   const totalUnreadUnified = unifiedUnreadCounts.total;
@@ -2343,6 +2789,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     { id: 'users', label: 'Usuarios', icon: Users },
     { id: 'orders', label: 'Pedidos', icon: ShoppingCart },
     { id: 'bots', label: 'Bots', icon: Bot },
+    { id: 'blog', label: 'Blog', icon: BookOpen },
     { id: 'unified-inbox', label: 'Bandeja Unificada', icon: Mail, badge: totalUnreadUnified > 0 ? totalUnreadUnified : undefined },
     { id: 'messages', label: 'Mensajes', icon: MessageSquare, badge: adminUnreadCount > 0 ? adminUnreadCount : undefined },
     { id: 'tickets', label: 'Tickets', icon: TicketIcon, badge: tickets.filter(t => t.status !== 'resuelto').length > 0 ? tickets.filter(t => t.status !== 'resuelto').length : undefined },
@@ -2380,7 +2827,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       paddingTop: isMobile ? '0' : '1rem'
     }}>
       {/* Header */}
-      <div className={isMobile ? 'admin-header-mobile' : ''} style={{ 
+      <div ref={panelHeaderRef} className={isMobile ? 'admin-header-mobile' : ''} style={{ 
         marginBottom: isMobile ? '1rem' : '2rem',
         padding: isMobile ? '1rem' : '0'
       }}>
@@ -2472,9 +2919,12 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
           {/* Stats Cards */}
           <div className={isMobile ? 'mobile-data-grid' : ''} style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(250px, 1fr))',
-            gap: '1.5rem',
-            marginBottom: '2rem'
+            gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: isMobile ? '0.5rem' : '1.5rem',
+            marginBottom: '2rem',
+            width: '100%',
+            maxWidth: '100%',
+            boxSizing: 'border-box'
           }}>
             <StatsCard
               title="Usuarios Totales"
@@ -2482,6 +2932,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               icon={Users}
               color="var(--primary)"
               subtitle={`${stats.users.active} activos`}
+              isMobile={isMobile}
             />
             <StatsCard
               title="Subastas Activas"
@@ -2489,6 +2940,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               icon={Gavel}
               color="var(--success)"
               subtitle={`${stats.auctions.ended} finalizadas`}
+              isMobile={isMobile}
             />
             <StatsCard
               title="Productos"
@@ -2496,6 +2948,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               icon={Package}
               color="var(--warning)"
               subtitle={`${stats.products.active} activos`}
+              isMobile={isMobile}
             />
             <StatsCard
               title="Pedidos Totales"
@@ -2503,6 +2956,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               icon={ShoppingCart}
               color="var(--info)"
               subtitle={`${orderStats.delivered} entregados`}
+              isMobile={isMobile}
             />
             <StatsCard
               title="Ingresos Totales"
@@ -2510,6 +2964,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               icon={DollarSign}
               color="var(--success)"
               subtitle={`${formatCurrency(stats.revenue.month)} este mes`}
+              isMobile={isMobile}
             />
             <StatsCard
               title="Bots Activos"
@@ -2517,6 +2972,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               icon={Bot}
               color="var(--secondary)"
               subtitle={`${stats.bots.totalBalance.toLocaleString()} balance total`}
+              isMobile={isMobile}
             />
             <StatsCard
               title="Tickets"
@@ -2524,6 +2980,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               icon={TicketIcon}
               color="var(--warning)"
               subtitle={`${stats.tickets.pending} pendientes, ${stats.tickets.resolved} resueltos`}
+              isMobile={isMobile}
             />
             <StatsCard
               title="Mensajes de Contacto"
@@ -2531,6 +2988,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               icon={Mail}
               color="var(--info)"
               subtitle={`${stats.contactMessages.unread} no leídos`}
+              isMobile={isMobile}
             />
           </div>
 
@@ -4337,103 +4795,105 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 Administrá y seguí el estado de todos los pedidos
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <button
-                onClick={async () => {
-                  if (window.confirm('¿Eliminar pedidos finalizados (entregados/cancelados) de más de 30 días?\n\nEsta acción no se puede deshacer.')) {
-                    const now = Date.now();
-                    const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
-                    const ordersToDelete = orders.filter((o: Order) => {
-                      if (['delivered', 'cancelled', 'expired', 'payment_expired'].includes(o.status)) {
-                        const orderDate = o.createdAt ? new Date(o.createdAt).getTime() : 0;
-                        return orderDate < thirtyDaysAgo;
+            {!isMobile && (
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  onClick={async () => {
+                    if (window.confirm('¿Eliminar pedidos finalizados (entregados/cancelados) de más de 30 días?\n\nEsta acción no se puede deshacer.')) {
+                      const now = Date.now();
+                      const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+                      const ordersToDelete = orders.filter((o: Order) => {
+                        if (['delivered', 'cancelled', 'expired', 'payment_expired'].includes(o.status)) {
+                          const orderDate = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+                          return orderDate < thirtyDaysAgo;
+                        }
+                        return false;
+                      });
+                      
+                      let deletedCount = 0;
+                      for (const order of ordersToDelete) {
+                        try {
+                          await remove(dbRef(realtimeDb, `orders/${order.id}`));
+                          deletedCount++;
+                          logOrderAction('Pedido eliminado (limpieza >30 días)', order.id, user?.id, user?.username, { 
+                            status: order.status,
+                            actionType: 'cleanup_old'
+                          });
+                        } catch (error) {
+                          console.error(`Error eliminando pedido ${order.id}:`, error);
+                        }
                       }
-                      return false;
-                    });
-                    
-                    let deletedCount = 0;
-                    for (const order of ordersToDelete) {
-                      try {
-                        await remove(dbRef(realtimeDb, `orders/${order.id}`));
-                        deletedCount++;
-                        logOrderAction('Pedido eliminado (limpieza >30 días)', order.id, user?.id, user?.username, { 
-                          status: order.status,
-                          actionType: 'cleanup_old'
-                        });
-                      } catch (error) {
-                        console.error(`Error eliminando pedido ${order.id}:`, error);
-                      }
+                      
+                      const cleanedOrders = orders.filter((o: Order) => !ordersToDelete.find(d => d.id === o.id));
+                      setOrders(cleanedOrders);
+                      logAdminAction(`Limpieza de pedidos: ${deletedCount} eliminados de Firebase`, user?.id, user?.username);
+                      alert(`✅ ${deletedCount} pedidos antiguos eliminados de Firebase`);
                     }
-                    
-                    const cleanedOrders = orders.filter((o: Order) => !ordersToDelete.find(d => d.id === o.id));
-                    setOrders(cleanedOrders);
-                    logAdminAction(`Limpieza de pedidos: ${deletedCount} eliminados de Firebase`, user?.id, user?.username);
-                    alert(`✅ ${deletedCount} pedidos antiguos eliminados de Firebase`);
-                  }
-                }}
-                className="btn btn-secondary"
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.5rem',
-                  padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
-                  fontSize: isMobile ? '0.875rem' : '0.9375rem'
-                }}
-              >
-                <Trash size={18} />
-                {!isMobile && 'Limpiar >30 días'}
-              </button>
-              <button
-                onClick={async () => {
-                  if (window.confirm('¿Eliminar pedidos finalizados (entregados/cancelados) de menos de 30 días?\n\nEsta acción no se puede deshacer.')) {
-                    const now = Date.now();
-                    const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
-                    const ordersToDelete = orders.filter((o: Order) => {
-                      if (['delivered', 'cancelled', 'expired', 'payment_expired'].includes(o.status)) {
-                        const orderDate = o.createdAt ? new Date(o.createdAt).getTime() : 0;
-                        return orderDate >= thirtyDaysAgo && orderDate < now;
+                  }}
+                  className="btn btn-secondary"
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem',
+                    padding: '0.875rem 1.25rem',
+                    fontSize: '0.9375rem'
+                  }}
+                >
+                  <Trash size={18} />
+                  Limpiar {'>'}30 días
+                </button>
+                <button
+                  onClick={async () => {
+                    if (window.confirm('¿Eliminar pedidos finalizados (entregados/cancelados) de menos de 30 días?\n\nEsta acción no se puede deshacer.')) {
+                      const now = Date.now();
+                      const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+                      const ordersToDelete = orders.filter((o: Order) => {
+                        if (['delivered', 'cancelled', 'expired', 'payment_expired'].includes(o.status)) {
+                          const orderDate = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+                          return orderDate >= thirtyDaysAgo && orderDate < now;
+                        }
+                        return false;
+                      });
+                      
+                      if (ordersToDelete.length === 0) {
+                        alert('ℹ️ No hay pedidos finalizados de menos de 30 días para eliminar');
+                        return;
                       }
-                      return false;
-                    });
-                    
-                    if (ordersToDelete.length === 0) {
-                      alert('ℹ️ No hay pedidos finalizados de menos de 30 días para eliminar');
-                      return;
-                    }
-                    
-                    let deletedCount = 0;
-                    for (const order of ordersToDelete) {
-                      try {
-                        await remove(dbRef(realtimeDb, `orders/${order.id}`));
-                        deletedCount++;
-                        logOrderAction('Pedido eliminado (limpieza <30 días)', order.id, user?.id, user?.username, { 
-                          status: order.status,
-                          actionType: 'cleanup_recent'
-                        });
-                      } catch (error) {
-                        console.error(`Error eliminando pedido ${order.id}:`, error);
+                      
+                      let deletedCount = 0;
+                      for (const order of ordersToDelete) {
+                        try {
+                          await remove(dbRef(realtimeDb, `orders/${order.id}`));
+                          deletedCount++;
+                          logOrderAction('Pedido eliminado (limpieza <30 días)', order.id, user?.id, user?.username, { 
+                            status: order.status,
+                            actionType: 'cleanup_recent'
+                          });
+                        } catch (error) {
+                          console.error(`Error eliminando pedido ${order.id}:`, error);
+                        }
                       }
+                      
+                      const cleanedOrders = orders.filter((o: Order) => !ordersToDelete.find(d => d.id === o.id));
+                      setOrders(cleanedOrders);
+                      logAdminAction(`Limpieza de pedidos recientes: ${deletedCount} eliminados de Firebase`, user?.id, user?.username);
+                      alert(`✅ ${deletedCount} pedidos recientes eliminados de Firebase`);
                     }
-                    
-                    const cleanedOrders = orders.filter((o: Order) => !ordersToDelete.find(d => d.id === o.id));
-                    setOrders(cleanedOrders);
-                    logAdminAction(`Limpieza de pedidos recientes: ${deletedCount} eliminados de Firebase`, user?.id, user?.username);
-                    alert(`✅ ${deletedCount} pedidos recientes eliminados de Firebase`);
-                  }
-                }}
-                className="btn btn-secondary"
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.5rem',
-                  padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
-                  fontSize: isMobile ? '0.875rem' : '0.9375rem'
-                }}
-              >
-                <Trash size={18} />
-                {!isMobile && 'Limpiar <30 días'}
-              </button>
-            </div>
+                  }}
+                  className="btn btn-secondary"
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem',
+                    padding: '0.875rem 1.25rem',
+                    fontSize: '0.9375rem'
+                  }}
+                >
+                  <Trash size={18} />
+                  Limpiar {'<'}30 días
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Estadísticas rápidas - Grid compacto en móvil */}
@@ -4735,6 +5195,123 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
             </div>
           </div>
 
+          {/* Botones de limpieza - Solo en móvil, debajo de los cuadros */}
+          {isMobile && (
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column',
+              gap: '0.75rem',
+              marginBottom: '2rem',
+              width: '100%'
+            }}>
+              <button
+                onClick={async () => {
+                  if (window.confirm('¿Eliminar pedidos finalizados (entregados/cancelados) de más de 30 días?\n\nEsta acción no se puede deshacer.')) {
+                    const now = Date.now();
+                    const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+                    const ordersToDelete = orders.filter((o: Order) => {
+                      if (['delivered', 'cancelled', 'expired', 'payment_expired'].includes(o.status)) {
+                        const orderDate = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+                        return orderDate < thirtyDaysAgo;
+                      }
+                      return false;
+                    });
+                    
+                    let deletedCount = 0;
+                    for (const order of ordersToDelete) {
+                      try {
+                        await remove(dbRef(realtimeDb, `orders/${order.id}`));
+                        deletedCount++;
+                        logOrderAction('Pedido eliminado (limpieza >30 días)', order.id, user?.id, user?.username, { 
+                          status: order.status,
+                          actionType: 'cleanup_old'
+                        });
+                      } catch (error) {
+                        console.error(`Error eliminando pedido ${order.id}:`, error);
+                      }
+                    }
+                    
+                    const cleanedOrders = orders.filter((o: Order) => !ordersToDelete.find(d => d.id === o.id));
+                    setOrders(cleanedOrders);
+                    logAdminAction(`Limpieza de pedidos: ${deletedCount} eliminados de Firebase`, user?.id, user?.username);
+                    alert(`✅ ${deletedCount} pedidos antiguos eliminados de Firebase`);
+                  }
+                }}
+                className="btn btn-secondary"
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  padding: '0.875rem 1rem',
+                  fontSize: '0.875rem',
+                  width: '100%',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-primary)'
+                }}
+              >
+                <Trash size={18} />
+                Limpiar {'>'}30 días
+              </button>
+              <button
+                onClick={async () => {
+                  if (window.confirm('¿Eliminar pedidos finalizados (entregados/cancelados) de menos de 30 días?\n\nEsta acción no se puede deshacer.')) {
+                    const now = Date.now();
+                    const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+                    const ordersToDelete = orders.filter((o: Order) => {
+                      if (['delivered', 'cancelled', 'expired', 'payment_expired'].includes(o.status)) {
+                        const orderDate = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+                        return orderDate >= thirtyDaysAgo && orderDate < now;
+                      }
+                      return false;
+                    });
+                    
+                    if (ordersToDelete.length === 0) {
+                      alert('ℹ️ No hay pedidos finalizados de menos de 30 días para eliminar');
+                      return;
+                    }
+                    
+                    let deletedCount = 0;
+                    for (const order of ordersToDelete) {
+                      try {
+                        await remove(dbRef(realtimeDb, `orders/${order.id}`));
+                        deletedCount++;
+                        logOrderAction('Pedido eliminado (limpieza <30 días)', order.id, user?.id, user?.username, { 
+                          status: order.status,
+                          actionType: 'cleanup_recent'
+                        });
+                      } catch (error) {
+                        console.error(`Error eliminando pedido ${order.id}:`, error);
+                      }
+                    }
+                    
+                    const cleanedOrders = orders.filter((o: Order) => !ordersToDelete.find(d => d.id === o.id));
+                    setOrders(cleanedOrders);
+                    logAdminAction(`Limpieza de pedidos recientes: ${deletedCount} eliminados de Firebase`, user?.id, user?.username);
+                    alert(`✅ ${deletedCount} pedidos recientes eliminados de Firebase`);
+                  }
+                }}
+                className="btn btn-secondary"
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  padding: '0.875rem 1rem',
+                  fontSize: '0.875rem',
+                  width: '100%',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-primary)'
+                }}
+              >
+                <Trash size={18} />
+                Limpiar {'<'}30 días
+              </button>
+            </div>
+          )}
+
           {/* Barra de acciones masivas */}
           {selectedOrders.size > 0 && (
             <div style={{
@@ -4969,7 +5546,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                           aspectRatio: '1',
                           display: 'flex',
                           flexDirection: 'column',
-                          justifyContent: 'space-between',
+                          justifyContent: 'flex-start',
                           cursor: 'pointer',
                           transition: 'all 0.2s',
                           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
@@ -5015,88 +5592,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                             }}
                           />
                         </div>
-                        
-                        {/* Botones de acción rápida */}
-                        <div style={{
-                          position: 'absolute',
-                          top: '0.5rem',
-                          right: '0.5rem',
-                          display: 'flex',
-                          gap: '0.25rem',
-                          zIndex: 10
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        >
-                          {order.status !== 'cancelled' && order.status !== 'delivered' && (
-                            <button
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                if (window.confirm(`¿Cancelar el pedido ${order.orderNumber || `#${order.id.slice(-6)}`}?`)) {
-                                  try {
-                                    await update(dbRef(realtimeDb, `orders/${order.id}`), { status: 'cancelled' });
-                                    updateOrderStatus(order.id, 'cancelled');
-                                    logOrderAction('Pedido cancelado', order.id, user?.id, user?.username, { 
-                                      oldStatus: order.status,
-                                      newStatus: 'cancelled',
-                                      actionType: 'cancel'
-                                    });
-                                    alert('✅ Pedido cancelado');
-                                  } catch (error) {
-                                    console.error('Error cancelando pedido:', error);
-                                    alert('❌ Error al cancelar');
-                                  }
-                                }
-                              }}
-                              style={{
-                                background: 'rgba(255, 255, 255, 0.2)',
-                                border: 'none',
-                                borderRadius: '0.25rem',
-                                padding: '0.25rem',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
-                              title="Cancelar"
-                            >
-                              <XCircle size={14} />
-                            </button>
-                          )}
-                          <button
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              if (window.confirm(`¿Eliminar el pedido ${order.orderNumber || `#${order.id.slice(-6)}`}?\n\nEsta acción no se puede deshacer.`)) {
-                                try {
-                                  await remove(dbRef(realtimeDb, `orders/${order.id}`));
-                                  const remainingOrders = orders.filter(o => o.id !== order.id);
-                                  setOrders(remainingOrders);
-                                  logOrderAction('Pedido eliminado', order.id, user?.id, user?.username, { 
-                                    status: order.status,
-                                    actionType: 'delete'
-                                  });
-                                  alert('✅ Pedido eliminado');
-                                } catch (error) {
-                                  console.error('Error eliminando pedido:', error);
-                                  alert('❌ Error al eliminar');
-                                }
-                              }
-                            }}
-                            style={{
-                              background: 'rgba(239, 68, 68, 0.8)',
-                              border: 'none',
-                              borderRadius: '0.25rem',
-                              padding: '0.25rem',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}
-                            title="Eliminar"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: 0 }}>
                           <div style={{ 
                             fontSize: '0.625rem', 
                             opacity: 0.9, 
@@ -5123,7 +5619,8 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                           display: 'flex', 
                           flexDirection: 'column', 
                           gap: '0.25rem',
-                          marginTop: '0.5rem'
+                          marginTop: '0.5rem',
+                          marginBottom: '0.5rem'
                         }}>
                           <div style={{ 
                             fontSize: '0.875rem', 
@@ -5152,6 +5649,113 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                           fontWeight: 600
                         }}>
                           {statusBadge.text.split(' ')[0]}
+                        </div>
+                        
+                        {/* Botones de acción - debajo del contenido */}
+                        <div style={{
+                          display: 'flex',
+                          gap: '0.5rem',
+                          justifyContent: 'center',
+                          width: '100%',
+                          marginTop: 'auto',
+                          paddingTop: '0.5rem'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        >
+                          {order.status !== 'cancelled' && order.status !== 'delivered' && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`¿Cancelar el pedido ${order.orderNumber || `#${order.id.slice(-6)}`}?`)) {
+                                  try {
+                                    await update(dbRef(realtimeDb, `orders/${order.id}`), { status: 'cancelled' });
+                                    updateOrderStatus(order.id, 'cancelled');
+                                    logOrderAction('Pedido cancelado', order.id, user?.id, user?.username, { 
+                                      oldStatus: order.status,
+                                      newStatus: 'cancelled',
+                                      actionType: 'cancel'
+                                    });
+                                    alert('✅ Pedido cancelado');
+                                  } catch (error) {
+                                    console.error('Error cancelando pedido:', error);
+                                    alert('❌ Error al cancelar');
+                                  }
+                                }
+                              }}
+                              style={{
+                                background: 'rgba(255, 255, 255, 0.25)',
+                                border: '1px solid rgba(255, 255, 255, 0.3)',
+                                borderRadius: '0.375rem',
+                                padding: '0.375rem 0.625rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.25rem',
+                                fontSize: '0.625rem',
+                                fontWeight: 600,
+                                color: 'white',
+                                flex: 1,
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.35)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                              }}
+                              title="Cancelar"
+                            >
+                              <XCircle size={12} />
+                              <span>Cancelar</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`¿Eliminar el pedido ${order.orderNumber || `#${order.id.slice(-6)}`}?\n\nEsta acción no se puede deshacer.`)) {
+                                try {
+                                  await remove(dbRef(realtimeDb, `orders/${order.id}`));
+                                  const remainingOrders = orders.filter(o => o.id !== order.id);
+                                  setOrders(remainingOrders);
+                                  logOrderAction('Pedido eliminado', order.id, user?.id, user?.username, { 
+                                    status: order.status,
+                                    actionType: 'delete'
+                                  });
+                                  alert('✅ Pedido eliminado');
+                                } catch (error) {
+                                  console.error('Error eliminando pedido:', error);
+                                  alert('❌ Error al eliminar');
+                                }
+                              }
+                            }}
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.9)',
+                              border: '1px solid rgba(255, 255, 255, 0.3)',
+                              borderRadius: '0.375rem',
+                              padding: '0.375rem 0.625rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.25rem',
+                              fontSize: '0.625rem',
+                              fontWeight: 600,
+                              color: 'white',
+                              flex: 1,
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 1)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.9)';
+                            }}
+                            title="Eliminar"
+                          >
+                            <Trash2 size={12} />
+                            <span>Eliminar</span>
+                          </button>
                         </div>
                       </div>
                     );
@@ -5519,7 +6123,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               </div>
             )}
           </div>
-          )}
+        )}
 
           {/* Resumen de totales */}
           {filteredOrders.length > 0 && (
@@ -5581,58 +6185,60 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 Administrá y controlá los bots de subastas automáticos
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <button
-                onClick={() => {
-                  const activeBots = bots.filter((b: any) => b.isActive);
-                  if (activeBots.length === 0) {
-                    alert('⚠️ No hay bots activos para desactivar');
-                    return;
-                  }
-                  if (window.confirm(`¿Desactivar todos los ${activeBots.length} bots activos?`)) {
-                    activeBots.forEach((bot: any) => {
-                      updateBot(bot.id, { isActive: false });
+            {!isMobile && (
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => {
+                    const activeBots = bots.filter((b: any) => b.isActive);
+                    if (activeBots.length === 0) {
+                      alert('⚠️ No hay bots activos para desactivar');
+                      return;
+                    }
+                    if (window.confirm(`¿Desactivar todos los ${activeBots.length} bots activos?`)) {
+                      activeBots.forEach((bot: any) => {
+                        updateBot(bot.id, { isActive: false });
+                      });
+                      logAdminAction(`Desactivados todos los bots (${activeBots.length})`, user?.id, user?.username);
+                    }
+                  }}
+                  className="btn btn-secondary"
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem',
+                    padding: '0.875rem 1.25rem',
+                    fontSize: '0.9375rem'
+                  }}
+                >
+                  <XCircle size={18} />
+                  Desactivar Todos
+                </button>
+                <button
+                  onClick={() => {
+                    setBotForm({
+                      name: '',
+                      balance: 10000,
+                      intervalMin: 5,
+                      intervalMax: 15,
+                      maxBidAmount: 5000,
+                      targetAuctions: []
                     });
-                    logAdminAction(`Desactivados todos los bots (${activeBots.length})`, user?.id, user?.username);
-                  }
-                }}
-                className="btn btn-secondary"
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.5rem',
-                  padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
-                  fontSize: isMobile ? '0.875rem' : '0.9375rem'
-                }}
-              >
-                <XCircle size={18} />
-                {!isMobile && 'Desactivar Todos'}
-              </button>
-              <button
-                onClick={() => {
-                  setBotForm({
-                    name: '',
-                    balance: 10000,
-                    intervalMin: 5,
-                    intervalMax: 15,
-                    maxBidAmount: 5000,
-                    targetAuctions: []
-                  });
-                  setShowBotForm(true);
-                }}
-                className="btn btn-primary"
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.5rem',
-                  padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
-                  fontSize: isMobile ? '0.875rem' : '0.9375rem'
-                }}
-              >
-                <Plus size={18} />
-                {!isMobile && 'Nuevo Bot'}
-              </button>
-            </div>
+                    setShowBotForm(true);
+                  }}
+                  className="btn btn-primary"
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem',
+                    padding: '0.875rem 1.25rem',
+                    fontSize: '0.9375rem'
+                  }}
+                >
+                  <Plus size={18} />
+                  Nuevo Bot
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Estadísticas rápidas - Grid compacto en móvil (igual que pedidos) */}
@@ -5774,6 +6380,75 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               </div>
             </div>
           </div>
+
+          {/* Botones de acción - Solo en móvil, debajo de los cuadros */}
+          {isMobile && (
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column',
+              gap: '0.75rem',
+              marginBottom: '2rem',
+              width: '100%'
+            }}>
+              <button
+                onClick={() => {
+                  const activeBots = bots.filter((b: any) => b.isActive);
+                  if (activeBots.length === 0) {
+                    alert('⚠️ No hay bots activos para desactivar');
+                    return;
+                  }
+                  if (window.confirm(`¿Desactivar todos los ${activeBots.length} bots activos?`)) {
+                    activeBots.forEach((bot: any) => {
+                      updateBot(bot.id, { isActive: false });
+                    });
+                    logAdminAction(`Desactivados todos los bots (${activeBots.length})`, user?.id, user?.username);
+                  }
+                }}
+                className="btn btn-secondary"
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  padding: '0.875rem 1rem',
+                  fontSize: '0.875rem',
+                  width: '100%',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-primary)'
+                }}
+              >
+                <XCircle size={18} />
+                Desactivar Todos
+              </button>
+              <button
+                onClick={() => {
+                  setBotForm({
+                    name: '',
+                    balance: 10000,
+                    intervalMin: 5,
+                    intervalMax: 15,
+                    maxBidAmount: 5000,
+                    targetAuctions: []
+                  });
+                  setShowBotForm(true);
+                }}
+                className="btn btn-primary"
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  padding: '0.875rem 1rem',
+                  fontSize: '0.875rem',
+                  width: '100%'
+                }}
+              >
+                <Plus size={18} />
+                Nuevo Bot
+              </button>
+            </div>
+          )}
 
           {/* Filtros y búsqueda */}
           <div style={{ 
@@ -6077,7 +6752,195 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   <h3 style={{ margin: '0 0 0.5rem', color: 'var(--text-primary)' }}>No se encontraron bots</h3>
                   <p>Crea tu primer bot o ajusta los filtros de búsqueda</p>
                 </div>
+              ) : isMobile ? (
+                // Vista móvil: Grid de cuadros
+                <div style={{ 
+                  background: 'var(--bg-secondary)', 
+                  borderRadius: '1rem', 
+                  border: '1px solid var(--border)',
+                  padding: '1rem'
+                }}>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '0.75rem'
+                  }}>
+                    {filteredBots.map((bot: any, index: number) => {
+                      const bidCount = getBotBidCount(bot.id);
+                      const botColor = bot.isActive 
+                        ? 'linear-gradient(135deg, #10b981, #059669)' 
+                        : 'linear-gradient(135deg, #6b7280, #4b5563)';
+                      
+                      return (
+                        <div
+                          key={`bot-${bot.id}-${index}`}
+                          style={{
+                            background: botColor,
+                            color: 'white',
+                            borderRadius: '0.75rem',
+                            padding: '0.875rem',
+                            aspectRatio: '1',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'flex-start',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.25)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'scale(1)';
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.15)';
+                          }}
+                        >
+                          {/* Estado en esquina superior derecha */}
+                          <div style={{
+                            position: 'absolute',
+                            top: '0.5rem',
+                            right: '0.5rem',
+                            fontSize: '0.625rem',
+                            opacity: 0.9,
+                            fontWeight: 600
+                          }}>
+                            {bot.isActive ? '✅' : '⏸️'}
+                          </div>
+                          
+                          {/* Contenido principal */}
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: 0 }}>
+                            <Bot size={20} style={{ marginBottom: '0.25rem', opacity: 0.9 }} />
+                            <div style={{ 
+                              fontSize: '0.625rem', 
+                              opacity: 0.9, 
+                              fontWeight: 600,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {bot.name}
+                            </div>
+                          </div>
+                          
+                          <div style={{ 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            gap: '0.25rem',
+                            marginTop: '0.5rem',
+                            marginBottom: '0.5rem'
+                          }}>
+                            <div style={{ 
+                              fontSize: '0.875rem', 
+                              fontWeight: 700,
+                              textShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                            }}>
+                              {formatCurrency(bot.balance)}
+                            </div>
+                            <div style={{ 
+                              fontSize: '0.625rem', 
+                              opacity: 0.9,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem'
+                            }}>
+                              <TrendingUp size={10} />
+                              {bidCount} ofertas
+                            </div>
+                          </div>
+                          
+                          {/* Botones de acción - debajo del contenido */}
+                          <div style={{
+                            display: 'flex',
+                            gap: '0.5rem',
+                            justifyContent: 'center',
+                            width: '100%',
+                            marginTop: 'auto',
+                            paddingTop: '0.5rem'
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const newBalance = prompt(`Recargar balance para "${bot.name}"\n\nBalance actual: ${formatCurrency(bot.balance)}\n\nIngresá el nuevo balance:`, bot.balance.toString());
+                                if (newBalance && !isNaN(Number(newBalance)) && Number(newBalance) >= 0) {
+                                  updateBot(bot.id, { balance: Number(newBalance) });
+                                  logAdminAction(`Balance recargado: ${bot.name} - ${formatCurrency(bot.balance)} → ${formatCurrency(Number(newBalance))}`, user?.id, user?.username);
+                                }
+                              }}
+                              style={{
+                                background: 'rgba(255, 255, 255, 0.25)',
+                                border: '1px solid rgba(255, 255, 255, 0.3)',
+                                borderRadius: '0.375rem',
+                                padding: '0.375rem 0.5rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.25rem',
+                                fontSize: '0.625rem',
+                                fontWeight: 600,
+                                color: 'white',
+                                flex: 1,
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.35)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                              }}
+                              title="Recargar"
+                            >
+                              <DollarSign size={12} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`¿Eliminar bot "${bot.name}"?\n\nEsta acción no se puede deshacer.`)) {
+                                  deleteBot(bot.id);
+                                  logAdminAction(`Bot eliminado: ${bot.name}`, user?.id, user?.username);
+                                }
+                              }}
+                              style={{
+                                background: 'rgba(239, 68, 68, 0.9)',
+                                border: '1px solid rgba(255, 255, 255, 0.3)',
+                                borderRadius: '0.375rem',
+                                padding: '0.375rem 0.5rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.25rem',
+                                fontSize: '0.625rem',
+                                fontWeight: 600,
+                                color: 'white',
+                                flex: 1,
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'rgba(239, 68, 68, 1)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.9)';
+                              }}
+                              title="Eliminar"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               ) : (
+                // Vista desktop: Tabla tradicional
                 <div className={isMobile ? 'mobile-table-container' : ''} style={{ 
                   background: 'var(--bg-secondary)', 
                   borderRadius: '1rem', 
@@ -10458,6 +11321,522 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         </div>
       )}
 
+      {/* Blog Tab - Gestión Completa del Blog */}
+      {activeTab === 'blog' && (
+        <div>
+          {/* Header con título y botón crear */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: '2rem',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div>
+              <h2 style={{ 
+                fontSize: isMobile ? '1.5rem' : '2rem', 
+                fontWeight: 700, 
+                marginBottom: '0.5rem', 
+                color: 'var(--text-primary)' 
+              }}>
+                Gestión del Blog
+              </h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '0.875rem' : '1rem' }}>
+                Crea, edita y gestiona las entradas del blog
+              </p>
+            </div>
+            {!isEditingBlogPost && (
+              <button
+                onClick={handleCreateBlogPost}
+                className="btn btn-primary"
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem',
+                  padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.5rem'
+                }}
+              >
+                <Plus size={18} />
+                Nueva Entrada
+              </button>
+            )}
+          </div>
+
+          {isEditingBlogPost ? (
+            /* Editor de Entrada de Blog */
+            <div style={{
+              background: 'var(--bg-secondary)',
+              borderRadius: '1rem',
+              padding: isMobile ? '1rem' : '2rem',
+              border: '1px solid var(--border)'
+            }}>
+              <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {selectedBlogPost?.id ? 'Editar Entrada' : 'Nueva Entrada'}
+                </h3>
+                <button
+                  onClick={() => {
+                    setIsEditingBlogPost(false);
+                    setSelectedBlogPost(null);
+                  }}
+                  className="btn btn-secondary"
+                  style={{ padding: '0.5rem 1rem' }}
+                >
+                  Cancelar
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {/* Título */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Título *
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedBlogPost?.title || ''}
+                    onChange={(e) => setSelectedBlogPost({ ...selectedBlogPost, title: e.target.value })}
+                    placeholder="Título de la entrada"
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+
+                {/* Extracto */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Extracto (Resumen)
+                  </label>
+                  <textarea
+                    value={selectedBlogPost?.excerpt || ''}
+                    onChange={(e) => setSelectedBlogPost({ ...selectedBlogPost, excerpt: e.target.value })}
+                    placeholder="Breve resumen de la entrada..."
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.9375rem',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+
+                {/* Categoría */}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      Categoría
+                    </label>
+                    <input
+                      type="text"
+                      value={selectedBlogPost?.category || ''}
+                      onChange={(e) => setSelectedBlogPost({ ...selectedBlogPost, category: e.target.value })}
+                      placeholder="Ej: Noticias, Tutoriales, Tips"
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      Estado
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedBlogPost?.published || false}
+                          onChange={(e) => setSelectedBlogPost({ ...selectedBlogPost, published: e.target.checked })}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                        />
+                        <span style={{ color: 'var(--text-primary)' }}>Publicado</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Imágenes */}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem' }}>
+                  {/* Banner */}
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      Imagen Banner
+                    </label>
+                    {selectedBlogPost?.bannerImage && (
+                      <img 
+                        src={selectedBlogPost.bannerImage} 
+                        alt="Banner" 
+                        style={{ 
+                          width: '100%', 
+                          maxHeight: '200px', 
+                          objectFit: 'cover', 
+                          borderRadius: '0.5rem', 
+                          marginBottom: '0.5rem' 
+                        }} 
+                      />
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleUploadBlogImage(file, 'banner');
+                      }}
+                      style={{ width: '100%', padding: '0.5rem' }}
+                    />
+                  </div>
+
+                  {/* Imagen Destacada */}
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      Imagen Destacada
+                    </label>
+                    {selectedBlogPost?.featuredImage && (
+                      <img 
+                        src={selectedBlogPost.featuredImage} 
+                        alt="Featured" 
+                        style={{ 
+                          width: '100%', 
+                          maxHeight: '200px', 
+                          objectFit: 'cover', 
+                          borderRadius: '0.5rem', 
+                          marginBottom: '0.5rem' 
+                        }} 
+                      />
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleUploadBlogImage(file, 'featured');
+                      }}
+                      style={{ width: '100%', padding: '0.5rem' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Contenido */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Contenido *
+                  </label>
+                  <textarea
+                    value={selectedBlogPost?.content || ''}
+                    onChange={(e) => setSelectedBlogPost({ ...selectedBlogPost, content: e.target.value })}
+                    placeholder="Escribe el contenido de la entrada aquí. Puedes usar HTML básico para formatear el texto."
+                    rows={15}
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.9375rem',
+                      fontFamily: 'monospace',
+                      resize: 'vertical'
+                    }}
+                  />
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                    💡 Tip: Puedes usar HTML básico para formatear el texto (p, h1-h6, strong, em, ul, ol, li, a, img, etc.)
+                  </p>
+                </div>
+
+                {/* Botones de acción */}
+                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => {
+                      setIsEditingBlogPost(false);
+                      setSelectedBlogPost(null);
+                    }}
+                    className="btn btn-secondary"
+                    style={{ padding: '0.875rem 1.5rem' }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleSaveBlogPost}
+                    className="btn btn-primary"
+                    style={{ padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  >
+                    <Save size={18} />
+                    Guardar Entrada
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Lista de Entradas del Blog */
+            <div>
+              {/* Filtros y búsqueda */}
+              <div style={{ 
+                display: 'flex', 
+                gap: '1rem', 
+                marginBottom: '1.5rem',
+                flexWrap: 'wrap'
+              }}>
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <div style={{ position: 'relative' }}>
+                    <Search size={18} style={{ 
+                      position: 'absolute', 
+                      left: '0.875rem', 
+                      top: '50%', 
+                      transform: 'translateY(-50%)', 
+                      color: 'var(--text-secondary)' 
+                    }} />
+                    <input
+                      type="text"
+                      placeholder="Buscar entradas..."
+                      value={blogSearchTerm}
+                      onChange={(e) => setBlogSearchTerm(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem 0.875rem 0.875rem 2.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '1rem'
+                      }}
+                    />
+                  </div>
+                </div>
+                <select
+                  value={blogFilterCategory}
+                  onChange={(e) => setBlogFilterCategory(e.target.value)}
+                  style={{
+                    padding: '0.875rem 1rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '1rem',
+                    cursor: 'pointer',
+                    minWidth: isMobile ? '100%' : '200px'
+                  }}
+                >
+                  <option value="all">📋 Todas las categorías</option>
+                  {blogCategories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Lista de posts */}
+              {filteredBlogPosts.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '4rem 2rem',
+                  background: 'var(--bg-secondary)',
+                  borderRadius: '1rem',
+                  border: '1px solid var(--border)'
+                }}>
+                  <BookOpen size={64} style={{ marginBottom: '1rem', opacity: 0.5, color: 'var(--text-secondary)' }} />
+                  <h3 style={{ margin: '0 0 0.5rem', color: 'var(--text-primary)' }}>No hay entradas del blog</h3>
+                  <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+                    {blogPosts.length === 0 
+                      ? 'Crea tu primera entrada del blog o importa el artículo de Navidad' 
+                      : 'No se encontraron entradas con los filtros aplicados'}
+                  </p>
+                  {blogPosts.length === 0 && (
+                    <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <button
+                        onClick={createNavidadPost}
+                        className="btn btn-secondary"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                      >
+                        <Upload size={18} />
+                        Importar Artículo de Navidad
+                      </button>
+                      <button
+                        onClick={handleCreateBlogPost}
+                        className="btn btn-primary"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                      >
+                        <Plus size={18} />
+                        Crear Nueva Entrada
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(350px, 1fr))', 
+                  gap: '1.5rem' 
+                }}>
+                  {filteredBlogPosts.map((post: any) => {
+                    const postDate = post.updatedAt || post.createdAt;
+                    const formattedDate = postDate ? new Date(postDate).toLocaleDateString('es-AR', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric'
+                    }) : 'Sin fecha';
+                    
+                    return (
+                      <div
+                        key={post.id}
+                        style={{
+                          background: 'var(--bg-secondary)',
+                          borderRadius: '1rem',
+                          border: '1px solid var(--border)',
+                          overflow: 'hidden',
+                          transition: 'all 0.2s',
+                          cursor: 'pointer'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-4px)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      >
+                        {post.bannerImage && (
+                          <img 
+                            src={post.bannerImage} 
+                            alt={post.title} 
+                            style={{ 
+                              width: '100%', 
+                              height: '200px', 
+                              objectFit: 'cover' 
+                            }} 
+                          />
+                        )}
+                        <div style={{ padding: '1.5rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                            <div style={{ flex: 1 }}>
+                              <h3 style={{ 
+                                fontSize: '1.125rem', 
+                                fontWeight: 600, 
+                                marginBottom: '0.5rem', 
+                                color: 'var(--text-primary)',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden'
+                              }}>
+                                {post.title || 'Sin título'}
+                              </h3>
+                              {post.category && (
+                                <span style={{
+                                  display: 'inline-block',
+                                  padding: '0.25rem 0.75rem',
+                                  borderRadius: '0.25rem',
+                                  background: 'var(--primary)',
+                                  color: 'white',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  marginBottom: '0.5rem'
+                                }}>
+                                  {post.category}
+                                </span>
+                              )}
+                            </div>
+                            {post.published ? (
+                              <span style={{
+                                padding: '0.25rem 0.75rem',
+                                borderRadius: '0.25rem',
+                                background: 'var(--success)',
+                                color: 'white',
+                                fontSize: '0.75rem',
+                                fontWeight: 600
+                              }}>
+                                Publicado
+                              </span>
+                            ) : (
+                              <span style={{
+                                padding: '0.25rem 0.75rem',
+                                borderRadius: '0.25rem',
+                                background: 'var(--bg-tertiary)',
+                                color: 'var(--text-secondary)',
+                                fontSize: '0.75rem',
+                                fontWeight: 600
+                              }}>
+                                Borrador
+                              </span>
+                            )}
+                          </div>
+                          
+                          {post.excerpt && (
+                            <p style={{ 
+                              color: 'var(--text-secondary)', 
+                              fontSize: '0.875rem', 
+                              marginBottom: '1rem',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 3,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden'
+                            }}>
+                              {post.excerpt}
+                            </p>
+                          )}
+                          
+                          <div style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center',
+                            marginTop: '1rem',
+                            paddingTop: '1rem',
+                            borderTop: '1px solid var(--border)'
+                          }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                              <div>{formattedDate}</div>
+                              {post.author && (
+                                <div style={{ marginTop: '0.25rem' }}>Por: {post.author}</div>
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <button
+                                onClick={() => handleEditBlogPost(post)}
+                                className="btn btn-secondary"
+                                style={{ padding: '0.5rem', display: 'flex', alignItems: 'center' }}
+                                title="Editar"
+                              >
+                                <Edit size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteBlogPost(post.id)}
+                                className="btn btn-secondary"
+                                style={{ padding: '0.5rem', display: 'flex', alignItems: 'center', color: 'var(--error)' }}
+                                title="Eliminar"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Modal de Republicar Subasta */}
       {republishModal.show && republishModal.auction && (
         <div style={{
@@ -10496,7 +11875,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               color: 'var(--text-secondary)',
               lineHeight: '1.5'
             }}>
-              ¿Cómo deseas republicar <strong>"{republishModal.auction.title}"</strong>?
+              ¿Cómo deseas republicar <strong>{'"'}{republishModal.auction.title}{'"'}</strong>?
             </p>
             <div style={{
               display: 'flex',

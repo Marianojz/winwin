@@ -165,6 +165,14 @@
           ".validate": "newData.hasChildren(['announcementId', 'userId', 'action', 'timestamp']) && newData.child('action').val().matches(/^(view|click|dismiss|link_click|image_click)$/)"
         }
       }
+    },
+    "blog": {
+      ".read": true,
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      "$postId": {
+        ".read": true,
+        ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+      }
     }
   }
 }
