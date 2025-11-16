@@ -11,6 +11,10 @@ Allow: /subastas
 Allow: /tienda
 Allow: /producto/
 Allow: /subastas/
+Allow: /categoria/
+Allow: /blog
+Allow: /blog/
+Allow: /como-funciona
 Allow: /terminos
 Allow: /preguntas
 Allow: /ayuda
@@ -40,6 +44,10 @@ Allow: /subastas
 Allow: /tienda
 Allow: /producto/
 Allow: /subastas/
+Allow: /categoria/
+Allow: /blog
+Allow: /blog/
+Allow: /como-funciona
 Crawl-delay: 1
 
 # Configuración específica para Googlebot-Image

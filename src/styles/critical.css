@@ -1,0 +1,90 @@
+/* CSS Crítico - Above the Fold
+ * Este CSS se inyecta inline en el <head> para mejorar LCP y FCP
+ * Solo incluye estilos esenciales para el render inicial
+ */
+
+/* Reset básico y variables CSS */
+:root {
+  --primary: #FF6B00;
+  --secondary: #0044AA;
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F5F7FA;
+  --text-primary: #1A1A1A;
+  --text-secondary: #666666;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* Layout básico */
+#root {
+  min-height: 100vh;
+}
+
+/* Navbar crítico */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Loading spinner crítico */
+.loading-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+
+/* Botones básicos */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+/* Prevenir layout shift en imágenes */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Container básico */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+/* Media query para móvil */
+@media (max-width: 768px) {
+  body {
+    padding-bottom: 70px;
+  }
+}
+

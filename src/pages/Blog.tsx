@@ -1,10 +1,19 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Calendar, User, Share2, Heart, BookOpen, Gift, Sparkles } from 'lucide-react';
+import { ArrowLeft, Calendar, User, Share2, Heart, BookOpen, Gift, Sparkles, Clock } from 'lucide-react';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { blogArticles } from '../data/blogArticles';
+import { useSEO } from '../hooks/useSEO';
 import './Blog.css';
 
 const Blog = () => {
   const isMobile = useIsMobile();
+
+  useSEO({
+    title: 'Blog Clikio - Consejos, Guías y Tendencias',
+    description: 'Descubre consejos útiles, guías completas y las últimas tendencias en compras online, ventas y más en el blog de Clikio.',
+    url: 'https://www.clickio.com.ar/blog',
+    type: 'website'
+  });
 
   return (
     <div className="blog-page">
@@ -62,8 +71,92 @@ const Blog = () => {
           </p>
         </div>
 
-        {/* Artículo Principal */}
-        <article className="blog-article">
+        {/* Lista de Artículos */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
+          gap: '2rem',
+          marginBottom: '3rem'
+        }}>
+          {blogArticles.map(article => (
+            <Link
+              key={article.id}
+              to={`/blog/${article.slug}`}
+              style={{
+                display: 'block',
+                background: 'var(--bg-secondary)',
+                borderRadius: '1rem',
+                overflow: 'hidden',
+                textDecoration: 'none',
+                transition: 'transform 0.2s, box-shadow 0.2s',
+                border: '1px solid var(--border)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-5px)';
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <div style={{ padding: '1.5rem' }}>
+                <div style={{
+                  display: 'inline-block',
+                  background: 'var(--primary)',
+                  color: 'white',
+                  padding: '0.25rem 0.75rem',
+                  borderRadius: '1rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  marginBottom: '1rem'
+                }}>
+                  {article.category}
+                </div>
+                <h2 style={{
+                  fontSize: '1.5rem',
+                  fontWeight: 700,
+                  marginBottom: '0.75rem',
+                  color: 'var(--text-primary)',
+                  lineHeight: 1.3
+                }}>
+                  {article.title}
+                </h2>
+                <p style={{
+                  color: 'var(--text-secondary)',
+                  fontSize: '0.9375rem',
+                  lineHeight: 1.6,
+                  marginBottom: '1rem'
+                }}>
+                  {article.excerpt}
+                </p>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '1rem',
+                  fontSize: '0.875rem',
+                  color: 'var(--text-secondary)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <User size={14} />
+                    <span>{article.author}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Calendar size={14} />
+                    <span>{new Date(article.date).toLocaleDateString('es-AR', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Clock size={14} />
+                    <span>{article.readTime} min</span>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+
+        {/* Artículo Principal - Mantener el contenido existente si es necesario */}
+        <article className="blog-article" style={{ display: 'none' }}>
           {/* Header del Artículo */}
           <header className="article-header">
             <div style={{

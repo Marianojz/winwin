@@ -14,6 +14,14 @@
     <meta name="description" content="Clikio - Plataforma de subastas y tienda online" />
     <link rel="manifest" href="/manifest.json" />
     <title>Clikio</title>
+    <!-- CSS Crítico Inline para mejorar LCP y FCP -->
+    <style>
+      :root{--primary:#FF6B00;--secondary:#0044AA;--bg-primary:#FFFFFF;--bg-secondary:#F5F7FA;--text-primary:#1A1A1A;--text-secondary:#666666}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','Roboto',sans-serif;background-color:var(--bg-primary);color:var(--text-primary);line-height:1.6;overflow-x:hidden}#root{min-height:100vh}.navbar{position:sticky;top:0;z-index:1000;background:var(--bg-primary);border-bottom:1px solid #E0E0E0}img{max-width:100%;height:auto;display:block}@media (max-width:768px){body{padding-bottom:70px}}
+    </style>
+    <!-- DNS Prefetch para recursos externos (mejora tiempo de conexión) -->
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+    <link rel="dns-prefetch" href="https://unpkg.com" />
     <!-- Script para SPA en GitHub Pages -->
     <script type="text/javascript">
       // Single Page Apps para GitHub Pages
@@ -28,9 +36,14 @@
         }
       }(window.location))
     </script>
+    <!-- Preconnect a Google Fonts para mejorar LCP -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Fuentes optimizadas con font-display: swap -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Preload de fuentes críticas -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"></noscript>
   <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 

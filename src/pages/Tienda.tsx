@@ -1,16 +1,28 @@
 import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Search, Filter, SlidersHorizontal } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import ProductCard from '../components/ProductCard';
 import { trackSearch } from '../utils/tracking';
+import { useSEO } from '../hooks/useSEO';
 
 const Tienda = () => {
   const { products, user } = useStore();
+  const location = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const searchTimeoutRef = useRef<number | null>(null);
   const lastSearchedRef = useRef<string>('');
+
+  // Leer parámetro de categoría de la URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const categoriaParam = params.get('categoria');
+    if (categoriaParam && ['1', '2', '3', '4', '5', '6'].includes(categoriaParam)) {
+      setCategoryFilter(categoriaParam);
+    }
+  }, [location.search]);
 
   let filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -53,6 +65,33 @@ const Tienda = () => {
       default:
         return 0;
     }
+  });
+
+  // SEO: Meta tags para página de tienda
+  const categoryNames: { [key: string]: string } = {
+    '1': 'Electrónica',
+    '2': 'Moda',
+    '3': 'Hogar',
+    '4': 'Deportes',
+    '5': 'Juguetes',
+    '6': 'Libros'
+  };
+
+  const categoryName = categoryFilter !== 'all' ? categoryNames[categoryFilter] : undefined;
+  const pageTitle = categoryName 
+    ? `Productos de ${categoryName} | Tienda Clikio`
+    : 'Tienda Oficial | Productos de Calidad | Clikio';
+  const pageDescription = categoryName
+    ? `Encuentra los mejores productos de ${categoryName} en Clikio. Precios fijos, stock en tiempo real y envío rápido.`
+    : 'Tienda oficial de Clikio con productos de calidad, precios fijos y envío rápido. Stock en tiempo real y pago seguro con MercadoPago.';
+
+  useSEO({
+    title: pageTitle,
+    description: pageDescription,
+    url: categoryName 
+      ? `https://www.clickio.com.ar/tienda?categoria=${categoryFilter}`
+      : 'https://www.clickio.com.ar/tienda',
+    type: 'website'
   });
 
   return (

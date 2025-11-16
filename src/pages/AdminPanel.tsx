@@ -57,6 +57,7 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 import { trackingSystem } from '../utils/tracking';
 import { actionLogger } from '../utils/actionLogger';
 import { runCleanup } from '../utils/dataCleaner';
+import { blogArticles as staticBlogArticles } from '../data/blogArticles';
 import { 
   loadMessageTemplates, 
   saveMessageTemplates, 
@@ -122,6 +123,7 @@ const AdminPanel = (): React.ReactElement => {
   const [blogSearchTerm, setBlogSearchTerm] = useState('');
   const [blogFilterCategory, setBlogFilterCategory] = useState<string>('all');
   const [blogCategories, setBlogCategories] = useState<string[]>([]);
+  const [blogFilterPublished, setBlogFilterPublished] = useState<string>('all'); // all, published, draft
   
   // Referencia para hacer scroll al inicio cuando cambia la pestaña
   const panelHeaderRef = useRef<HTMLDivElement>(null);
@@ -209,25 +211,34 @@ const AdminPanel = (): React.ReactElement => {
       const blogRef = dbRef(realtimeDb, 'blog');
       const unsubscribe = onValue(blogRef, (snapshot) => {
         const data = snapshot.val();
+        console.log('[Blog] Datos recibidos de Firebase:', data);
         if (data && Object.keys(data).length > 0) {
           const postsArray = Object.keys(data).map(key => ({
             id: key,
             ...data[key]
           }));
+          console.log('[Blog] Artículos procesados:', postsArray.length, postsArray);
           setBlogPosts(postsArray);
           
           // Extraer categorías únicas
           const categories = [...new Set(postsArray.map((post: any) => post.category).filter(Boolean))];
           setBlogCategories(categories);
         } else {
+          console.log('[Blog] No hay artículos en Firebase');
           setBlogPosts([]);
           setBlogCategories([]);
         }
+      }, (error) => {
+        console.error('[Blog] Error cargando artículos:', error);
       });
       
       return () => {
         off(blogRef);
       };
+    } else {
+      // Limpiar cuando no está en la pestaña de blog
+      setBlogPosts([]);
+      setBlogCategories([]);
     }
   }, [user?.isAdmin, activeTab]);
   
@@ -2383,305 +2394,133 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     }
   };
 
-  // Función para crear el artículo de Navidad
-  const createNavidadPost = async () => {
+  // Función para importar artículos estáticos al blog
+  const importStaticArticles = async () => {
     if (!user) return;
     
-    const navidadPostId = 'blog_navidad_2024';
+    console.log('[Blog Import] Iniciando importación de', staticBlogArticles.length, 'artículos');
+    console.log('[Blog Import] Artículos a importar:', staticBlogArticles.map(a => ({ id: a.id, title: a.title })));
     
-    // Verificar si ya existe
-    try {
-      const existingPostRef = dbRef(realtimeDb, `blog/${navidadPostId}`);
-      const snapshot = await get(existingPostRef);
-      if (snapshot.exists()) {
-        alert('ℹ️ El artículo de Navidad ya existe. Puedes editarlo desde la lista.');
+    if (!window.confirm(`¿Importar ${staticBlogArticles.length} artículos del blog al gestor?\n\nEsto creará/actualizará los artículos en Firebase.`)) {
         return;
       }
-    } catch (error) {
-      console.error('Error verificando artículo existente:', error);
-    }
-    const navidadPost = {
-      id: navidadPostId,
-      title: '¿Qué regalar esta Navidad? Guía completa de regalería en Argentina',
-      excerpt: 'La Navidad se acerca y con ella la oportunidad de sorprender a tus seres queridos. Te traemos las mejores ideas de regalos para esta temporada, con opciones para todos los gustos y presupuestos.',
-      category: 'Regalería',
-      bannerImage: 'https://images.unsplash.com/photo-1482517967863-00e15c9b44be?w=1200&q=80',
-      featuredImage: 'https://images.unsplash.com/photo-1482517967863-00e15c9b44be?w=1200&q=80',
-      author: 'Equipo Clikio',
-      published: true,
-      createdAt: new Date('2024-12-20').toISOString(),
-      updatedAt: new Date('2024-12-20').toISOString(),
-      tags: ['navidad', 'regalos', 'guía'],
-      views: 0,
-      content: `<section style="margin-bottom: 3rem;">
-  <p style="margin-bottom: 1.5rem;">
-    La Navidad en Argentina es una época especial llena de tradiciones, encuentros familiares y, por supuesto, 
-    la búsqueda del regalo perfecto. Este año, las tendencias en regalería combinan lo tradicional con lo moderno, 
-    ofreciendo opciones para todos los gustos y presupuestos.
-  </p>
-  <p style="margin-bottom: 1.5rem;">
-    Desde productos gourmet típicos argentinos hasta tecnología de última generación, pasando por experiencias 
-    únicas y regalos personalizados, hay un mundo de posibilidades esperándote. En esta guía completa, te ayudamos 
-    a encontrar el regalo ideal para cada persona especial en tu vida.
-  </p>
-</section>
 
-<section style="margin-bottom: 3rem;">
-  <h2 style="font-size: 2rem; font-weight: 700; margin-bottom: 1.5rem; color: var(--text-primary);">
-    Regalos Tradicionales Argentinos
-  </h2>
-  
-  <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
-    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border);">
-      <img src="https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=600&q=80" alt="Pan Dulce" style="width: 100%; height: 200px; object-fit: cover; border-radius: 0.75rem; margin-bottom: 1rem;" />
-      <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Pan Dulce Artesanal</h3>
-      <p style="font-size: 0.9375rem; color: var(--text-secondary); line-height: 1.6;">
-        Este clásico de la mesa navideña es un pan esponjoso relleno de frutas secas y confitadas. 
-        Un regalo que nunca pasa de moda y que todos disfrutan. Podés encontrar versiones artesanales 
-        con ingredientes premium en panaderías especializadas.
-      </p>
-    </div>
-
-    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border);">
-      <img src="https://images.unsplash.com/photo-1603532648955-039310d9ed75?w=600&q=80" alt="Alfajores" style="width: 100%; height: 200px; object-fit: cover; border-radius: 0.75rem; margin-bottom: 1rem;" />
-      <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Alfajores Artesanales</h3>
-      <p style="font-size: 0.9375rem; color: var(--text-secondary); line-height: 1.6;">
-        Los alfajores rellenos de dulce de leche y bañados en chocolate son una delicia que representa 
-        la dulzura de la Navidad argentina. Marcas artesanales ofrecen versiones gourmet con ingredientes 
-        de primera calidad.
-      </p>
-    </div>
-  </div>
-
-  <div style="padding: 1.5rem; background: linear-gradient(135deg, rgba(255, 107, 0, 0.1), rgba(255, 159, 64, 0.1)); border-radius: 1rem; border: 1px solid var(--primary); margin-top: 1.5rem;">
-    <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--primary);">
-      Vinos Argentinos Premium
-    </h3>
-    <p style="margin-bottom: 1rem; line-height: 1.6;">
-      Una botella de Malbec o Torrontés de alguna bodega reconocida es un obsequio elegante y apreciado 
-      por los amantes del buen vino. Las bodegas de Mendoza, San Juan y Salta ofrecen opciones excepcionales 
-      que van desde los $5.000 hasta ediciones limitadas premium.
-    </p>
-    <img src="https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=800&q=80" alt="Vinos Argentinos" style="width: 100%; height: 250px; object-fit: cover; border-radius: 0.75rem;" />
-  </div>
-</section>
-
-<section style="margin-bottom: 3rem;">
-  <h2 style="font-size: 2rem; font-weight: 700; margin-bottom: 1.5rem; color: var(--text-primary);">
-    Regalos Tecnológicos
-  </h2>
-  
-  <p style="margin-bottom: 1.5rem;">
-    La tecnología sigue siendo una de las categorías más populares en la lista de deseos navideños. 
-    Según estudios recientes, estos son los regalos tecnológicos más buscados en Argentina:
-  </p>
-
-  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
-    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border); text-align: center;">
-      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">Parlantes Portátiles</h3>
-      <p style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6;">
-        Ideales para quienes disfrutan de la música en cualquier lugar. Precios desde $15.000.
-      </p>
-    </div>
-
-    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border); text-align: center;">
-      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">Auriculares Inalámbricos</h3>
-      <p style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6;">
-        Perfectos para los que buscan comodidad y calidad de sonido. Desde $8.000.
-      </p>
-    </div>
-
-    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border); text-align: center;">
-      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">Smartwatches</h3>
-      <p style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6;">
-        Para aquellos interesados en tecnología y seguimiento de actividad física. Desde $25.000.
-      </p>
-    </div>
-  </div>
-</section>
-
-<section style="margin-bottom: 3rem;">
-  <h2 style="font-size: 2rem; font-weight: 700; margin-bottom: 1.5rem; color: var(--text-primary);">
-    Regalos Personalizados y Artesanales
-  </h2>
-  
-  <p style="margin-bottom: 1.5rem;">
-    Un regalo hecho a mano o personalizado demuestra dedicación y cariño. Estas son algunas ideas que 
-    podés encontrar en emprendimientos argentinos:
-  </p>
-
-  <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
-    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border);">
-      <img src="https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=600&q=80" alt="Tazas Personalizadas" style="width: 100%; height: 200px; object-fit: cover; border-radius: 0.75rem; margin-bottom: 1rem;" />
-      <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Tazas Personalizadas</h3>
-      <p style="font-size: 0.9375rem; color: var(--text-secondary); line-height: 1.6;">
-        Con mensajes o imágenes que tengan un significado especial para la persona que lo recibe. 
-        Podés personalizarlas con fotos, frases o diseños únicos.
-      </p>
-    </div>
-
-    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border);">
-      <img src="https://images.unsplash.com/photo-1512820790803-83ca750daaf4?w=600&q=80" alt="Velas Aromáticas" style="width: 100%; height: 200px; object-fit: cover; border-radius: 0.75rem; margin-bottom: 1rem;" />
-      <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Velas Aromáticas Artesanales</h3>
-      <p style="font-size: 0.9375rem; color: var(--text-secondary); line-height: 1.6;">
-        Con fragancias que evocan recuerdos o sensaciones agradables. Emprendimientos locales ofrecen 
-        opciones con cera de soja y esencias naturales.
-      </p>
-    </div>
-  </div>
-</section>
-
-<section style="margin-bottom: 3rem;">
-  <h2 style="font-size: 2rem; font-weight: 700; margin-bottom: 1.5rem; color: var(--text-primary);">
-    Experiencias como Regalo
-  </h2>
-  
-  <p style="margin-bottom: 1.5rem;">
-    Regalar experiencias se ha convertido en una tendencia creciente. Algunas opciones que podés considerar:
-  </p>
-
-  <div style="padding: 2rem; background: linear-gradient(135deg, rgba(255, 107, 0, 0.05), rgba(255, 159, 64, 0.05)); border-radius: 1rem; border: 1px solid var(--border); margin-bottom: 1.5rem;">
-    <ul style="list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
-      <li style="display: flex; align-items: flex-start; gap: 0.75rem;">
-        <span style="color: var(--primary); font-size: 1.5rem;">✓</span>
-        <div>
-          <strong style="display: block; margin-bottom: 0.25rem;">Cenas en Restaurantes Temáticos</strong>
-          <span style="font-size: 0.875rem; color: var(--text-secondary);">Ofrece una noche especial en un lugar único</span>
-        </div>
-      </li>
-      <li style="display: flex; align-items: flex-start; gap: 0.75rem;">
-        <span style="color: var(--primary); font-size: 1.5rem;">✓</span>
-        <div>
-          <strong style="display: block; margin-bottom: 0.25rem;">Clases de Cocina o Arte</strong>
-          <span style="font-size: 0.875rem; color: var(--text-secondary);">Para quienes disfrutan aprendiendo nuevas habilidades</span>
-        </div>
-      </li>
-      <li style="display: flex; align-items: flex-start; gap: 0.75rem;">
-        <span style="color: var(--primary); font-size: 1.5rem;">✓</span>
-        <div>
-          <strong style="display: block; margin-bottom: 0.25rem;">Entradas para Espectáculos</strong>
-          <span style="font-size: 0.875rem; color: var(--text-secondary);">Conciertos, obras de teatro o eventos deportivos</span>
-        </div>
-      </li>
-      <li style="display: flex; align-items: flex-start; gap: 0.75rem;">
-        <span style="color: var(--primary); font-size: 1.5rem;">✓</span>
-        <div>
-          <strong style="display: block; margin-bottom: 0.25rem;">Días de Spa y Bienestar</strong>
-          <span style="font-size: 0.875rem; color: var(--text-secondary);">Sesiones de masajes, tratamientos faciales o relajación</span>
-        </div>
-      </li>
-    </ul>
-  </div>
-</section>
-
-<section style="margin-bottom: 3rem;">
-  <h2 style="font-size: 2rem; font-weight: 700; margin-bottom: 1.5rem; color: var(--text-primary);">
-    Regalos Sostenibles
-  </h2>
-  
-  <p style="margin-bottom: 1.5rem;">
-    Para aquellos comprometidos con el medio ambiente, los regalos sostenibles son una excelente opción. 
-    Emprendimientos argentinos ofrecen productos ecológicos y responsables:
-  </p>
-
-  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;">
-    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border); text-align: center;">
-      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">Bolsas de Tela Reutilizables</h3>
-      <p style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6;">
-        Para reducir el uso de plásticos. Diseños únicos de emprendedores locales.
-      </p>
-    </div>
-
-    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border); text-align: center;">
-      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">Productos de Higiene Ecológicos</h3>
-      <p style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6;">
-        Como jabones artesanales o champús sólidos, libres de químicos dañinos.
-      </p>
-    </div>
-
-    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border); text-align: center;">
-      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">Libros sobre Sostenibilidad</h3>
-      <p style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6;">
-        Para fomentar prácticas más amigables con el planeta.
-      </p>
-    </div>
-  </div>
-</section>
-
-<section style="padding: 2rem; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 1rem; color: white; margin-bottom: 3rem;">
-  <h2 style="font-size: 2rem; font-weight: 700; margin-bottom: 1.5rem; color: white;">
-    Consejos para Elegir el Regalo Perfecto
-  </h2>
-  
-  <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 1rem;">
-    <li style="display: flex; align-items: flex-start; gap: 0.75rem;">
-      <span style="font-size: 1.5rem;">💡</span>
-      <div>
-        <strong style="display: block; margin-bottom: 0.25rem;">Conocé los Gustos del Destinatario</strong>
-        <span style="font-size: 0.9375rem; opacity: 0.9;">Observá sus intereses y necesidades para elegir un regalo que realmente aprecie.</span>
-      </div>
-    </li>
-    <li style="display: flex; align-items: flex-start; gap: 0.75rem;">
-      <span style="font-size: 1.5rem;">⭐</span>
-      <div>
-        <strong style="display: block; margin-bottom: 0.25rem;">Optá por la Calidad</strong>
-        <span style="font-size: 0.9375rem; opacity: 0.9;">Un regalo bien hecho y duradero siempre será valorado.</span>
-      </div>
-    </li>
-    <li style="display: flex; align-items: flex-start; gap: 0.75rem;">
-      <span style="font-size: 1.5rem;">🎁</span>
-      <div>
-        <strong style="display: block; margin-bottom: 0.25rem;">Considerá Experiencias</strong>
-        <span style="font-size: 0.9375rem; opacity: 0.9;">A veces, un momento especial compartido es más significativo que un objeto material.</span>
-      </div>
-    </li>
-    <li style="display: flex; align-items: flex-start; gap: 0.75rem;">
-      <span style="font-size: 1.5rem;">🇦🇷</span>
-      <div>
-        <strong style="display: block; margin-bottom: 0.25rem;">Apoyá lo Local</strong>
-        <span style="font-size: 0.9375rem; opacity: 0.9;">Elegí productos de emprendedores y artesanos argentinos para fomentar la economía local.</span>
-      </div>
-    </li>
-  </ul>
-</section>
-
-<div style="padding: 2rem; background: var(--bg-secondary); border-radius: 1rem; border: 1px solid var(--border); text-align: center; margin-bottom: 3rem;">
-  <p style="font-size: 1.25rem; line-height: 1.8; margin-bottom: 1rem; font-weight: 500;">
-    Recordá que lo más importante es el gesto y el cariño con el que se entrega el regalo. 
-    ¡Que esta Navidad sea una oportunidad para compartir y celebrar con tus seres queridos!
-  </p>
-  <p style="font-size: 1rem; color: var(--text-secondary); font-style: italic;">
-    Desde Clikio, te deseamos una Feliz Navidad llena de alegría, amor y buenos momentos. 🎄✨
-  </p>
-</div>`
-    };
-    
     try {
-      const postRef = dbRef(realtimeDb, `blog/${navidadPostId}`);
-      await firebaseSet(postRef, navidadPost);
-      alert('✅ Artículo de Navidad creado correctamente');
-      logAdminAction('Artículo de Navidad creado', user.id, user.username, { postId: navidadPostId });
+      let imported = 0;
+      let updated = 0;
+      let errors = 0;
+      const errorDetails: string[] = [];
+
+      // Primero, obtener todos los artículos existentes para buscar por slug
+      const allBlogRef = dbRef(realtimeDb, 'blog');
+      const allBlogSnapshot = await get(allBlogRef);
+      const existingArticles: { [key: string]: any } = allBlogSnapshot.exists() ? allBlogSnapshot.val() : {};
+      console.log('[Blog Import] Artículos existentes en Firebase:', Object.keys(existingArticles));
+
+      for (const article of staticBlogArticles) {
+        try {
+          // Buscar si ya existe un artículo con el mismo slug, título o ID similar
+          let existingArticleKey: string | null = null;
+          for (const [key, existingArticle] of Object.entries(existingArticles)) {
+            // Buscar por slug primero
+            if (existingArticle.slug && existingArticle.slug === article.slug) {
+              existingArticleKey = key;
+              console.log(`[Blog Import] Encontrado artículo existente por slug: ${key} (slug: ${existingArticle.slug})`);
+              break;
+            }
+            // Buscar por título si no tiene slug o si el slug no coincide
+            if (existingArticle.title && existingArticle.title.toLowerCase().trim() === article.title.toLowerCase().trim()) {
+              existingArticleKey = key;
+              console.log(`[Blog Import] Encontrado artículo existente por título: ${key} (título: ${existingArticle.title})`);
+              break;
+            }
+            // Buscar por ID similar (para casos como blog_navidad_2024 vs blog_6)
+            if (key.includes('navidad') && article.slug.includes('navidad')) {
+              existingArticleKey = key;
+              console.log(`[Blog Import] Encontrado artículo existente por ID similar (navidad): ${key}`);
+              break;
+            }
+          }
+
+          // Usar el ID existente si se encontró, o crear uno nuevo con prefijo 'blog_'
+          const articleId = existingArticleKey || `blog_${article.id}`;
+          console.log(`[Blog Import] Procesando artículo: ${articleId} - ${article.title} (slug: ${article.slug})`);
+          
+          const existingRef = dbRef(realtimeDb, `blog/${articleId}`);
+          
+          const articleData = {
+            id: articleId,
+            title: article.title,
+            slug: article.slug,
+            excerpt: article.excerpt,
+            content: article.content,
+            category: article.category,
+            tags: article.tags || [],
+            author: article.author || user.username || 'Admin',
+            authorId: user.id,
+            published: true, // Los artículos estáticos se importan como publicados
+            createdAt: article.date || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            featuredImage: article.featuredImage || '',
+            readTime: article.readTime || 5,
+            views: 0
+          };
+
+          if (existingArticleKey) {
+            // Actualizar artículo existente (mantener vistas y fecha de creación original)
+            const existingData = existingArticles[existingArticleKey];
+            console.log(`[Blog Import] Actualizando artículo existente: ${articleId}`);
+            await firebaseSet(existingRef, {
+              ...articleData,
+              createdAt: existingData.createdAt || articleData.createdAt, // Mantener fecha original
+              views: existingData.views || 0 // Mantener vistas
+            });
+            updated++;
+          } else {
+            // Crear nuevo artículo
+            console.log(`[Blog Import] Creando nuevo artículo: ${articleId}`);
+            await firebaseSet(existingRef, articleData);
+            imported++;
+          }
+          console.log(`[Blog Import] ✅ Artículo procesado: ${articleId}`);
+        } catch (error: any) {
+          console.error(`[Blog Import] ❌ Error importando artículo ${article.title}:`, error);
+          errors++;
+          errorDetails.push(`${article.title}: ${error.message || 'Error desconocido'}`);
+        }
+      }
+
+      const message = `✅ Importación completada:\n• ${imported} artículos nuevos\n• ${updated} artículos actualizados\n• ${errors} errores${errors > 0 ? '\n\nErrores:\n' + errorDetails.join('\n') : ''}`;
+      alert(message);
+      console.log('[Blog Import] Resultado final:', { imported, updated, errors, errorDetails });
+      logAdminAction('Artículos del blog importados', user.id, user.username, { imported, updated, errors, errorDetails });
     } catch (error) {
-      console.error('Error creando artículo de Navidad:', error);
-      alert('❌ Error al crear el artículo de Navidad');
+      console.error('[Blog Import] Error general importando artículos:', error);
+      alert('❌ Error al importar los artículos. Revisa la consola para más detalles.');
     }
   };
 
   // Funciones para gestión del blog
   const handleCreateBlogPost = () => {
+    // Generar slug único basado en timestamp
+    const timestamp = Date.now();
+    const slug = `articulo-${timestamp}`;
+    
     setSelectedBlogPost({
-      id: `blog_${Date.now()}`,
+      id: `blog_${timestamp}`,
       title: '',
+      slug: slug,
       content: '',
       excerpt: '',
       category: '',
+      tags: [],
       bannerImage: '',
       featuredImage: '',
       author: user?.username || 'Admin',
       published: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      tags: [],
+      readTime: 5,
       views: 0
     });
     setIsEditingBlogPost(true);
@@ -2701,23 +2540,68 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     }
 
     try {
+      // Generar slug automáticamente si no existe
+      let slug = selectedBlogPost.slug || '';
+      if (!slug) {
+        slug = selectedBlogPost.title
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '') // Remover acentos
+          .replace(/[^a-z0-9]+/g, '-') // Reemplazar espacios y caracteres especiales
+          .replace(/^-+|-+$/g, ''); // Remover guiones al inicio y final
+      }
+
+      // Calcular tiempo de lectura aproximado (250 palabras por minuto)
+      const wordCount = selectedBlogPost.content.split(/\s+/).length;
+      const readTime = Math.max(1, Math.ceil(wordCount / 250));
+
       const postData = {
         ...selectedBlogPost,
+        slug: slug,
+        readTime: readTime,
         updatedAt: new Date().toISOString(),
         author: user.username || 'Admin',
-        authorId: user.id
+        authorId: user.id,
+        createdAt: selectedBlogPost.createdAt || new Date().toISOString() // Mantener fecha original si existe
       };
 
       const postRef = dbRef(realtimeDb, `blog/${selectedBlogPost.id}`);
       await firebaseSet(postRef, postData);
       
-      alert('✅ Entrada de blog guardada correctamente');
+      const action = selectedBlogPost.createdAt ? 'actualizada' : 'creada';
+      alert(`✅ Entrada de blog ${action} correctamente`);
       setIsEditingBlogPost(false);
       setSelectedBlogPost(null);
-      logAdminAction('Entrada de blog guardada', user.id, user.username, { postId: selectedBlogPost.id, title: selectedBlogPost.title });
+      logAdminAction(`Entrada de blog ${action}`, user.id, user.username, { postId: selectedBlogPost.id, title: selectedBlogPost.title, published: postData.published });
     } catch (error) {
       console.error('Error guardando entrada de blog:', error);
       alert('❌ Error al guardar la entrada de blog');
+    }
+  };
+
+  // Función para cambiar estado de publicación
+  const handleTogglePublish = async (post: any) => {
+    if (!user) return;
+    
+    const newPublishedState = !post.published;
+    const action = newPublishedState ? 'publicar' : 'despublicar';
+    
+    if (!window.confirm(`¿${action.charAt(0).toUpperCase() + action.slice(1)} "${post.title}"?`)) {
+      return;
+    }
+
+    try {
+      const postRef = dbRef(realtimeDb, `blog/${post.id}`);
+      await update(postRef, {
+        published: newPublishedState,
+        updatedAt: new Date().toISOString()
+      });
+      
+      alert(`✅ Artículo ${newPublishedState ? 'publicado' : 'despublicado'} correctamente`);
+      logAdminAction(`Artículo ${action}do`, user.id, user.username, { postId: post.id, title: post.title });
+    } catch (error) {
+      console.error(`Error al ${action} artículo:`, error);
+      alert(`❌ Error al ${action} el artículo`);
     }
   };
 
@@ -2766,17 +2650,22 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       const matchesSearch = !blogSearchTerm || 
         post.title?.toLowerCase().includes(blogSearchTerm.toLowerCase()) ||
         post.content?.toLowerCase().includes(blogSearchTerm.toLowerCase()) ||
-        post.excerpt?.toLowerCase().includes(blogSearchTerm.toLowerCase());
+        post.excerpt?.toLowerCase().includes(blogSearchTerm.toLowerCase()) ||
+        post.tags?.some((tag: string) => tag.toLowerCase().includes(blogSearchTerm.toLowerCase()));
       
       const matchesCategory = blogFilterCategory === 'all' || post.category === blogFilterCategory;
       
-      return matchesSearch && matchesCategory;
+      const matchesPublished = blogFilterPublished === 'all' || 
+        (blogFilterPublished === 'published' && post.published) ||
+        (blogFilterPublished === 'draft' && !post.published);
+      
+      return matchesSearch && matchesCategory && matchesPublished;
     }).sort((a: any, b: any) => {
       const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime();
       const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime();
       return dateB - dateA;
     });
-  }, [blogPosts, blogSearchTerm, blogFilterCategory]);
+  }, [blogPosts, blogSearchTerm, blogFilterCategory, blogFilterPublished]);
 
   // Calcular contadores para bandeja unificada
   const unifiedUnreadCounts = getUnreadCountsByType(unifiedMessages);
@@ -11347,19 +11236,35 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               </p>
             </div>
             {!isEditingBlogPost && (
-              <button
-                onClick={handleCreateBlogPost}
-                className="btn btn-primary"
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.5rem',
-                  padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.5rem'
-                }}
-              >
-                <Plus size={18} />
-                Nueva Entrada
-              </button>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <button
+                  onClick={importStaticArticles}
+                  className="btn btn-secondary"
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem',
+                    padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.5rem'
+                  }}
+                  title="Importar los 6 artículos del blog desde el código"
+                >
+                  <Upload size={18} />
+                  Importar Artículos ({staticBlogArticles.length})
+                </button>
+                <button
+                  onClick={handleCreateBlogPost}
+                  className="btn btn-primary"
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem',
+                    padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.5rem'
+                  }}
+                >
+                  <Plus size={18} />
+                  Nueva Entrada
+                </button>
+              </div>
             )}
           </div>
 
@@ -11640,7 +11545,40 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>
+                <select
+                  value={blogFilterPublished}
+                  onChange={(e) => setBlogFilterPublished(e.target.value)}
+                  style={{
+                    padding: '0.875rem 1rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '1rem',
+                    cursor: 'pointer',
+                    minWidth: isMobile ? '100%' : '200px'
+                  }}
+                >
+                  <option value="all">📄 Todos los estados</option>
+                  <option value="published">✅ Publicados</option>
+                  <option value="draft">📝 Borradores</option>
+                </select>
               </div>
+              
+              {/* Información de debug (solo en desarrollo) */}
+              {process.env.NODE_ENV === 'development' && (
+                <div style={{
+                  padding: '0.75rem',
+                  background: 'var(--bg-secondary)',
+                  borderRadius: '0.5rem',
+                  marginBottom: '1rem',
+                  fontSize: '0.875rem',
+                  color: 'var(--text-secondary)'
+                }}>
+                  <strong>Debug:</strong> Total artículos: {blogPosts.length} | Filtrados: {filteredBlogPosts.length} | 
+                  Búsqueda: "{blogSearchTerm}" | Categoría: {blogFilterCategory} | Estado: {blogFilterPublished}
+                </div>
+              )}
 
               {/* Lista de posts */}
               {filteredBlogPosts.length === 0 ? (
@@ -11655,27 +11593,53 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   <h3 style={{ margin: '0 0 0.5rem', color: 'var(--text-primary)' }}>No hay entradas del blog</h3>
                   <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
                     {blogPosts.length === 0 
-                      ? 'Crea tu primera entrada del blog o importa el artículo de Navidad' 
-                      : 'No se encontraron entradas con los filtros aplicados'}
+                      ? `Importa los ${staticBlogArticles.length} artículos del blog o crea una nueva entrada` 
+                      : `No se encontraron entradas con los filtros aplicados (${blogPosts.length} artículos en total)`}
                   </p>
-                  {blogPosts.length === 0 && (
-                    <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-                      <button
-                        onClick={createNavidadPost}
-                        className="btn btn-secondary"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-                      >
-                        <Upload size={18} />
-                        Importar Artículo de Navidad
-                      </button>
-                      <button
-                        onClick={handleCreateBlogPost}
-                        className="btn btn-primary"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-                      >
-                        <Plus size={18} />
-                        Crear Nueva Entrada
-                      </button>
+                  <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={importStaticArticles}
+                      className="btn btn-secondary"
+                      style={{ 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: '0.5rem',
+                        padding: '0.875rem 1.5rem',
+                        fontSize: '1rem',
+                        fontWeight: 600
+                      }}
+                      title={`Importar ${staticBlogArticles.length} artículos del blog desde el código fuente`}
+                    >
+                      <Upload size={20} />
+                      Importar {staticBlogArticles.length} Artículos del Blog
+                    </button>
+                    <button
+                      onClick={handleCreateBlogPost}
+                      className="btn btn-primary"
+                      style={{ 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: '0.5rem',
+                        padding: '0.875rem 1.5rem',
+                        fontSize: '1rem',
+                        fontWeight: 600
+                      }}
+                    >
+                      <Plus size={20} />
+                      Crear Nueva Entrada
+                    </button>
+                  </div>
+                  {blogPosts.length > 0 && (
+                    <div style={{ 
+                      marginTop: '1.5rem', 
+                      padding: '1rem', 
+                      background: 'var(--bg-primary)', 
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)'
+                    }}>
+                      <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: 0 }}>
+                        💡 <strong>Tip:</strong> Si no ves los artículos, verifica los filtros de categoría y estado arriba.
+                      </p>
                     </div>
                   )}
                 </div>

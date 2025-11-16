@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Star, Package, ChevronLeft, CreditCard, TrendingUp, AlertCircle } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { formatCurrency, formatTimeAgo } from '../utils/helpers';
+import { useSEO, generateProductStructuredData } from '../hooks/useSEO';
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -12,6 +13,26 @@ const ProductDetail = () => {
   const product = products.find(p => p.id === id);
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
+
+  // SEO: Meta tags y structured data para productos
+  const productImage = product?.images[0]?.startsWith('http') 
+    ? product.images[0] 
+    : product?.images[0] 
+      ? `https://www.clickio.com.ar${product.images[0]}` 
+      : undefined;
+  
+  useSEO({
+    title: product?.name,
+    description: product?.description 
+      ? (product.description.length > 160 
+          ? product.description.substring(0, 157) + '...' 
+          : product.description)
+      : undefined,
+    image: productImage,
+    url: product ? `https://www.clickio.com.ar/producto/${product.id}` : undefined,
+    type: 'product',
+    structuredData: product ? generateProductStructuredData(product) : undefined
+  });
 
   if (!product) {
     return (

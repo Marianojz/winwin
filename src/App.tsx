@@ -31,6 +31,10 @@ import Notificaciones from './pages/Notificaciones';
 import Perfil from './pages/Perfil';
 import AdminPanel from './pages/AdminPanel';
 import Blog from './pages/Blog';
+import BlogArticle from './pages/BlogArticle';
+import ComoFunciona from './pages/ComoFunciona';
+import CategoriaPage from './pages/CategoriaPage';
+import NotFound from './pages/NotFound';
 
 // Componente Footer condicional
 const Footer = () => {
@@ -641,6 +645,17 @@ function App() {
             />
             <Route path="/admin" element={<AdminPanel />} />
             <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:slug" element={
+              <Suspense fallback={<LoadingSpinner size="md" text="Cargando artículo..." />}>
+                <BlogArticle />
+              </Suspense>
+            } />
+            <Route path="/como-funciona" element={
+              <Suspense fallback={<LoadingSpinner size="md" text="Cargando..." />}>
+                <ComoFunciona />
+              </Suspense>
+            } />
+            <Route path="/categoria/:categoriaId" element={<CategoriaPage />} />
             <Route 
               path="/completar-perfil" 
               element={
@@ -657,6 +672,8 @@ function App() {
                 </Suspense>
               } 
             />
+            {/* Ruta catch-all para 404 */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
         <Footer />
