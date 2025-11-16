@@ -2743,8 +2743,8 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     if (!user) return;
     
     try {
-      const imageRef = storageRef(storage, `blog/${selectedBlogPost?.id || Date.now()}/${type}_${file.name}`);
-      const uploadResult = await uploadImage(file, imageRef);
+      const folder = `blog/${selectedBlogPost?.id || Date.now()}`;
+      const uploadResult = await uploadImage(file, folder);
       
       if (uploadResult && selectedBlogPost) {
         if (type === 'banner') {
