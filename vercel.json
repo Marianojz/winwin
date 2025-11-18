@@ -31,7 +31,7 @@
       ]
     },
     {
-      "source": "/(.*\\.(js|css|woff2?|ttf|eot))",
+      "source": "/:path*.(js|css|woff2|ttf|eot)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -40,7 +40,7 @@
       ]
     },
     {
-      "source": "/(.*\\.(jpg|jpeg|png|gif|webp|avif|svg|ico))",
+      "source": "/:path*.(jpg|jpeg|png|gif|webp|avif|svg|ico)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -49,7 +49,7 @@
       ]
     },
     {
-      "source": "/(.*\\.(html|xml|txt))",
+      "source": "/:path*.(html|xml|txt)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -95,7 +95,7 @@
   ],
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/:path*",
       "destination": "/index.html"
     }
   ]
