@@ -209,7 +209,7 @@ const GoogleAddressPicker = ({
 
       // Función para geocodificación inversa (definida localmente para evitar dependencias)
       const handleReverseGeocode = (lat: number, lng: number) => {
-        const currentGeocoder = geocoderRef.current || geocoderInstance;
+        const currentGeocoder = geocoderRef.current;
         if (!currentGeocoder) return;
         setLoading(true);
         
