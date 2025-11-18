@@ -25,7 +25,7 @@
 .admin-main-content-mobile {
   flex: 1;
   padding: 1rem;
-  padding-bottom: 80px; /* Space for bottom nav */
+  padding-bottom: 80px; /* Space for general bottom navbar */
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
@@ -33,55 +33,20 @@
   position: relative;
 }
 
-/* Navegación inferior móvil */
-.admin-bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: white;
-  border-top: 1px solid #e0e0e0;
-  display: flex;
-  justify-content: flex-start;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 0.5rem;
-  z-index: 1001; /* Mayor que navbar-mobile (1000) para estar por encima */
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
-  scrollbar-width: thin;
-  -webkit-overflow-scrolling: touch;
-  gap: 0.25rem;
+/* Navegación superior del admin (sticky) */
+.admin-top-nav {
+  position: sticky;
+  top: 60px; /* Debajo de la navbar superior (altura aproximada de la navbar) */
+  z-index: 998; /* Debajo de la navbar (99999) pero por encima del contenido */
+  background: var(--bg-primary);
+  border-bottom: 2px solid var(--border);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
-.nav-item-mobile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 0.4rem 0.5rem;
-  font-size: 0.65rem;
-  min-width: 55px;
-  max-width: 70px;
-  flex-shrink: 0;
-  cursor: pointer;
-  color: var(--text-secondary);
-  transition: color 0.2s;
-  border: none;
-  background: transparent;
-  gap: 0.2rem;
-}
-
-.nav-item-mobile.active {
-  color: var(--primary);
-}
-
-.nav-item-mobile:hover {
-  color: var(--primary);
-}
-
-.nav-item-mobile svg {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
+@media (min-width: 769px) {
+  .admin-top-nav {
+    top: 60px; /* Mantener debajo de la navbar también en desktop */
+  }
 }
 
 /* Grid de datos móvil */
@@ -186,12 +151,7 @@
 
   .admin-main-content-mobile {
     padding: 0.75rem;
-    margin-bottom: 70px; /* Ensure content doesn't get hidden behind bottom nav */
-  }
-
-  .admin-bottom-nav {
-    display: flex;
-    height: 60px; /* Fixed height for bottom nav */
+    margin-bottom: 80px; /* Ensure content doesn't get hidden behind general bottom navbar */
   }
 
   .mobile-data-grid {
@@ -225,8 +185,7 @@
 
   /* Ensure all action buttons are easily tappable */
   .action-button, 
-  button,
-  .nav-item-mobile {
+  button {
     min-height: 44px; /* iOS minimum tap target size */
     min-width: 44px;
     padding: 0.5rem 1rem;
@@ -246,10 +205,6 @@
 }
 
 @media (min-width: 769px) {
-  .admin-bottom-nav {
-    display: none;
-  }
-
   .admin-main-content-mobile {
     padding-bottom: 1rem;
   }

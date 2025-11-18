@@ -70,6 +70,12 @@ const ChatWidget = ({ onContactClick, onHelpCenterClick }: ChatWidgetProps) => {
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     
+    // Los administradores no pueden enviar mensajes a través de este widget
+    if (user?.isAdmin) {
+      alert('⚠️ Los administradores no pueden enviar mensajes a través de este widget. Usá el panel de administración para gestionar conversaciones.');
+      return;
+    }
+    
     if (!user || !conversationId || !newMessage.trim() || sending || !conversationExists || conversationStatus !== 'open') {
       if (!conversationExists) {
         alert('⚠️ No podés enviar mensajes hasta que el administrador inicie la conversación.');
@@ -168,13 +174,18 @@ const ChatWidget = ({ onContactClick, onHelpCenterClick }: ChatWidgetProps) => {
                 className="chat-widget-icon-btn"
                 onClick={() => setIsMinimized(!isMinimized)}
                 aria-label={isMinimized ? 'Expandir' : 'Minimizar'}
+                title={isMinimized ? 'Expandir' : 'Minimizar'}
               >
                 {isMinimized ? <Maximize2 size={18} /> : <Minimize2 size={18} />}
               </button>
               <button
-                className="chat-widget-icon-btn"
-                onClick={() => setIsOpen(false)}
+                className="chat-widget-icon-btn chat-widget-close-header-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsOpen(false);
+                }}
                 aria-label="Cerrar chat"
+                title="Cerrar"
               >
                 <X size={18} />
               </button>
@@ -254,7 +265,11 @@ const ChatWidget = ({ onContactClick, onHelpCenterClick }: ChatWidgetProps) => {
               </div>
 
               {/* Input de mensaje */}
-              {conversationExists && conversationStatus === 'open' ? (
+              {user?.isAdmin ? (
+                <div className="chat-widget-closed-notice">
+                  <p>⚠️ Los administradores no pueden enviar mensajes a través de este widget. Usá el panel de administración para gestionar conversaciones.</p>
+                </div>
+              ) : conversationExists && conversationStatus === 'open' ? (
                 <form className="chat-widget-input-container" onSubmit={handleSendMessage}>
                   <textarea
                     ref={inputRef}

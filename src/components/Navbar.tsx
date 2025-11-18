@@ -9,7 +9,6 @@ import { specialEvents } from '../utils/dateSpecialEvents';
 import { getUnreadCount } from '../utils/messages';
 import { getUserAvatarUrl, getUserInitial } from '../utils/avatarHelper';
 import ThemeToggle from './ThemeToggle';
-import SoundToggle from './SoundToggle';
 import AvatarMenu from './AvatarMenu';
 import StickerRenderer from './StickerRenderer';
 import CategoriesDropdown from './CategoriesDropdown';
@@ -197,21 +196,26 @@ const Navbar = () => {
   // Determinar si el enlace está activo para el navbar móvil
   const isActive = (path: string) => location.pathname === path;
 
+  // En móvil, solo mostrar navbar superior en la página de inicio
+  const showTopNavbar = !isMobile || location.pathname === '/';
+
   return (
     <>
-      {/* Navbar Superior (Desktop) */}
+      {/* Navbar Superior (Desktop) - En móvil solo en inicio */}
+      {showTopNavbar && (
       <nav className="navbar">
         <div className="navbar-container" style={{
           display: 'flex',
           alignItems: 'center',
-          gap: isMobile ? '0.125rem' : '1.5rem',
+          gap: isMobile ? '0.75rem' : '1.5rem',
           flexWrap: isMobile ? 'nowrap' : 'wrap',
           overflowX: 'hidden',
           overflowY: 'hidden',
           width: '100%',
-          justifyContent: isMobile ? 'space-between' : 'flex-start',
+          justifyContent: isMobile ? 'flex-start' : 'flex-start',
           paddingRight: isMobile ? '0.5rem' : '0',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          position: 'relative'
         }}>
           {/* 1. Logo */}
           <Link to="/" className="navbar-logo" style={{ 
@@ -221,7 +225,8 @@ const Navbar = () => {
             gap: isMobile ? '0.25rem' : '0.75rem',
             textDecoration: 'none',
             flexShrink: 0,
-            minWidth: isMobile ? 'auto' : 'auto'
+            minWidth: isMobile ? 'auto' : 'auto',
+            marginRight: isMobile ? '0.5rem' : '0'
           }}>
             <div style={{ 
               position: 'relative', 
@@ -299,11 +304,12 @@ const Navbar = () => {
 
           {/* 2. Menú desplegable de categorías */}
           <div style={{ 
-            transform: isMobile ? 'scale(0.7)' : 'scale(1)',
+            transform: isMobile ? 'scaleX(1.3)' : 'scale(1)',
             transformOrigin: 'center',
             flexShrink: 0,
             position: 'relative',
-            zIndex: 99999
+            zIndex: 99999,
+            marginLeft: isMobile ? '0.75rem' : '0'
           }}>
             <CategoriesDropdown />
           </div>
@@ -311,18 +317,19 @@ const Navbar = () => {
           {/* 3. Nombre del sitio llamativo */}
           <Link to="/" style={{ 
             textDecoration: 'none',
-            flexGrow: isMobile ? 1 : 1,
+            flexGrow: isMobile ? 1 : 0,
             flexShrink: 1,
-            flexBasis: isMobile ? '0%' : '0%',
+            flexBasis: isMobile ? '0%' : 'auto',
             minWidth: isMobile ? '30px' : '150px',
             maxWidth: isMobile ? 'none' : 'none',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
-            marginRight: isMobile ? '0.125rem' : '0',
             display: 'flex',
             justifyContent: 'center',
-            alignItems: 'center'
+            alignItems: 'center',
+            textAlign: 'center',
+            marginRight: !isMobile ? 'auto' : '0'
           }}>
             <span className="navbar-logo-text" style={{
               fontSize: isMobile ? '1.125rem' : '2.5rem',
@@ -342,35 +349,7 @@ const Navbar = () => {
             </span>
           </Link>
 
-          {/* 4. Carrito - Reordenado */}
-          {isAuthenticated && (
-            <Link 
-              to="/carrito" 
-              className="navbar-icon-btn" 
-              title="Carrito"
-              style={{
-                padding: isMobile ? '0.2rem' : '0.5rem',
-                minWidth: isMobile ? '22px' : '36px',
-                maxWidth: isMobile ? '22px' : '36px',
-                flexShrink: 0,
-                marginLeft: isMobile ? '0' : 'auto'
-              }}
-            >
-              <ShoppingCart size={isMobile ? 12 : 20} />
-              {cartItemsCount > 0 && (
-                <span className="navbar-badge" style={{
-                  fontSize: isMobile ? '0.35rem' : '0.6rem',
-                  padding: isMobile ? '0.05rem 0.08rem' : '0.1rem 0.25rem',
-                  minWidth: isMobile ? '9px' : '14px',
-                  lineHeight: isMobile ? '1' : '1.2'
-                }}>
-                  {cartItemsCount}
-                </span>
-              )}
-            </Link>
-          )}
-
-          {/* 5. Notificaciones - Reordenado */}
+          {/* 4. Notificaciones - Reordenado (primero) */}
           {isAuthenticated && (
             <Link 
               to="/notificaciones" 
@@ -380,7 +359,11 @@ const Navbar = () => {
                 padding: isMobile ? '0.2rem' : '0.5rem',
                 minWidth: isMobile ? '22px' : '36px',
                 maxWidth: isMobile ? '22px' : '36px',
-                flexShrink: 0
+                flexShrink: 0,
+                marginLeft: isMobile ? 'auto' : '0',
+                position: isMobile ? 'relative' : 'relative',
+                zIndex: isMobile ? 10 : 'auto',
+                order: isMobile ? 10 : 'auto'
               }}
             >
               <Bell size={isMobile ? 12 : 20} />
@@ -397,23 +380,44 @@ const Navbar = () => {
             </Link>
           )}
 
-          {/* 6. Modos de colores - Reordenado */}
-          <div style={{ 
-            transform: isMobile ? 'scale(0.6)' : 'scale(1)',
-            transformOrigin: 'center',
-            flexShrink: 0
-          }}>
-            <ThemeToggle />
-          </div>
+          {/* 5. Carrito - Reordenado (después de notificaciones) */}
+          {isAuthenticated && (
+            <Link 
+              to="/carrito" 
+              className="navbar-icon-btn" 
+              title="Carrito"
+              style={{
+                padding: isMobile ? '0.2rem' : '0.5rem',
+                minWidth: isMobile ? '22px' : '36px',
+                maxWidth: isMobile ? '22px' : '36px',
+                flexShrink: 0,
+                order: isMobile ? 11 : 'auto'
+              }}
+            >
+              <ShoppingCart size={isMobile ? 12 : 20} />
+              {cartItemsCount > 0 && (
+                <span className="navbar-badge" style={{
+                  fontSize: isMobile ? '0.35rem' : '0.6rem',
+                  padding: isMobile ? '0.05rem 0.08rem' : '0.1rem 0.25rem',
+                  minWidth: isMobile ? '9px' : '14px',
+                  lineHeight: isMobile ? '1' : '1.2'
+                }}>
+                  {cartItemsCount}
+                </span>
+              )}
+            </Link>
+          )}
 
-          {/* 7. Sonido - Reordenado */}
-          <div style={{ 
-            transform: isMobile ? 'scale(0.6)' : 'scale(1)',
-            transformOrigin: 'center',
-            flexShrink: 0
-          }}>
-            <SoundToggle />
-          </div>
+          {/* 6. Modos de colores - Reordenado (oculto en móvil) */}
+          {!isMobile && (
+            <div style={{ 
+              transform: 'scale(1)',
+              transformOrigin: 'center',
+              flexShrink: 0
+            }}>
+              <ThemeToggle />
+            </div>
+          )}
 
           {/* 8. Perfil - Solo visible en desktop, oculto en móvil */}
           {!isMobile && (
@@ -453,10 +457,10 @@ const Navbar = () => {
           )}
         </div>
       </nav>
+      )}
 
-      {/* Navbar Inferior (Mobile) - ¡ESTE ES EL NUEVO! */}
-      {/* Ocultar navbar móvil en el panel de admin para evitar superposición */}
-      {location.pathname !== '/admin' && (
+      {/* Navbar Inferior (Mobile) - Siempre visible en móvil, incluyendo el panel de admin */}
+      {isMobile && (
       <nav className="navbar-mobile">
         <Link 
           to="/" 

@@ -43,6 +43,7 @@ declare global {
     initGoogleMaps: () => void;
     __googleMapsLoading?: Promise<void>;
     __googleMapsLoaded?: boolean;
+    __googleMapsApiKeyLogged?: boolean; // Para evitar logs repetitivos
   }
 }
 
@@ -90,8 +91,19 @@ const GoogleAddressPicker = ({
     country: initialAddress?.components.country || 'Argentina'
   });
 
+  // Refs para evitar múltiples inicializaciones
+  const servicesInitializedRef = useRef(false);
+  const autocompleteServiceRef = useRef<any>(null);
+  const placesServiceRef = useRef<any>(null);
+  const geocoderRef = useRef<any>(null);
+
   // Inicializar servicios de Google Maps
   const initializeServices = useCallback(() => {
+    // Evitar inicializar múltiples veces
+    if (servicesInitializedRef.current && autocompleteServiceRef.current && placesServiceRef.current && geocoderRef.current) {
+      return;
+    }
+
     if (!window.google || !window.google.maps) {
       console.warn('⚠️ Google Maps API aún no está disponible');
       return;
@@ -115,13 +127,23 @@ const GoogleAddressPicker = ({
 
         // Si llegamos aquí, places está disponible
         try {
+          // Verificar nuevamente antes de crear instancias
+          if (servicesInitializedRef.current && autocompleteServiceRef.current && placesServiceRef.current && geocoderRef.current) {
+            return;
+          }
+
           const autocomplete = new window.google.maps.places.AutocompleteService();
           const places = new window.google.maps.places.PlacesService(document.createElement('div'));
           const geocoderInstance = new window.google.maps.Geocoder();
 
+          // Guardar en refs y estados
+          autocompleteServiceRef.current = autocomplete;
+          placesServiceRef.current = places;
+          geocoderRef.current = geocoderInstance;
           setAutocompleteService(autocomplete);
           setPlacesService(places);
           setGeocoder(geocoderInstance);
+          servicesInitializedRef.current = true;
           
           if (import.meta.env.DEV) {
             console.log('✅ Servicios de Google Maps inicializados correctamente');
@@ -187,7 +209,8 @@ const GoogleAddressPicker = ({
 
       // Función para geocodificación inversa (definida localmente para evitar dependencias)
       const handleReverseGeocode = (lat: number, lng: number) => {
-        if (!geocoder) return;
+        const currentGeocoder = geocoderRef.current || geocoderInstance;
+        if (!currentGeocoder) return;
         setLoading(true);
         
         // Actualizar posición del marcador inmediatamente (feedback visual instantáneo)
@@ -198,7 +221,7 @@ const GoogleAddressPicker = ({
           mapInstance.panTo({ lat, lng });
         }
         
-        geocoder.geocode(
+        currentGeocoder.geocode(
           { location: { lat, lng } },
           (results: any[], status: string) => {
             if (status === 'OK' && results && results.length > 0) {
@@ -282,8 +305,9 @@ const GoogleAddressPicker = ({
 
   // Cargar Google Maps API (solo una vez globalmente)
   useEffect(() => {
-    // Debug: verificar qué se está recibiendo
-    if (import.meta.env.DEV) {
+    // Evitar logs repetitivos - solo mostrar una vez globalmente
+    if (import.meta.env.DEV && !window.__googleMapsApiKeyLogged) {
+      window.__googleMapsApiKeyLogged = true;
       console.log('🔍 [GoogleAddressPicker] API Key recibida:', apiKey ? `${apiKey.substring(0, 10)}...` : 'VACÍA');
       console.log('🔍 [GoogleAddressPicker] import.meta.env.VITE_GOOGLE_MAPS_API_KEY:', import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? `${import.meta.env.VITE_GOOGLE_MAPS_API_KEY.substring(0, 10)}...` : 'VACÍA');
     }
@@ -375,11 +399,102 @@ const GoogleAddressPicker = ({
     };
   }, [apiKey, countryRestriction, initializeServices]);
 
+  // Parsear componentes de dirección (definir primero para evitar dependencia circular)
+  const parseAddressComponents = useCallback((place: any) => {
+    if (!place) {
+      console.error('❌ parseAddressComponents: place es null o undefined');
+      return;
+    }
+
+    const addressComponents = place.address_components || [];
+    const newComponents: AddressComponents = {
+      street: '',
+      streetNumber: '',
+      floor: '',
+      apartment: '',
+      crossStreets: '',
+      locality: '',
+      province: '',
+      postalCode: '',
+      country: 'Argentina'
+    };
+
+    addressComponents.forEach((component: any) => {
+      const types = component.types || [];
+      
+      if (types.includes('route')) {
+        newComponents.street = component.long_name || component.short_name || '';
+      } else if (types.includes('street_number')) {
+        newComponents.streetNumber = component.long_name || component.short_name || '';
+      } else if (types.includes('locality') || types.includes('administrative_area_level_2')) {
+        if (!newComponents.locality) {
+          newComponents.locality = component.long_name || component.short_name || '';
+        }
+      } else if (types.includes('administrative_area_level_1')) {
+        newComponents.province = component.long_name || component.short_name || '';
+      } else if (types.includes('postal_code')) {
+        newComponents.postalCode = component.long_name || component.short_name || '';
+      } else if (types.includes('country')) {
+        newComponents.country = component.long_name || 'Argentina';
+      }
+    });
+
+    // Si no hay calle pero sí hay formatted_address, intentar extraerla
+    if (!newComponents.street && place.formatted_address) {
+      const parts = place.formatted_address.split(',');
+      if (parts.length > 0) {
+        const firstPart = parts[0].trim();
+        // Intentar separar calle y número
+        const streetMatch = firstPart.match(/^(.+?)\s+(\d+)/);
+        if (streetMatch) {
+          newComponents.street = streetMatch[1].trim();
+          newComponents.streetNumber = streetMatch[2].trim();
+        } else {
+          newComponents.street = firstPart;
+        }
+      }
+    }
+
+    setComponents(newComponents);
+    
+    const location = place.geometry?.location;
+    if (!location) {
+      console.error('❌ parseAddressComponents: place.geometry.location es null o undefined');
+      return;
+    }
+
+    const addressData: AddressData = {
+      formatted: place.formatted_address || place.name || '',
+      components: newComponents,
+      coordinates: {
+        lat: typeof location.lat === 'function' ? location.lat() : location.lat,
+        lng: typeof location.lng === 'function' ? location.lng() : location.lng
+      },
+      placeId: place.place_id || ''
+    };
+
+    setAddressData(addressData);
+    setIsValidAddress(true);
+    setSearchQuery(addressData.formatted);
+    
+    // Llamar al callback para notificar al componente padre
+    try {
+      onAddressSelect(addressData);
+      if (import.meta.env.DEV) {
+        console.log('✅ Dirección seleccionada y callback ejecutado:', addressData);
+      }
+    } catch (error) {
+      console.error('❌ Error en onAddressSelect:', error);
+    }
+  }, [onAddressSelect]);
+
   // Autocompletado predictivo
   const handleSearchChange = useCallback((value: string) => {
     setSearchQuery(value);
     
-    if (!value.trim() || !autocompleteService) {
+    // Usar el ref en lugar del estado para asegurar que siempre tengamos el servicio más reciente
+    const currentAutocompleteService = autocompleteServiceRef.current || autocompleteService;
+    if (!value.trim() || !currentAutocompleteService) {
       setPredictions([]);
       setShowPredictions(false);
       return;
@@ -392,7 +507,7 @@ const GoogleAddressPicker = ({
       types: ['address']
     };
 
-    autocompleteService.getPlacePredictions(request, (predictions: any[], status: string) => {
+    currentAutocompleteService.getPlacePredictions(request, (predictions: any[], status: string) => {
       if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
         setPredictions(predictions);
         setShowPredictions(true);
@@ -406,11 +521,6 @@ const GoogleAddressPicker = ({
           const errorMsg = 'Places API no está habilitada. Habilita "Places API" en Google Cloud Console.';
           setApiError(errorMsg);
           console.error('❌', errorMsg);
-          console.error('   Pasos para habilitar:');
-          console.error('   1. Ve a: https://console.cloud.google.com/google/maps-apis/api-list');
-          console.error('   2. Busca "Places API" (NO "Places API (New)")');
-          console.error('   3. Haz clic en "Habilitar"');
-          console.error('   4. Verifica que la facturación esté activa');
         } else if (status === window.google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
           // No hay resultados, no es un error
           setApiError('');
@@ -431,7 +541,22 @@ const GoogleAddressPicker = ({
 
   // Seleccionar predicción
   const selectPrediction = useCallback((placeId: string) => {
-    if (!placesService) return;
+    // Usar el ref en lugar del estado para asegurar que siempre tengamos el servicio más reciente
+    const currentPlacesService = placesServiceRef.current || placesService;
+    if (!currentPlacesService) {
+      console.warn('⚠️ PlacesService no está disponible aún. Esperando inicialización...');
+      // Reintentar después de un breve delay
+      setTimeout(() => {
+        const retryService = placesServiceRef.current || placesService;
+        if (retryService) {
+          selectPrediction(placeId);
+        } else {
+          setApiError('Servicio de direcciones no disponible. Por favor, recarga la página.');
+          setLoading(false);
+        }
+      }, 500);
+      return;
+    }
 
     setLoading(true);
     setShowPredictions(false);
@@ -447,7 +572,7 @@ const GoogleAddressPicker = ({
       ]
     };
 
-    placesService.getDetails(request, (place: any, status: string) => {
+    currentPlacesService.getDetails(request, (place: any, status: string) => {
       if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
         parseAddressComponents(place);
         // Actualizar mapa instantáneamente
@@ -459,61 +584,13 @@ const GoogleAddressPicker = ({
           // Zoom más cercano para mejor precisión
           map.setZoom(18);
         }
+      } else {
+        console.error('❌ Error obteniendo detalles del lugar:', status);
+        setApiError('Error al obtener los detalles de la dirección seleccionada.');
       }
       setLoading(false);
     });
-  }, [placesService, map, marker]);
-
-  // Parsear componentes de dirección
-  const parseAddressComponents = useCallback((place: any) => {
-    const addressComponents = place.address_components || [];
-    const newComponents: AddressComponents = {
-      street: '',
-      streetNumber: '',
-      floor: '',
-      apartment: '',
-      crossStreets: '',
-      locality: '',
-      province: '',
-      postalCode: '',
-      country: 'Argentina'
-    };
-
-    addressComponents.forEach((component: any) => {
-      const types = component.types;
-      
-      if (types.includes('route')) {
-        newComponents.street = component.long_name;
-      } else if (types.includes('street_number')) {
-        newComponents.streetNumber = component.long_name;
-      } else if (types.includes('locality') || types.includes('administrative_area_level_2')) {
-        newComponents.locality = component.long_name;
-      } else if (types.includes('administrative_area_level_1')) {
-        newComponents.province = component.long_name;
-      } else if (types.includes('postal_code')) {
-        newComponents.postalCode = component.long_name;
-      } else if (types.includes('country')) {
-        newComponents.country = component.long_name;
-      }
-    });
-
-    setComponents(newComponents);
-    
-    const addressData: AddressData = {
-      formatted: place.formatted_address || place.name,
-      components: newComponents,
-      coordinates: {
-        lat: place.geometry.location.lat(),
-        lng: place.geometry.location.lng()
-      },
-      placeId: place.place_id
-    };
-
-    setAddressData(addressData);
-    setIsValidAddress(true);
-    setSearchQuery(place.formatted_address || place.name);
-    onAddressSelect(addressData);
-  }, [onAddressSelect]);
+  }, [placesService, map, marker, parseAddressComponents]);
 
   // Geocodificación inversa
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {

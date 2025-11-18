@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { User, Settings, MessageSquare, LogOut, X, Loader, LayoutDashboard } from 'lucide-react';
+import { User, Settings, MessageSquare, LogOut, X, Loader, LayoutDashboard, Volume2, VolumeX, Sun, Moon, Sparkles } from 'lucide-react';
 import { auth } from '../config/firebase';
 import { useStore } from '../store/useStore';
 import { getUnreadCount } from '../utils/messages';
+import { soundManager } from '../utils/sounds';
 import './AvatarMenu.css';
 
 interface AvatarMenuProps {
@@ -25,10 +26,11 @@ type MenuState = 'closed' | 'open' | 'navigating';
 const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setUser } = useStore();
+  const { setUser, theme, toggleTheme } = useStore();
   const [menuState, setMenuState] = useState<MenuState>('closed');
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const [soundEnabled, setSoundEnabled] = useState(soundManager.isEnabled());
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0, bottom: undefined as number | undefined });
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -91,6 +93,57 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
       console.error('Error cargando contador de mensajes:', error);
     }
   }, [user?.id]);
+
+  // Cargar preferencia de sonido
+  useEffect(() => {
+    const saved = localStorage.getItem('soundEnabled');
+    if (saved !== null) {
+      const isEnabled = saved === 'true';
+      setSoundEnabled(isEnabled);
+    }
+  }, []);
+
+  const toggleSound = () => {
+    const newState = !soundEnabled;
+    setSoundEnabled(newState);
+    localStorage.setItem('soundEnabled', String(newState));
+    
+    if (newState) {
+      soundManager.enable();
+    } else {
+      soundManager.disable();
+    }
+  };
+
+  const getThemeIcon = () => {
+    if (theme === 'light') {
+      return Sun;
+    } else if (theme === 'dark') {
+      return Moon;
+    } else {
+      return Sparkles;
+    }
+  };
+
+  const getThemeLabel = () => {
+    if (theme === 'light') {
+      return 'Tema: Modo Claro';
+    } else if (theme === 'dark') {
+      return 'Tema: Modo Oscuro';
+    } else {
+      return 'Tema: Modo Experimental';
+    }
+  };
+
+  const getNextThemeLabel = () => {
+    if (theme === 'light') {
+      return 'Cambiar a Oscuro';
+    } else if (theme === 'dark') {
+      return 'Cambiar a Experimental';
+    } else {
+      return 'Cambiar a Claro';
+    }
+  };
 
   // Cerrar menú al hacer clic fuera
   useEffect(() => {
@@ -178,44 +231,64 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
     }
   };
 
-  const menuItems = [
-    {
-      label: 'Perfil',
-      icon: User,
-      path: '/perfil',
-      onClick: () => handleNavigation('/perfil')
-    },
-    {
-      label: 'Configuración',
-      icon: Settings,
-      path: '/perfil?tab=settings',
-      onClick: () => handleNavigation('/perfil?tab=settings')
-    },
-    {
-      label: 'Mensajes',
-      icon: MessageSquare,
-      path: '/perfil?tab=messages',
-      onClick: () => handleNavigation('/perfil?tab=messages'),
-      badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined
-    },
-    {
-      label: 'Cerrar Sesión',
-      icon: LogOut,
-      path: null,
-      onClick: handleLogout,
-      variant: 'danger' as const
-    }
-  ];
+  // Generar menuItems dinámicamente para que se actualicen cuando cambien theme o soundEnabled
+  const menuItems = useMemo(() => {
+    const items = [
+      {
+        label: 'Perfil',
+        icon: User,
+        path: '/perfil',
+        onClick: () => handleNavigation('/perfil')
+      },
+      {
+        label: 'Configuración',
+        icon: Settings,
+        path: '/perfil?tab=settings',
+        onClick: () => handleNavigation('/perfil?tab=settings')
+      },
+      {
+        label: 'Mensajes',
+        icon: MessageSquare,
+        path: '/perfil?tab=messages',
+        onClick: () => handleNavigation('/perfil?tab=messages'),
+        badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined
+      },
+      {
+        label: getThemeLabel(),
+        icon: getThemeIcon(),
+        path: null,
+        onClick: toggleTheme,
+        isToggle: true,
+        toggleLabel: getNextThemeLabel()
+      },
+      {
+        label: soundEnabled ? 'Sonidos: Activados' : 'Sonidos: Desactivados',
+        icon: soundEnabled ? Volume2 : VolumeX,
+        path: null,
+        onClick: toggleSound,
+        isToggle: true
+      },
+      {
+        label: 'Cerrar Sesión',
+        icon: LogOut,
+        path: null,
+        onClick: handleLogout,
+        variant: 'danger' as const
+      }
+    ];
 
-  // Agregar Panel Admin si es admin
-  if (user.isAdmin) {
-    menuItems.splice(1, 0, {
-      label: 'Panel Admin',
-      icon: LayoutDashboard,
-      path: '/admin',
-      onClick: () => handleNavigation('/admin')
-    });
-  }
+    // Agregar Panel Admin si es admin (después de Perfil)
+    if (user.isAdmin) {
+      items.splice(1, 0, {
+        label: 'Panel Admin',
+        icon: LayoutDashboard,
+        path: '/admin',
+        onClick: () => handleNavigation('/admin')
+      });
+    }
+
+    return items;
+  }, [theme, soundEnabled, unreadMessagesCount, user.isAdmin]);
 
   const overlayPortal = menuState === 'open' ? (
     <div
@@ -322,9 +395,9 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
             return (
               <button
                 key={index}
-                className={`avatar-menu-item ${item.variant || ''} ${menuState === 'navigating' ? 'navigating' : ''} ${isActive ? 'active' : ''}`}
+                className={`avatar-menu-item ${item.variant || ''} ${menuState === 'navigating' && !item.isToggle ? 'navigating' : ''} ${isActive ? 'active' : ''}`}
                 onClick={item.onClick}
-                disabled={menuState === 'navigating'}
+                disabled={menuState === 'navigating' && !item.isToggle}
               >
                 {menuState === 'navigating' && navigatingTo === item.path ? (
                   <>
@@ -337,6 +410,16 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
                     <span>{item.label}</span>
                     {item.badge !== undefined && item.badge !== null && (
                       <span className="avatar-menu-badge">{item.badge}</span>
+                    )}
+                    {item.isToggle && (
+                      <span style={{ 
+                        marginLeft: 'auto', 
+                        fontSize: '0.75rem', 
+                        color: item.toggleLabel ? 'var(--primary)' : (soundEnabled ? 'var(--success)' : 'var(--text-secondary)'),
+                        fontWeight: 600
+                      }}>
+                        {item.toggleLabel || (soundEnabled ? 'ON' : 'OFF')}
+                      </span>
                     )}
                   </>
                 )}

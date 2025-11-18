@@ -31,7 +31,10 @@ const ProductDetail = () => {
     image: productImage,
     url: product ? `https://www.clickio.com.ar/producto/${product.id}` : undefined,
     type: 'product',
-    structuredData: product ? generateProductStructuredData(product) : undefined
+    structuredData: product ? generateProductStructuredData({
+      ...product,
+      categoryId: product.categoryId
+    }) : undefined
   });
 
   if (!product) {

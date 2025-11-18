@@ -314,7 +314,7 @@ const Ayuda = () => {
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="+54 9 11 1234-5678"
+                    placeholder="11 5610 1104"
                     style={{
                       width: '100%',
                       padding: '0.75rem',

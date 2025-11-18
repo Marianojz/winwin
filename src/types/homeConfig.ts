@@ -243,7 +243,7 @@ export const defaultHomeConfig: HomeConfig = {
   },
   contactSection: {
     title: 'Contacto',
-    email: 'contacto@subastaargenta.com',
+    email: 'clickiotienda@gmail.com',
     active: false
   },
   updatedAt: new Date()

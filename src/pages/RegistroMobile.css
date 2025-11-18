@@ -24,6 +24,20 @@
   margin: auto;
 }
 
+@media (max-width: 768px) {
+  .register-container {
+    padding: 0.5rem;
+  }
+  
+  .form-section {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 1.25rem 1rem !important;
+    border-radius: 1rem;
+    margin: 0;
+  }
+}
+
 .form-header {
   text-align: center;
   margin-bottom: 2rem;
@@ -83,9 +97,43 @@
 }
 
 .form-group {
-  display: flex;
-  flex-direction: column;
+  display: flex !important;
+  flex-direction: column !important;
   gap: 0.5rem;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .register-form {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1.5rem;
+  }
+  
+  .form-group {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+    width: 100% !important;
+  }
+  
+  .form-group > * {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  .input-wrapper,
+  .password-input-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  .form-input {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+  }
 }
 
 .form-label {
@@ -234,6 +282,13 @@
   border: 1px solid var(--border);
 }
 
+@media (max-width: 768px) {
+  .address-section {
+    margin: 2rem 0;
+    padding: 1.5rem 1.25rem;
+  }
+}
+
 .section-title {
   font-size: 1.25rem;
   font-weight: 600;
@@ -257,6 +312,18 @@
   grid-template-columns: 2fr 1fr;
   gap: 1rem;
   margin: 1.5rem 0;
+}
+
+@media (max-width: 768px) {
+  .address-main-fields {
+    grid-template-columns: 1fr !important;
+    gap: 1.25rem;
+    margin: 1.75rem 0;
+  }
+  
+  .address-field-primary {
+    width: 100%;
+  }
 }
 
 .address-field-primary {
@@ -344,6 +411,18 @@
   gap: 1rem;
   background: var(--bg-primary);
   border-top: 1px solid var(--border);
+}
+
+@media (max-width: 768px) {
+  .address-additional-fields {
+    grid-template-columns: 1fr !important;
+    gap: 1.25rem;
+    padding: 1.25rem;
+  }
+  
+  .address-field-secondary {
+    width: 100%;
+  }
 }
 
 .address-field-secondary {
@@ -448,6 +527,13 @@
   min-height: 300px;
 }
 
+@media (max-width: 768px) {
+  .interactive-map-container {
+    margin-top: 1rem;
+    min-height: 200px;
+  }
+}
+
 /* Ocultar secciones duplicadas del GoogleAddressPicker cuando hay campos integrados */
 .address-picker-mobile .address-fields-section {
   display: none; /* Ocultar campos desglosados del picker, usar los integrados */
@@ -465,12 +551,24 @@
 /* Estilos responsive para address-main-fields */
 @media (max-width: 768px) {
   .address-main-fields {
-    grid-template-columns: 1fr;
-    gap: 1rem;
+    grid-template-columns: 1fr !important;
+    gap: 1.25rem;
+    margin: 1.75rem 0;
+  }
+  
+  .address-field-primary {
+    width: 100%;
+    grid-column: 1 / -1;
   }
   
   .address-additional-fields {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
+    gap: 1.25rem;
+  }
+  
+  .address-field-secondary {
+    width: 100%;
+    grid-column: 1 / -1;
   }
   
   .address-province-display {
@@ -484,7 +582,7 @@
 }
 
 /* Estilos responsive para address-group (legacy) */
-@media (min-width: 768px) {
+@media (min-width: 769px) {
   .address-group {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -621,14 +719,14 @@
 /* Optimizaciones Mobile */
 @media (max-width: 768px) {
   .register-container {
-    padding: 0.75rem;
+    padding: 0.5rem !important;
     min-height: 100vh;
     min-height: 100dvh; /* Dynamic viewport height para mobile */
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    align-items: center;
-    padding-top: 1rem;
+    align-items: stretch;
+    padding-top: 0.5rem;
     /* Scroll suave */
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
@@ -637,7 +735,8 @@
   /* Sección de dirección centrada verticalmente */
   .address-section {
     width: 100%;
-    margin: 1rem 0;
+    margin: 1.5rem 0;
+    padding: 1.25rem 1rem;
     /* Scroll suave entre secciones */
     scroll-margin-top: 80px;
     scroll-snap-align: start;
@@ -652,9 +751,12 @@
   }
 
   .form-section {
-    padding: 1.5rem 1.25rem;
-    border-radius: 1.25rem;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 1.25rem 1rem !important;
+    border-radius: 1rem;
     margin: 0;
+    box-sizing: border-box;
   }
 
   .form-header h1 {
@@ -662,10 +764,36 @@
   }
 
   .register-form {
-    gap: 1rem;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1.5rem;
+  }
+  
+  .form-group {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    scroll-margin-top: 100px;
+    scroll-snap-align: start;
+  }
+  
+  .form-group > * {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  .input-wrapper,
+  .password-input-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: block !important;
   }
 
   .form-input {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
     padding: 0.875rem;
     font-size: 16px; /* Importante: previene zoom en iOS */
     min-height: 48px; /* Tamaño mínimo para touch */
@@ -675,15 +803,12 @@
   
   .address-input-primary,
   .address-input-secondary {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
     min-height: 48px;
     word-break: break-word;
     overflow-wrap: break-word;
-  }
-
-  /* Scroll suave para campos */
-  .form-group {
-    scroll-margin-top: 100px;
-    scroll-snap-align: start;
   }
 
   /* Ajuste automático al enfocar - mejorado */

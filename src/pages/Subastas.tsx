@@ -3,6 +3,7 @@ import { Search, Filter } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import AuctionCard from '../components/AuctionCard';
 import { trackSearch } from '../utils/tracking';
+import { useSEO, generateAuctionListStructuredData } from '../hooks/useSEO';
 
 const Subastas = () => {
   const { auctions, user } = useStore();
@@ -31,6 +32,17 @@ const Subastas = () => {
     const matchesFilter = filter === 'all' || auction.categoryId === filter;
     const isActive = auction.status === 'active';
     return matchesSearch && matchesFilter && isActive;
+  });
+
+  // SEO: Schema.org para lista de subastas
+  useSEO({
+    title: 'Subastas Activas - Ofertá en Tiempo Real',
+    description: 'Participá en nuestras subastas activas. Ofertá en tiempo real y llevate los mejores productos a precios increíbles.',
+    url: 'https://www.clickio.com.ar/subastas',
+    type: 'website',
+    structuredData: filteredAuctions.length > 0 
+      ? generateAuctionListStructuredData(filteredAuctions.slice(0, 50)) // Limitar a 50 para evitar schemas muy grandes
+      : undefined
   });
 
   // Trackear búsquedas con debounce
@@ -162,8 +174,14 @@ const Subastas = () => {
           flex: 1;
           border: none;
           background: transparent;
+          color: var(--text-primary) !important;
           font-size: 1rem;
           outline: none;
+        }
+        
+        .filter-box select option {
+          background-color: var(--bg-secondary) !important;
+          color: var(--text-primary) !important;
         }
 
         .search-box svg,

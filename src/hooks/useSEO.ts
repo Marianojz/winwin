@@ -92,12 +92,13 @@ export const generateProductStructuredData = (product: {
   price: number;
   stock: number;
   averageRating: number;
-  ratings: Array<{ rating: number; comment: string; username: string }>;
+  ratings: Array<{ rating: number; comment: string; username: string; createdAt?: Date }>;
+  categoryId?: string;
 }) => {
   const productUrl = `${SITE_URL}/producto/${product.id}`;
-  const imageUrl = product.images[0]?.startsWith('http') 
-    ? product.images[0] 
-    : `${SITE_URL}${product.images[0]}`;
+  const images = product.images.map(img => 
+    img.startsWith('http') ? img : `${SITE_URL}${img}`
+  );
 
   const aggregateRating = product.ratings.length > 0 ? {
     '@type': 'AggregateRating',
@@ -119,7 +120,8 @@ export const generateProductStructuredData = (product: {
       bestRating: 5,
       worstRating: 1
     },
-    reviewBody: rating.comment
+    reviewBody: rating.comment,
+    ...(rating.createdAt && { datePublished: new Date(rating.createdAt).toISOString() })
   }));
 
   return {
@@ -127,30 +129,234 @@ export const generateProductStructuredData = (product: {
     '@type': 'Product',
     name: product.name,
     description: product.description,
-    image: product.images.map(img => 
-      img.startsWith('http') ? img : `${SITE_URL}${img}`
-    ),
+    image: images,
     sku: product.id,
+    mpn: product.id,
     brand: {
       '@type': 'Brand',
       name: 'Clikio'
     },
+    category: product.categoryId || 'General',
     offers: {
       '@type': 'Offer',
       url: productUrl,
       priceCurrency: 'ARS',
-      price: product.price,
+      price: product.price.toString(),
+      priceValidUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 1 año desde ahora
       availability: product.stock > 0 
         ? 'https://schema.org/InStock' 
         : 'https://schema.org/OutOfStock',
       itemCondition: 'https://schema.org/NewCondition',
       seller: {
         '@type': 'Organization',
-        name: 'Clikio'
+        name: 'Clikio',
+        url: SITE_URL
+      },
+      availabilityStarts: new Date().toISOString(),
+      inventoryLevel: {
+        '@type': 'QuantitativeValue',
+        value: product.stock
       }
     },
     ...(aggregateRating && { aggregateRating }),
     ...(reviews.length > 0 && { review: reviews })
+  };
+};
+
+/**
+ * Genera structured data para una subasta/oferta
+ */
+export const generateAuctionStructuredData = (auction: {
+  id: string;
+  title: string;
+  description: string;
+  images: string[];
+  startingPrice: number;
+  currentPrice: number;
+  buyNowPrice?: number;
+  startTime: Date;
+  endTime: Date;
+  status: string;
+  categoryId?: string;
+  condition?: string;
+}) => {
+  const auctionUrl = `${SITE_URL}/subastas/${auction.id}`;
+  const images = auction.images.map(img => 
+    img.startsWith('http') ? img : `${SITE_URL}${img}`
+  );
+
+  const conditionMap: Record<string, string> = {
+    'new': 'https://schema.org/NewCondition',
+    'like-new': 'https://schema.org/NewCondition',
+    'excellent': 'https://schema.org/ExcellentCondition',
+    'good': 'https://schema.org/GoodCondition',
+    'fair': 'https://schema.org/FairCondition'
+  };
+
+  const offers = [];
+  
+  // Oferta de subasta (bidding)
+  if (auction.status === 'active') {
+    offers.push({
+      '@type': 'Offer',
+      priceCurrency: 'ARS',
+      price: auction.currentPrice.toString(),
+      priceSpecification: {
+        '@type': 'UnitPriceSpecification',
+        priceCurrency: 'ARS',
+        price: auction.currentPrice.toString(),
+        valueAddedTaxIncluded: true
+      },
+      availability: 'https://schema.org/PreOrder',
+      itemCondition: conditionMap[auction.condition || 'new'] || 'https://schema.org/NewCondition',
+      seller: {
+        '@type': 'Organization',
+        name: 'Clikio',
+        url: SITE_URL
+      },
+      validFrom: new Date(auction.startTime).toISOString(),
+      validThrough: new Date(auction.endTime).toISOString()
+    });
+  }
+
+  // Oferta de compra directa (buyNow)
+  if (auction.buyNowPrice) {
+    offers.push({
+      '@type': 'Offer',
+      priceCurrency: 'ARS',
+      price: auction.buyNowPrice.toString(),
+      priceSpecification: {
+        '@type': 'UnitPriceSpecification',
+        priceCurrency: 'ARS',
+        price: auction.buyNowPrice.toString(),
+        valueAddedTaxIncluded: true
+      },
+      availability: auction.status === 'active' 
+        ? 'https://schema.org/InStock' 
+        : 'https://schema.org/OutOfStock',
+      itemCondition: conditionMap[auction.condition || 'new'] || 'https://schema.org/NewCondition',
+      seller: {
+        '@type': 'Organization',
+        name: 'Clikio',
+        url: SITE_URL
+      },
+      validFrom: new Date(auction.startTime).toISOString(),
+      validThrough: new Date(auction.endTime).toISOString()
+    });
+  }
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: auction.title,
+    description: auction.description,
+    image: images,
+    sku: auction.id,
+    mpn: auction.id,
+    brand: {
+      '@type': 'Brand',
+      name: 'Clikio'
+    },
+    category: auction.categoryId || 'General',
+    offers: offers.length === 1 ? offers[0] : offers,
+    ...(auction.status === 'active' && {
+      additionalProperty: {
+        '@type': 'PropertyValue',
+        name: 'Tipo de Venta',
+        value: 'Subasta'
+      }
+    })
+  };
+};
+
+/**
+ * Genera structured data para una lista de productos (ItemList)
+ */
+export const generateProductListStructuredData = (products: Array<{
+  id: string;
+  name: string;
+  description: string;
+  images: string[];
+  price: number;
+  stock: number;
+}>) => {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    numberOfItems: products.length,
+    itemListElement: products.map((product, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      item: {
+        '@type': 'Product',
+        name: product.name,
+        description: product.description,
+        image: product.images[0]?.startsWith('http') 
+          ? product.images[0] 
+          : `${SITE_URL}${product.images[0]}`,
+        sku: product.id,
+        offers: {
+          '@type': 'Offer',
+          url: `${SITE_URL}/producto/${product.id}`,
+          priceCurrency: 'ARS',
+          price: product.price.toString(),
+          availability: product.stock > 0 
+            ? 'https://schema.org/InStock' 
+            : 'https://schema.org/OutOfStock',
+          seller: {
+            '@type': 'Organization',
+            name: 'Clikio'
+          }
+        }
+      }
+    }))
+  };
+};
+
+/**
+ * Genera structured data para una lista de subastas (ItemList)
+ */
+export const generateAuctionListStructuredData = (auctions: Array<{
+  id: string;
+  title: string;
+  description: string;
+  images: string[];
+  currentPrice: number;
+  buyNowPrice?: number;
+  endTime: Date;
+  status: string;
+}>) => {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    numberOfItems: auctions.length,
+    itemListElement: auctions.map((auction, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      item: {
+        '@type': 'Product',
+        name: auction.title,
+        description: auction.description,
+        image: auction.images[0]?.startsWith('http') 
+          ? auction.images[0] 
+          : `${SITE_URL}${auction.images[0]}`,
+        sku: auction.id,
+        offers: {
+          '@type': 'Offer',
+          url: `${SITE_URL}/subastas/${auction.id}`,
+          priceCurrency: 'ARS',
+          price: auction.currentPrice.toString(),
+          availability: auction.status === 'active' 
+            ? 'https://schema.org/PreOrder' 
+            : 'https://schema.org/OutOfStock',
+          validThrough: new Date(auction.endTime).toISOString(),
+          seller: {
+            '@type': 'Organization',
+            name: 'Clikio'
+          }
+        }
+      }
+    }))
   };
 };
 

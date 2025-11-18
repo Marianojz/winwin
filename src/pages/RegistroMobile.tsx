@@ -372,7 +372,7 @@ const RegistroMobile = () => {
                 id="phone"
                 name="phone"
                 type="tel"
-                placeholder="11 1234-5678"
+                placeholder="11 5610 1104"
                 value={formData.phone}
                 onChange={handleChange}
                 required

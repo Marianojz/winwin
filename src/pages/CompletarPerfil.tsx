@@ -172,7 +172,13 @@ const CompletarPerfil = () => {
                 value={formData.province} 
                 onChange={handleChange} 
                 required 
-                style={{ padding: '0.875rem 1.25rem', borderRadius: '0.75rem' }}
+                style={{ 
+                  padding: '0.875rem 1.25rem', 
+                  borderRadius: '0.75rem',
+                  backgroundColor: 'var(--bg-primary)',
+                  color: 'var(--text-primary)',
+                  border: '2px solid var(--border)'
+                }}
               >
                 <option value="">Provincia</option>
                 <option value="Buenos Aires">Buenos Aires</option>

@@ -4,7 +4,7 @@ import { Search, Filter, SlidersHorizontal } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import ProductCard from '../components/ProductCard';
 import { trackSearch } from '../utils/tracking';
-import { useSEO } from '../hooks/useSEO';
+import { useSEO, generateProductListStructuredData } from '../hooks/useSEO';
 
 const Tienda = () => {
   const { products, user } = useStore();
@@ -29,6 +29,17 @@ const Tienda = () => {
                          product.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || product.categoryId === categoryFilter;
     return matchesSearch && matchesCategory && product.stock > 0;
+  });
+
+  // SEO: Schema.org para lista de productos
+  useSEO({
+    title: 'Tienda - Productos en Venta',
+    description: 'Descubrí nuestra amplia selección de productos. Precios fijos, stock en tiempo real y envío seguro.',
+    url: 'https://www.clickio.com.ar/tienda',
+    type: 'website',
+    structuredData: filteredProducts.length > 0 
+      ? generateProductListStructuredData(filteredProducts.slice(0, 50)) // Limitar a 50 para evitar schemas muy grandes
+      : undefined
   });
 
   // Trackear búsquedas con debounce
@@ -224,8 +235,15 @@ const Tienda = () => {
           flex: 1;
           border: none;
           background: transparent;
+          color: var(--text-primary) !important;
           font-size: 1rem;
           outline: none;
+        }
+        
+        .filter-box select option,
+        .sort-box select option {
+          background-color: var(--bg-secondary) !important;
+          color: var(--text-primary) !important;
         }
 
         .search-box svg,

@@ -249,12 +249,6 @@ const AdminPanel = (): React.ReactElement => {
   
   // Función para generar colores aleatorios complementarios
   const generateComplementaryColors = (): ThemeColors => {
-    // Generar un color base aleatorio (hue entre 0-360)
-    const baseHue = Math.floor(Math.random() * 360);
-    
-    // Calcular el color complementario (180 grados de diferencia)
-    const complementaryHue = (baseHue + 180) % 360;
-    
     // Función helper para convertir HSL a HEX
     const hslToHex = (h: number, s: number, l: number): string => {
       l /= 100;
@@ -266,6 +260,120 @@ const AdminPanel = (): React.ReactElement => {
       };
       return `#${f(0)}${f(8)}${f(4)}`;
     };
+
+    // Si está en modo experimental, generar temas oscuros con estilos especiales
+    if (activeColorMode === 'experimental') {
+      const themeType = Math.floor(Math.random() * 5); // 0-4: neon, eléctrico, punk, cyberpunk, dark vibrant
+      
+      if (themeType === 0) {
+        // NEON: Colores brillantes sobre fondos muy oscuros
+        const neonHue = Math.floor(Math.random() * 360);
+        const neonSecondary = (neonHue + 60 + Math.floor(Math.random() * 60)) % 360;
+        
+        return {
+          primary: hslToHex(neonHue, 90 + Math.random() * 10, 50 + Math.random() * 10), // Muy saturado, brillante
+          primaryHover: hslToHex(neonHue, 95, 60 + Math.random() * 10),
+          secondary: hslToHex(neonSecondary, 85 + Math.random() * 15, 55 + Math.random() * 10),
+          background: hslToHex(neonHue, 30 + Math.random() * 20, 8 + Math.random() * 5), // Muy oscuro
+          backgroundSecondary: hslToHex(neonHue, 25 + Math.random() * 15, 12 + Math.random() * 5),
+          backgroundTertiary: hslToHex(neonHue, 20 + Math.random() * 15, 18 + Math.random() * 5),
+          textPrimary: hslToHex(neonHue, 20 + Math.random() * 20, 85 + Math.random() * 10), // Casi blanco con tinte
+          textSecondary: hslToHex(neonHue, 15 + Math.random() * 15, 65 + Math.random() * 15),
+          border: hslToHex(neonHue, 40 + Math.random() * 20, 25 + Math.random() * 10),
+          success: hslToHex(120 + Math.random() * 30, 80 + Math.random() * 20, 50 + Math.random() * 15),
+          warning: hslToHex(45 + Math.random() * 30, 85 + Math.random() * 15, 55 + Math.random() * 10),
+          error: hslToHex(0 + Math.random() * 20, 90 + Math.random() * 10, 50 + Math.random() * 15),
+          info: hslToHex(180 + Math.random() * 40, 85 + Math.random() * 15, 55 + Math.random() * 10)
+        };
+      } else if (themeType === 1) {
+        // ELÉCTRICO: Azules/cyan brillantes sobre fondos oscuros
+        const electricHue = 180 + Math.floor(Math.random() * 60); // Azul-cyan
+        const electricAccent = (electricHue + 120 + Math.floor(Math.random() * 40)) % 360; // Complementario
+        
+        return {
+          primary: hslToHex(electricHue, 85 + Math.random() * 15, 55 + Math.random() * 10),
+          primaryHover: hslToHex(electricHue, 90, 65 + Math.random() * 10),
+          secondary: hslToHex(electricAccent, 80 + Math.random() * 20, 60 + Math.random() * 10),
+          background: hslToHex(electricHue, 40 + Math.random() * 20, 10 + Math.random() * 5),
+          backgroundSecondary: hslToHex(electricHue, 35 + Math.random() * 15, 15 + Math.random() * 5),
+          backgroundTertiary: hslToHex(electricHue, 30 + Math.random() * 15, 20 + Math.random() * 5),
+          textPrimary: hslToHex(electricHue, 15 + Math.random() * 15, 90 + Math.random() * 5),
+          textSecondary: hslToHex(electricHue, 20 + Math.random() * 20, 70 + Math.random() * 10),
+          border: hslToHex(electricHue, 50 + Math.random() * 20, 30 + Math.random() * 10),
+          success: hslToHex(150 + Math.random() * 20, 75 + Math.random() * 25, 55 + Math.random() * 15),
+          warning: hslToHex(50 + Math.random() * 20, 80 + Math.random() * 20, 60 + Math.random() * 10),
+          error: hslToHex(0 + Math.random() * 30, 85 + Math.random() * 15, 55 + Math.random() * 15),
+          info: hslToHex(electricHue, 80 + Math.random() * 20, 60 + Math.random() * 10)
+        };
+      } else if (themeType === 2) {
+        // PUNK: Rosas/magenta/rojos vibrantes sobre fondos oscuros
+        const punkHue = 300 + Math.floor(Math.random() * 60); // Magenta-rosa
+        const punkAccent = (punkHue + 180 + Math.floor(Math.random() * 40)) % 360; // Complementario (verde-cyan)
+        
+        return {
+          primary: hslToHex(punkHue, 90 + Math.random() * 10, 50 + Math.random() * 15),
+          primaryHover: hslToHex(punkHue, 95, 60 + Math.random() * 10),
+          secondary: hslToHex(punkAccent, 85 + Math.random() * 15, 55 + Math.random() * 15),
+          background: hslToHex(punkHue, 35 + Math.random() * 25, 8 + Math.random() * 5),
+          backgroundSecondary: hslToHex(punkHue, 30 + Math.random() * 20, 12 + Math.random() * 5),
+          backgroundTertiary: hslToHex(punkHue, 25 + Math.random() * 20, 18 + Math.random() * 5),
+          textPrimary: hslToHex(punkHue, 10 + Math.random() * 15, 88 + Math.random() * 7),
+          textSecondary: hslToHex(punkHue, 15 + Math.random() * 20, 65 + Math.random() * 15),
+          border: hslToHex(punkHue, 45 + Math.random() * 25, 25 + Math.random() * 10),
+          success: hslToHex(120 + Math.random() * 40, 75 + Math.random() * 25, 50 + Math.random() * 20),
+          warning: hslToHex(30 + Math.random() * 30, 85 + Math.random() * 15, 55 + Math.random() * 15),
+          error: hslToHex(0 + Math.random() * 30, 90 + Math.random() * 10, 50 + Math.random() * 15),
+          info: hslToHex(200 + Math.random() * 40, 80 + Math.random() * 20, 55 + Math.random() * 15)
+        };
+      } else if (themeType === 3) {
+        // CYBERPUNK: Verde-cyan y magenta sobre fondos muy oscuros
+        const cyberHue = Math.random() < 0.5 ? 150 + Math.floor(Math.random() * 30) : 300 + Math.floor(Math.random() * 30);
+        const cyberAccent = (cyberHue + 180) % 360;
+        
+        return {
+          primary: hslToHex(cyberHue, 90 + Math.random() * 10, 50 + Math.random() * 15),
+          primaryHover: hslToHex(cyberHue, 95, 60 + Math.random() * 10),
+          secondary: hslToHex(cyberAccent, 85 + Math.random() * 15, 55 + Math.random() * 15),
+          background: hslToHex(cyberHue, 30 + Math.random() * 20, 6 + Math.random() * 4),
+          backgroundSecondary: hslToHex(cyberHue, 25 + Math.random() * 15, 10 + Math.random() * 4),
+          backgroundTertiary: hslToHex(cyberHue, 20 + Math.random() * 15, 16 + Math.random() * 4),
+          textPrimary: hslToHex(cyberHue, 20 + Math.random() * 20, 85 + Math.random() * 10),
+          textSecondary: hslToHex(cyberHue, 15 + Math.random() * 15, 60 + Math.random() * 15),
+          border: hslToHex(cyberHue, 50 + Math.random() * 20, 22 + Math.random() * 8),
+          success: hslToHex(120 + Math.random() * 40, 80 + Math.random() * 20, 50 + Math.random() * 20),
+          warning: hslToHex(45 + Math.random() * 30, 85 + Math.random() * 15, 55 + Math.random() * 15),
+          error: hslToHex(0 + Math.random() * 30, 90 + Math.random() * 10, 50 + Math.random() * 15),
+          info: hslToHex(180 + Math.random() * 40, 85 + Math.random() * 15, 55 + Math.random() * 15)
+        };
+      } else {
+        // DARK VIBRANT: Cualquier color vibrante sobre fondo oscuro
+        const vibrantHue = Math.floor(Math.random() * 360);
+        const vibrantSecondary = (vibrantHue + 60 + Math.floor(Math.random() * 60)) % 360;
+        
+        return {
+          primary: hslToHex(vibrantHue, 85 + Math.random() * 15, 50 + Math.random() * 20),
+          primaryHover: hslToHex(vibrantHue, 90, 60 + Math.random() * 15),
+          secondary: hslToHex(vibrantSecondary, 80 + Math.random() * 20, 55 + Math.random() * 20),
+          background: hslToHex(vibrantHue, 25 + Math.random() * 25, 8 + Math.random() * 6),
+          backgroundSecondary: hslToHex(vibrantHue, 20 + Math.random() * 20, 12 + Math.random() * 6),
+          backgroundTertiary: hslToHex(vibrantHue, 18 + Math.random() * 18, 18 + Math.random() * 6),
+          textPrimary: hslToHex(vibrantHue, 15 + Math.random() * 20, 85 + Math.random() * 10),
+          textSecondary: hslToHex(vibrantHue, 12 + Math.random() * 18, 65 + Math.random() * 15),
+          border: hslToHex(vibrantHue, 35 + Math.random() * 25, 25 + Math.random() * 10),
+          success: hslToHex((vibrantHue + 120) % 360, 75 + Math.random() * 25, 50 + Math.random() * 20),
+          warning: hslToHex((vibrantHue + 60) % 360, 80 + Math.random() * 20, 55 + Math.random() * 15),
+          error: hslToHex((vibrantHue + 0) % 360, 85 + Math.random() * 15, 50 + Math.random() * 20),
+          info: hslToHex((vibrantHue + 240) % 360, 80 + Math.random() * 20, 55 + Math.random() * 15)
+        };
+      }
+    }
+    
+    // Para modos light y dark, mantener la lógica original
+    // Generar un color base aleatorio (hue entre 0-360)
+    const baseHue = Math.floor(Math.random() * 360);
+    
+    // Calcular el color complementario (180 grados de diferencia)
+    const complementaryHue = (baseHue + 180) % 360;
     
     // Generar variaciones de saturación y luminosidad para crear una paleta armoniosa
     const primary = hslToHex(baseHue, 70 + Math.random() * 20, 45 + Math.random() * 15);
@@ -2687,8 +2795,6 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     { id: 'settings', label: 'Configuración', icon: Activity }
   ];
 
-  // Tabs para navegación móvil inferior (todas las secciones)
-  const mainMobileTabs = tabs;
 
   // Protección de acceso - DEBE IR DESPUÉS DE TODOS LOS HOOKS
   if (!user?.isAdmin) {
@@ -2736,15 +2842,16 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         </p>
       </div>
 
-      {/* Tabs Navigation - Solo visible en desktop */}
-      {!isMobile && (
+      {/* Tabs Navigation - Siempre visible en la parte superior (sticky) */}
+      <div className="admin-top-nav" style={{
+        padding: isMobile ? '0.75rem 1rem' : '1rem 0',
+        marginBottom: '2rem'
+      }}>
         <div style={{
           display: 'flex',
-          gap: '0.5rem',
-          marginBottom: '2rem',
+          gap: isMobile ? '0.375rem' : '0.5rem',
           overflowX: 'auto',
           paddingBottom: '0.5rem',
-          borderBottom: '2px solid var(--border)',
           scrollbarWidth: 'thin',
           WebkitOverflowScrolling: 'touch'
         }}>
@@ -2756,36 +2863,36 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 style={{
-                  padding: '0.75rem 1.5rem',
+                  padding: isMobile ? '0.5rem 0.75rem' : '0.75rem 1.5rem',
                   background: isActive ? 'var(--primary)' : 'transparent',
                   color: isActive ? 'white' : 'var(--text-secondary)',
                   border: `1px solid ${isActive ? 'var(--primary)' : 'var(--border)'}`,
                   borderRadius: '0.5rem',
                   cursor: 'pointer',
-                  fontSize: '0.875rem',
+                  fontSize: isMobile ? '0.75rem' : '0.875rem',
                   fontWeight: 600,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
+                  gap: isMobile ? '0.375rem' : '0.5rem',
                   whiteSpace: 'nowrap',
                   transition: 'all 0.2s',
                   position: 'relative',
                   flexShrink: 0
                 }}
               >
-                <Icon size={18} />
+                <Icon size={isMobile ? 16 : 18} />
                 {tab.label}
                 {tab.badge && (
                   <span style={{
                     background: 'var(--error)',
                     color: 'white',
                     borderRadius: '50%',
-                    width: '20px',
-                    height: '20px',
+                    width: isMobile ? '18px' : '20px',
+                    height: isMobile ? '18px' : '20px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '0.75rem',
+                    fontSize: isMobile ? '0.625rem' : '0.75rem',
                     fontWeight: 700,
                     marginLeft: '0.25rem'
                   }}>
@@ -2796,7 +2903,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
             );
           })}
         </div>
-      )}
+      </div>
 
       {/* Main Content */}
       <div className={isMobile ? 'admin-main-content-mobile' : ''} style={{
@@ -11917,46 +12024,6 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         </div>
       )}
 
-      {/* Navegación inferior móvil */}
-      {isMobile && (
-        <div className="admin-bottom-nav">
-          {mainMobileTabs.map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`nav-item-mobile ${isActive ? 'active' : ''}`}
-                style={{ position: 'relative' }}
-                title={tab.label}
-              >
-                <Icon size={20} />
-                <span style={{ fontSize: '0.65rem', lineHeight: '1' }}>{tab.label.length > 10 ? tab.label.substring(0, 10) + '...' : tab.label}</span>
-                {tab.badge && (
-                  <span style={{
-                    position: 'absolute',
-                    top: '0.25rem',
-                    right: '0.25rem',
-                    background: 'var(--error)',
-                    color: 'white',
-                    borderRadius: '50%',
-                    width: '18px',
-                    height: '18px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.625rem',
-                    fontWeight: 700
-                  }}>
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 };

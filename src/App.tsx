@@ -1,4 +1,4 @@
-import { useEffect, useState, Suspense, lazy } from 'react';
+import { useEffect, useState, useRef, Suspense, lazy } from 'react';
 import { useSyncFirebase } from './hooks/useSyncFirebase';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { ref, onValue } from 'firebase/database';
@@ -95,6 +95,8 @@ function RedirectHandler() {
   const location = useLocation();
   const [isProcessing, setIsProcessing] = useState(false);
   const [hasCheckedRedirect, setHasCheckedRedirect] = useState(false);
+  const lastCheckedPathRef = useRef<string>('');
+  const redirectCheckCountRef = useRef<number>(0);
 
   useEffect(() => {
     let mounted = true;
@@ -103,19 +105,28 @@ function RedirectHandler() {
     const handleRedirectResult = async () => {
       // Evitar procesar múltiples veces
       if (isProcessing) {
-        console.log('⏳ [MÓVIL] Ya se está procesando un redirect...');
         return;
       }
 
       if (!mounted) return;
 
-      try {
+      // Solo loggear si es la primera vez o si cambió la ruta significativamente
+      const shouldLog = redirectCheckCountRef.current === 0 || 
+                        lastCheckedPathRef.current !== location.pathname ||
+                        location.search || location.hash;
+      
+      if (shouldLog && import.meta.env.DEV) {
         console.log('🔍 [MÓVIL] Verificando redirect result...', {
           currentUser: auth.currentUser?.uid,
           pathname: location.pathname,
           search: location.search,
           hash: location.hash
         });
+        lastCheckedPathRef.current = location.pathname;
+        redirectCheckCountRef.current++;
+      }
+
+      try {
         let result;
         try {
           result = await getRedirectResult(auth);
@@ -199,7 +210,10 @@ function RedirectHandler() {
             }
           }
         } else {
-          console.log('ℹ️ [MÓVIL] No hay redirect result pendiente');
+          // Solo loggear si es relevante (primera vez o hay cambios)
+          if (shouldLog && import.meta.env.DEV) {
+            console.log('ℹ️ [MÓVIL] No hay redirect result pendiente');
+          }
         }
       } catch (error: any) {
         console.error('❌ [MÓVIL] Error procesando redirect result:', error);
@@ -253,20 +267,36 @@ function RedirectHandler() {
   }, [setUser, navigate, isProcessing, hasCheckedRedirect, location.pathname]);
 
   // Listener adicional para auth state changes en móvil (backup)
+  const lastAuthStateRef = useRef<string>('');
+  const authStateChangeCountRef = useRef<number>(0);
+  
   useEffect(() => {
     let mounted = true;
     
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!mounted) return;
       
-      console.log('🔍 [MÓVIL BACKUP] Auth state changed:', { 
-        hasFirebaseUser: !!firebaseUser, 
-        firebaseUserId: firebaseUser?.uid,
-        hasStoreUser: !!user,
-        storeUserId: user?.id,
-        pathname: location.pathname,
-        isProcessing 
-      });
+      // Crear un hash del estado actual para comparar
+      const currentState = `${firebaseUser?.uid || 'none'}-${user?.id || 'none'}-${location.pathname}`;
+      
+      // Solo loggear si el estado realmente cambió
+      const shouldLog = lastAuthStateRef.current !== currentState;
+      lastAuthStateRef.current = currentState;
+      
+      if (shouldLog && import.meta.env.DEV) {
+        authStateChangeCountRef.current++;
+        // Solo loggear los primeros cambios o cambios significativos
+        if (authStateChangeCountRef.current <= 5 || firebaseUser?.uid !== user?.id) {
+          console.log('🔍 [MÓVIL BACKUP] Auth state changed:', { 
+            hasFirebaseUser: !!firebaseUser, 
+            firebaseUserId: firebaseUser?.uid,
+            hasStoreUser: !!user,
+            storeUserId: user?.id,
+            pathname: location.pathname,
+            isProcessing 
+          });
+        }
+      }
       
       // Si hay un usuario autenticado pero no está en el store, y estamos en login
       // podría ser que venga de un redirect que no se procesó
@@ -547,19 +577,18 @@ function App() {
     cleanExpiredCache();
   }, []);
 
-  // Limpiar datos obsoletos de localStorage al iniciar la aplicación
-  useEffect(() => {
-    console.log('🧹 Iniciando limpieza de localStorage obsoleto...');
-    initializeLocalStorageCleanup(user?.id);
-  }, []); // Solo al montar la aplicación
+  // Ref para evitar limpiezas duplicadas para el mismo usuario
+  const lastCleanupUserIdRef = useRef<string | undefined>(undefined);
 
   // Limpiar datos específicos del usuario cuando cambia el usuario
+  // NOTA: main.tsx ejecuta una limpieza general al inicio, esta es específica por usuario
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && lastCleanupUserIdRef.current !== user.id) {
+      lastCleanupUserIdRef.current = user.id;
       console.log(`🧹 Limpiando datos obsoletos de localStorage para usuario: ${user.id}`);
       initializeLocalStorageCleanup(user.id);
     }
-  }, [user?.id]);
+  }, [user?.id]); // Ejecutar cuando cambie el usuario
 
   // Cargar bots automáticamente al iniciar la app (sin importar si hay usuario logueado)
   useEffect(() => {
@@ -579,7 +608,13 @@ function App() {
   }, []);
   
   return (
-    <Router basename={import.meta.env.BASE_URL}>
+    <Router 
+      basename={import.meta.env.BASE_URL}
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true
+      }}
+    >
       <div className="app">
         <RedirectHandler />
         <Hreflang />

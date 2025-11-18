@@ -7,9 +7,11 @@ import { auth, db } from '../config/firebase';
 import GoogleAddressPicker, { AddressData } from '../components/GoogleAddressPicker';
 import { GOOGLE_MAPS_CONFIG } from '../config/googleMaps';
 import EmailVerificationModal from '../components/EmailVerificationModal';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 const Registro = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -362,7 +364,14 @@ const Registro = () => {
 
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            {/* Nombre completo / DNI */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+                gap: '1rem'
+              }}
+            >
               <div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
                   <User size={18} /> Nombre Completo
@@ -422,7 +431,14 @@ const Registro = () => {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            {/* Email / Teléfono */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+                gap: '1rem'
+              }}
+            >
               <div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
                   <Mail size={18} /> Email
@@ -459,7 +475,7 @@ const Registro = () => {
                   <input 
                     name="phone" 
                     type="tel" 
-                    placeholder="11 1234-5678" 
+                    placeholder="11 5610 1104" 
                     value={formData.phone} 
                     onChange={handleChange} 
                     required 
@@ -481,7 +497,14 @@ const Registro = () => {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            {/* Contraseña / Confirmar */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+                gap: '1rem'
+              }}
+            >
               <div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
                   <Lock size={18} /> Contraseña

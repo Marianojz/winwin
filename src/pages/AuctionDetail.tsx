@@ -6,6 +6,7 @@ import { useStore } from '../store/useStore';
 import { formatCurrency, formatTimeAgo } from '../utils/helpers';
 import { launchConfettiFromTop } from '../utils/celebrations';
 import Countdown from '../components/Countdown';
+import { useSEO, generateAuctionStructuredData } from '../hooks/useSEO';
 
 const AuctionDetail = () => {
   const { id } = useParams();
@@ -78,6 +79,26 @@ const AuctionDetail = () => {
   }
 
   const isActive = auction.status === 'active';
+
+  // SEO: Schema.org para subasta
+  const auctionImage = auction?.images[0]?.startsWith('http') 
+    ? auction.images[0] 
+    : auction?.images[0] 
+      ? `https://www.clickio.com.ar${auction.images[0]}` 
+      : undefined;
+  
+  useSEO({
+    title: auction?.title,
+    description: auction?.description 
+      ? (auction.description.length > 160 
+          ? auction.description.substring(0, 157) + '...' 
+          : auction.description)
+      : undefined,
+    image: auctionImage,
+    url: auction ? `https://www.clickio.com.ar/subastas/${auction.id}` : undefined,
+    type: 'product',
+    structuredData: auction ? generateAuctionStructuredData(auction) : undefined
+  });
 
   // Agregar hooks/cálculos auxiliares para saber tiempo restante (en segundos)
   const now = Date.now();

@@ -116,8 +116,8 @@ const Contacto = () => {
                 <Mail size={24} style={{ color: 'var(--primary)', flexShrink: 0, marginTop: '0.25rem' }} />
                 <div>
                   <strong style={{ display: 'block', marginBottom: '0.25rem' }}>Email</strong>
-                  <a href="mailto:soporte@clikio.com" style={{ color: 'var(--primary)', textDecoration: 'none' }}>
-                    soporte@clikio.com
+                  <a href="mailto:clickiotienda@gmail.com" style={{ color: 'var(--primary)', textDecoration: 'none' }}>
+                    clickiotienda@gmail.com
                   </a>
                 </div>
               </div>
@@ -125,9 +125,9 @@ const Contacto = () => {
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
                 <Phone size={24} style={{ color: 'var(--primary)', flexShrink: 0, marginTop: '0.25rem' }} />
                 <div>
-                  <strong style={{ display: 'block', marginBottom: '0.25rem' }}>Teléfono</strong>
-                  <a href="tel:+541112345678" style={{ color: 'var(--primary)', textDecoration: 'none' }}>
-                    +54 11 1234-5678
+                  <strong style={{ display: 'block', marginBottom: '0.25rem' }}>Teléfono / WhatsApp</strong>
+                  <a href="https://wa.me/5491156101104" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none' }}>
+                    11 5610 1104
                   </a>
                 </div>
               </div>
@@ -251,7 +251,7 @@ const Contacto = () => {
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+54 9 11 1234-5678"
+                  placeholder="11 5610 1104"
                   required
                   style={{
                     width: '100%',

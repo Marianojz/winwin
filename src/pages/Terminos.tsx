@@ -481,7 +481,7 @@ const Terminos = () => {
               listStyle: 'none'
             }}>
               <li style={{ marginBottom: '0.5rem' }}>
-                📧 Email: soporte@subastaargenta.com
+                📧 Email: clickiotienda@gmail.com
               </li>
               <li style={{ marginBottom: '0.5rem' }}>
                 📱 Centro de Ayuda en nuestro sitio web
