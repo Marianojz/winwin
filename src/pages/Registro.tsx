@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, User, MapPin, FileText, Loader, Phone, Eye, EyeOff, CheckCircle, X } from 'lucide-react';
 import { createUserWithEmailAndPassword, sendEmailVerification, User as FirebaseUser } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { auth, db, syncUserToRealtimeDb } from '../config/firebase';
 import GoogleAddressPicker, { AddressData } from '../components/GoogleAddressPicker';
 import { GOOGLE_MAPS_CONFIG } from '../config/googleMaps';
 import EmailVerificationModal from '../components/EmailVerificationModal';
@@ -263,10 +263,12 @@ const Registro = () => {
       } = addressData?.components || {};
       const fullAddress = addressData?.formatted || formData.address;
 
+      const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.username)}&size=200&background=FF6B00&color=fff&bold=true`;
+
       await setDoc(doc(db, 'users', user.uid), {
         username: formData.username,
         email: formData.email,
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.username)}&size=200&background=FF6B00&color=fff&bold=true`,
+        avatar: avatarUrl,
         dni: formData.dni,
         phone: formData.phone,
         address: fullAddress,
@@ -293,6 +295,15 @@ const Registro = () => {
         isAdmin: false,
         active: true
       });
+
+      // Sincronizar usuario a Realtime Database inmediatamente
+      await syncUserToRealtimeDb(
+        user.uid,
+        false,
+        formData.email,
+        formData.username,
+        avatarUrl
+      );
 
       // Enviar email de verificación
       try {

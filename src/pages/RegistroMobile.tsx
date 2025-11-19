@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, User, Phone, Eye, EyeOff, Loader, CheckCircle, AlertCircle, X } from 'lucide-react';
 import { createUserWithEmailAndPassword, sendEmailVerification, User as FirebaseUser } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { auth, db, syncUserToRealtimeDb } from '../config/firebase';
 import GoogleAddressPicker, { AddressData } from '../components/GoogleAddressPicker';
 import { GOOGLE_MAPS_CONFIG } from '../config/googleMaps';
 import EmailVerificationModal from '../components/EmailVerificationModal';
@@ -244,11 +244,17 @@ const RegistroMobile = () => {
         addressComponents.crossStreets && `Entre ${addressComponents.crossStreets}`
       ].filter(Boolean).join(', ');
 
-      // Guardar datos en Firestore
+      const avatarUrl =
+        user.photoURL ||
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.name || 'Usuario')}&size=200&background=FF6B00&color=fff&bold=true`;
+
+      // Guardar datos en Firestore (alineado con Registro web)
       await setDoc(doc(db, 'users', user.uid), {
         id: user.uid,
-        email: formData.email,
         username: formData.name,
+        email: formData.email,
+        avatar: avatarUrl,
+        dni: '', // En mobile no se pide DNI; queda listo para completarse luego
         phone: formData.phone,
         address: fullAddress,
         addressDetails: {
@@ -269,9 +275,20 @@ const RegistroMobile = () => {
         mapAddress: addressData.formatted,
         placeId: addressData.placeId,
         createdAt: new Date().toISOString(),
+        emailVerified: false,
+        role: 'user',
         isAdmin: false,
-        emailVerified: false
+        active: true
       });
+
+      // Sincronizar usuario a Realtime Database para que las reglas funcionen igual que en web
+      await syncUserToRealtimeDb(
+        user.uid,
+        false,
+        formData.email,
+        formData.name,
+        avatarUrl
+      );
 
       // Enviar email de verificación
       try {

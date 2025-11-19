@@ -639,7 +639,7 @@ function App() {
               path="/registro" 
               element={
                 <Suspense fallback={<LoadingSpinner size="lg" text="Cargando registro..." />}>
-                  <Registro />
+                  {window.innerWidth <= 768 ? <RegistroMobile /> : <Registro />}
                 </Suspense>
               } 
             />
