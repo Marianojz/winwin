@@ -143,8 +143,35 @@ const GoogleAddressPicker = ({
             return;
           }
 
-          const autocomplete = new window.google.maps.places.AutocompleteService();
-          const places = new window.google.maps.places.PlacesService(document.createElement('div'));
+          // Intentar usar la nueva API primero, luego fallback a legacy
+          let autocomplete: any = null;
+          let places: any = null;
+          
+          // Intentar nueva API (AutocompleteSuggestion)
+          if (window.google.maps.places.AutocompleteSuggestion) {
+            try {
+              // La nueva API funciona diferente, pero por ahora usamos legacy como fallback
+              console.log('ℹ️ Nueva API de Places disponible, pero usando legacy por compatibilidad');
+            } catch (e) {
+              console.warn('⚠️ Nueva API no disponible, usando legacy');
+            }
+          }
+          
+          // Usar API legacy (aún funciona para proyectos existentes)
+          // Nota: Google recomienda migrar a la nueva API, pero la legacy sigue funcionando
+          try {
+            autocomplete = new window.google.maps.places.AutocompleteService();
+            places = new window.google.maps.places.PlacesService(document.createElement('div'));
+          } catch (legacyError: any) {
+            if (legacyError?.message?.includes('not available to new customers') || 
+                legacyError?.message?.includes('AutocompleteService')) {
+              console.error('❌ Places API (legacy) no disponible para nuevos clientes. Necesitas migrar a la nueva API.');
+              setApiError('Places API (legacy) no está disponible. Por favor, contacta al administrador para migrar a la nueva API de Google Places.');
+              return;
+            }
+            throw legacyError;
+          }
+          
           const geocoderInstance = new window.google.maps.Geocoder();
 
           // Guardar en refs y estados
@@ -860,33 +887,36 @@ const GoogleAddressPicker = ({
                 fontSize: '0.9rem',
                 lineHeight: '1.6'
               }}>
-                <strong>⚠️ IMPORTANTE: El código usa "Places API" (legacy), no "Places API (New)"</strong>
+                <strong>⚠️ IMPORTANTE: Google está deprecando "Places API" (legacy)</strong>
+                <p style={{ margin: '0.5rem 0', color: '#ffd700' }}>
+                  Desde marzo 2025, Google no permite "Places API" (legacy) para nuevos clientes. 
+                  Si tu proyecto es nuevo, necesitas usar "Places API (New)".
+                </p>
                 <ol style={{ margin: '0.5rem 0 0 1.25rem', padding: 0 }}>
-                  <li><strong>PASO 1 - Habilitar "Places API" (legacy) en el proyecto:</strong>
+                  <li><strong>Si tu proyecto es ANTIGUO (antes de marzo 2025):</strong>
                     <ul style={{ margin: '0.25rem 0 0.5rem 1.5rem', padding: 0 }}>
-                      <li>Ve a{' '}
+                      <li>La API legacy debería seguir funcionando</li>
+                      <li>Verifica que "Places API" esté habilitada en{' '}
                         <a 
                           href="https://console.cloud.google.com/apis/library?q=places%20api" 
                           target="_blank" 
                           rel="noopener noreferrer"
                           style={{ color: '#ffd700', textDecoration: 'underline', fontWeight: 'bold' }}
                         >
-                          Biblioteca de APIs - Buscar "Places API"
+                          Google Cloud Console
                         </a>
                       </li>
-                      <li>Busca específicamente <strong>"Places API"</strong> (sin "New")</li>
-                      <li>Si NO aparece "Places API" (legacy), significa que Google ya no la permite para proyectos nuevos</li>
-                      <li>En ese caso, necesitamos migrar el código a "Places API (New)"</li>
+                      <li>Verifica que tu API key tenga acceso a "Places API" (legacy)</li>
                     </ul>
                   </li>
-                  <li><strong>PASO 2 - Si "Places API" (legacy) NO está disponible:</strong>
+                  <li><strong>Si tu proyecto es NUEVO (después de marzo 2025):</strong>
                     <ul style={{ margin: '0.25rem 0 0.5rem 1.5rem', padding: 0 }}>
-                      <li>Marca la casilla de <strong>"Places API (New)"</strong> en las restricciones de tu API key</li>
-                      <li>El código necesita ser actualizado para usar la nueva API</li>
-                      <li>Esto requiere cambios en el código (migración de AutocompleteService a AutocompleteSuggestion)</li>
+                      <li>Necesitas habilitar <strong>"Places API (New)"</strong> en Google Cloud Console</li>
+                      <li>El código necesita ser migrado a la nueva API (AutocompleteSuggestion)</li>
+                      <li>Por ahora, el código usa la API legacy que puede no funcionar para proyectos nuevos</li>
                     </ul>
                   </li>
-                  <li><strong>SOLUCIÓN TEMPORAL:</strong> Si no puedes habilitar "Places API" (legacy), puedes usar "Places API (New)" pero el código necesita actualizarse</li>
+                  <li><strong>SOLUCIÓN:</strong> Contacta al desarrollador para migrar el código a "Places API (New)"</li>
                 </ol>
               </div>
             </div>
