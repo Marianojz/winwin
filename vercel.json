@@ -31,7 +31,7 @@
       ]
     },
     {
-      "source": "/:path*.(js|css|woff2|ttf|eot)",
+      "source": "/:path*.(js|css|woff2|ttf|eot|woff)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -95,7 +95,11 @@
   ],
   "rewrites": [
     {
-      "source": "/:path*",
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
