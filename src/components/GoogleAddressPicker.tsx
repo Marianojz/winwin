@@ -71,6 +71,7 @@ const GoogleAddressPicker = ({
   const [autocompleteService, setAutocompleteService] = useState<any>(null);
   const [placesService, setPlacesService] = useState<any>(null);
   const [apiError, setApiError] = useState<string>('');
+  const [isMobile, setIsMobile] = useState(false);
 
   // Refs
   const autocompleteInputRef = useRef<HTMLInputElement>(null);
@@ -96,6 +97,16 @@ const GoogleAddressPicker = ({
   const autocompleteServiceRef = useRef<any>(null);
   const placesServiceRef = useRef<any>(null);
   const geocoderRef = useRef<any>(null);
+
+  // Detectar si es móvil
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Inicializar servicios de Google Maps
   const initializeServices = useCallback(() => {
@@ -492,6 +503,37 @@ const GoogleAddressPicker = ({
   const handleSearchChange = useCallback((value: string) => {
     setSearchQuery(value);
     
+    // Verificar que Google Maps esté cargado
+    if (!window.google || !window.google.maps || !window.google.maps.places) {
+      if (import.meta.env.DEV) {
+        console.warn('⚠️ Google Maps API aún no está cargada, esperando...');
+      }
+      // Reintentar después de un breve delay (usar el valor actual del input)
+      setTimeout(() => {
+        const currentValue = autocompleteInputRef.current?.value || value;
+        if (window.google && window.google.maps && window.google.maps.places && currentValue.trim()) {
+          // Llamar directamente a la lógica sin recursión
+          const currentAutocompleteService = autocompleteServiceRef.current;
+          if (currentAutocompleteService) {
+            const request = {
+              input: currentValue,
+              componentRestrictions: { country: countryRestriction },
+              language: 'es',
+              types: ['address'] as any[]
+            };
+            currentAutocompleteService.getPlacePredictions(request, (predictions: any[], status: string) => {
+              if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+                setPredictions(predictions);
+                setShowPredictions(true);
+                setApiError('');
+              }
+            });
+          }
+        }
+      }, 500);
+      return;
+    }
+    
     // Usar el ref en lugar del estado para asegurar que siempre tengamos el servicio más reciente
     const currentAutocompleteService = autocompleteServiceRef.current || autocompleteService;
     if (!value.trim() || !currentAutocompleteService) {
@@ -507,11 +549,27 @@ const GoogleAddressPicker = ({
       types: ['address']
     };
 
+    if (import.meta.env.DEV && isMobile) {
+      console.log('🔍 [MÓVIL] Buscando direcciones:', value);
+    }
+
     currentAutocompleteService.getPlacePredictions(request, (predictions: any[], status: string) => {
+      if (import.meta.env.DEV && isMobile) {
+        console.log('🔍 [MÓVIL] Respuesta de Places API:', { 
+          status, 
+          predictionsCount: predictions?.length || 0,
+          hasPredictions: !!predictions && predictions.length > 0
+        });
+      }
+
       if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
         setPredictions(predictions);
         setShowPredictions(true);
         setApiError(''); // Limpiar error si funciona
+        
+        if (import.meta.env.DEV && isMobile) {
+          console.log('✅ [MÓVIL] Predicciones mostradas:', predictions.length);
+        }
       } else {
         setPredictions([]);
         setShowPredictions(false);
@@ -524,6 +582,9 @@ const GoogleAddressPicker = ({
         } else if (status === window.google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
           // No hay resultados, no es un error
           setApiError('');
+          if (import.meta.env.DEV && isMobile) {
+            console.log('ℹ️ [MÓVIL] No se encontraron resultados para:', value);
+          }
         } else {
           // Otros errores
           if (import.meta.env.DEV) {
@@ -537,7 +598,7 @@ const GoogleAddressPicker = ({
         }
       }
     });
-  }, [autocompleteService, countryRestriction]);
+  }, [autocompleteService, countryRestriction, isMobile]);
 
   // Seleccionar predicción
   const selectPrediction = useCallback((placeId: string) => {
@@ -846,10 +907,44 @@ const GoogleAddressPicker = ({
             onChange={(e) => handleSearchChange(e.target.value)}
             onFocus={() => {
               if (predictions.length > 0) setShowPredictions(true);
+              // En móvil, asegurar que el input esté visible
+              if (isMobile && autocompleteInputRef.current) {
+                setTimeout(() => {
+                  autocompleteInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+              }
             }}
+            onInput={(e) => {
+              // Asegurar que el evento se propaga correctamente en móvil
+              const value = (e.target as HTMLInputElement).value;
+              handleSearchChange(value);
+            }}
+            autoComplete="off"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck="false"
+            inputMode="text"
           />
           {loading && <Loader className="search-loader" size={18} />}
         </div>
+
+        {/* Overlay oscuro en móvil cuando hay predicciones */}
+        {showPredictions && predictions.length > 0 && isMobile && (
+          <div 
+            className="predictions-overlay"
+            onClick={() => setShowPredictions(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 99998,
+              animation: 'fadeIn 0.2s ease'
+            }}
+          />
+        )}
 
         {/* Lista de predicciones */}
         {showPredictions && predictions.length > 0 && (
@@ -859,7 +954,17 @@ const GoogleAddressPicker = ({
                 key={prediction.place_id}
                 type="button"
                 className="prediction-item"
-                onClick={() => selectPrediction(prediction.place_id)}
+                onClick={() => {
+                  selectPrediction(prediction.place_id);
+                  setShowPredictions(false);
+                }}
+                onTouchStart={(e) => {
+                  // Mejorar respuesta táctil en móvil
+                  e.currentTarget.style.opacity = '0.7';
+                }}
+                onTouchEnd={(e) => {
+                  e.currentTarget.style.opacity = '1';
+                }}
               >
                 <MapPin size={16} />
                 <div className="prediction-content">

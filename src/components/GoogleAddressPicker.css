@@ -58,9 +58,13 @@
   border: none;
   outline: none;
   background: transparent;
-  font-size: 1rem;
+  font-size: 16px; /* Prevenir zoom en iOS */
   color: var(--text-primary);
   font-family: inherit;
+  /* Mejoras para móvil */
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
 }
 
 .address-search-input::placeholder {
@@ -362,11 +366,15 @@
   }
 
   .address-search-container {
-    position: sticky;
-    top: 0;
+    position: relative;
     z-index: 10;
     background: var(--bg-primary);
     padding-bottom: 0.5rem;
+  }
+  
+  .search-input-wrapper {
+    position: relative;
+    z-index: 11;
   }
 
   .address-fields-section {
@@ -408,17 +416,20 @@
   }
 
   .predictions-list {
-    position: fixed;
-    top: auto;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    margin: 0;
-    border-radius: 1rem 1rem 0 0;
-    max-height: 60vh;
-    z-index: 10000;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
-    animation: slideUp 0.3s ease;
+    position: fixed !important;
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    margin: 0 !important;
+    border-radius: 1rem 1rem 0 0 !important;
+    max-height: 60vh !important;
+    z-index: 99999 !important;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3) !important;
+    animation: slideUp 0.3s ease !important;
+    /* Asegurar que esté por encima de todo */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
   }
 
   @keyframes slideUp {
