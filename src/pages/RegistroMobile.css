@@ -529,8 +529,18 @@
 
 @media (max-width: 768px) {
   .interactive-map-container {
-    margin-top: 1rem;
+    margin-top: 0.75rem; /* Reducido de 1rem */
     min-height: 200px;
+  }
+
+  /* Ocultar el contenedor del mapa si está vacío (sin mapa renderizado) */
+  .interactive-map-container:empty {
+    display: none;
+    height: 0;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
   }
 }
 

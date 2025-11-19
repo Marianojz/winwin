@@ -116,7 +116,7 @@ const GoogleAddressPicker = ({
     }
 
     if (!window.google || !window.google.maps) {
-      console.warn('⚠️ Google Maps API aún no está disponible');
+      // Log eliminado para reducir ruido en consola
       return;
     }
 
@@ -151,9 +151,9 @@ const GoogleAddressPicker = ({
           if (window.google.maps.places.AutocompleteSuggestion) {
             try {
               // La nueva API funciona diferente, pero por ahora usamos legacy como fallback
-              console.log('ℹ️ Nueva API de Places disponible, pero usando legacy por compatibilidad');
+              // Log eliminado para reducir ruido en consola
             } catch (e) {
-              console.warn('⚠️ Nueva API no disponible, usando legacy');
+              // Log eliminado para reducir ruido en consola
             }
           }
           
@@ -183,9 +183,7 @@ const GoogleAddressPicker = ({
           setGeocoder(geocoderInstance);
           servicesInitializedRef.current = true;
           
-          if (import.meta.env.DEV) {
-            console.log('✅ Servicios de Google Maps inicializados correctamente');
-          }
+          // Log eliminado para reducir ruido en consola
         } catch (error: any) {
           if (error?.message?.includes('legacy') || error?.message?.includes('not enabled')) {
             setApiError('Places API (legacy) no está habilitada. Habilita "Places API" en Google Cloud Console.');
@@ -203,17 +201,36 @@ const GoogleAddressPicker = ({
 
     // Iniciar el proceso de inicialización
     tryInitialize();
+  }, [apiKey, countryRestriction]);
 
-    // Inicializar mapa solo una vez
-    // Usar el contenedor externo si se proporciona, sino usar el ref interno
-    const mapContainer = mapContainerId 
-      ? document.getElementById(mapContainerId) 
-      : mapRef.current;
-    
-    if (mapContainer && !map) {
+  // Inicializar mapa solo cuando Google Maps esté completamente cargado
+  useEffect(() => {
+    // Si ya hay un mapa, no hacer nada
+    if (map) {
+      return;
+    }
+
+    // Función para inicializar el mapa cuando esté listo
+    const initMap = () => {
+      // Verificar que Google Maps esté completamente cargado
+      if (!window.google || !window.google.maps || typeof window.google.maps.Map !== 'function') {
+        return false;
+      }
+
+      // Usar el contenedor externo si se proporciona, sino usar el ref interno
+      const mapContainer = mapContainerId 
+        ? document.getElementById(mapContainerId) 
+        : mapRef.current;
+      
+      // Verificar que el contenedor exista
+      if (!mapContainer) {
+        return false;
+      }
+
       const initialCenter = initialAddress?.coordinates || { lat: -34.6037, lng: -58.3816 };
       
-      const mapInstance = new window.google.maps.Map(mapContainer, {
+      try {
+        const mapInstance = new window.google.maps.Map(mapContainer, {
         center: initialCenter,
         zoom: 15,
         mapTypeControl: false,
@@ -338,17 +355,48 @@ const GoogleAddressPicker = ({
         mapInstance.setCenter(initialAddress.coordinates);
         markerInstance.setPosition(initialAddress.coordinates);
       }
+      return true;
+    } catch (error: any) {
+      console.error('❌ Error inicializando mapa de Google Maps:', error);
+      // No mostrar error al usuario si el mapa no es crítico (solo se muestra si showMap es true)
+      return false;
     }
-  }, [initialAddress, onAddressSelect, mapContainerId]);
+  };
+
+  // Intentar inicializar inmediatamente si ya está listo
+  if (initMap()) {
+    return;
+  }
+
+  // Si no está listo, esperar a que se cargue
+  if (window.__googleMapsLoading) {
+    window.__googleMapsLoading.then(() => {
+      initMap();
+    }).catch(() => {
+      // Error silencioso
+    });
+    return;
+  }
+
+  // Si no hay promesa de carga, verificar periódicamente (máximo 5 segundos)
+  let attempts = 0;
+  const maxAttempts = 50; // 50 intentos * 100ms = 5 segundos
+  const checkInterval = setInterval(() => {
+    attempts++;
+    if (initMap() || attempts >= maxAttempts) {
+      clearInterval(checkInterval);
+    }
+  }, 100);
+
+  return () => {
+    clearInterval(checkInterval);
+  };
+}, [initialAddress, onAddressSelect, mapContainerId, map]);
 
   // Cargar Google Maps API (solo una vez globalmente)
   useEffect(() => {
     // Evitar logs repetitivos - solo mostrar una vez globalmente
-    if (import.meta.env.DEV && !window.__googleMapsApiKeyLogged) {
-      window.__googleMapsApiKeyLogged = true;
-      console.log('🔍 [GoogleAddressPicker] API Key recibida:', apiKey ? `${apiKey.substring(0, 10)}...` : 'VACÍA');
-      console.log('🔍 [GoogleAddressPicker] import.meta.env.VITE_GOOGLE_MAPS_API_KEY:', import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? `${import.meta.env.VITE_GOOGLE_MAPS_API_KEY.substring(0, 10)}...` : 'VACÍA');
-    }
+    // Logs de API Key eliminados para reducir ruido en consola
 
     // Validar que la API key esté configurada
     if (!apiKey || apiKey.trim() === '') {
@@ -518,9 +566,7 @@ const GoogleAddressPicker = ({
     // Llamar al callback para notificar al componente padre
     try {
       onAddressSelect(addressData);
-      if (import.meta.env.DEV) {
-        console.log('✅ Dirección seleccionada y callback ejecutado:', addressData);
-      }
+      // Log eliminado para reducir ruido en consola
     } catch (error) {
       console.error('❌ Error en onAddressSelect:', error);
     }
@@ -532,9 +578,7 @@ const GoogleAddressPicker = ({
     
     // Verificar que Google Maps esté cargado
     if (!window.google || !window.google.maps || !window.google.maps.places) {
-      if (import.meta.env.DEV) {
-        console.warn('⚠️ Google Maps API aún no está cargada, esperando...');
-      }
+      // Log eliminado para reducir ruido en consola
       // Reintentar después de un breve delay (usar el valor actual del input)
       setTimeout(() => {
         const currentValue = autocompleteInputRef.current?.value || value;
@@ -576,27 +620,24 @@ const GoogleAddressPicker = ({
       types: ['address']
     };
 
-    if (import.meta.env.DEV && isMobile) {
-      console.log('🔍 [MÓVIL] Buscando direcciones:', value);
-    }
+    // Logs eliminados para reducir ruido en consola
 
     currentAutocompleteService.getPlacePredictions(request, (predictions: any[], status: string) => {
-      if (import.meta.env.DEV && isMobile) {
-        console.log('🔍 [MÓVIL] Respuesta de Places API:', { 
-          status, 
-          predictionsCount: predictions?.length || 0,
-          hasPredictions: !!predictions && predictions.length > 0
-        });
-      }
+      // Logs eliminados para reducir ruido en consola
 
       if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
         setPredictions(predictions);
         setShowPredictions(true);
         setApiError(''); // Limpiar error si funciona
         
-        if (import.meta.env.DEV && isMobile) {
-          console.log('✅ [MÓVIL] Predicciones mostradas:', predictions.length);
+        // En móvil, hacer scroll para que las predicciones sean visibles
+        if (isMobile && autocompleteInputRef.current) {
+          setTimeout(() => {
+            // Scroll suave para que el input quede visible con espacio para las predicciones
+            autocompleteInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 150);
         }
+        // Logs eliminados para reducir ruido en consola
       } else {
         setPredictions([]);
         setShowPredictions(false);
@@ -609,9 +650,7 @@ const GoogleAddressPicker = ({
         } else if (status === window.google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
           // No hay resultados, no es un error
           setApiError('');
-          if (import.meta.env.DEV && isMobile) {
-            console.log('ℹ️ [MÓVIL] No se encontraron resultados para:', value);
-          }
+          // Logs eliminados para reducir ruido en consola
         } else {
           // Otros errores
           if (import.meta.env.DEV) {
@@ -632,7 +671,7 @@ const GoogleAddressPicker = ({
     // Usar el ref en lugar del estado para asegurar que siempre tengamos el servicio más reciente
     const currentPlacesService = placesServiceRef.current || placesService;
     if (!currentPlacesService) {
-      console.warn('⚠️ PlacesService no está disponible aún. Esperando inicialización...');
+      // Log eliminado para reducir ruido en consola
       // Reintentar después de un breve delay
       setTimeout(() => {
         const retryService = placesServiceRef.current || placesService;
@@ -937,10 +976,11 @@ const GoogleAddressPicker = ({
             onChange={(e) => handleSearchChange(e.target.value)}
             onFocus={() => {
               if (predictions.length > 0) setShowPredictions(true);
-              // En móvil, asegurar que el input esté visible
+              // En móvil, hacer scroll para que el input y las predicciones sean visibles
               if (isMobile && autocompleteInputRef.current) {
                 setTimeout(() => {
-                  autocompleteInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  // Scroll para que el input quede en la parte superior visible
+                  autocompleteInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }, 100);
               }
             }}
@@ -958,7 +998,7 @@ const GoogleAddressPicker = ({
           {loading && <Loader className="search-loader" size={18} />}
         </div>
 
-        {/* Overlay oscuro en móvil cuando hay predicciones */}
+        {/* Overlay oscuro en móvil cuando hay predicciones - ahora opcional ya que las predicciones están debajo del input */}
         {showPredictions && predictions.length > 0 && isMobile && (
           <div 
             className="predictions-overlay"
@@ -969,9 +1009,10 @@ const GoogleAddressPicker = ({
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'rgba(0, 0, 0, 0.5)',
-              zIndex: 99998,
-              animation: 'fadeIn 0.2s ease'
+              background: 'rgba(0, 0, 0, 0.2)', /* Más transparente ya que las predicciones están cerca */
+              zIndex: 99, /* Debajo de las predicciones (100) pero por encima del contenido */
+              animation: 'fadeIn 0.2s ease',
+              pointerEvents: 'auto' /* Permitir clicks para cerrar */
             }}
           />
         )}
@@ -1133,7 +1174,8 @@ const GoogleAddressPicker = ({
       )}
 
       {/* Mapa interactivo - solo si showMap es true y no hay mapContainerId externo */}
-      {showMap && !mapContainerId && (
+      {/* En móvil, si hay mapContainerId, no renderizar esta sección para evitar espacio vacío */}
+      {showMap && !mapContainerId && !isMobile && (
       <div className="map-section">
         <h3 className="section-title">
           <MapPin size={18} />

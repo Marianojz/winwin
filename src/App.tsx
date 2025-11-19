@@ -115,13 +115,8 @@ function RedirectHandler() {
                         lastCheckedPathRef.current !== location.pathname ||
                         location.search || location.hash;
       
-      if (shouldLog && import.meta.env.DEV) {
-        console.log('🔍 [MÓVIL] Verificando redirect result...', {
-          currentUser: auth.currentUser?.uid,
-          pathname: location.pathname,
-          search: location.search,
-          hash: location.hash
-        });
+      // Log eliminado para reducir ruido en consola
+      if (shouldLog) {
         lastCheckedPathRef.current = location.pathname;
         redirectCheckCountRef.current++;
       }
@@ -160,7 +155,7 @@ function RedirectHandler() {
         
         if (result && result.user) {
           setIsProcessing(true);
-          console.log('✅ [MÓVIL] Google Sign-In redirect exitoso, procesando usuario...', result.user.uid);
+          // Log eliminado para reducir ruido en consola
           toast.info('Procesando tu cuenta...', 2000);
           
           try {
@@ -168,12 +163,7 @@ function RedirectHandler() {
             
             if (!mounted) return;
             
-            console.log('👤 [MÓVIL] Usuario procesado:', {
-              id: fullUser.id,
-              email: fullUser.email,
-              isAdmin: fullUser.isAdmin,
-              needsCompleteProfile
-            });
+            // Log eliminado para reducir ruido en consola
             
             setUser(fullUser);
             toast.success('¡Inicio de sesión exitoso!', 2000);
@@ -185,15 +175,15 @@ function RedirectHandler() {
 
             // Redirigir según si necesita completar perfil
             if (needsCompleteProfile) {
-              console.log('📝 [MÓVIL] Redirigiendo a completar perfil...');
+              // Log eliminado para reducir ruido en consola
               navigate('/completar-perfil', { replace: true });
             } else {
               // Redirigir según rol
               if (fullUser.isAdmin) {
-                console.log('👑 [MÓVIL] Redirigiendo a admin...');
+                // Log eliminado para reducir ruido en consola
                 navigate('/admin', { replace: true });
               } else {
-                console.log('🏠 [MÓVIL] Redirigiendo a home...');
+                // Log eliminado para reducir ruido en consola
                 navigate('/', { replace: true });
               }
             }
@@ -210,10 +200,7 @@ function RedirectHandler() {
             }
           }
         } else {
-          // Solo loggear si es relevante (primera vez o hay cambios)
-          if (shouldLog && import.meta.env.DEV) {
-            console.log('ℹ️ [MÓVIL] No hay redirect result pendiente');
-          }
+          // Log eliminado para reducir ruido en consola
         }
       } catch (error: any) {
         console.error('❌ [MÓVIL] Error procesando redirect result:', error);
@@ -301,7 +288,7 @@ function RedirectHandler() {
       // Si hay un usuario autenticado pero no está en el store, y estamos en login
       // podría ser que venga de un redirect que no se procesó
       if (firebaseUser && !user && location.pathname === '/login') {
-        console.log('🔍 [MÓVIL BACKUP] Usuario autenticado detectado en /login, verificando redirect...', firebaseUser.uid);
+        // Log eliminado para reducir ruido en consola
         
         // Intentar procesar el redirect result
         try {
@@ -334,7 +321,7 @@ function RedirectHandler() {
           }
           
           if (result && result.user && !isProcessing) {
-            console.log('✅ [MÓVIL BACKUP] Redirect result encontrado, procesando...');
+            // Log eliminado para reducir ruido en consola
             setIsProcessing(true);
             toast.info('Procesando tu cuenta...', 2000);
             
@@ -363,15 +350,11 @@ function RedirectHandler() {
             
             // Si el usuario ya está en el store, no procesar de nuevo
             if (currentUser && currentUser.id === firebaseUser.uid) {
-              console.log('✅ [MÓVIL BACKUP] Usuario ya procesado por otro handler, saltando...');
+              // Log eliminado para reducir ruido en consola
               return;
             }
             
-            console.log('🔍 [MÓVIL BACKUP] No hay redirect result, pero usuario autenticado detectado. Procesando directamente...', {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              displayName: firebaseUser.displayName
-            });
+            // Log eliminado para reducir ruido en consola
             
             // Esperar un momento para asegurar que no hay otro proceso en curso
             await new Promise(resolve => setTimeout(resolve, 300));
@@ -379,7 +362,7 @@ function RedirectHandler() {
             // Verificar nuevamente si ya se procesó (doble verificación)
             const currentUserAfterDelay = useStore.getState().user;
             if (currentUserAfterDelay && currentUserAfterDelay.id === firebaseUser.uid) {
-              console.log('✅ [MÓVIL BACKUP] Usuario ya procesado durante el delay, saltando...');
+              // Log eliminado para reducir ruido en consola
               return;
             }
             
@@ -394,17 +377,12 @@ function RedirectHandler() {
               // Verificar una vez más antes de actualizar
               const finalCheck = useStore.getState().user;
               if (finalCheck && finalCheck.id === firebaseUser.uid) {
-                console.log('✅ [MÓVIL BACKUP] Usuario ya procesado durante processGoogleAuthResult, saltando actualización...');
+                // Log eliminado para reducir ruido en consola
                 setIsProcessing(false);
                 return;
               }
               
-              console.log('✅ [MÓVIL BACKUP] Usuario procesado exitosamente:', {
-                id: fullUser.id,
-                email: fullUser.email,
-                isAdmin: fullUser.isAdmin,
-                needsCompleteProfile
-              });
+              // Log eliminado para reducir ruido en consola
               
               setUser(fullUser);
               toast.success('¡Inicio de sesión exitoso!', 2000);
@@ -593,7 +571,7 @@ function App() {
   // Cargar bots automáticamente al iniciar la app (sin importar si hay usuario logueado)
   useEffect(() => {
     if (loadBots) {
-      console.log('🤖 Cargando bots automáticamente...');
+      // Log eliminado - funcionalidad oculta del admin
       loadBots();
     }
   }, [loadBots]);
