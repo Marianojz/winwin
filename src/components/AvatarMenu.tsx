@@ -78,7 +78,8 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
         setMenuPosition({
           top: rect.bottom + window.scrollY + 12,
           bottom: undefined,
-          right: window.innerWidth - rect.right - window.scrollX
+          right: window.innerWidth - rect.right - window.scrollX,
+          left: undefined
         });
       }
     };

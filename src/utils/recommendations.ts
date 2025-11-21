@@ -41,7 +41,7 @@ function calculateProductSimilarity(
 
   // Misma categoría = alta similitud
   const likedCategory = likedProduct.productCategory || 'general';
-  const candidateCategory = candidateProduct.category || 'general';
+  const candidateCategory = candidateProduct.categoryId || 'general';
   
   if (likedCategory === candidateCategory) {
     score += 50;
@@ -109,7 +109,7 @@ export async function getPersonalizedRecommendations(
       const reasons: string[] = [];
 
       // Score basado en categoría favorita
-      const productCategory = product.category || 'general';
+      const productCategory = product.categoryId || 'general';
       if (categories[productCategory]) {
         const categoryWeight = (categories[productCategory] / totalLikes) * 100;
         totalScore += categoryWeight;
@@ -186,7 +186,7 @@ export async function getCategoryRecommendations(
 
     for (const [category, count] of sortedCategories) {
       const categoryProducts = allProducts
-        .filter(p => (p.category || 'general') === category)
+        .filter(p => (p.categoryId || 'general') === category)
         .filter(p => !likedProductIds.has(p.id))
         .slice(0, limit);
 
@@ -223,7 +223,7 @@ export function getSimilarProducts(
     let score = 0;
 
     // Misma categoría
-    if ((candidate.category || 'general') === (product.category || 'general')) {
+    if ((candidate.categoryId || 'general') === (product.categoryId || 'general')) {
       score += 50;
     }
 

@@ -59,13 +59,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
       }
     } catch (error) {
       console.error('Error al dar like:', error);
-      addNotification({
-        userId: 'current',
-        type: 'error',
-        title: 'Error',
-        message: 'No se pudo actualizar el like. Intentá nuevamente.',
-        read: false
-      });
+      // No mostrar notificación de error para likes, solo loguear
     } finally {
       setLiking(false);
     }

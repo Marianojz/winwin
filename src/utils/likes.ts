@@ -41,7 +41,7 @@ export async function likeProduct(
     const likeData = {
       productId: product.id,
       productName: product.name,
-      productCategory: product.category || 'general',
+      productCategory: product.categoryId || 'general',
       timestamp: new Date().toISOString()
     };
 
