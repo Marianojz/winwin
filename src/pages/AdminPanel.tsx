@@ -12,7 +12,8 @@ import {
   MousePointerClick, Image as ImageIcon, Save, Store, Mail, Send,
   CheckCircle, Truck, FileText, Calendar, User, CreditCard,
   ArrowRight, ArrowDown, ArrowUp, Download, Trash, HelpCircle, Ticket as TicketIcon,
-  MessageSquare, Palette, Shuffle, CheckSquare, Square, BookOpen, Upload
+  MessageSquare, Palette, Shuffle, CheckSquare, Square, BookOpen, Upload,
+  Calculator, Percent, Package2, TrendingDown, Copy, Check
 } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -135,6 +136,27 @@ const AdminPanel = (): React.ReactElement => {
       // Log silencioso - funcionalidad oculta del admin
     }
   }, [user?.isAdmin, loadBots]);
+
+  // Cargar preferencias desde Firebase cuando el usuario esté autenticado
+  useEffect(() => {
+    const loadPreferences = async () => {
+      if (user?.id) {
+        try {
+          // Cargar messageTemplates
+          const templates = await loadMessageTemplates(user.id);
+          setMessageTemplates(templates);
+          
+          // Cargar quickReplies
+          const replies = await loadQuickReplies(user.id);
+          setQuickReplies(replies);
+        } catch (error) {
+          console.error('❌ Error cargando preferencias:', error);
+        }
+      }
+    };
+
+    loadPreferences();
+  }, [user?.id]);
 
   // Los bots funcionan silenciosamente - funcionalidad oculta del admin
   
@@ -466,7 +488,7 @@ const AdminPanel = (): React.ReactElement => {
   }, []);
 
   // Estados para templates de mensajes
-  const [messageTemplates, setMessageTemplates] = useState<MessageTemplate[]>(() => loadMessageTemplates());
+  const [messageTemplates, setMessageTemplates] = useState<MessageTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [templatePreview, setTemplatePreview] = useState<string>('');
   
@@ -482,7 +504,7 @@ const AdminPanel = (): React.ReactElement => {
   const [closingConversation, setClosingConversation] = useState(false);
   
   // Estados para plantillas de respuestas rápidas
-  const [quickReplies, setQuickReplies] = useState<QuickReply[]>(() => loadQuickReplies());
+  const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [showQuickReplyEditor, setShowQuickReplyEditor] = useState(false);
   
@@ -877,7 +899,10 @@ const newAuction: Auction = {
   isFlash: totalMinutes <= 60, // Si dura 1 hora o menos, es flash
   condition: auctionForm.condition || 'new',
   createdBy: user.id,
-  createdAt: new Date()  // ← AGREGAR createdAt
+  createdAt: new Date(),  // ← AGREGAR createdAt
+  unitsPerBundle: auctionForm.unitsPerBundle > 0 ? auctionForm.unitsPerBundle : undefined,
+  bundles: auctionForm.bundles > 0 ? auctionForm.bundles : undefined,
+  sellOnlyByBundle: auctionForm.sellOnlyByBundle || false
 };
 
       // Guardar en Firebase usando la función del store
@@ -922,7 +947,10 @@ setAuctionForm({
   allowExtension: true,
   scheduled: false,
   scheduledDate: '',
-  scheduledTime: ''
+  scheduledTime: '',
+  unitsPerBundle: 1,
+  bundles: 0,
+  sellOnlyByBundle: false
 });
 
       // Volver a la lista de subastas
@@ -947,7 +975,10 @@ setAuctionForm({
   badges: [] as string[],
   stickers: [] as string[],
   active: true,
-  featured: false
+  featured: false,
+  unitsPerBundle: 1, // Unidades por bulto (uxb)
+  bundles: 0, // Cantidad de bultos disponibles
+  sellOnlyByBundle: false // Solo se vende por bulto completo
 });
 
   // Estados para subastas
@@ -969,7 +1000,10 @@ const [auctionForm, setAuctionForm] = useState({
   allowExtension: true,
   scheduled: false,
   scheduledDate: '',
-  scheduledTime: ''
+  scheduledTime: '',
+  unitsPerBundle: 1, // Unidades por bulto (uxb)
+  bundles: 0, // Cantidad de bultos disponibles
+  sellOnlyByBundle: false // Solo se vende por bulto completo
 });
 
   // Estados para bots
@@ -1200,7 +1234,10 @@ const [auctionForm, setAuctionForm] = useState({
     badges: product.badges || [],
     stickers: product.stickers || [],
     active: product.active !== undefined ? product.active : true,
-    featured: product.featured === true
+    featured: product.featured === true,
+    unitsPerBundle: product.unitsPerBundle || 1,
+    bundles: product.bundles || 0,
+    sellOnlyByBundle: product.sellOnlyByBundle || false
   });
   setActiveTab('edit-product');
 };
@@ -1216,7 +1253,10 @@ const [auctionForm, setAuctionForm] = useState({
     badges: [] as string[],
     stickers: [] as string[], // Agregar stickers inicializado
     active: true,
-    featured: false
+    featured: false,
+    unitsPerBundle: 1,
+    bundles: 0,
+    sellOnlyByBundle: false
   });
   setEditingProduct(null);
   setActiveTab('create-product');
@@ -1248,6 +1288,16 @@ const [auctionForm, setAuctionForm] = useState({
   // Validar stock
   if (productForm.stock < 0) {
     errors.push('El stock no puede ser negativo');
+  }
+
+  // Validar unidades por bulto
+  if (productForm.unitsPerBundle && productForm.unitsPerBundle < 1) {
+    errors.push('Las unidades por bulto deben ser al menos 1');
+  }
+
+  // Validar bultos
+  if (productForm.bundles && productForm.bundles < 0) {
+    errors.push('Los bultos no pueden ser negativos');
   }
 
   // Validar imágenes
@@ -1292,6 +1342,9 @@ const [auctionForm, setAuctionForm] = useState({
         stickers: productForm.stickers || [],
         active: productForm.active,
         featured: productForm.featured,
+        unitsPerBundle: productForm.unitsPerBundle || 1,
+        bundles: productForm.bundles || 0,
+        sellOnlyByBundle: productForm.sellOnlyByBundle || false,
         updatedAt: new Date().toISOString()
       };
 
@@ -1433,7 +1486,10 @@ const [auctionForm, setAuctionForm] = useState({
   allowExtension: true,
   scheduled: false,
   scheduledDate: '',
-  scheduledTime: ''
+  scheduledTime: '',
+  unitsPerBundle: auction.unitsPerBundle || 1,
+  bundles: auction.bundles || 0,
+  sellOnlyByBundle: auction.sellOnlyByBundle || false
 });
     setActiveTab('edit-auction');
   };
@@ -1476,7 +1532,10 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
           condition: auctionForm.condition,
           featured: auctionForm.featured,
           endTime: newEndTime,
-          isFlash: totalMinutes <= 60
+          isFlash: totalMinutes <= 60,
+          unitsPerBundle: auctionForm.unitsPerBundle > 0 ? auctionForm.unitsPerBundle : undefined,
+          bundles: auctionForm.bundles > 0 ? auctionForm.bundles : undefined,
+          sellOnlyByBundle: auctionForm.sellOnlyByBundle || false
         };
       }
       return a;
@@ -2320,9 +2379,15 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
   };
 
   // Funciones para templates de mensajes
-  const handleSaveTemplate = (templateId: string, template: Partial<MessageTemplate>) => {
-    if (updateMessageTemplate(templateId, template)) {
-      const updated = loadMessageTemplates();
+  const handleSaveTemplate = async (templateId: string, template: Partial<MessageTemplate>) => {
+    if (!user?.id) {
+      alert('❌ No hay usuario autenticado');
+      return;
+    }
+    
+    const success = await updateMessageTemplate(user.id, templateId, template);
+    if (success) {
+      const updated = await loadMessageTemplates(user.id);
       setMessageTemplates(updated);
       logAdminAction(`Template de mensaje actualizado: ${template.title || templateId}`, user?.id, user?.username);
       alert('✅ Template guardado correctamente');
@@ -2352,10 +2417,14 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
 
   // Recargar templates cuando cambia el tab
   useEffect(() => {
-    if (activeTab === 'settings') {
-      setMessageTemplates(loadMessageTemplates());
-    }
-  }, [activeTab]);
+    const reloadTemplates = async () => {
+      if (activeTab === 'settings' && user?.id) {
+        const templates = await loadMessageTemplates(user.id);
+        setMessageTemplates(templates);
+      }
+    };
+    reloadTemplates();
+  }, [activeTab, user?.id]);
 
   // Función para limpieza manual de datos antiguos
   const handleManualCleanup = async () => {
@@ -2787,6 +2856,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     { id: 'orders', label: 'Pedidos', icon: ShoppingCart },
     { id: 'bots', label: 'Bots', icon: Bot },
     { id: 'blog', label: 'Blog', icon: BookOpen },
+    { id: 'utilities', label: 'Utilidades', icon: Calculator },
     { id: 'unified-inbox', label: 'Bandeja Unificada', icon: Mail, badge: totalUnreadUnified > 0 ? totalUnreadUnified : undefined },
     { id: 'messages', label: 'Mensajes', icon: MessageSquare, badge: adminUnreadCount > 0 ? adminUnreadCount : undefined },
     { id: 'tickets', label: 'Tickets', icon: TicketIcon, badge: tickets.filter(t => t.status !== 'resuelto').length > 0 ? tickets.filter(t => t.status !== 'resuelto').length : undefined },
@@ -2795,6 +2865,989 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     { id: 'settings', label: 'Configuración', icon: Activity }
   ];
 
+
+  // ============================================
+  // COMPONENTES DE UTILIDADES
+  // ============================================
+
+  // Componente de Búsqueda de Productos
+  const ProductSearch = ({ onSelectProduct, selectedProduct }: { onSelectProduct: (product: Product | null) => void; selectedProduct: Product | null }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [showResults, setShowResults] = useState(false);
+    const searchRef = useRef<HTMLDivElement>(null);
+
+    const filteredProducts = products.filter(p =>
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.id.toLowerCase().includes(searchTerm.toLowerCase())
+    ).slice(0, 5);
+
+    const handleSelect = (product: Product) => {
+      onSelectProduct(product);
+      setSearchTerm(product.name);
+      setShowResults(false);
+    };
+
+    const handleClear = () => {
+      onSelectProduct(null);
+      setSearchTerm('');
+      setShowResults(false);
+    };
+
+    // Cerrar resultados al hacer click fuera
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+          setShowResults(false);
+        }
+      };
+
+      if (showResults) {
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+      }
+    }, [showResults]);
+
+    return (
+      <div ref={searchRef} style={{ position: 'relative', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+          <div style={{ flex: 1, position: 'relative' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+              Buscar Producto
+            </label>
+            <div style={{ position: 'relative' }}>
+              <Search size={18} style={{
+                position: 'absolute',
+                left: '0.75rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-secondary)',
+                pointerEvents: 'none'
+              }} />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setShowResults(e.target.value.length > 0);
+                }}
+                onFocus={() => setShowResults(searchTerm.length > 0)}
+                placeholder="Buscar por nombre o ID..."
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 0.75rem 0.75rem 2.5rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.875rem'
+                }}
+              />
+            </div>
+            {showResults && filteredProducts.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                marginTop: '0.25rem',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: '0.5rem',
+                maxHeight: '200px',
+                overflowY: 'auto',
+                zIndex: 1000,
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+              }}>
+                {filteredProducts.map((product) => (
+                  <div
+                    key={product.id}
+                    onClick={() => handleSelect(product)}
+                    style={{
+                      padding: '0.75rem',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid var(--border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-tertiary)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {product.images && product.images.length > 0 && (
+                      <img
+                        src={product.images[0]}
+                        alt={product.name}
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          objectFit: 'cover',
+                          borderRadius: '0.5rem'
+                        }}
+                      />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {product.name}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        {formatCurrency(product.price)} • Stock: {product.stock}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {selectedProduct && (
+            <button
+              onClick={handleClear}
+              style={{
+                marginTop: '1.75rem',
+                padding: '0.5rem',
+                borderRadius: '0.5rem',
+                border: '1px solid var(--border)',
+                background: 'var(--error)',
+                color: 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title="Limpiar selección"
+            >
+              <XCircle size={18} />
+            </button>
+          )}
+        </div>
+        {selectedProduct && (
+          <div style={{
+            padding: '0.75rem',
+            background: 'var(--bg-tertiary)',
+            borderRadius: '0.5rem',
+            fontSize: '0.8125rem',
+            color: 'var(--text-secondary)'
+          }}>
+            <strong>Producto seleccionado:</strong> {selectedProduct.name} • Precio: {formatCurrency(selectedProduct.price)}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Calculadora de Costos y Ganancia
+  const CostCalculator = () => {
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const [costoProducto, setCostoProducto] = useState('');
+    const [porcentajeGanancia, setPorcentajeGanancia] = useState('');
+    const [costoEnvio, setCostoEnvio] = useState('');
+    const [impuestos, setImpuestos] = useState('');
+
+    // Cargar datos del producto cuando se selecciona
+    useEffect(() => {
+      if (selectedProduct) {
+        // Estimar costo basado en precio (asumiendo 30% de margen por defecto)
+        const precioActual = selectedProduct.price || 0;
+        const costoEstimado = precioActual / 1.3; // Estimación simple
+        setCostoProducto(costoEstimado.toFixed(2));
+        setPorcentajeGanancia('30');
+      }
+    }, [selectedProduct]);
+
+    const calcular = () => {
+      const costo = parseFloat(costoProducto) || 0;
+      const ganancia = parseFloat(porcentajeGanancia) || 0;
+      const envio = parseFloat(costoEnvio) || 0;
+      const tax = parseFloat(impuestos) || 0;
+
+      const gananciaMonto = (costo * ganancia) / 100;
+      const subtotal = costo + gananciaMonto;
+      const totalImpuestos = (subtotal * tax) / 100;
+      const precioVenta = subtotal + totalImpuestos + envio;
+      const gananciaNeta = precioVenta - costo - envio - totalImpuestos;
+      const margenGanancia = costo > 0 ? (gananciaNeta / precioVenta) * 100 : 0;
+
+      return {
+        costo,
+        gananciaMonto,
+        subtotal,
+        totalImpuestos,
+        envio,
+        precioVenta,
+        gananciaNeta,
+        margenGanancia
+      };
+    };
+
+    const resultados = calcular();
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <ProductSearch onSelectProduct={setSelectedProduct} selectedProduct={selectedProduct} />
+        
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+            Costo del Producto ($)
+          </label>
+          <input
+            type="number"
+            value={costoProducto}
+            onChange={(e) => setCostoProducto(e.target.value)}
+            placeholder="0.00"
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              borderRadius: '0.5rem',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-primary)',
+              color: 'var(--text-primary)',
+              fontSize: '1rem'
+            }}
+          />
+        </div>
+
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+            Porcentaje de Ganancia (%)
+          </label>
+          <input
+            type="number"
+            value={porcentajeGanancia}
+            onChange={(e) => setPorcentajeGanancia(e.target.value)}
+            placeholder="30"
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              borderRadius: '0.5rem',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-primary)',
+              color: 'var(--text-primary)',
+              fontSize: '1rem'
+            }}
+          />
+        </div>
+
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+            Costo de Envío ($)
+          </label>
+          <input
+            type="number"
+            value={costoEnvio}
+            onChange={(e) => setCostoEnvio(e.target.value)}
+            placeholder="0.00"
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              borderRadius: '0.5rem',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-primary)',
+              color: 'var(--text-primary)',
+              fontSize: '1rem'
+            }}
+          />
+        </div>
+
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+            Impuestos (%)
+          </label>
+          <input
+            type="number"
+            value={impuestos}
+            onChange={(e) => setImpuestos(e.target.value)}
+            placeholder="21"
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              borderRadius: '0.5rem',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-primary)',
+              color: 'var(--text-primary)',
+              fontSize: '1rem'
+            }}
+          />
+        </div>
+
+        {(costoProducto || porcentajeGanancia) && (
+          <div style={{
+            marginTop: '1rem',
+            padding: '1rem',
+            background: 'var(--bg-primary)',
+            borderRadius: '0.75rem',
+            border: '2px solid var(--primary)'
+          }}>
+            <div style={{ marginBottom: '0.75rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+              Precio de Venta Sugerido
+            </div>
+            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>
+              {formatCurrency(resultados.precioVenta)}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.875rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Ganancia Neta:</span>
+                <span style={{ fontWeight: 600, color: 'var(--success)' }}>{formatCurrency(resultados.gananciaNeta)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Margen:</span>
+                <span style={{ fontWeight: 600, color: 'var(--success)' }}>{resultados.margenGanancia.toFixed(2)}%</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <button
+          onClick={() => {
+            setSelectedProduct(null);
+            setCostoProducto('');
+            setPorcentajeGanancia('');
+            setCostoEnvio('');
+            setImpuestos('');
+          }}
+          className="btn btn-secondary"
+          style={{
+            width: '100%',
+            padding: '0.75rem',
+            marginTop: '0.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <RefreshCw size={16} />
+          Limpiar Todo
+        </button>
+      </div>
+    );
+  };
+
+  // Calculadora de Margen
+  const MarginCalculator = () => {
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const [modoCalculo, setModoCalculo] = useState<'venta-costo' | 'margen' | 'markup'>('venta-costo');
+    const [precioVenta, setPrecioVenta] = useState('');
+    const [costo, setCosto] = useState('');
+    const [margenDeseado, setMargenDeseado] = useState('');
+    const [markupDeseado, setMarkupDeseado] = useState('');
+
+    // Cargar datos del producto cuando se selecciona
+    useEffect(() => {
+      if (selectedProduct) {
+        setPrecioVenta((selectedProduct.price || 0).toString());
+        // Estimar costo basado en precio (asumiendo 30% de margen por defecto)
+        const precioActual = selectedProduct.price || 0;
+        const costoEstimado = precioActual / 1.3;
+        setCosto(costoEstimado.toFixed(2));
+        setMargenDeseado('30');
+        setMarkupDeseado('42.86'); // Markup equivalente a 30% de margen
+      }
+    }, [selectedProduct]);
+
+    const calcular = () => {
+      if (modoCalculo === 'venta-costo') {
+        // Modo: Precio de venta y costo → calcular margen y markup
+        const venta = parseFloat(precioVenta) || 0;
+        const costoVal = parseFloat(costo) || 0;
+        const ganancia = venta - costoVal;
+        const margenPorcentaje = venta > 0 ? (ganancia / venta) * 100 : 0;
+        const markupPorcentaje = costoVal > 0 ? (ganancia / costoVal) * 100 : 0;
+        return { 
+          tipo: 'venta-costo',
+          ganancia, 
+          margenPorcentaje, 
+          markupPorcentaje,
+          precioVenta: venta,
+          costo: costoVal
+        };
+      } else if (modoCalculo === 'margen') {
+        // Modo: Costo y margen deseado → calcular precio de venta
+        const costoVal = parseFloat(costo) || 0;
+        const margen = parseFloat(margenDeseado) || 0;
+        if (costoVal > 0 && margen >= 0 && margen < 100) {
+          const precioVentaCalculado = costoVal / (1 - margen / 100);
+          const ganancia = precioVentaCalculado - costoVal;
+          const markupPorcentaje = costoVal > 0 ? (ganancia / costoVal) * 100 : 0;
+          return {
+            tipo: 'margen',
+            precioVenta: precioVentaCalculado,
+            costo: costoVal,
+            ganancia,
+            margenPorcentaje: margen,
+            markupPorcentaje
+          };
+        }
+        return { tipo: 'margen', precioVenta: 0, costo: costoVal, ganancia: 0, margenPorcentaje: margen, markupPorcentaje: 0 };
+      } else {
+        // Modo: Costo y markup deseado → calcular precio de venta
+        const costoVal = parseFloat(costo) || 0;
+        const markup = parseFloat(markupDeseado) || 0;
+        if (costoVal > 0 && markup >= 0) {
+          const ganancia = (costoVal * markup) / 100;
+          const precioVentaCalculado = costoVal + ganancia;
+          const margenPorcentaje = precioVentaCalculado > 0 ? (ganancia / precioVentaCalculado) * 100 : 0;
+          return {
+            tipo: 'markup',
+            precioVenta: precioVentaCalculado,
+            costo: costoVal,
+            ganancia,
+            margenPorcentaje,
+            markupPorcentaje: markup
+          };
+        }
+        return { tipo: 'markup', precioVenta: 0, costo: costoVal, ganancia: 0, margenPorcentaje: 0, markupPorcentaje: markup };
+      }
+    };
+
+    const resultados = calcular();
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <ProductSearch onSelectProduct={setSelectedProduct} selectedProduct={selectedProduct} />
+        
+        {/* Selector de Modo */}
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+            Modo de Cálculo
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+            <button
+              onClick={() => setModoCalculo('venta-costo')}
+              style={{
+                padding: '0.625rem',
+                borderRadius: '0.5rem',
+                border: `2px solid ${modoCalculo === 'venta-costo' ? 'var(--primary)' : 'var(--border)'}`,
+                background: modoCalculo === 'venta-costo' ? 'var(--primary)' : 'var(--bg-primary)',
+                color: modoCalculo === 'venta-costo' ? 'white' : 'var(--text-primary)',
+                cursor: 'pointer',
+                fontSize: '0.8125rem',
+                fontWeight: 600,
+                transition: 'all 0.2s'
+              }}
+            >
+              Venta → Margen
+            </button>
+            <button
+              onClick={() => setModoCalculo('margen')}
+              style={{
+                padding: '0.625rem',
+                borderRadius: '0.5rem',
+                border: `2px solid ${modoCalculo === 'margen' ? 'var(--primary)' : 'var(--border)'}`,
+                background: modoCalculo === 'margen' ? 'var(--primary)' : 'var(--bg-primary)',
+                color: modoCalculo === 'margen' ? 'white' : 'var(--text-primary)',
+                cursor: 'pointer',
+                fontSize: '0.8125rem',
+                fontWeight: 600,
+                transition: 'all 0.2s'
+              }}
+            >
+              Margen → Venta
+            </button>
+            <button
+              onClick={() => setModoCalculo('markup')}
+              style={{
+                padding: '0.625rem',
+                borderRadius: '0.5rem',
+                border: `2px solid ${modoCalculo === 'markup' ? 'var(--primary)' : 'var(--border)'}`,
+                background: modoCalculo === 'markup' ? 'var(--primary)' : 'var(--bg-primary)',
+                color: modoCalculo === 'markup' ? 'white' : 'var(--text-primary)',
+                cursor: 'pointer',
+                fontSize: '0.8125rem',
+                fontWeight: 600,
+                transition: 'all 0.2s'
+              }}
+            >
+              Markup → Venta
+            </button>
+          </div>
+        </div>
+
+        {/* Campo Costo - Siempre visible */}
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+            Costo del Producto ($) *
+          </label>
+          <input
+            type="number"
+            value={costo}
+            onChange={(e) => setCosto(e.target.value)}
+            placeholder="0.00"
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              borderRadius: '0.5rem',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-primary)',
+              color: 'var(--text-primary)',
+              fontSize: '1rem'
+            }}
+          />
+        </div>
+
+        {/* Campos según el modo */}
+        {modoCalculo === 'venta-costo' && (
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+              Precio de Venta ($)
+            </label>
+            <input
+              type="number"
+              value={precioVenta}
+              onChange={(e) => setPrecioVenta(e.target.value)}
+              placeholder="0.00"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '0.5rem',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                fontSize: '1rem'
+              }}
+            />
+            <small style={{ display: 'block', marginTop: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+              Ingresa el precio de venta para calcular el margen y markup
+            </small>
+          </div>
+        )}
+
+        {modoCalculo === 'margen' && (
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+              Margen de Ganancia Deseado (%)
+            </label>
+            <input
+              type="number"
+              value={margenDeseado}
+              onChange={(e) => {
+                const valor = e.target.value;
+                setMargenDeseado(valor);
+                // Calcular markup equivalente automáticamente
+                if (valor && parseFloat(valor) >= 0 && parseFloat(valor) < 100) {
+                  const margen = parseFloat(valor);
+                  const markup = (margen / (100 - margen)) * 100;
+                  setMarkupDeseado(markup.toFixed(2));
+                }
+              }}
+              placeholder="30"
+              min="0"
+              max="99.99"
+              step="0.01"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '0.5rem',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                fontSize: '1rem'
+              }}
+            />
+            <small style={{ display: 'block', marginTop: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+              Porcentaje de ganancia sobre el precio de venta (0-99%)
+            </small>
+          </div>
+        )}
+
+        {modoCalculo === 'markup' && (
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+              Markup de Ganancia Deseado (%)
+            </label>
+            <input
+              type="number"
+              value={markupDeseado}
+              onChange={(e) => {
+                const valor = e.target.value;
+                setMarkupDeseado(valor);
+                // Calcular margen equivalente automáticamente
+                if (valor && parseFloat(valor) >= 0) {
+                  const markup = parseFloat(valor);
+                  const margen = (markup / (100 + markup)) * 100;
+                  setMargenDeseado(margen.toFixed(2));
+                }
+              }}
+              placeholder="42.86"
+              min="0"
+              step="0.01"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '0.5rem',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                fontSize: '1rem'
+              }}
+            />
+            <small style={{ display: 'block', marginTop: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+              Porcentaje de ganancia sobre el costo
+            </small>
+          </div>
+        )}
+
+        {/* Resultados */}
+        {((modoCalculo === 'venta-costo' && precioVenta && costo) || 
+          (modoCalculo === 'margen' && costo && margenDeseado) ||
+          (modoCalculo === 'markup' && costo && markupDeseado)) && (
+          <div style={{
+            marginTop: '1rem',
+            padding: '1.25rem',
+            background: 'var(--bg-primary)',
+            borderRadius: '0.75rem',
+            border: '2px solid var(--success)',
+            boxShadow: '0 4px 12px rgba(34, 197, 94, 0.1)'
+          }}>
+            <div style={{ marginBottom: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+              {modoCalculo === 'venta-costo' ? 'Resultados del Análisis' : 'Precio de Venta Calculado'}
+            </div>
+            
+            {(modoCalculo === 'margen' || modoCalculo === 'markup') && (
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                  Precio de Venta Recomendado
+                </div>
+                <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--success)' }}>
+                  {formatCurrency(resultados.precioVenta)}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.875rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: 'var(--bg-secondary)', borderRadius: '0.5rem' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Ganancia:</span>
+                <span style={{ fontWeight: 600, color: resultados.ganancia >= 0 ? 'var(--success)' : 'var(--error)' }}>
+                  {formatCurrency(resultados.ganancia)}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: 'var(--bg-secondary)', borderRadius: '0.5rem' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Margen:</span>
+                <span style={{ fontWeight: 600, color: resultados.margenPorcentaje >= 0 ? 'var(--success)' : 'var(--error)' }}>
+                  {resultados.margenPorcentaje.toFixed(2)}%
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: 'var(--bg-secondary)', borderRadius: '0.5rem' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Markup:</span>
+                <span style={{ fontWeight: 600, color: resultados.markupPorcentaje >= 0 ? 'var(--success)' : 'var(--error)' }}>
+                  {resultados.markupPorcentaje.toFixed(2)}%
+                </span>
+              </div>
+              {modoCalculo === 'venta-costo' && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: 'var(--bg-secondary)', borderRadius: '0.5rem' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Costo:</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {formatCurrency(resultados.costo)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <button
+          onClick={() => {
+            setSelectedProduct(null);
+            setPrecioVenta('');
+            setCosto('');
+            setMargenDeseado('');
+            setMarkupDeseado('');
+            setModoCalculo('venta-costo');
+          }}
+          className="btn btn-secondary"
+          style={{
+            width: '100%',
+            padding: '0.75rem',
+            marginTop: '0.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <RefreshCw size={16} />
+          Limpiar Todo
+        </button>
+      </div>
+    );
+  };
+
+  // Calculadora de Descuentos
+  const DiscountCalculator = () => {
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const [precioOriginal, setPrecioOriginal] = useState('');
+    const [descuento, setDescuento] = useState('');
+    const [tipoDescuento, setTipoDescuento] = useState<'porcentaje' | 'fijo'>('porcentaje');
+
+    // Cargar datos del producto cuando se selecciona
+    useEffect(() => {
+      if (selectedProduct) {
+        setPrecioOriginal((selectedProduct.price || 0).toString());
+      }
+    }, [selectedProduct]);
+
+    const calcular = () => {
+      const original = parseFloat(precioOriginal) || 0;
+      const desc = parseFloat(descuento) || 0;
+
+      let precioFinal = 0;
+      let ahorro = 0;
+
+      if (tipoDescuento === 'porcentaje') {
+        ahorro = (original * desc) / 100;
+        precioFinal = original - ahorro;
+      } else {
+        ahorro = desc;
+        precioFinal = original - desc;
+      }
+
+      const porcentajeReal = original > 0 ? (ahorro / original) * 100 : 0;
+
+      return { precioFinal, ahorro, porcentajeReal };
+    };
+
+    const resultados = calcular();
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <ProductSearch onSelectProduct={setSelectedProduct} selectedProduct={selectedProduct} />
+        
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+            Precio Original ($)
+          </label>
+          <input
+            type="number"
+            value={precioOriginal}
+            onChange={(e) => setPrecioOriginal(e.target.value)}
+            placeholder="0.00"
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              borderRadius: '0.5rem',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-primary)',
+              color: 'var(--text-primary)',
+              fontSize: '1rem'
+            }}
+          />
+        </div>
+
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+            Tipo de Descuento
+          </label>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <button
+              onClick={() => setTipoDescuento('porcentaje')}
+              style={{
+                flex: 1,
+                padding: '0.5rem',
+                borderRadius: '0.5rem',
+                border: `2px solid ${tipoDescuento === 'porcentaje' ? 'var(--primary)' : 'var(--border)'}`,
+                background: tipoDescuento === 'porcentaje' ? 'var(--primary)' : 'var(--bg-primary)',
+                color: tipoDescuento === 'porcentaje' ? 'white' : 'var(--text-primary)',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: 600
+              }}
+            >
+              Porcentaje (%)
+            </button>
+            <button
+              onClick={() => setTipoDescuento('fijo')}
+              style={{
+                flex: 1,
+                padding: '0.5rem',
+                borderRadius: '0.5rem',
+                border: `2px solid ${tipoDescuento === 'fijo' ? 'var(--primary)' : 'var(--border)'}`,
+                background: tipoDescuento === 'fijo' ? 'var(--primary)' : 'var(--bg-primary)',
+                color: tipoDescuento === 'fijo' ? 'white' : 'var(--text-primary)',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: 600
+              }}
+            >
+              Monto Fijo ($)
+            </button>
+          </div>
+          <input
+            type="number"
+            value={descuento}
+            onChange={(e) => setDescuento(e.target.value)}
+            placeholder={tipoDescuento === 'porcentaje' ? '10' : '0.00'}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              borderRadius: '0.5rem',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-primary)',
+              color: 'var(--text-primary)',
+              fontSize: '1rem'
+            }}
+          />
+        </div>
+
+        {(precioOriginal && descuento) && (
+          <div style={{
+            marginTop: '1rem',
+            padding: '1rem',
+            background: 'var(--bg-primary)',
+            borderRadius: '0.75rem',
+            border: '2px solid var(--warning)'
+          }}>
+            <div style={{ marginBottom: '0.75rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+              Precio Final
+            </div>
+            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--warning)', marginBottom: '1rem' }}>
+              {formatCurrency(resultados.precioFinal)}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.875rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Ahorro:</span>
+                <span style={{ fontWeight: 600, color: 'var(--success)' }}>{formatCurrency(resultados.ahorro)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Descuento Real:</span>
+                <span style={{ fontWeight: 600, color: 'var(--success)' }}>{resultados.porcentajeReal.toFixed(2)}%</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <button
+          onClick={() => {
+            setSelectedProduct(null);
+            setPrecioOriginal('');
+            setDescuento('');
+            setTipoDescuento('porcentaje');
+          }}
+          className="btn btn-secondary"
+          style={{
+            width: '100%',
+            padding: '0.75rem',
+            marginTop: '0.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <RefreshCw size={16} />
+          Limpiar Todo
+        </button>
+      </div>
+    );
+  };
+
+  // Generador de Códigos
+  const CodeGenerator = () => {
+    const [codigo, setCodigo] = useState('');
+    const [longitud, setLongitud] = useState(8);
+    const [copiado, setCopiado] = useState(false);
+
+    const generarCodigo = () => {
+      const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let nuevoCodigo = '';
+      for (let i = 0; i < longitud; i++) {
+        nuevoCodigo += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+      }
+      setCodigo(nuevoCodigo);
+      setCopiado(false);
+    };
+
+    const copiarCodigo = () => {
+      if (codigo) {
+        navigator.clipboard.writeText(codigo);
+        setCopiado(true);
+        setTimeout(() => setCopiado(false), 2000);
+      }
+    };
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+            Longitud del Código
+          </label>
+          <input
+            type="number"
+            value={longitud}
+            onChange={(e) => setLongitud(Math.max(4, Math.min(20, parseInt(e.target.value) || 8)))}
+            min="4"
+            max="20"
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              borderRadius: '0.5rem',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-primary)',
+              color: 'var(--text-primary)',
+              fontSize: '1rem'
+            }}
+          />
+        </div>
+
+        <button
+          onClick={generarCodigo}
+          className="btn btn-primary"
+          style={{ width: '100%', padding: '0.75rem' }}
+        >
+          Generar Código
+        </button>
+
+        {codigo && (
+          <div style={{
+            marginTop: '1rem',
+            padding: '1rem',
+            background: 'var(--bg-primary)',
+            borderRadius: '0.75rem',
+            border: '2px solid var(--primary)'
+          }}>
+            <div style={{ marginBottom: '0.75rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+              Código Generado
+            </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.75rem',
+              background: 'var(--bg-secondary)',
+              borderRadius: '0.5rem',
+              marginBottom: '0.75rem'
+            }}>
+              <code style={{
+                flex: 1,
+                fontSize: '1.25rem',
+                fontWeight: 700,
+                color: 'var(--primary)',
+                letterSpacing: '2px',
+                fontFamily: 'monospace'
+              }}>
+                {codigo}
+              </code>
+              <button
+                onClick={copiarCodigo}
+                style={{
+                  padding: '0.5rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border)',
+                  background: copiado ? 'var(--success)' : 'var(--bg-tertiary)',
+                  color: copiado ? 'white' : 'var(--text-primary)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                title="Copiar código"
+              >
+                {copiado ? <Check size={18} /> : <Copy size={18} />}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Protección de acceso - DEBE IR DESPUÉS DE TODOS LOS HOOKS
   if (!user?.isAdmin) {
@@ -4010,6 +5063,101 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 </div>
               )}
 
+              {/* Unidades por Bulto y Bultos */}
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Unidades por Bulto (uxb)
+                  </label>
+                  <input
+                    type="number"
+                    value={auctionForm.unitsPerBundle || 1}
+                    onChange={(e) => {
+                      const unitsPerBundle = Number(e.target.value) || 1;
+                      setAuctionForm({ ...auctionForm, unitsPerBundle });
+                    }}
+                    min="1"
+                    placeholder="Ej: 6"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '1rem'
+                    }}
+                  />
+                  <small style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
+                    Cantidad de unidades que contiene cada bulto
+                  </small>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Bultos Disponibles
+                  </label>
+                  <input
+                    type="number"
+                    value={auctionForm.bundles || 0}
+                    onChange={(e) => {
+                      const bundles = Number(e.target.value) || 0;
+                      setAuctionForm({ ...auctionForm, bundles });
+                    }}
+                    min="0"
+                    placeholder="Ej: 10"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '1rem'
+                    }}
+                  />
+                  <small style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
+                    Cantidad de bultos disponibles
+                  </small>
+                </div>
+              </div>
+
+              {/* Opción: Solo se vende por bulto */}
+              {auctionForm.unitsPerBundle && auctionForm.unitsPerBundle > 0 && (
+                <div style={{
+                  padding: '1rem',
+                  background: 'var(--bg-tertiary)',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border)'
+                }}>
+                  <label style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.75rem', 
+                    cursor: 'pointer',
+                    color: 'var(--text-primary)',
+                    fontWeight: 500
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={auctionForm.sellOnlyByBundle || false}
+                      onChange={(e) => setAuctionForm({ ...auctionForm, sellOnlyByBundle: e.target.checked })}
+                      style={{ 
+                        width: '18px', 
+                        height: '18px',
+                        cursor: 'pointer',
+                        accentColor: 'var(--primary)'
+                      }}
+                    />
+                    <div>
+                      <span style={{ fontWeight: 600 }}>Solo se vende por bulto completo</span>
+                      <small style={{ display: 'block', marginTop: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.8125rem' }}>
+                        Si está activado, los clientes solo podrán comprar bultos completos ({auctionForm.unitsPerBundle} unidades), no unidades individuales
+                      </small>
+                    </div>
+                  </label>
+                </div>
+              )}
+
               {/* Botones */}
               <div style={{ 
                 display: 'flex', 
@@ -4141,6 +5289,11 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                       }}>
                         {product.stock} unidades
                       </span>
+                      {product.unitsPerBundle && product.unitsPerBundle > 0 && product.bundles && product.bundles > 0 && (
+                        <span style={{ display: 'block', marginTop: '0.25rem', fontSize: '0.8125rem' }}>
+                          ({product.bundles} bulto{product.bundles !== 1 ? 's' : ''} × {product.unitsPerBundle} uxb)
+                        </span>
+                      )}
                     </p>
                     <p style={{ margin: '0.25rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
                       Estado: <span style={{
@@ -4303,6 +5456,118 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   />
                 </div>
               </div>
+
+              {/* Unidades por Bulto y Bultos */}
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Unidades por Bulto (uxb) *
+                  </label>
+                  <input
+                    type="number"
+                    value={productForm.unitsPerBundle || 1}
+                    onChange={(e) => {
+                      const unitsPerBundle = Number(e.target.value) || 1;
+                      const bundles = productForm.bundles || 0;
+                      const calculatedStock = unitsPerBundle * bundles;
+                      setProductForm({ 
+                        ...productForm, 
+                        unitsPerBundle,
+                        stock: calculatedStock > 0 ? calculatedStock : productForm.stock
+                      });
+                    }}
+                    min="1"
+                    placeholder="Ej: 12"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '1rem'
+                    }}
+                  />
+                  <small style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
+                    Cantidad de unidades que contiene cada bulto
+                  </small>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Bultos Disponibles *
+                  </label>
+                  <input
+                    type="number"
+                    value={productForm.bundles || 0}
+                    onChange={(e) => {
+                      const bundles = Number(e.target.value) || 0;
+                      const unitsPerBundle = productForm.unitsPerBundle || 1;
+                      const calculatedStock = unitsPerBundle * bundles;
+                      setProductForm({ 
+                        ...productForm, 
+                        bundles,
+                        stock: calculatedStock > 0 ? calculatedStock : productForm.stock
+                      });
+                    }}
+                    min="0"
+                    placeholder="Ej: 10"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '1rem'
+                    }}
+                  />
+                  <small style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
+                    Cantidad de bultos en stock
+                    {productForm.unitsPerBundle && productForm.bundles && (
+                      <span style={{ display: 'block', marginTop: '0.25rem', fontWeight: 500, color: 'var(--primary)' }}>
+                        Total: {(productForm.unitsPerBundle * productForm.bundles).toLocaleString()} unidades
+                      </span>
+                    )}
+                  </small>
+                </div>
+              </div>
+
+              {/* Opción: Solo se vende por bulto */}
+              {productForm.unitsPerBundle && productForm.unitsPerBundle > 0 && (
+                <div style={{
+                  padding: '1rem',
+                  background: 'var(--bg-tertiary)',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border)'
+                }}>
+                  <label style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.75rem', 
+                    cursor: 'pointer',
+                    color: 'var(--text-primary)',
+                    fontWeight: 500
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={productForm.sellOnlyByBundle || false}
+                      onChange={(e) => setProductForm({ ...productForm, sellOnlyByBundle: e.target.checked })}
+                      style={{ 
+                        width: '18px', 
+                        height: '18px',
+                        cursor: 'pointer',
+                        accentColor: 'var(--primary)'
+                      }}
+                    />
+                    <div>
+                      <span style={{ fontWeight: 600 }}>Solo se vende por bulto completo</span>
+                      <small style={{ display: 'block', marginTop: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.8125rem' }}>
+                        Si está activado, los clientes solo podrán comprar bultos completos ({productForm.unitsPerBundle} unidades), no unidades individuales
+                      </small>
+                    </div>
+                  </label>
+                </div>
+              )}
 
               {/* Categoría */}
               <div>
@@ -5610,6 +6875,24 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                           }}>
                             {order.productName || 'Producto'}
                           </div>
+                          {order.quantity && (
+                            <div style={{ 
+                              fontSize: '0.625rem', 
+                              opacity: 0.9,
+                              marginTop: '0.25rem'
+                            }}>
+                              Cantidad: {order.quantity}
+                            </div>
+                          )}
+                          {order.unitsPerBundle && order.unitsPerBundle > 0 && order.bundles !== undefined && (
+                            <div style={{ 
+                              fontSize: '0.625rem', 
+                              opacity: 0.85,
+                              marginTop: '0.125rem'
+                            }}>
+                              {order.unitsPerBundle} uxb, {order.bundles} bultos
+                            </div>
+                          )}
                         </div>
                         <div style={{ 
                           display: 'flex', 
@@ -8242,6 +9525,178 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Utilidades Tab */}
+      {activeTab === 'utilities' && (
+        <div>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: '2rem',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div>
+              <h2 style={{ 
+                margin: 0, 
+                marginBottom: '0.5rem', 
+                color: 'var(--text-primary)',
+                fontSize: isMobile ? '1.5rem' : '2rem'
+              }}>
+                🛠️ Utilidades
+              </h2>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: isMobile ? '0.875rem' : '1rem' }}>
+                Calculadoras y herramientas útiles para gestionar tu negocio
+              </p>
+            </div>
+          </div>
+
+          {/* Grid de Utilidades */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
+            gap: '1.5rem',
+            marginBottom: '2rem'
+          }}>
+            {/* Calculadora de Costos y Ganancia */}
+            <div style={{
+              background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              border: '1px solid var(--border)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '0.75rem',
+                  background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white'
+                }}>
+                  <Calculator size={24} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.25rem', fontWeight: 700 }}>
+                    Calculadora de Costos
+                  </h3>
+                  <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    Calcula precio de venta y ganancia
+                  </p>
+                </div>
+              </div>
+
+              <CostCalculator />
+            </div>
+
+            {/* Calculadora de Margen */}
+            <div style={{
+              background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              border: '1px solid var(--border)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '0.75rem',
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white'
+                }}>
+                  <Percent size={24} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.25rem', fontWeight: 700 }}>
+                    Calculadora de Margen
+                  </h3>
+                  <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    Calcula margen de ganancia
+                  </p>
+                </div>
+              </div>
+
+              <MarginCalculator />
+            </div>
+
+            {/* Calculadora de Descuentos */}
+            <div style={{
+              background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              border: '1px solid var(--border)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '0.75rem',
+                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white'
+                }}>
+                  <TrendingDown size={24} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.25rem', fontWeight: 700 }}>
+                    Calculadora de Descuentos
+                  </h3>
+                  <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    Calcula precios con descuento
+                  </p>
+                </div>
+              </div>
+
+              <DiscountCalculator />
+            </div>
+
+            {/* Generador de Códigos */}
+            <div style={{
+              background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              border: '1px solid var(--border)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '0.75rem',
+                  background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white'
+                }}>
+                  <Package2 size={24} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.25rem', fontWeight: 700 }}>
+                    Generador de Códigos
+                  </h3>
+                  <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    Genera códigos de descuento
+                  </p>
+                </div>
+              </div>
+
+              <CodeGenerator />
+            </div>
           </div>
         </div>
       )}
@@ -10890,7 +12345,9 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                             onClick={() => {
                               setSelectedTemplate(null);
                               setTemplatePreview('');
-                              setMessageTemplates(loadMessageTemplates());
+                              if (user?.id) {
+                                loadMessageTemplates(user.id).then(setMessageTemplates);
+                              }
                             }}
                             className="btn btn-secondary"
                             style={{ 
@@ -11150,6 +12607,16 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '1rem' }}>
                     {selectedOrder.productName || 'Sin nombre'}
                   </div>
+                  {selectedOrder.quantity && (
+                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                      Cantidad: <strong>{selectedOrder.quantity}</strong> unidades
+                    </div>
+                  )}
+                  {selectedOrder.unitsPerBundle && selectedOrder.unitsPerBundle > 0 && selectedOrder.bundles !== undefined && (
+                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                      {selectedOrder.unitsPerBundle} unidades por bulto, {selectedOrder.bundles} bultos disponibles
+                    </div>
+                  )}
                 </div>
                 <div style={{
                   background: 'var(--bg-secondary)',

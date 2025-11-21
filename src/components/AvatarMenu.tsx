@@ -94,19 +94,44 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
     }
   }, [user?.id]);
 
-  // Cargar preferencia de sonido
+  // Cargar preferencia de sonido desde Firebase
   useEffect(() => {
-    const saved = localStorage.getItem('soundEnabled');
-    if (saved !== null) {
-      const isEnabled = saved === 'true';
-      setSoundEnabled(isEnabled);
-    }
-  }, []);
+    const loadPreference = async () => {
+      if (user) {
+        try {
+          const { loadUserPreferences } = await import('../utils/userPreferences');
+          const preferences = await loadUserPreferences(user.id);
+          if (preferences.soundEnabled !== undefined) {
+            const isEnabled = preferences.soundEnabled;
+            setSoundEnabled(isEnabled);
+            if (isEnabled) {
+              soundManager.enable();
+            } else {
+              soundManager.disable();
+            }
+          }
+        } catch (error) {
+          console.error('❌ Error cargando preferencia de sonido:', error);
+        }
+      }
+    };
 
-  const toggleSound = () => {
+    loadPreference();
+  }, [user]);
+
+  const toggleSound = async () => {
     const newState = !soundEnabled;
     setSoundEnabled(newState);
-    localStorage.setItem('soundEnabled', String(newState));
+    
+    // Guardar en Firebase si hay usuario
+    if (user) {
+      try {
+        const { updateUserPreference } = await import('../utils/userPreferences');
+        await updateUserPreference(user.id, 'soundEnabled', newState);
+      } catch (error) {
+        console.error('❌ Error guardando preferencia de sonido:', error);
+      }
+    }
     
     if (newState) {
       soundManager.enable();

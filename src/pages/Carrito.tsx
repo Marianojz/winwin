@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Trash2, ShoppingCart, CreditCard, Minus, Plus } from 'lucide-react';
 import { useStore } from '../store/useStore';
@@ -6,9 +7,12 @@ import { Order } from '../types';
 import { createAutoMessage, saveMessage } from '../utils/messages';
 import { generateOrderNumber } from '../utils/orderNumberGenerator';
 import { logOrderCreated } from '../utils/orderTransactions';
+import PaymentOptionsModal from '../components/PaymentOptionsModal';
 
 const Carrito = () => {
   const navigate = useNavigate();
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const shippingCost = 5000; // Costo de envío fijo
   
   const { 
     cart, 
@@ -23,27 +27,68 @@ const Carrito = () => {
     setProducts
   } = useStore();
 
-  const handleCheckout = () => {
+  const validateCart = (): boolean => {
     if (cart.length === 0) {
       alert('El carrito está vacío');
-      return;
+      return false;
     }
 
     if (!user) {
       navigate('/login');
-      return;
+      return false;
     }
 
-    // Verificar stock disponible
-    const stockIssues = cart.filter(item => item.quantity > item.product.stock);
+    // Verificar stock disponible y validar bultos completos si aplica
+    const stockIssues: Array<{ item: typeof cart[0]; message: string }> = [];
+    
+    cart.forEach(item => {
+      // Validar que si solo se vende por bulto, la cantidad sea un múltiplo de unitsPerBundle
+      if (item.product.sellOnlyByBundle && item.product.unitsPerBundle && item.product.unitsPerBundle > 0) {
+        if (item.quantity % item.product.unitsPerBundle !== 0) {
+          stockIssues.push({
+            item,
+            message: `- ${item.product.name}: Solo se vende por bultos completos de ${item.product.unitsPerBundle} unidades (cantidad actual: ${item.quantity})`
+          });
+          return;
+        }
+        const bundles = item.quantity / item.product.unitsPerBundle;
+        if (bundles > (item.product.bundles || 0)) {
+          stockIssues.push({
+            item,
+            message: `- ${item.product.name}: Solo hay ${item.product.bundles || 0} bulto${(item.product.bundles || 0) !== 1 ? 's' : ''} disponible${(item.product.bundles || 0) !== 1 ? 's' : ''} (solicitado: ${bundles})`
+          });
+          return;
+        }
+      } else {
+        if (item.quantity > item.product.stock) {
+          stockIssues.push({
+            item,
+            message: `- ${item.product.name} (disponibles: ${item.product.stock} unidades)`
+          });
+        }
+      }
+    });
+    
     if (stockIssues.length > 0) {
-      alert(`Stock insuficiente para:\n${stockIssues.map(item => `- ${item.product.name} (disponibles: ${item.product.stock})`).join('\n')}`);
-      return;
+      alert(`Problemas con el carrito:\n${stockIssues.map(issue => issue.message).join('\n')}`);
+      return false;
     }
 
-    // Crear órdenes para cada producto
+    return true;
+  };
+
+  const handleCheckout = () => {
+    if (!validateCart()) return;
+    setShowPaymentModal(true);
+  };
+
+  const handlePayNow = async () => {
+    setShowPaymentModal(false);
+    if (!validateCart() || !user) return;
+
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 horas para pagar
+    const totalWithShipping = cartTotal + shippingCost;
 
     // Crear órdenes de forma asíncrona para generar números únicos
     const createOrders = async () => {
@@ -61,11 +106,14 @@ const Carrito = () => {
             productType: 'store',
             type: 'store',
             amount: item.product.price * item.quantity,
+            quantity: item.quantity,
             status: 'pending_payment',
             deliveryMethod: 'shipping',
             createdAt: now,
             expiresAt: expiresAt,
-            address: user.address || { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } }
+            address: user.address || { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } },
+            unitsPerBundle: item.product.unitsPerBundle,
+            bundles: item.product.bundles
           };
 
           await addOrder(order);
@@ -74,16 +122,26 @@ const Carrito = () => {
           await logOrderCreated(order.id, orderNumber, user.id, user.username, order.amount);
 
           // Reducir stock temporalmente (se devolverá si no paga)
-          const updatedProducts = products.map(p =>
-            p.id === item.product.id
-              ? { ...p, stock: p.stock - item.quantity }
-              : p
-          );
+          const updatedProducts = products.map(p => {
+            if (p.id === item.product.id) {
+              const updatedProduct = { ...p, stock: p.stock - item.quantity };
+              // Si tiene unidades por bulto y bultos, calcular cuántos bultos se vendieron
+              if (p.unitsPerBundle && p.unitsPerBundle > 0 && p.bundles && p.bundles > 0) {
+                const unidadesVendidas = item.quantity;
+                const bultosVendidos = Math.ceil(unidadesVendidas / p.unitsPerBundle);
+                updatedProduct.bundles = Math.max(0, p.bundles - bultosVendidos);
+                // Recalcular stock basado en bultos restantes
+                updatedProduct.stock = updatedProduct.bundles * p.unitsPerBundle;
+              }
+              return updatedProduct;
+            }
+            return p;
+          });
           setProducts(updatedProducts);
           
           // Crear mensaje automático para la compra
           try {
-            const autoMsg = createAutoMessage(
+            const autoMsg = await createAutoMessage(
               user.id,
               user.username,
               'purchase',
@@ -109,7 +167,7 @@ const Carrito = () => {
         userId: user.id,
         type: 'purchase',
         title: '🛍️ Compra Iniciada',
-        message: `Compraste ${cart.length} producto(s) por ${formatCurrency(cartTotal)}. Tenés 48hs para pagar.`,
+        message: `Compraste ${cart.length} producto(s) por ${formatCurrency(totalWithShipping)} (incluye envío). Tenés 48hs para pagar.`,
         read: false
       });
 
@@ -118,37 +176,148 @@ const Carrito = () => {
         userId: 'admin',
         type: 'purchase',
         title: '🛍️ Nueva Compra',
-        message: `${user.username} inició una compra por ${formatCurrency(cartTotal)}. Esperando pago.`,
+        message: `${user.username} inició una compra por ${formatCurrency(totalWithShipping)}. Esperando pago.`,
         read: false
       });
 
       clearCart();
-      navigate('/perfil?tab=orders');
+      
+      // Redirigir a MercadoPago (aquí iría la integración real)
+      const mercadopagoLink = `https://www.mercadopago.com.ar/checkout/v1/payment?preference_id=MOCK-CART-${Date.now()}`;
+      alert(`✅ Pedido creado exitosamente!\n\nTotal a pagar: ${formatCurrency(totalWithShipping)}\n\nRedirigiendo a MercadoPago...`);
+      // window.location.href = mercadopagoLink; // Descomentar cuando tengas la integración real
+      navigate('/notificaciones');
+    };
+
+    createOrders();
+  };
+
+  const handlePayOnDelivery = async () => {
+    setShowPaymentModal(false);
+    if (!validateCart() || !user) return;
+
+    const totalWithShipping = cartTotal + shippingCost;
+    const productNames = cart.map(item => item.product.name).join(', ');
+
+    const confirm = window.confirm(
+      `¿Confirmas la compra de ${cart.length} producto(s) por ${formatCurrency(cartTotal)}?\n\nCosto de envío: ${formatCurrency(shippingCost)}\nTotal a pagar al recibir: ${formatCurrency(totalWithShipping)}\n\nSe enviará un mensaje de preparación de tu pedido.`
+    );
+
+    if (!confirm) return;
+
+    const now = new Date();
+
+    // Crear órdenes de forma asíncrona para generar números únicos
+    const createOrders = async () => {
+      for (const item of cart) {
+        try {
+          const orderNumber = await generateOrderNumber();
+          
+          const displayQuantity = item.product.sellOnlyByBundle && item.product.unitsPerBundle && item.product.unitsPerBundle > 0
+            ? `${item.quantity / item.product.unitsPerBundle} bulto${item.quantity / item.product.unitsPerBundle !== 1 ? 's' : ''} (${item.quantity} unidades)`
+            : `${item.quantity} unidad${item.quantity !== 1 ? 'es' : ''}`;
+
+          const order: Order = {
+            id: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            orderNumber,
+            userId: user.id,
+            userName: user.username,
+            productId: item.product.id,
+            productName: item.product.name,
+            productImage: item.product.images[0] || '',
+            productType: 'store',
+            type: 'store',
+            amount: (item.product.price * item.quantity) + (shippingCost / cart.length), // Dividir envío entre productos
+            quantity: item.quantity,
+            status: 'preparing', // Estado de preparación para pago al recibir
+            deliveryMethod: 'shipping',
+            createdAt: now,
+            address: user.address || { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } },
+            unitsPerBundle: item.product.unitsPerBundle,
+            bundles: item.product.bundles
+          };
+
+          await addOrder(order);
+          
+          // Registrar transacción en el log
+          await logOrderCreated(order.id, orderNumber, user.id, user.username, order.amount);
+
+          // Reducir stock (ya que el pedido está confirmado)
+          const updatedProducts = products.map(p => {
+            if (p.id === item.product.id) {
+              const updatedProduct: any = {
+                ...p,
+                stock: p.stock - item.quantity
+              };
+              // Solo actualizar bundles si el producto tiene unitsPerBundle
+              if (item.product.unitsPerBundle && item.product.unitsPerBundle > 0) {
+                updatedProduct.bundles = (item.product.bundles || 0) - Math.floor(item.quantity / item.product.unitsPerBundle);
+              }
+              return updatedProduct;
+            }
+            return p;
+          });
+          setProducts(updatedProducts);
+
+          // Enviar mensaje de preparación al cliente
+          const preparationMessage = await createAutoMessage(
+            user.id,
+            user.username,
+            'purchase',
+            {
+              productName: `${item.product.name} (${displayQuantity})`,
+              productId: item.product.id,
+              orderId: orderNumber,
+              amount: order.amount
+            }
+          );
+
+          // Personalizar el mensaje para preparación
+          preparationMessage.content = `Hola ${user.username}, 👋
+
+Tu pedido de "${item.product.name}" (${displayQuantity}) está siendo preparado.
+
+Detalles:
+• Número de pedido: ${orderNumber}
+• Producto: ${item.product.name}
+• Cantidad: ${displayQuantity}
+• Subtotal: ${formatCurrency(item.product.price * item.quantity)}
+• Costo de envío (proporcional): ${formatCurrency(shippingCost / cart.length)}
+• Total a pagar al recibir: ${formatCurrency(order.amount)}
+
+Te notificaremos cuando tu pedido esté listo para el envío. El pago se realizará al momento de la entrega.`;
+
+          await saveMessage(preparationMessage);
+        } catch (error) {
+          console.error('Error creando pedido:', error);
+        }
+      }
+
+      // Notificación para el usuario
+      addNotification({
+        userId: user.id,
+        type: 'purchase',
+        title: 'Pedido confirmado',
+        message: `Tu pedido de ${cart.length} producto(s) está siendo preparado. Total a pagar al recibir: ${formatCurrency(totalWithShipping)}`,
+        read: false
+      });
+
+      // Notificación para el admin
+      addNotification({
+        userId: 'admin',
+        type: 'purchase',
+        title: '🛍️ Nueva Compra (Pago al Recibir)',
+        message: `${user.username} realizó una compra por ${formatCurrency(totalWithShipping)}. Pago al recibir.`,
+        read: false
+      });
+
+      clearCart();
+      alert(`✅ Pedido confirmado!\n\nTotal a pagar al recibir: ${formatCurrency(totalWithShipping)}\n\nTe notificaremos cuando tu pedido esté listo.`);
+      navigate('/notificaciones');
     };
 
     createOrders();
 
-    // Notificación para el usuario
-    addNotification({
-      userId: user.id,
-      type: 'purchase',
-      title: '🛍️ Compra Iniciada',
-      message: `Compraste ${cart.length} producto(s) por ${formatCurrency(cartTotal)}. Tenés 48hs para pagar.`,
-      read: false
-    });
-
-    // Notificación para el admin
-    addNotification({
-      userId: 'admin',
-      type: 'purchase',
-      title: '🛍️ Nueva Compra',
-      message: `${user.username} inició una compra por ${formatCurrency(cartTotal)}. Esperando pago.`,
-      read: false
-    });
-
-    clearCart();
-    alert('¡Compra iniciada! Te enviamos el link de pago por email. Tenés 48hs para completar el pago.');
-    navigate('/notificaciones');
   };
 
   if (cart.length === 0) {
@@ -185,6 +354,11 @@ const Carrito = () => {
                 <div className="cart-item-content">
                   <h3 className="cart-item-title">{item.product.name}</h3>
                   <p className="cart-item-description">{item.product.description}</p>
+                  {item.product.unitsPerBundle && item.product.unitsPerBundle > 0 && item.product.bundles && item.product.bundles > 0 && (
+                    <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                      {item.product.bundles} bulto{item.product.bundles !== 1 ? 's' : ''} × {item.product.unitsPerBundle} uxb
+                    </p>
+                  )}
                   
                   <div className="cart-item-actions">
                     <div className="quantity-selector">
@@ -231,12 +405,12 @@ const Carrito = () => {
             
             <div className="summary-row">
               <span>Envío</span>
-              <span className="summary-value summary-free">Gratis</span>
+              <span className="summary-value">{formatCurrency(shippingCost)}</span>
             </div>
             
             <div className="summary-total">
               <span>Total</span>
-              <span className="total-value">{formatCurrency(cartTotal)}</span>
+              <span className="total-value">{formatCurrency(cartTotal + shippingCost)}</span>
             </div>
             
             <button 
@@ -244,7 +418,7 @@ const Carrito = () => {
               className="btn btn-primary checkout-btn"
             >
               <CreditCard size={22} />
-              Pagar con MercadoPago
+              Proceder al Pago
             </button>
             
             <p className="cart-disclaimer">
@@ -508,6 +682,16 @@ const Carrito = () => {
           }
         }
       `}</style>
+
+      <PaymentOptionsModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onPayNow={handlePayNow}
+        onPayOnDelivery={handlePayOnDelivery}
+        productName={cart.length === 1 ? cart[0].product.name : `${cart.length} productos`}
+        totalAmount={cartTotal}
+        shippingCost={shippingCost}
+      />
     </div>
   );
 };

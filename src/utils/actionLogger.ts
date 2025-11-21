@@ -45,8 +45,13 @@ class ActionLogger {
         );
         
         console.log(`✅ Cargados ${this.logs.length} logs de acciones desde Firebase`);
-      }, (error) => {
-        console.error('Error cargando logs desde Firebase:', error);
+      }, (error: any) => {
+        // Solo mostrar error si no es un error de permisos esperado
+        // Los logs solo son accesibles para administradores según las reglas de seguridad
+        if (error?.code !== 'PERMISSION_DENIED' && error?.code !== 'permission_denied') {
+          console.error('Error cargando logs desde Firebase:', error);
+        }
+        // Silenciosamente establecer logs vacíos si no hay permisos
         this.logs = [];
       });
     } catch (error) {

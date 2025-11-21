@@ -15,7 +15,7 @@ export interface MessageTemplateConfig {
   updatedAt: Date;
 }
 
-const TEMPLATES_STORAGE_KEY = 'message_templates';
+// TODO: Guardado en Firebase userPreferences/{userId}/messageTemplates
 
 // Variables disponibles para cada tipo de mensaje
 const TEMPLATE_VARIABLES: Record<MessageTemplate['type'], string[]> = {
@@ -129,39 +129,43 @@ Has sido superado en la subasta "{auctionTitle}".
 ];
 
 
-// Cargar templates desde localStorage
-export const loadMessageTemplates = (): MessageTemplate[] => {
+// Cargar templates desde Firebase
+export const loadMessageTemplates = async (userId: string): Promise<MessageTemplate[]> => {
   try {
-    const saved = localStorage.getItem(TEMPLATES_STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return parsed.map((t: any) => ({
+    const { loadUserPreferences } = await import('./userPreferences');
+    const preferences = await loadUserPreferences(userId);
+    
+    if (preferences.messageTemplates && Array.isArray(preferences.messageTemplates) && preferences.messageTemplates.length > 0) {
+      return preferences.messageTemplates.map((t: any) => ({
         ...t,
         createdAt: new Date(t.createdAt),
         updatedAt: t.updatedAt ? new Date(t.updatedAt) : undefined
       }));
     }
+    
     // Si no hay templates guardados, usar los por defecto y guardarlos
-    saveMessageTemplates(DEFAULT_TEMPLATES);
+    await saveMessageTemplates(userId, DEFAULT_TEMPLATES);
     return DEFAULT_TEMPLATES;
   } catch (error) {
-    console.error('Error cargando templates:', error);
+    console.error('❌ Error cargando templates:', error);
     return DEFAULT_TEMPLATES;
   }
 };
 
-// Guardar templates en localStorage
-export const saveMessageTemplates = (templates: MessageTemplate[]): void => {
+// Guardar templates en Firebase
+export const saveMessageTemplates = async (userId: string, templates: MessageTemplate[]): Promise<void> => {
   try {
-    localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(templates));
+    const { updateUserPreference } = await import('./userPreferences');
+    await updateUserPreference(userId, 'messageTemplates', templates);
   } catch (error) {
-    console.error('Error guardando templates:', error);
+    console.error('❌ Error guardando templates:', error);
+    throw error;
   }
 };
 
 // Obtener template por tipo
-export const getTemplateByType = (type: MessageTemplate['type']): MessageTemplate | undefined => {
-  const templates = loadMessageTemplates();
+export const getTemplateByType = async (userId: string, type: MessageTemplate['type']): Promise<MessageTemplate | undefined> => {
+  const templates = await loadMessageTemplates(userId);
   return templates.find(t => t.type === type && t.active);
 };
 
@@ -188,18 +192,18 @@ export const renderTemplate = (
 };
 
 // Actualizar template
-export const updateMessageTemplate = (templateId: string, updates: Partial<MessageTemplate>): boolean => {
+export const updateMessageTemplate = async (userId: string, templateId: string, updates: Partial<MessageTemplate>): Promise<boolean> => {
   try {
-    const templates = loadMessageTemplates();
+    const templates = await loadMessageTemplates(userId);
     const updated = templates.map(t => 
       t.id === templateId 
         ? { ...t, ...updates, updatedAt: new Date() }
         : t
     );
-    saveMessageTemplates(updated);
+    await saveMessageTemplates(userId, updated);
     return true;
   } catch (error) {
-    console.error('Error actualizando template:', error);
+    console.error('❌ Error actualizando template:', error);
     return false;
   }
 };

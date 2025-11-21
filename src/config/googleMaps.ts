@@ -17,14 +17,17 @@ if (import.meta.env.DEV) {
   console.log('🔍 VITE_GOOGLE_MAPS_API_KEY:', import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '(no definida)');
 }
 
-// SOLUCIÓN TEMPORAL PARA DESARROLLO:
-// Si no hay key en las variables de entorno, usar la key directamente (solo en desarrollo)
-// ⚠️ IMPORTANTE: Esto es solo para desarrollo. En producción, la key DEBE venir de .env
-// ⚠️ ELIMINA ESTA LÍNEA después de reiniciar el servidor y verificar que funciona
-if (!apiKeyFromEnv && import.meta.env.DEV) {
-  console.warn('⚠️ Usando API key temporal para desarrollo (el servidor necesita reiniciarse)');
-  apiKeyFromEnv = 'AIzaSyDqrLcDMRPASXE7dJO7OsqaGa63VLLayJw'; // Key temporal solo para desarrollo
-  console.warn('   ⚠️ RECUERDA: Reinicia el servidor (Ctrl+C y luego npm run dev) para cargar desde .env');
+// ⚠️ SEGURIDAD: La API key DEBE venir de variables de entorno
+// No se permite hardcodear la API key en el código fuente
+if (!apiKeyFromEnv) {
+  if (import.meta.env.DEV) {
+    console.error('❌ VITE_GOOGLE_MAPS_API_KEY no está configurada');
+    console.error('   Crea un archivo .env en la raíz del proyecto y agrega:');
+    console.error('   VITE_GOOGLE_MAPS_API_KEY=tu_api_key_aqui');
+    console.error('   Luego reinicia el servidor de desarrollo');
+  } else {
+    console.error('❌ VITE_GOOGLE_MAPS_API_KEY no está configurada en producción');
+  }
 }
 
 export const GOOGLE_MAPS_API_KEY = apiKeyFromEnv;

@@ -39,6 +39,9 @@ export interface Auction {
   condition?: 'new' | 'like-new' | 'excellent' | 'good' | 'fair';
   stickers?: string[]; // Stickers para hacer más atractivo
   createdAt?: Date;
+  unitsPerBundle?: number; // Unidades por bulto (uxb)
+  bundles?: number; // Cantidad de bultos disponibles
+  sellOnlyByBundle?: boolean; // Si es true, solo se puede vender por bulto completo
 }
 
 export interface Bid {
@@ -67,6 +70,9 @@ export interface Product {
   featured?: boolean;
   createdAt?: string;
   updatedAt?: string;
+  unitsPerBundle?: number; // Unidades por bulto (uxb)
+  bundles?: number; // Cantidad de bultos disponibles
+  sellOnlyByBundle?: boolean; // Si es true, solo se puede vender por bulto completo
 }
 
 export interface Rating {
@@ -191,6 +197,7 @@ export interface Order {
   productType: ProductType;
   type: ProductType;              // Alias para compatibilidad
   amount: number;
+  quantity?: number;              // Cantidad de productos en el pedido
   status: OrderStatus;
   paymentMethod?: string;
   deliveryMethod: DeliveryMethod;  // AGREGADO
@@ -203,6 +210,8 @@ export interface Order {
   notes?: string;
   address: Address;
   shippingAddress?: ShippingAddress; // AGREGADO para compatibilidad con AdminPanel
+  unitsPerBundle?: number;        // NUEVO: Unidades por bulto del producto
+  bundles?: number;               // NUEVO: Bultos del producto al momento del pedido
 }
 
 // Interfaz para el log de transacciones

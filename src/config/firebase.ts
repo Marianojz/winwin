@@ -4,19 +4,47 @@ import { getFirestore, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getDatabase, ref, set } from 'firebase/database';  // <- NUEVA IMPORTACIÓN
 
-// ⚠️ IMPORTANTE: Actualiza estas credenciales con las del nuevo proyecto Firebase
-// Sigue la guía en: GUIA_CAMBIO_DOMINIO_CLICKIO.md
-// Reemplaza TODO este objeto con las credenciales del nuevo proyecto "clickio"
+// ⚠️ IMPORTANTE: Las credenciales ahora se cargan desde variables de entorno
+// Crea un archivo .env en la raíz del proyecto con las variables necesarias
+// Ver .env.example para referencia
+// 
+// Para desarrollo local:
+// 1. Copia .env.example a .env
+// 2. Completa las variables con tus credenciales de Firebase
+// 3. Reinicia el servidor de desarrollo
+
 const firebaseConfig = {
-  apiKey: "AIzaSyDhJldFdxpezX2MCANk67PBIWPbZacevEc",
-  authDomain: "clikio-773fa.firebaseapp.com",
-  projectId: "clikio-773fa",
-  storageBucket: "clikio-773fa.firebasestorage.app",
-  messagingSenderId: "930158513107",
-  appId: "1:930158513107:web:685ebe622ced3398e8bd26",
-  databaseURL: "https://clikio-773fa-default-rtdb.firebaseio.com",
-  measurementId: "G-13J0SJPW40"  // <- NUEVA LÍNEA
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "",
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || "",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || ""
 };
+
+// Validar que las credenciales estén configuradas
+if (import.meta.env.DEV) {
+  const requiredVars = [
+    'VITE_FIREBASE_API_KEY',
+    'VITE_FIREBASE_AUTH_DOMAIN',
+    'VITE_FIREBASE_PROJECT_ID',
+    'VITE_FIREBASE_STORAGE_BUCKET',
+    'VITE_FIREBASE_MESSAGING_SENDER_ID',
+    'VITE_FIREBASE_APP_ID',
+    'VITE_FIREBASE_DATABASE_URL'
+  ];
+  
+  const missingVars = requiredVars.filter(varName => !import.meta.env[varName]);
+  
+  if (missingVars.length > 0) {
+    console.error('❌ Variables de entorno de Firebase faltantes:', missingVars);
+    console.error('   Crea un archivo .env con las variables necesarias (ver .env.example)');
+  } else {
+    console.log('✅ Todas las variables de entorno de Firebase están configuradas');
+  }
+}
 
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig);

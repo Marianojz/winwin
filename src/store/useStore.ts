@@ -2,6 +2,7 @@ import { ref, update, set as firebaseSet, get as firebaseGet, onValue, off, remo
 import { realtimeDb } from '../config/firebase';
 import { create } from 'zustand';
 import { User, Auction, Product, CartItem, Notification, Theme, Bot, Order, OrderStatus } from '../types';
+import { loadUserPreferences, updateUserPreference, migratePreferencesFromLocalStorage } from '../utils/userPreferences';
 
 interface AppState {
   // Theme
@@ -60,58 +61,12 @@ interface AppState {
   updateOrderStatus: (orderId: string, status: OrderStatus, updates?: Partial<Order>) => Promise<void>;
 }
 
-// Función auxiliar para guardar en localStorage de forma segura
-const safeLocalStorageSet = (key: string, value: any) => {
-  try {
-    const stringValue = JSON.stringify(value);
-    
-    // Si es muy grande (>4MB), no guardar imágenes
-    if (stringValue.length > 4 * 1024 * 1024) {
-      console.warn(`⚠️ Datos de "${key}" muy grandes, limpiando imágenes...`);
-      
-      if (key === 'auctions') {
-        const cleanedAuctions = value.map((auction: any) => ({
-          ...auction,
-          images: [] // Remover imágenes para ahorrar espacio
-        }));
-        localStorage.setItem(key, JSON.stringify(cleanedAuctions));
-      } else {
-        localStorage.setItem(key, stringValue);
-      }
-    } else {
-      localStorage.setItem(key, stringValue);
-    }
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-      console.error('❌ localStorage lleno, limpiando datos antiguos...');
-      
-      // Limpiar auctions y products viejos
-      localStorage.removeItem('auctions');
-      localStorage.removeItem('products');
-      
-      // Intentar guardar versión limpia sin imágenes
-      if (key === 'auctions') {
-        const cleanedAuctions = value.map((auction: any) => ({
-          ...auction,
-          images: [] // Sin imágenes
-        }));
-        try {
-          localStorage.setItem(key, JSON.stringify(cleanedAuctions));
-        } catch (e) {
-          console.error('❌ No se pudo guardar ni siquiera sin imágenes');
-        }
-      }
-    } else {
-      console.error('❌ Error guardando en localStorage:', error);
-    }
-  }
-};
-
 export const useStore = create<AppState>((set, get) => ({
-  // Theme
-  theme: (localStorage.getItem('theme') as Theme) || 'light',
-  toggleTheme: () => {
+  // Theme - TODO desde Firebase
+  theme: 'light' as Theme, // Valor por defecto, se carga desde Firebase cuando el usuario se autentica
+  toggleTheme: async () => {
     const currentTheme = get().theme;
+    const user = get().user;
     let newTheme: Theme;
     if (currentTheme === 'light') {
       newTheme = 'dark';
@@ -120,16 +75,44 @@ export const useStore = create<AppState>((set, get) => ({
     } else {
       newTheme = 'light';
     }
-    localStorage.setItem('theme', newTheme);
+    
+    // Actualizar estado local inmediatamente
     set({ theme: newTheme });
+    
+    // Guardar en Firebase si hay usuario autenticado
+    if (user) {
+      try {
+        await updateUserPreference(user.id, 'theme', newTheme);
+      } catch (error) {
+        console.error('❌ Error guardando theme en Firebase:', error);
+      }
+    }
   },
 
   // User - SIEMPRE desde Firebase, NO localStorage
   user: null,
-  setUser: (user) => {
+  setUser: async (user) => {
     if (!user) {
       // Limpiar notificaciones cuando el usuario se desloguea
       set({ notifications: [], unreadCount: 0 });
+      // Resetear theme al valor por defecto
+      set({ theme: 'light' });
+    } else {
+      // Cargar preferencias del usuario desde Firebase
+      try {
+        // Migrar preferencias desde localStorage si es necesario (solo una vez)
+        await migratePreferencesFromLocalStorage(user.id);
+        
+        // Cargar preferencias
+        const preferences = await loadUserPreferences(user.id);
+        
+        // Aplicar theme si existe
+        if (preferences.theme) {
+          set({ theme: preferences.theme });
+        }
+      } catch (error) {
+        console.error('❌ Error cargando preferencias de usuario:', error);
+      }
     }
     // NO guardar en localStorage - siempre usar Firebase como fuente de verdad
     set({ user, isAuthenticated: !!user });
@@ -386,11 +369,22 @@ export const useStore = create<AppState>((set, get) => ({
         products.forEach(product => {
           const createdAt = product.createdAt;
           const updatedAt = product.updatedAt;
-          updates[product.id] = {
+          
+          // Construir objeto del producto sin valores undefined
+          const productData: any = {
             ...product,
             createdAt: typeof createdAt === 'string' ? createdAt : (createdAt && typeof createdAt === 'object' && 'toISOString' in createdAt ? (createdAt as Date).toISOString() : createdAt || new Date().toISOString()),
             updatedAt: typeof updatedAt === 'string' ? updatedAt : (updatedAt && typeof updatedAt === 'object' && 'toISOString' in updatedAt ? (updatedAt as Date).toISOString() : updatedAt || new Date().toISOString())
           };
+          
+          // Filtrar propiedades undefined (Firebase no las acepta)
+          Object.keys(productData).forEach(key => {
+            if (productData[key] === undefined) {
+              delete productData[key];
+            }
+          });
+          
+          updates[product.id] = productData;
         });
         
         // Solo actualizar si hay productos (no hacer update completo si está vacío)
@@ -546,6 +540,7 @@ export const useStore = create<AppState>((set, get) => ({
         const currentState = get();
         // Evitar procesamiento simultáneo o durante batch updates
         if ((currentState as any)._notificationProcessing) {
+          console.log('⏸️ Listener de notificaciones: procesamiento en curso, omitiendo actualización');
           return; // Salir silenciosamente si ya se está procesando
         }
         
@@ -864,23 +859,11 @@ export const useStore = create<AppState>((set, get) => ({
         return;
       }
       
-      // Actualizar en Firebase con set() para garantizar guardado completo
-      await firebaseSet(notificationRef, {
-        ...currentNotification,
-        read: true,
-        readAt: readAt
-      });
-      
-      // IMPORTANTE: Esperar un momento para que Firebase procese antes de actualizar estado local
-      // Esto evita que el listener de tiempo real sobrescriba con datos antiguos
-      // Aumentado a 500ms para dar más tiempo a Firebase de procesar el cambio
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Actualización del estado local DESPUÉS de confirmar guardado en Firebase
+      // Actualizar estado local INMEDIATAMENTE para feedback instantáneo
       const updatedNotifications = state.notifications.map(n => 
         n.id === notificationId 
           ? { ...n, read: true, readAt: new Date(readAt) }
-          : { ...n, read: n.read === true || (typeof n.read === 'string' && (n.read === 'true' || String(n.read) === 'true')) || n.readAt ? true : false }
+          : n
       );
       
       const newUnreadCount = updatedNotifications.filter(n => !n.read).length;
@@ -890,13 +873,24 @@ export const useStore = create<AppState>((set, get) => ({
         unreadCount: newUnreadCount
       });
       
+      // Marcar flag de procesamiento para evitar que el listener sobrescriba
+      (get() as any)._notificationProcessing = true;
+      
+      // Actualizar en Firebase con set() para garantizar guardado completo
+      await firebaseSet(notificationRef, {
+        ...currentNotification,
+        read: true,
+        readAt: readAt
+      });
+      
       console.log(`✅ Notificación ${notificationId} marcada como leída en Firebase. No leídas restantes: ${newUnreadCount}`);
       
-      // Limpiar flag después de un delay adicional para asegurar que el listener respete el cambio
+      // Limpiar flags después de un delay para permitir que el listener procese los cambios
       setTimeout(() => {
         const state = get();
         delete (state as any)[markingKey];
-      }, 1000);
+        (state as any)._notificationProcessing = false;
+      }, 2000); // Aumentado a 2 segundos para dar más tiempo
     } catch (error) {
       console.error('❌ Error marcando notificación como leída en Firebase:', error);
       delete (state as any)[markingKey];
@@ -923,6 +917,22 @@ export const useStore = create<AppState>((set, get) => ({
     const readAt = new Date().toISOString();
     
     try {
+      // Actualizar estado local INMEDIATAMENTE para feedback instantáneo
+      const updatedNotifications = state.notifications.map(n => {
+        const isUnread = unreadNotifications.find(un => un.id === n.id);
+        if (isUnread) {
+          return { ...n, read: true, readAt: new Date(readAt) };
+        }
+        return n;
+      });
+      
+      const newUnreadCount = 0; // Todas están leídas ahora
+      
+      set({
+        notifications: updatedNotifications,
+        unreadCount: newUnreadCount
+      });
+      
       // Marcar flag para evitar que el listener procese durante el batch update
       (get() as any)._notificationProcessing = true;
       
@@ -958,7 +968,7 @@ export const useStore = create<AppState>((set, get) => ({
       // Resetear flag después de un delay para permitir que el listener procese los cambios
       setTimeout(() => {
         (get() as any)._notificationProcessing = false;
-      }, 1500); // Aumentado a 1.5 segundos para dar más tiempo
+      }, 2000); // Aumentado a 2 segundos para dar más tiempo
     } catch (error) {
       console.error('❌ Error marcando todas las notificaciones como leídas en Firebase:', error);
       // Resetear flag incluso si hay error
@@ -1189,6 +1199,17 @@ export const useStore = create<AppState>((set, get) => ({
       // Agregar orderNumber si existe
       if (order.orderNumber) {
         firebaseOrder.orderNumber = order.orderNumber;
+      }
+      
+      // Agregar cantidad y unidades/bultos si existen
+      if (order.quantity !== undefined) {
+        firebaseOrder.quantity = order.quantity;
+      }
+      if (order.unitsPerBundle !== undefined) {
+        firebaseOrder.unitsPerBundle = order.unitsPerBundle;
+      }
+      if (order.bundles !== undefined) {
+        firebaseOrder.bundles = order.bundles;
       }
       
       // Solo agregar propiedades opcionales si tienen valor

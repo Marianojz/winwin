@@ -537,7 +537,7 @@ export const watchConversationStatus = (
 };
 
 // Mensajes automáticos
-export const createAutoMessage = (
+export const createAutoMessage = async (
   userId: string,
   username: string,
   type: 'auction_won' | 'purchase' | 'payment_reminder' | 'order_shipped' | 'order_delivered' | 'auction_outbid',
@@ -554,9 +554,15 @@ export const createAutoMessage = (
     minBid?: number;
     paymentDeadline?: string;
   }
-): Message => {
-  // Intentar obtener template personalizado
-  const template = getTemplateByType(type);
+): Promise<Message> => {
+  // Intentar obtener template personalizado desde Firebase
+  let template;
+  try {
+    template = await getTemplateByType(userId, type);
+  } catch (error) {
+    console.error('❌ Error cargando template:', error);
+    template = undefined;
+  }
   
   let content = '';
   

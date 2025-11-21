@@ -58,8 +58,13 @@ class TrackingSystem {
         ).slice(0, this.MAX_TRACKED);
         
         console.log(`✅ Cargados ${this.clicks.length} clicks desde Firebase`);
-      }, (error) => {
-        console.error('Error cargando clicks desde Firebase:', error);
+      }, (error: any) => {
+        // Solo mostrar error si no es un error de permisos esperado
+        // Los clicks solo son accesibles para administradores según las reglas de seguridad
+        if (error?.code !== 'PERMISSION_DENIED' && error?.code !== 'permission_denied') {
+          console.error('Error cargando clicks desde Firebase:', error);
+        }
+        // Silenciosamente establecer clicks vacíos si no hay permisos
         this.clicks = [];
       });
     } catch (error) {
@@ -88,8 +93,13 @@ class TrackingSystem {
         ).slice(0, this.MAX_TRACKED);
         
         console.log(`✅ Cargadas ${this.searches.length} búsquedas desde Firebase`);
-      }, (error) => {
-        console.error('Error cargando búsquedas desde Firebase:', error);
+      }, (error: any) => {
+        // Solo mostrar error si no es un error de permisos esperado
+        // Las búsquedas solo son accesibles para administradores según las reglas de seguridad
+        if (error?.code !== 'PERMISSION_DENIED' && error?.code !== 'permission_denied') {
+          console.error('Error cargando búsquedas desde Firebase:', error);
+        }
+        // Silenciosamente establecer búsquedas vacías si no hay permisos
         this.searches = [];
       });
     } catch (error) {

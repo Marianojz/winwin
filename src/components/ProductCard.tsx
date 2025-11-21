@@ -152,7 +152,14 @@ const ProductCard = ({ product }: ProductCardProps) => {
 
         <div className="product-card-price">
           <span className="product-price">{formatCurrency(product.price)}</span>
-          <span className="product-stock">{product.stock} disponibles</span>
+          <span className="product-stock">
+            {product.stock} disponibles
+            {product.unitsPerBundle && product.unitsPerBundle > 0 && product.bundles && product.bundles > 0 && (
+              <span style={{ display: 'block', fontSize: '0.6875rem', marginTop: '0.25rem', opacity: 0.8 }}>
+                {product.bundles} bulto{product.bundles !== 1 ? 's' : ''} × {product.unitsPerBundle} uxb
+              </span>
+            )}
+          </span>
         </div>
 
         <div className="product-card-actions">

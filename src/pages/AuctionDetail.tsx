@@ -7,11 +7,16 @@ import { formatCurrency, formatTimeAgo } from '../utils/helpers';
 import { launchConfettiFromTop } from '../utils/celebrations';
 import Countdown from '../components/Countdown';
 import { useSEO, generateAuctionStructuredData } from '../hooks/useSEO';
+import PaymentOptionsModal from '../components/PaymentOptionsModal';
+import { createAutoMessage, saveMessage } from '../utils/messages';
+import { generateOrderNumber } from '../utils/orderNumberGenerator';
+import { logOrderCreated } from '../utils/orderTransactions';
+import { Order } from '../types';
 
 const AuctionDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { auctions, user, isAuthenticated, addBid, addNotification } = useStore();
+  const { auctions, user, isAuthenticated, addBid, addNotification, addOrder } = useStore();
   
   const auction = auctions.find(a => a.id === id);
   const [bidAmount, setBidAmount] = useState('');
@@ -19,6 +24,7 @@ const AuctionDetail = () => {
   const [showBidError, setShowBidError] = useState('');
   const [isRecentlyEnded, setIsRecentlyEnded] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(0);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   useEffect(() => {
     if (auction) {
@@ -191,24 +197,196 @@ const AuctionDetail = () => {
     }
 
     if (auction.buyNowPrice) {
-      const confirm = window.confirm(
-        `¿Confirmas la compra directa por ${formatCurrency(auction.buyNowPrice)}?\n\nSerás redirigido a MercadoPago para completar el pago.`
-      );
-      
-      if (confirm) {
+      // Mostrar modal de opciones de pago
+      setShowPaymentModal(true);
+    }
+  };
+
+  // Costo de envío estimado (puedes ajustar este valor o calcularlo dinámicamente)
+  const shippingCost = 5000; // $5000 ARS como ejemplo
+
+  const handlePayNow = async () => {
+    setShowPaymentModal(false);
+    const totalAmount = auction.buyNowPrice!;
+    const totalWithShipping = totalAmount + shippingCost;
+
+    // Información sobre bultos si aplica
+    let bundleInfo = '';
+    if (auction.sellOnlyByBundle && auction.unitsPerBundle && auction.unitsPerBundle > 0) {
+      bundleInfo = `\n\n⚠️ IMPORTANTE: Esta subasta solo se vende por bulto completo.\nEstás comprando 1 bulto de ${auction.unitsPerBundle} unidades.`;
+      if (auction.bundles && auction.bundles > 0) {
+        bundleInfo += `\nBultos disponibles: ${auction.bundles}`;
+      }
+    } else if (auction.unitsPerBundle && auction.unitsPerBundle > 0 && auction.bundles && auction.bundles > 0) {
+      bundleInfo = `\n\n📦 Información: ${auction.bundles} bulto${auction.bundles !== 1 ? 's' : ''} disponible${auction.bundles !== 1 ? 's' : ''} (${auction.unitsPerBundle} unidades por bulto)`;
+    }
+
+    const confirm = window.confirm(
+      `¿Confirmas la compra directa por ${formatCurrency(totalAmount)}?${bundleInfo}\n\nCosto de envío: ${formatCurrency(shippingCost)}\nTotal a pagar: ${formatCurrency(totalWithShipping)}\n\nSerás redirigido a MercadoPago para completar el pago.`
+    );
+
+    if (confirm && user) {
+      try {
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 horas para pagar
+        const orderNumber = await generateOrderNumber();
+        
+        const quantity = auction.sellOnlyByBundle && auction.unitsPerBundle ? auction.unitsPerBundle : 1;
+        
+        const order: Order = {
+          id: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          orderNumber,
+          userId: user.id,
+          userName: user.username,
+          productId: auction.id,
+          productName: auction.title,
+          productImage: auction.images[0] || '',
+          productType: 'auction',
+          type: 'auction',
+          amount: totalWithShipping,
+          quantity: quantity,
+          status: 'pending_payment',
+          deliveryMethod: 'shipping',
+          createdAt: now,
+          expiresAt: expiresAt,
+          address: user.address || { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } },
+          unitsPerBundle: auction.unitsPerBundle,
+          bundles: auction.bundles
+        };
+
+        await addOrder(order);
+        
+        // Registrar transacción en el log
+        await logOrderCreated(order.id, orderNumber, user.id, user.username, order.amount);
+
+        const purchaseMessage = auction.sellOnlyByBundle && auction.unitsPerBundle && auction.unitsPerBundle > 0
+          ? `Compraste "${auction.title}" (1 bulto de ${auction.unitsPerBundle} unidades) por ${formatCurrency(totalWithShipping)} (incluye envío). Tenés 48hs para completar el pago en MercadoPago.`
+          : `Compraste "${auction.title}" por ${formatCurrency(totalWithShipping)} (incluye envío). Tenés 48hs para completar el pago en MercadoPago.`;
+
         addNotification({
-          userId: user!.id,
+          userId: user.id,
           type: 'auction_won',
           title: '¡Compra realizada con éxito!',
-          message: `Compraste "${auction.title}" por ${formatCurrency(auction.buyNowPrice)}. Tenés 48hs para completar el pago en MercadoPago.`,
+          message: purchaseMessage,
           read: false,
           link: '/notificaciones'
         });
         launchConfettiFromTop(3500);
-        
+
         const mercadopagoLink = `https://www.mercadopago.com.ar/checkout/v1/payment?preference_id=MOCK-${auction.id}-${Date.now()}`;
+
+        const successMessage = auction.sellOnlyByBundle && auction.unitsPerBundle && auction.unitsPerBundle > 0
+          ? `🎉 ¡COMPRA EXITOSA!\n\nNúmero de pedido: ${orderNumber}\nProducto: ${auction.title}\nCantidad: 1 bulto de ${auction.unitsPerBundle} unidades\nSubtotal: ${formatCurrency(totalAmount)}\nCosto de envío: ${formatCurrency(shippingCost)}\nTotal: ${formatCurrency(totalWithShipping)}\n\nTenés 48 horas para completar el pago.\n\n📧 Revisá tus notificaciones para ver el ticket de pago.\n\n🔗 Link de pago: ${mercadopagoLink}`
+          : `🎉 ¡COMPRA EXITOSA!\n\nNúmero de pedido: ${orderNumber}\nProducto: ${auction.title}\nSubtotal: ${formatCurrency(totalAmount)}\nCosto de envío: ${formatCurrency(shippingCost)}\nTotal: ${formatCurrency(totalWithShipping)}\n\nTenés 48 horas para completar el pago.\n\n📧 Revisá tus notificaciones para ver el ticket de pago.\n\n🔗 Link de pago: ${mercadopagoLink}`;
+
+        alert(successMessage);
+        // window.location.href = mercadopagoLink; // Descomentar cuando tengas la integración real
+      } catch (error) {
+        console.error('Error creando pedido:', error);
+        alert('Hubo un error al crear el pedido. Por favor, intentá nuevamente.');
+      }
+    }
+  };
+
+  const handlePayOnDelivery = async () => {
+    setShowPaymentModal(false);
+    const totalAmount = auction.buyNowPrice!;
+    const totalWithShipping = totalAmount + shippingCost;
+
+    // Información sobre bultos si aplica
+    let bundleInfo = '';
+    if (auction.sellOnlyByBundle && auction.unitsPerBundle && auction.unitsPerBundle > 0) {
+      bundleInfo = `\n\n⚠️ IMPORTANTE: Esta subasta solo se vende por bulto completo.\nEstás comprando 1 bulto de ${auction.unitsPerBundle} unidades.`;
+      if (auction.bundles && auction.bundles > 0) {
+        bundleInfo += `\nBultos disponibles: ${auction.bundles}`;
+      }
+    } else if (auction.unitsPerBundle && auction.unitsPerBundle > 0 && auction.bundles && auction.bundles > 0) {
+      bundleInfo = `\n\n📦 Información: ${auction.bundles} bulto${auction.bundles !== 1 ? 's' : ''} disponible${auction.bundles !== 1 ? 's' : ''} (${auction.unitsPerBundle} unidades por bulto)`;
+    }
+
+    const confirm = window.confirm(
+      `¿Confirmas la compra directa por ${formatCurrency(totalAmount)}?${bundleInfo}\n\nCosto de envío: ${formatCurrency(shippingCost)}\nTotal a pagar al recibir: ${formatCurrency(totalWithShipping)}\n\nSe enviará un mensaje de preparación de tu pedido.`
+    );
+
+    if (confirm && user) {
+      try {
+        const now = new Date();
+        const orderNumber = await generateOrderNumber();
+        const quantity = auction.sellOnlyByBundle && auction.unitsPerBundle ? auction.unitsPerBundle : 1;
         
-        alert(`🎉 ¡COMPRA EXITOSA!\n\nProducto: ${auction.title}\nMonto: ${formatCurrency(auction.buyNowPrice)}\n\nTenés 48 horas para completar el pago.\n\n📧 Revisá tus notificaciones para ver el ticket de pago.\n\n🔗 Link de pago: ${mercadopagoLink}`);
+        const order: Order = {
+          id: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          orderNumber,
+          userId: user.id,
+          userName: user.username,
+          productId: auction.id,
+          productName: auction.title,
+          productImage: auction.images[0] || '',
+          productType: 'auction',
+          type: 'auction',
+          amount: totalWithShipping,
+          quantity: quantity,
+          status: 'preparing', // Estado de preparación para pago al recibir
+          deliveryMethod: 'shipping',
+          createdAt: now,
+          address: user.address || { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } },
+          unitsPerBundle: auction.unitsPerBundle,
+          bundles: auction.bundles
+        };
+
+        await addOrder(order);
+        
+        // Registrar transacción en el log
+        await logOrderCreated(order.id, orderNumber, user.id, user.username, order.amount);
+
+        const productDescription = auction.sellOnlyByBundle && auction.unitsPerBundle && auction.unitsPerBundle > 0
+          ? `${auction.title} (1 bulto de ${auction.unitsPerBundle} unidades)`
+          : auction.title;
+
+        // Enviar mensaje de preparación al cliente
+        const preparationMessage = await createAutoMessage(
+          user.id,
+          user.username,
+          'purchase',
+          {
+            productName: productDescription,
+            productId: auction.id,
+            orderId: orderNumber,
+            amount: totalWithShipping
+          }
+        );
+
+        // Personalizar el mensaje para preparación
+        preparationMessage.content = `Hola ${user.username}, 👋
+
+Tu pedido de "${auction.title}" está siendo preparado.
+
+Detalles:
+• Número de pedido: ${orderNumber}
+• Producto: ${auction.title}${auction.sellOnlyByBundle && auction.unitsPerBundle ? ` (1 bulto de ${auction.unitsPerBundle} unidades)` : ''}
+• Subtotal: ${formatCurrency(totalAmount)}
+• Costo de envío: ${formatCurrency(shippingCost)}
+• Total a pagar al recibir: ${formatCurrency(totalWithShipping)}
+
+Te notificaremos cuando tu pedido esté listo para el envío. El pago se realizará al momento de la entrega.`;
+
+        await saveMessage(preparationMessage);
+
+        addNotification({
+          userId: user.id,
+          type: 'auction_won',
+          title: 'Pedido confirmado',
+          message: `Tu pedido de ${auction.title} está siendo preparado. Total a pagar al recibir: ${formatCurrency(totalWithShipping)}`,
+          read: false,
+          link: '/notificaciones'
+        });
+
+        launchConfettiFromTop(3500);
+
+        alert(`✅ Pedido confirmado!\n\nNúmero de pedido: ${orderNumber}\n\nSe ha enviado un mensaje de preparación a tu bandeja de entrada.\n\nTotal a pagar al recibir: ${formatCurrency(totalWithShipping)}`);
+      } catch (error) {
+        console.error('Error creando pedido:', error);
+        alert('Hubo un error al crear el pedido. Por favor, intentá nuevamente.');
       }
     }
   };
@@ -273,6 +451,28 @@ const AuctionDetail = () => {
 
           <div className="auction-info">
             <h1 className="auction-title">{auction.title}</h1>
+            
+            {/* Información de bultos si aplica */}
+            {auction.unitsPerBundle && auction.unitsPerBundle > 0 && (
+              <div style={{ 
+                marginBottom: '1rem',
+                padding: '0.75rem',
+                background: auction.sellOnlyByBundle ? 'rgba(255, 167, 38, 0.1)' : 'var(--bg-tertiary)',
+                borderRadius: '0.5rem',
+                border: auction.sellOnlyByBundle ? '1px solid var(--warning)' : '1px solid var(--border)'
+              }}>
+                {auction.sellOnlyByBundle ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--warning)', fontWeight: 600 }}>
+                    <span>⚠️</span>
+                    <span>Solo se vende por bulto completo: {auction.unitsPerBundle} unidades</span>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    📦 {auction.bundles || 0} bulto{(auction.bundles || 0) !== 1 ? 's' : ''} disponible{(auction.bundles || 0) !== 1 ? 's' : ''} × {auction.unitsPerBundle} unidades por bulto
+                  </div>
+                )}
+              </div>
+            )}
             
             <div className="auction-price-box">
               <div className="auction-price-section">
@@ -543,9 +743,27 @@ const AuctionDetail = () => {
                   <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: 600 }}>
                     🛒 Compra Directa Disponible
                   </div>
-                  <div className="buy-now-price" style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--success)', marginBottom: '1rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                  <div className="buy-now-price" style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--success)', marginBottom: '0.5rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
                     {formatCurrency(auction.buyNowPrice)}
                   </div>
+                  {auction.sellOnlyByBundle && auction.unitsPerBundle && auction.unitsPerBundle > 0 && (
+                    <div style={{ 
+                      fontSize: '0.8125rem', 
+                      color: 'var(--warning)', 
+                      fontWeight: 600,
+                      padding: '0.5rem',
+                      background: 'rgba(255, 167, 38, 0.1)',
+                      borderRadius: '0.5rem',
+                      marginBottom: '0.5rem'
+                    }}>
+                      ⚠️ Solo se vende por bulto completo: {auction.unitsPerBundle} unidades
+                    </div>
+                  )}
+                  {auction.unitsPerBundle && auction.unitsPerBundle > 0 && auction.bundles && auction.bundles > 0 && !auction.sellOnlyByBundle && (
+                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                      📦 {auction.bundles} bulto{auction.bundles !== 1 ? 's' : ''} disponible{auction.bundles !== 1 ? 's' : ''} ({auction.unitsPerBundle} unidades por bulto)
+                    </div>
+                  )}
                 </div>
                 <button 
                   onClick={handleBuyNow} 
@@ -915,6 +1133,18 @@ const AuctionDetail = () => {
           }
         }
       `}</style>
+
+      {auction && auction.buyNowPrice && (
+        <PaymentOptionsModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          onPayNow={handlePayNow}
+          onPayOnDelivery={handlePayOnDelivery}
+          productName={auction.title}
+          totalAmount={auction.buyNowPrice}
+          shippingCost={shippingCost}
+        />
+      )}
     </div>
   );
 };

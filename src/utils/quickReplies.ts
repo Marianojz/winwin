@@ -1,4 +1,5 @@
 // Sistema de plantillas de respuestas rápidas para chat
+// TODO: Guardado en Firebase userPreferences/{userId}/quickReplies
 export interface QuickReply {
   id: string;
   title: string;
@@ -8,8 +9,6 @@ export interface QuickReply {
   createdAt: Date;
   updatedAt?: Date;
 }
-
-const QUICK_REPLIES_STORAGE_KEY = 'quick_replies';
 
 // Plantillas por defecto
 const DEFAULT_QUICK_REPLIES: QuickReply[] = [
@@ -71,52 +70,56 @@ const DEFAULT_QUICK_REPLIES: QuickReply[] = [
   }
 ];
 
-// Cargar plantillas desde localStorage
-export const loadQuickReplies = (): QuickReply[] => {
+// Cargar plantillas desde Firebase
+export const loadQuickReplies = async (userId: string): Promise<QuickReply[]> => {
   try {
-    const stored = localStorage.getItem(QUICK_REPLIES_STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return parsed.map((qr: any) => ({
+    const { loadUserPreferences } = await import('./userPreferences');
+    const preferences = await loadUserPreferences(userId);
+    
+    if (preferences.quickReplies && Array.isArray(preferences.quickReplies) && preferences.quickReplies.length > 0) {
+      return preferences.quickReplies.map((qr: any) => ({
         ...qr,
         createdAt: new Date(qr.createdAt),
         updatedAt: qr.updatedAt ? new Date(qr.updatedAt) : undefined
       }));
     }
+    
+    // Si no hay datos guardados, usar defaults y guardarlos
+    await saveQuickReplies(userId, DEFAULT_QUICK_REPLIES);
+    return DEFAULT_QUICK_REPLIES;
   } catch (error) {
-    console.error('Error cargando quick replies:', error);
+    console.error('❌ Error cargando quick replies:', error);
+    return DEFAULT_QUICK_REPLIES;
   }
-  
-  // Si no hay datos guardados, usar defaults y guardarlos
-  saveQuickReplies(DEFAULT_QUICK_REPLIES);
-  return DEFAULT_QUICK_REPLIES;
 };
 
-// Guardar plantillas en localStorage
-export const saveQuickReplies = (replies: QuickReply[]): void => {
+// Guardar plantillas en Firebase
+export const saveQuickReplies = async (userId: string, replies: QuickReply[]): Promise<void> => {
   try {
-    localStorage.setItem(QUICK_REPLIES_STORAGE_KEY, JSON.stringify(replies));
+    const { updateUserPreference } = await import('./userPreferences');
+    await updateUserPreference(userId, 'quickReplies', replies);
   } catch (error) {
-    console.error('Error guardando quick replies:', error);
+    console.error('❌ Error guardando quick replies:', error);
+    throw error;
   }
 };
 
 // Agregar nueva plantilla
-export const addQuickReply = (reply: Omit<QuickReply, 'id' | 'createdAt'>): QuickReply => {
-  const replies = loadQuickReplies();
+export const addQuickReply = async (userId: string, reply: Omit<QuickReply, 'id' | 'createdAt'>): Promise<QuickReply> => {
+  const replies = await loadQuickReplies(userId);
   const newReply: QuickReply = {
     ...reply,
     id: `qr-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     createdAt: new Date()
   };
   replies.push(newReply);
-  saveQuickReplies(replies);
+  await saveQuickReplies(userId, replies);
   return newReply;
 };
 
 // Actualizar plantilla
-export const updateQuickReply = (id: string, updates: Partial<QuickReply>): boolean => {
-  const replies = loadQuickReplies();
+export const updateQuickReply = async (userId: string, id: string, updates: Partial<QuickReply>): Promise<boolean> => {
+  const replies = await loadQuickReplies(userId);
   const index = replies.findIndex(r => r.id === id);
   if (index === -1) return false;
   
@@ -125,27 +128,29 @@ export const updateQuickReply = (id: string, updates: Partial<QuickReply>): bool
     ...updates,
     updatedAt: new Date()
   };
-  saveQuickReplies(replies);
+  await saveQuickReplies(userId, replies);
   return true;
 };
 
 // Eliminar plantilla
-export const deleteQuickReply = (id: string): boolean => {
-  const replies = loadQuickReplies();
+export const deleteQuickReply = async (userId: string, id: string): Promise<boolean> => {
+  const replies = await loadQuickReplies(userId);
   const filtered = replies.filter(r => r.id !== id);
   if (filtered.length === replies.length) return false;
   
-  saveQuickReplies(filtered);
+  await saveQuickReplies(userId, filtered);
   return true;
 };
 
 // Obtener plantillas por categoría
-export const getQuickRepliesByCategory = (category: QuickReply['category']): QuickReply[] => {
-  return loadQuickReplies().filter(r => r.category === category && r.active);
+export const getQuickRepliesByCategory = async (userId: string, category: QuickReply['category']): Promise<QuickReply[]> => {
+  const replies = await loadQuickReplies(userId);
+  return replies.filter(r => r.category === category && r.active);
 };
 
 // Obtener todas las plantillas activas
-export const getActiveQuickReplies = (): QuickReply[] => {
-  return loadQuickReplies().filter(r => r.active);
+export const getActiveQuickReplies = async (userId: string): Promise<QuickReply[]> => {
+  const replies = await loadQuickReplies(userId);
+  return replies.filter(r => r.active);
 };
 
