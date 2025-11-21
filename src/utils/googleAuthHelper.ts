@@ -104,9 +104,11 @@ export const processGoogleAuthResult = async (user: any): Promise<{ fullUser: Us
     // Usuario existente
     userData = userDoc.data();
     
-    // Actualizar avatar de Google si está disponible y es diferente (en una sola operación)
+    // Solo actualizar avatar de Google si NO hay un avatar guardado manualmente
+    // Si el usuario seleccionó un avatar, no sobrescribirlo con el de Google
     const updates: any = {};
-    if (user.photoURL && user.photoURL !== userData.avatar) {
+    if (user.photoURL && !userData.avatar) {
+      // Solo guardar avatar de Google si no hay uno guardado
       updates.avatar = user.photoURL;
     }
     
@@ -131,10 +133,11 @@ export const processGoogleAuthResult = async (user: any): Promise<{ fullUser: Us
     }
   }
 
-  // Priorizar siempre el avatar de Google si está disponible
+  // Priorizar el avatar guardado sobre el de Google
+  // Solo usar el avatar de Google si no hay uno guardado manualmente
   const googleAvatar = user.photoURL || '';
   const savedAvatar = userData?.avatar || '';
-  const finalAvatar = googleAvatar || savedAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || userData?.username || 'U')}&size=200&background=FF6B00&color=fff&bold=true`;
+  const finalAvatar = savedAvatar || googleAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || userData?.username || 'U')}&size=200&background=FF6B00&color=fff&bold=true`;
   
   const fullUser: User = {
     id: user.uid,

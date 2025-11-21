@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Mail, Lock, LogIn, Eye, EyeOff, AlertCircle, Loader } from 'lucide-react';
 import GoogleSignIn from '../components/GoogleSignIn';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db, syncUserToRealtimeDb } from '../config/firebase';
 import { useStore } from '../store/useStore';
@@ -32,6 +32,105 @@ const Login = () => {
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location, navigate]);
+
+  // Detectar si viene de verificación de email y hacer login automático si está autenticado
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('verified') === 'true') {
+      // Verificar si el usuario está autenticado después de verificar
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (firebaseUser && firebaseUser.emailVerified) {
+          // El usuario está autenticado y el email está verificado
+          // Intentar hacer login automático
+          try {
+            setLoading(true);
+            const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+            
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              
+              // Verificar que el usuario está activo
+              if (userData.active === false) {
+                toast.error('Tu cuenta ha sido suspendida. Contactá al administrador.', 5000);
+                await auth.signOut();
+                setLoading(false);
+                navigate('/login', { replace: true });
+                return;
+              }
+              
+              const fullUser: User = {
+                id: firebaseUser.uid,
+                email: firebaseUser.email!,
+                username: userData.username || 'Usuario',
+                avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username || firebaseUser.email?.split('@')[0] || 'U')}&size=200&background=FF6B00&color=fff&bold=true`,
+                isAdmin: userData.role === 'admin' || userData.isAdmin === true,
+                dni: userData.dni || '',
+                phone: userData.phone || '',
+                createdAt: userData.createdAt ? new Date(userData.createdAt) : new Date(),
+                address: userData.address ? {
+                  street: userData.address,
+                  locality: userData.locality,
+                  province: userData.province,
+                  location: {
+                    lat: userData.latitude || 0,
+                    lng: userData.longitude || 0
+                  }
+                } : undefined
+              };
+
+              // Sincronizar con Realtime Database
+              await syncUserToRealtimeDb(
+                fullUser.id,
+                fullUser.isAdmin,
+                fullUser.email,
+                fullUser.username,
+                fullUser.avatar
+              );
+
+              setUser(fullUser);
+              toast.success('¡Email verificado exitosamente! Redirigiendo a tu cuenta...', 3000);
+              
+              // Esperar un momento antes de navegar
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              // Navegar según rol
+              if (fullUser.isAdmin) {
+                navigate('/admin', { replace: true });
+              } else {
+                navigate('/', { replace: true });
+              }
+            } else {
+              // Usuario no existe en Firestore, mostrar mensaje
+              toast.success('¡Email verificado exitosamente! Ya podés iniciar sesión con tu cuenta.', 6000);
+              navigate('/login', { replace: true });
+            }
+          } catch (error: any) {
+            console.error('Error en login automático después de verificación:', error);
+            toast.success('¡Email verificado exitosamente! Ya podés iniciar sesión con tu cuenta.', 6000);
+            navigate('/login', { replace: true });
+          } finally {
+            setLoading(false);
+            unsubscribe();
+          }
+        } else {
+          // Usuario no está autenticado o email no verificado
+          toast.success('¡Email verificado exitosamente! Ya podés iniciar sesión con tu cuenta.', 6000);
+          navigate('/login', { replace: true });
+          unsubscribe();
+        }
+      });
+      
+      // Limpiar después de 5 segundos si no hay usuario autenticado
+      const timeout = setTimeout(() => {
+        unsubscribe();
+      }, 5000);
+      
+      return () => {
+        clearTimeout(timeout);
+        unsubscribe();
+      };
+    }
+  }, [location.search, navigate, setUser]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

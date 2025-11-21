@@ -737,38 +737,57 @@ export const useStore = create<AppState>((set, get) => ({
     const user = get().user;
     if (!user) return;
     
+    // Determinar el userId destino
+    let targetUserId: string;
+    if (notification.userId === 'admin') {
+      // Si se quiere notificar al admin y el usuario actual es admin, usar su ID
+      // Si no es admin, usar 'admin' como identificador especial
+      targetUserId = user.isAdmin ? user.id : 'admin';
+    } else if (notification.userId === 'current') {
+      // Si se especifica 'current', usar el usuario actual
+      targetUserId = user.id;
+    } else {
+      // Usar notification.userId si está especificado, sino usar el usuario actual
+      targetUserId = notification.userId || user.id;
+    }
+    
     const newNotification = {
       ...notification,
+      userId: targetUserId, // Asegurar que userId esté en la notificación
       id: `NOTIF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       createdAt: new Date().toISOString(),
       read: false
     };
     
     try {
-      // Guardar en Firebase Realtime Database
-      const notificationRef = ref(realtimeDb, `notifications/${user.id}/${newNotification.id}`);
+      // Guardar en Firebase Realtime Database usando el targetUserId
+      const notificationRef = ref(realtimeDb, `notifications/${targetUserId}/${newNotification.id}`);
       await firebaseSet(notificationRef, newNotification);
       
-      // Actualización optimista local
-      set(state => ({
-        notifications: [{
-          ...newNotification,
-          createdAt: new Date(newNotification.createdAt)
-        }, ...state.notifications],
-        unreadCount: state.unreadCount + 1
-      }));
+      // Actualización optimista local solo si la notificación es para el usuario actual
+      if (targetUserId === user.id) {
+        set(state => ({
+          notifications: [{
+            ...newNotification,
+            createdAt: new Date(newNotification.createdAt)
+          }, ...state.notifications],
+          unreadCount: state.unreadCount + 1
+        }));
+      }
       
-      console.log(`✅ Notificación guardada en Firebase: ${newNotification.id}`);
+      console.log(`✅ Notificación guardada en Firebase para usuario ${targetUserId}: ${newNotification.id}`);
     } catch (error) {
       console.error('❌ Error guardando notificación en Firebase:', error);
-      // Fallback: actualizar solo localmente si falla Firebase
-      set(state => ({
-        notifications: [{
-          ...newNotification,
-          createdAt: new Date(newNotification.createdAt)
-        }, ...state.notifications],
-        unreadCount: state.unreadCount + 1
-      }));
+      // Fallback: actualizar solo localmente si falla Firebase y es para el usuario actual
+      if (targetUserId === user.id) {
+        set(state => ({
+          notifications: [{
+            ...newNotification,
+            createdAt: new Date(newNotification.createdAt)
+          }, ...state.notifications],
+          unreadCount: state.unreadCount + 1
+        }));
+      }
     }
   },
   

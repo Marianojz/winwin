@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom';
-import { ShoppingCart, Star } from 'lucide-react';
+import { ShoppingCart, Star, Heart } from 'lucide-react';
 import { Product } from '../types';
 import { formatCurrency } from '../utils/helpers';
 import { useStore } from '../store/useStore';
 import { trackProductClick } from '../utils/tracking';
 import { getStickerById } from '../utils/stickers';
+import { useState, useEffect } from 'react';
+import { likeProduct, unlikeProduct, isProductLiked } from '../utils/likes';
 
 interface ProductCardProps {
   product: Product;
@@ -12,10 +14,61 @@ interface ProductCardProps {
 
 const ProductCard = ({ product }: ProductCardProps) => {
   const { addToCart, addNotification, user } = useStore();
+  const [isLiked, setIsLiked] = useState(false);
+  const [liking, setLiking] = useState(false);
+
+  // Verificar si el producto está liked al cargar
+  useEffect(() => {
+    if (user?.id && product?.id) {
+      isProductLiked(user.id, product.id)
+        .then(setIsLiked)
+        .catch((error) => {
+          // Si hay error de permisos, simplemente asumimos que no está liked
+          console.warn('No se pudo verificar like (puede ser normal si no hay likes aún):', error.message);
+          setIsLiked(false);
+        });
+    } else {
+      setIsLiked(false);
+    }
+  }, [user?.id, product.id]);
 
   const handleClick = () => {
     // Registrar click en el tracking system
     trackProductClick(product.id, product.name, user?.id, user?.username);
+  };
+
+  const handleLike = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!user) {
+      // Redirigir al login sin notificación
+      return;
+    }
+
+    if (liking) return;
+
+    setLiking(true);
+    try {
+      if (isLiked) {
+        await unlikeProduct(user.id, product.id);
+        setIsLiked(false);
+      } else {
+        await likeProduct(user.id, product);
+        setIsLiked(true);
+      }
+    } catch (error) {
+      console.error('Error al dar like:', error);
+      addNotification({
+        userId: 'current',
+        type: 'error',
+        title: 'Error',
+        message: 'No se pudo actualizar el like. Intentá nuevamente.',
+        read: false
+      });
+    } finally {
+      setLiking(false);
+    }
   };
 
   const handleAddToCart = (e: React.MouseEvent) => {
@@ -38,6 +91,23 @@ const ProductCard = ({ product }: ProductCardProps) => {
     >
       <div className="product-card-image">
         <img src={product.images[0]} alt={product.name} loading="lazy" />
+        
+        {/* Botón de Like */}
+        {user && (
+          <button
+            className={`like-button ${isLiked ? 'liked' : ''}`}
+            onClick={handleLike}
+            disabled={liking}
+            title={isLiked ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+            aria-label={isLiked ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+          >
+            <Heart 
+              size={20} 
+              fill={isLiked ? 'currentColor' : 'none'}
+              className={liking ? 'liking' : ''}
+            />
+          </button>
+        )}
         
         {/* Stickers/Emojis - Uno arriba, uno abajo, más pequeños y con fondo transparente */}
         {product.stickers && product.stickers.length > 0 && (
@@ -210,10 +280,62 @@ const ProductCard = ({ product }: ProductCardProps) => {
           transform: scale(1.05);
         }
 
-        .product-badge {
+        .like-button {
           position: absolute;
           top: 0.5rem;
           right: 0.5rem;
+          background: rgba(255, 255, 255, 0.9);
+          border: none;
+          border-radius: 50%;
+          width: 36px;
+          height: 36px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          z-index: 12;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+          color: var(--text-secondary);
+        }
+
+        .like-button:hover {
+          background: rgba(255, 255, 255, 1);
+          transform: scale(1.1);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .like-button.liked {
+          background: rgba(239, 68, 68, 0.9);
+          color: white;
+        }
+
+        .like-button.liked:hover {
+          background: rgba(239, 68, 68, 1);
+        }
+
+        .like-button:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .like-button .liking {
+          animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+          0%, 100% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.2);
+          }
+        }
+
+        .product-badge {
+          position: absolute;
+          top: 0.5rem;
+          left: 0.5rem;
           font-size: 0.6875rem;
           padding: 0.25rem 0.5rem;
           border-radius: 0.375rem;

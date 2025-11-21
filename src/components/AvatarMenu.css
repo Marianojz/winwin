@@ -32,22 +32,25 @@
 }
 
 .avatar-menu-avatar {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid var(--primary);
+  border: 3px solid var(--primary);
   display: block;
-  transition: border-color 0.2s ease;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .avatar-menu-trigger:hover .avatar-menu-avatar {
   border-color: var(--secondary);
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .avatar-menu-fallback {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--primary), var(--secondary));
   display: flex;
@@ -55,8 +58,33 @@
   justify-content: center;
   color: white;
   font-weight: 700;
-  font-size: 1rem;
-  border: 2px solid var(--primary);
+  font-size: 1.25rem;
+  border: 3px solid var(--primary);
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.avatar-menu-trigger:hover .avatar-menu-fallback {
+  border-color: var(--secondary);
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* En desktop, en la página principal, volver al tamaño original */
+@media (min-width: 769px) {
+  .navbar[data-page="home"] .avatar-menu-avatar,
+  .navbar[data-page="home"] .avatar-menu-fallback {
+    width: 40px;
+    height: 40px;
+    border-width: 2px;
+    font-size: 1rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .navbar[data-page="home"] .avatar-menu-trigger:hover .avatar-menu-avatar,
+  .navbar[data-page="home"] .avatar-menu-trigger:hover .avatar-menu-fallback {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  }
 }
 
 /* Overlay */
@@ -121,6 +149,12 @@
 }
 
 /* Cuando está en navbar móvil, las transformaciones deben ser diferentes */
+.navbar-mobile-item--profile .avatar-menu {
+  min-width: calc(100vw - 2rem) !important;
+  max-width: 500px !important;
+  width: calc(100vw - 2rem) !important;
+}
+
 .navbar-mobile-item--profile .avatar-menu.open {
   transform: translateX(-50%) translateY(0) scale(1) !important;
 }
@@ -332,17 +366,62 @@
 /* Mobile */
 @media (max-width: 768px) {
   .avatar-menu {
-    min-width: 260px;
-    right: -0.5rem;
+    min-width: calc(100vw - 2rem) !important;
+    max-width: 500px !important;
+    width: calc(100vw - 2rem) !important;
+    border-radius: 1.5rem 1.5rem 0 0 !important;
+    box-shadow: 0 -8px 24px var(--shadow-lg) !important;
+    max-height: calc(100vh - 120px) !important;
+    overflow-y: auto !important;
+    margin-bottom: 0 !important;
+  }
+  
+  /* Asegurar que el menú no se achique y esté bien posicionado */
+  .avatar-menu.open {
+    transform: translateX(-50%) translateY(0) scale(1) !important;
+  }
+  
+  /* Asegurar que el menú tenga suficiente espacio desde abajo y no se corte */
+  .navbar-mobile-item--profile .avatar-menu {
+    bottom: 112px !important;
+    max-height: calc(100vh - 140px) !important;
   }
 
   .avatar-menu-header {
-    padding: 1rem;
+    padding: 1.5rem;
+    padding-bottom: 1rem;
+  }
+
+  .avatar-menu-header-avatar img,
+  .avatar-menu-header-fallback {
+    width: 56px !important;
+    height: 56px !important;
+    font-size: 1.5rem !important;
+  }
+
+  .avatar-menu-name {
+    font-size: 1.1rem;
+  }
+
+  .avatar-menu-email {
+    font-size: 0.9rem;
   }
 
   .avatar-menu-item {
-    padding: 0.75rem 1rem;
-    font-size: 0.9rem;
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+    min-height: 52px;
+  }
+
+  .avatar-menu-item svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  /* Hacer el overlay más visible en móvil */
+  .avatar-menu-overlay {
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
   }
 }
 

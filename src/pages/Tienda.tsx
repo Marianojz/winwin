@@ -5,6 +5,7 @@ import { useStore } from '../store/useStore';
 import ProductCard from '../components/ProductCard';
 import { trackSearch } from '../utils/tracking';
 import { useSEO, generateProductListStructuredData } from '../hooks/useSEO';
+import PersonalizedRecommendations from '../components/PersonalizedRecommendations';
 
 const Tienda = () => {
   const { products, user } = useStore();
@@ -147,6 +148,11 @@ const Tienda = () => {
             </select>
           </div>
         </div>
+
+        {/* Recomendaciones Personalizadas - Solo si el usuario está logueado y no hay búsqueda activa */}
+        {user && !searchTerm && categoryFilter === 'all' && (
+          <PersonalizedRecommendations limit={8} showCategories={true} />
+        )}
 
         <div className="results-info">
           <span>{filteredProducts.length} productos encontrados</span>

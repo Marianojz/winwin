@@ -145,13 +145,22 @@ export function attachAuthListener(onUser: (user: any | null) => void) {
         
         if (userDoc.exists()) {
           const userData = userDoc.data();
-          // Priorizar siempre el avatar de Google si está disponible
+          // Priorizar el avatar guardado en Firestore sobre el de Google
+          // Solo usar el avatar de Google si no hay uno guardado manualmente
           const googleAvatar = firebaseUser.photoURL || '';
           const savedAvatar = userData.avatar || '';
-          const finalAvatar = googleAvatar || savedAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username || firebaseUser.displayName || 'U')}&size=200&background=FF6B00&color=fff&bold=true`;
           
-          // Si hay avatar de Google y es diferente al guardado, actualizarlo en Firestore y Realtime Database
-          if (googleAvatar && googleAvatar !== savedAvatar) {
+          // Determinar el avatar final: usar el guardado si existe, sino el de Google, sino generar uno
+          let finalAvatar: string;
+          if (savedAvatar) {
+            // Si hay un avatar guardado, usarlo (el usuario lo seleccionó manualmente)
+            finalAvatar = savedAvatar;
+            console.log('✅ [AUTH LISTENER] Usando avatar guardado en Firestore:', savedAvatar);
+          } else if (googleAvatar) {
+            // Solo si no hay avatar guardado, usar el de Google y guardarlo
+            finalAvatar = googleAvatar;
+            console.log('✅ [AUTH LISTENER] No hay avatar guardado, usando avatar de Google y guardándolo');
+            // Guardar el avatar de Google en Firestore solo si no hay uno guardado
             updateDoc(userDocRef, { avatar: googleAvatar }).catch(err => 
               console.warn('Error actualizando avatar en Firestore:', err)
             );
@@ -163,6 +172,10 @@ export function attachAuthListener(onUser: (user: any | null) => void) {
               userData.username || firebaseUser.displayName || 'Usuario',
               googleAvatar
             ).catch(err => console.warn('Error sincronizando avatar a Realtime Database:', err));
+          } else {
+            // Generar avatar por defecto
+            finalAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username || firebaseUser.displayName || 'U')}&size=200&background=FF6B00&color=fff&bold=true`;
+            console.log('✅ [AUTH LISTENER] Generando avatar por defecto');
           }
           
           const isAdmin = userData.role === 'admin' || userData.isAdmin === true;

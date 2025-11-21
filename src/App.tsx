@@ -34,6 +34,7 @@ import Blog from './pages/Blog';
 import BlogArticle from './pages/BlogArticle';
 import ComoFunciona from './pages/ComoFunciona';
 import CategoriaPage from './pages/CategoriaPage';
+import MisFavoritos from './pages/MisFavoritos';
 import NotFound from './pages/NotFound';
 
 // Componente Footer condicional
@@ -624,6 +625,7 @@ function App() {
             <Route path="/carrito" element={<Carrito />} />
             <Route path="/notificaciones" element={<Notificaciones />} />
             <Route path="/perfil" element={<Perfil />} />
+            <Route path="/mis-favoritos" element={<MisFavoritos />} />
             <Route 
               path="/terminos" 
               element={

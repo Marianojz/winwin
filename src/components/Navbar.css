@@ -415,15 +415,17 @@
 }
 
 .navbar-mobile-item--profile .avatar-menu-trigger {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
+  position: relative;
 }
 
 .navbar-mobile-item--profile .avatar-menu-avatar,
 .navbar-mobile-item--profile .avatar-menu-fallback {
-  width: 32px !important;
-  height: 32px !important;
-  font-size: 0.875rem;
+  width: 44px !important;
+  height: 44px !important;
+  font-size: 1.1rem !important;
+  border-width: 3px !important;
 }
 
 .navbar-mobile-item--profile span {

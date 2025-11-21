@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Star, Package, ChevronLeft, CreditCard, TrendingUp, AlertCircle } from 'lucide-react';
+import { ShoppingCart, Star, Package, ChevronLeft, CreditCard, TrendingUp, AlertCircle, Heart } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { formatCurrency, formatTimeAgo } from '../utils/helpers';
 import { useSEO, generateProductStructuredData } from '../hooks/useSEO';
@@ -9,6 +9,9 @@ import { createAutoMessage, saveMessage } from '../utils/messages';
 import { generateOrderNumber } from '../utils/orderNumberGenerator';
 import { logOrderCreated } from '../utils/orderTransactions';
 import { Order } from '../types';
+import { getSimilarProducts } from '../utils/recommendations';
+import ProductCard from '../components/ProductCard';
+import { likeProduct, unlikeProduct, isProductLiked } from '../utils/likes';
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -18,6 +21,9 @@ const ProductDetail = () => {
   const product = products.find(p => p.id === id);
   const [selectedImage, setSelectedImage] = useState(0);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [similarProducts, setSimilarProducts] = useState<any[]>([]);
+  const [isLiked, setIsLiked] = useState(false);
+  const [liking, setLiking] = useState(false);
   // Inicializar quantity: si solo se vende por bulto, comenzar con un bulto completo
   const initialQuantity = product?.sellOnlyByBundle && product?.unitsPerBundle && product.unitsPerBundle > 0
     ? product.unitsPerBundle
@@ -32,6 +38,55 @@ const ProductDetail = () => {
       setQuantity(1);
     }
   }, [product?.id, product?.sellOnlyByBundle, product?.unitsPerBundle]);
+
+  // Cargar productos similares
+  useEffect(() => {
+    if (product && products.length > 0) {
+      const similar = getSimilarProducts(product, products, 6);
+      setSimilarProducts(similar);
+    }
+  }, [product?.id, products]);
+
+  // Verificar si el producto está liked al cargar
+  useEffect(() => {
+    if (user?.id && product?.id) {
+      isProductLiked(user.id, product.id)
+        .then(setIsLiked)
+        .catch((error) => {
+          console.warn('No se pudo verificar like:', error.message);
+          setIsLiked(false);
+        });
+    } else {
+      setIsLiked(false);
+    }
+  }, [user?.id, product?.id]);
+
+  const handleLike = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    if (liking || !product) return;
+
+    setLiking(true);
+    try {
+      if (isLiked) {
+        await unlikeProduct(user.id, product.id);
+        setIsLiked(false);
+      } else {
+        await likeProduct(user.id, product);
+        setIsLiked(true);
+      }
+    } catch (error) {
+      console.error('Error al dar like:', error);
+    } finally {
+      setLiking(false);
+    }
+  };
 
   // SEO: Meta tags y structured data para productos
   const productImage = product?.images[0]?.startsWith('http') 
@@ -357,6 +412,22 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
                 src={product.images[selectedImage]} 
                 alt={product.name}
               />
+              {/* Botón de Like */}
+              {user && (
+                <button
+                  className={`like-button-detail ${isLiked ? 'liked' : ''}`}
+                  onClick={handleLike}
+                  disabled={liking}
+                  title={isLiked ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                  aria-label={isLiked ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                >
+                  <Heart 
+                    size={24} 
+                    fill={isLiked ? 'currentColor' : 'none'}
+                    className={liking ? 'liking' : ''}
+                  />
+                </button>
+              )}
             </div>
             {product.images.length > 1 && (
               <div className="image-thumbnails">
@@ -375,7 +446,25 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
 
           {/* Información del Producto */}
           <div className="product-info">
-            <h1 className="product-title">{product.name}</h1>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '1rem' }}>
+              <h1 className="product-title" style={{ margin: 0, flex: 1 }}>{product.name}</h1>
+              {/* Botón de Like en el título (móvil) */}
+              {user && (
+                <button
+                  className={`like-button-detail-mobile ${isLiked ? 'liked' : ''}`}
+                  onClick={handleLike}
+                  disabled={liking}
+                  title={isLiked ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                  aria-label={isLiked ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                >
+                  <Heart 
+                    size={24} 
+                    fill={isLiked ? 'currentColor' : 'none'}
+                    className={liking ? 'liking' : ''}
+                  />
+                </button>
+              )}
+            </div>
 
             {/* Rating */}
             {product.averageRating > 0 && (
@@ -629,6 +718,32 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
             </div>
           </div>
         )}
+
+        {/* Productos Similares */}
+        {similarProducts.length > 0 && (
+          <div style={{ marginTop: '3rem', paddingTop: '3rem', borderTop: '2px solid var(--border)' }}>
+            <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <TrendingUp size={24} color="var(--primary)" />
+                <h2 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700, background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                  Productos Similares
+                </h2>
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', margin: 0 }}>
+                Otros productos que podrían interesarte
+              </p>
+            </div>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', 
+              gap: '1.5rem' 
+            }}>
+              {similarProducts.map(similarProduct => (
+                <ProductCard key={similarProduct.id} product={similarProduct} />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <PaymentOptionsModal
@@ -663,12 +778,69 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
           display: flex;
           align-items: center;
           justify-content: center;
+          position: relative;
         }
 
         .main-image img {
           width: 100%;
           height: 100%;
           object-fit: cover;
+        }
+
+        .like-button-detail {
+          position: absolute;
+          top: 1rem;
+          right: 1rem;
+          background: rgba(255, 255, 255, 0.95);
+          border: none;
+          border-radius: 50%;
+          width: 48px;
+          height: 48px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          z-index: 10;
+          box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+          color: var(--text-secondary);
+        }
+
+        .like-button-detail:hover {
+          background: rgba(255, 255, 255, 1);
+          transform: scale(1.1);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        .like-button-detail.liked {
+          background: rgba(239, 68, 68, 0.95);
+          color: white;
+        }
+
+        .like-button-detail.liked:hover {
+          background: rgba(239, 68, 68, 1);
+        }
+
+        .like-button-detail:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .like-button-detail .liking {
+          animation: pulse 1s ease-in-out infinite;
+        }
+
+        .like-button-detail-mobile {
+          display: none;
+        }
+
+        @keyframes pulse {
+          0%, 100% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.2);
+          }
         }
 
         .image-thumbnails {
@@ -755,6 +927,46 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
           .product-title {
             font-size: 1.5rem;
             margin-bottom: 0.75rem;
+          }
+
+          .like-button-detail {
+            display: none;
+          }
+
+          .like-button-detail-mobile {
+            display: flex;
+            background: rgba(255, 255, 255, 0.95);
+            border: none;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            color: var(--text-secondary);
+            flex-shrink: 0;
+          }
+
+          .like-button-detail-mobile:hover {
+            background: rgba(255, 255, 255, 1);
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+          }
+
+          .like-button-detail-mobile.liked {
+            background: rgba(239, 68, 68, 0.95);
+            color: white;
+          }
+
+          .like-button-detail-mobile.liked:hover {
+            background: rgba(239, 68, 68, 1);
+          }
+
+          .like-button-detail-mobile:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
           }
 
           .price-box {

@@ -2,7 +2,28 @@
   "rules": {
     "auctions": {
       ".read": true,
-      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      "$auctionId": {
+        ".read": true,
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || (!newData.hasChild('title') && !newData.hasChild('description') && !newData.hasChild('status') && !newData.hasChild('endTime') && !newData.hasChild('startingPrice') && !newData.hasChild('createdBy')))",
+        "currentPrice": {
+          ".read": true,
+          ".write": "auth != null"
+        },
+        "lastBidAt": {
+          ".read": true,
+          ".write": "auth != null"
+        },
+        "bids": {
+          ".read": true,
+          ".write": "auth != null",
+          "$bidId": {
+            ".read": true,
+            ".write": "auth != null && (!data.exists() || data.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.hasChildren(['id', 'auctionId', 'userId', 'username', 'amount', 'createdAt']) && newData.child('userId').isString() && newData.child('username').isString() && newData.child('amount').isNumber() && newData.child('amount').val() > 0"
+          }
+        }
+      }
     },
     "products": {
       ".read": true,
@@ -182,6 +203,30 @@
       "$postId": {
         ".read": true,
         ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+      }
+    },
+    "user_likes": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+        ".write": "auth != null && auth.uid == $userId",
+        "$productId": {
+          ".read": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+          ".write": "auth != null && auth.uid == $userId",
+          ".validate": "!newData.exists() || (newData.hasChildren(['productId', 'productName', 'productCategory', 'timestamp']) && newData.child('productId').isString() && newData.child('productName').isString() && newData.child('productCategory').isString() && newData.child('timestamp').isString())"
+        }
+      }
+    },
+    "product_likes": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$productId": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        "$userId": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid == $userId",
+          ".validate": "!newData.exists() || (newData.hasChildren(['userId', 'timestamp']) && newData.child('userId').isString() && newData.child('timestamp').isString())"
+        }
       }
     }
   }

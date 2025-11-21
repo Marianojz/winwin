@@ -203,7 +203,7 @@ const Navbar = () => {
     <>
       {/* Navbar Superior (Desktop) - En móvil solo en inicio */}
       {showTopNavbar && (
-      <nav className="navbar">
+      <nav className="navbar" data-page={location.pathname === '/' ? 'home' : 'other'}>
         <div className="navbar-container" style={{
           display: 'flex',
           alignItems: 'center',
@@ -356,9 +356,9 @@ const Navbar = () => {
               className="navbar-icon-btn" 
               title="Notificaciones"
               style={{
-                padding: isMobile ? '0.2rem' : '0.5rem',
-                minWidth: isMobile ? '22px' : '36px',
-                maxWidth: isMobile ? '22px' : '36px',
+                padding: isMobile ? '0.3rem' : '0.5rem',
+                minWidth: isMobile ? '28px' : '44px',
+                maxWidth: isMobile ? '28px' : '44px',
                 flexShrink: 0,
                 marginLeft: isMobile ? 'auto' : '0',
                 position: isMobile ? 'relative' : 'relative',
@@ -366,12 +366,12 @@ const Navbar = () => {
                 order: isMobile ? 10 : 'auto'
               }}
             >
-              <Bell size={isMobile ? 12 : 20} />
+              <Bell size={isMobile ? 18 : 24} />
               {unreadCount > 0 && (
                 <span className="navbar-badge" style={{
-                  fontSize: isMobile ? '0.35rem' : '0.6rem',
-                  padding: isMobile ? '0.05rem 0.08rem' : '0.1rem 0.25rem',
-                  minWidth: isMobile ? '9px' : '14px',
+                  fontSize: isMobile ? '0.4rem' : '0.65rem',
+                  padding: isMobile ? '0.1rem 0.15rem' : '0.15rem 0.3rem',
+                  minWidth: isMobile ? '10px' : '16px',
                   lineHeight: isMobile ? '1' : '1.2'
                 }}>
                   {unreadCount}
@@ -380,27 +380,26 @@ const Navbar = () => {
             </Link>
           )}
 
-          {/* 5. Carrito - Reordenado (después de notificaciones) */}
-          {isAuthenticated && (
+          {/* 5. Carrito - Solo visible en desktop */}
+          {!isMobile && isAuthenticated && (
             <Link 
               to="/carrito" 
               className="navbar-icon-btn" 
               title="Carrito"
               style={{
-                padding: isMobile ? '0.2rem' : '0.5rem',
-                minWidth: isMobile ? '22px' : '36px',
-                maxWidth: isMobile ? '22px' : '36px',
-                flexShrink: 0,
-                order: isMobile ? 11 : 'auto'
+                padding: '0.5rem',
+                minWidth: '44px',
+                maxWidth: '44px',
+                flexShrink: 0
               }}
             >
-              <ShoppingCart size={isMobile ? 12 : 20} />
+              <ShoppingCart size={24} />
               {cartItemsCount > 0 && (
                 <span className="navbar-badge" style={{
-                  fontSize: isMobile ? '0.35rem' : '0.6rem',
-                  padding: isMobile ? '0.05rem 0.08rem' : '0.1rem 0.25rem',
-                  minWidth: isMobile ? '9px' : '14px',
-                  lineHeight: isMobile ? '1' : '1.2'
+                  fontSize: '0.65rem',
+                  padding: '0.15rem 0.3rem',
+                  minWidth: '16px',
+                  lineHeight: '1.2'
                 }}>
                   {cartItemsCount}
                 </span>
@@ -485,6 +484,31 @@ const Navbar = () => {
           <Store size={24} />
           <span>Tienda</span>
         </Link>
+        
+        {/* Carrito - Agregado al navbar móvil */}
+        {isAuthenticated && (
+          <Link 
+            to="/carrito" 
+            className={`navbar-mobile-item ${isActive('/carrito') ? 'navbar-mobile-item--active' : ''}`}
+            style={{ position: 'relative' }}
+          >
+            <ShoppingCart size={24} />
+            {cartItemsCount > 0 && (
+              <span className="navbar-badge" style={{
+                position: 'absolute',
+                top: '0.25rem',
+                right: '0.25rem',
+                fontSize: '0.65rem',
+                padding: '0.15rem 0.3rem',
+                minWidth: '16px',
+                lineHeight: '1.2'
+              }}>
+                {cartItemsCount}
+              </span>
+            )}
+            <span>Carrito</span>
+          </Link>
+        )}
         
         {user?.isAdmin && (
           <Link 

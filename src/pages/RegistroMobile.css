@@ -118,15 +118,23 @@
     width: 100% !important;
   }
   
-  .form-group > * {
+  .form-group > *:not(.password-input-wrapper) {
     width: 100% !important;
     max-width: 100% !important;
   }
   
-  .input-wrapper,
+  .input-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
   .password-input-wrapper {
     width: 100% !important;
     max-width: 100% !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
   }
   
   .form-input {
@@ -263,6 +271,51 @@
   justify-content: center;
   transition: color 0.2s ease;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* En móvil: iconos fuera del input, a un costado */
+@media (max-width: 768px) {
+  .password-input-wrapper {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 0.5rem;
+    position: relative;
+    width: 100% !important;
+  }
+
+  .password-input-wrapper .form-input {
+    padding-right: 1rem !important; /* Padding normal, sin espacio extra para iconos */
+    flex: 1 1 auto !important; /* El input ocupa el espacio disponible */
+    min-width: 0 !important; /* Permite que se achique si es necesario */
+    width: auto !important; /* No fuerza width 100% */
+    max-width: none !important;
+  }
+
+  .password-input-wrapper .form-input.input-valid,
+  .password-input-wrapper .form-input.input-invalid {
+    padding-right: 1rem !important;
+  }
+
+  .password-input-icons {
+    position: static !important; /* Fuera del flujo absoluto */
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 0.5rem;
+    pointer-events: none;
+    flex-shrink: 0 !important; /* No se achica */
+    margin-left: 0;
+    width: auto !important;
+    max-width: none !important;
+  }
+
+  .password-toggle {
+    position: static !important; /* Fuera del flujo absoluto */
+    pointer-events: auto;
+    flex-shrink: 0 !important; /* No se achica */
+    width: auto !important;
+  }
 }
 
 .password-toggle:hover {
@@ -788,16 +841,24 @@
     scroll-snap-align: start;
   }
   
-  .form-group > * {
+  .form-group > *:not(.password-input-wrapper) {
     width: 100% !important;
     max-width: 100% !important;
   }
   
-  .input-wrapper,
-  .password-input-wrapper {
+  .input-wrapper {
     width: 100% !important;
     max-width: 100% !important;
     display: block !important;
+  }
+  
+  .password-input-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
   }
 
   .form-input {
@@ -809,6 +870,26 @@
     min-height: 48px; /* Tamaño mínimo para touch */
     word-break: break-word;
     overflow-wrap: break-word;
+  }
+  
+  .password-input-wrapper .form-input {
+    width: auto !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+  
+  .password-input-icons {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    position: static !important;
+    width: auto !important;
+    max-width: none !important;
+    flex-shrink: 0 !important;
+    margin-left: 0 !important;
+    right: auto !important;
   }
   
   .address-input-primary,

@@ -123,12 +123,25 @@ class TrackingSystem {
     };
 
     try {
-      // Guardar en Firebase
+      // Guardar en Firebase - Filtrar valores undefined (Firebase no los acepta)
       const clicksRef = ref(realtimeDb, 'tracking_clicks');
-      await push(clicksRef, {
-        ...click,
+      const firebaseData: any = {
+        id: click.id,
+        entityType: click.entityType,
+        entityId: click.entityId,
+        entityName: click.entityName,
         timestamp: click.timestamp.toISOString()
-      });
+      };
+      
+      // Solo incluir userId y userName si no son undefined
+      if (userId !== undefined && userId !== null) {
+        firebaseData.userId = userId;
+      }
+      if (userName !== undefined && userName !== null) {
+        firebaseData.userName = userName;
+      }
+      
+      await push(clicksRef, firebaseData);
       
       // Actualización optimista local
       this.clicks.unshift(click);
@@ -136,12 +149,14 @@ class TrackingSystem {
         this.clicks = this.clicks.slice(0, this.MAX_TRACKED);
       }
 
-      // También registrar en actionLogger
-      await actionLogger.log(
-        `Click en ${entityType === 'product' ? 'producto' : 'subasta'}: ${entityName}`,
-        entityType === 'product' ? 'product' : 'auction',
-        { userId, userName, entityId, details: { entityName } }
-      );
+      // También registrar en actionLogger (solo si hay userId)
+      if (userId) {
+        await actionLogger.log(
+          `Click en ${entityType === 'product' ? 'producto' : 'subasta'}: ${entityName}`,
+          entityType === 'product' ? 'product' : 'auction',
+          { userId, userName, entityId, details: { entityName } }
+        );
+      }
     } catch (error) {
       console.error('❌ Error guardando click en Firebase:', error);
       // Fallback: guardar solo localmente si falla Firebase
@@ -168,12 +183,24 @@ class TrackingSystem {
     };
 
     try {
-      // Guardar en Firebase
+      // Guardar en Firebase - Filtrar valores undefined (Firebase no los acepta)
       const searchesRef = ref(realtimeDb, 'tracking_searches');
-      await push(searchesRef, {
-        ...search,
+      const firebaseData: any = {
+        id: search.id,
+        query: search.query,
+        results: search.results,
         timestamp: search.timestamp.toISOString()
-      });
+      };
+      
+      // Solo incluir userId y userName si no son undefined
+      if (userId !== undefined && userId !== null) {
+        firebaseData.userId = userId;
+      }
+      if (userName !== undefined && userName !== null) {
+        firebaseData.userName = userName;
+      }
+      
+      await push(searchesRef, firebaseData);
       
       // Actualización optimista local
       this.searches.unshift(search);
@@ -181,12 +208,14 @@ class TrackingSystem {
         this.searches = this.searches.slice(0, this.MAX_TRACKED);
       }
 
-      // También registrar en actionLogger
-      await actionLogger.log(
-        `Búsqueda: "${query}" (${results} resultados)`,
-        'system',
-        { userId, userName, details: { query, results } }
-      );
+      // También registrar en actionLogger (solo si hay userId)
+      if (userId) {
+        await actionLogger.log(
+          `Búsqueda: "${query}" (${results} resultados)`,
+          'system',
+          { userId, userName, details: { query, results } }
+        );
+      }
     } catch (error) {
       console.error('❌ Error guardando búsqueda en Firebase:', error);
       // Fallback: guardar solo localmente si falla Firebase

@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, User, MapPin, FileText, Loader, Phone, Eye, EyeOff, CheckCircle, X } from 'lucide-react';
-import { createUserWithEmailAndPassword, sendEmailVerification, User as FirebaseUser } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, sendEmailVerification, User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db, syncUserToRealtimeDb } from '../config/firebase';
 import GoogleAddressPicker, { AddressData } from '../components/GoogleAddressPicker';
 import { GOOGLE_MAPS_CONFIG } from '../config/googleMaps';
 import EmailVerificationModal from '../components/EmailVerificationModal';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { useStore } from '../store/useStore';
+import { processGoogleAuthResult } from '../utils/googleAuthHelper';
+import { toast } from '../utils/toast';
 
 const Registro = () => {
   const navigate = useNavigate();
+  const { setUser } = useStore();
   const isMobile = useIsMobile();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -21,6 +25,7 @@ const Registro = () => {
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [registeredUser, setRegisteredUser] = useState<FirebaseUser | null>(null);
   const [addressData, setAddressData] = useState<AddressData | null>(null);
+  const [hasGoogleAuth, setHasGoogleAuth] = useState(false);
 
   const [formData, setFormData] = useState({
     email: '',
@@ -134,6 +139,59 @@ const Registro = () => {
     }
   }, [formData, addressData]);
 
+  // Detectar si el usuario se autenticó con Google mientras completaba el formulario
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Solo actuar si hay un usuario autenticado y es con Google
+      if (firebaseUser && !hasGoogleAuth) {
+        const isGoogleAuth = firebaseUser.providerData?.some(
+          (provider: any) => provider.providerId === 'google.com'
+        );
+
+        if (isGoogleAuth) {
+          setHasGoogleAuth(true);
+          
+          // Verificar si el usuario ya existe en Firestore
+          try {
+            const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+            
+            if (userDoc.exists()) {
+              // Usuario ya existe, procesar y redirigir
+              const { fullUser, needsCompleteProfile } = await processGoogleAuthResult(firebaseUser);
+              setUser(fullUser);
+              
+              toast.success('¡Ya tenés una cuenta con Google! Redirigiendo...', 3000);
+              
+              // Esperar un momento antes de redirigir
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              
+              if (needsCompleteProfile) {
+                navigate('/completar-perfil', { replace: true });
+              } else if (fullUser.isAdmin) {
+                navigate('/admin', { replace: true });
+              } else {
+                navigate('/', { replace: true });
+              }
+            } else {
+              // Usuario nuevo con Google, redirigir a completar perfil
+              toast.info('¡Cuenta creada con Google! Completá tu perfil para continuar.', 4000);
+              
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              navigate('/completar-perfil', { replace: true });
+            }
+          } catch (error: any) {
+            console.error('Error procesando autenticación Google:', error);
+            toast.error('Error al procesar tu cuenta de Google', 5000);
+          }
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [hasGoogleAuth, navigate, setUser]);
+
   const handleAddressSelect = (address: AddressData) => {
     setAddressData(address);
     setFormData(prev => ({
@@ -241,6 +299,20 @@ const Registro = () => {
     setError('');
 
     try {
+      // Verificar si el usuario ya está autenticado con Google antes de crear cuenta manual
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const isGoogleAuth = currentUser.providerData?.some(
+          (provider: any) => provider.providerId === 'google.com'
+        );
+        
+        if (isGoogleAuth) {
+          setError('Ya tenés una cuenta creada con Google. Por favor, iniciá sesión con Google o cerrá sesión primero.');
+          setLoading(false);
+          return;
+        }
+      }
+
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email,

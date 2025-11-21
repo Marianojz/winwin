@@ -68,25 +68,7 @@ const AuctionDetail = () => {
     }
   }, [timeRemaining]);
 
-  // Si la subasta no existe O si finalizó hace más de 30 minutos
-  if (!auction || ((auction.status === 'ended' || auction.status === 'sold') && !isRecentlyEnded)) {
-    return (
-      <div style={{ minHeight: 'calc(100vh - 80px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-        <div style={{ textAlign: 'center' }}>
-          <AlertCircle size={64} color="var(--error)" style={{ marginBottom: '1rem' }} />
-          <h2>Subasta no encontrada</h2>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>La subasta que buscas no existe o fue eliminada.</p>
-          <button onClick={() => navigate('/subastas')} className="btn btn-primary">
-            Volver a Subastas
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const isActive = auction.status === 'active';
-
-  // SEO: Schema.org para subasta
+  // SEO: Schema.org para subasta (DEBE ir antes de cualquier return condicional)
   const auctionImage = auction?.images[0]?.startsWith('http') 
     ? auction.images[0] 
     : auction?.images[0] 
@@ -105,6 +87,24 @@ const AuctionDetail = () => {
     type: 'product',
     structuredData: auction ? generateAuctionStructuredData(auction) : undefined
   });
+
+  // Si la subasta no existe O si finalizó hace más de 30 minutos
+  if (!auction || ((auction.status === 'ended' || auction.status === 'sold') && !isRecentlyEnded)) {
+    return (
+      <div style={{ minHeight: 'calc(100vh - 80px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+        <div style={{ textAlign: 'center' }}>
+          <AlertCircle size={64} color="var(--error)" style={{ marginBottom: '1rem' }} />
+          <h2>Subasta no encontrada</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>La subasta que buscas no existe o fue eliminada.</p>
+          <button onClick={() => navigate('/subastas')} className="btn btn-primary">
+            Volver a Subastas
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const isActive = auction.status === 'active';
 
   // Agregar hooks/cálculos auxiliares para saber tiempo restante (en segundos)
   const now = Date.now();

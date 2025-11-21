@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { User, Settings, MessageSquare, LogOut, X, Loader, LayoutDashboard, Volume2, VolumeX, Sun, Moon, Sparkles } from 'lucide-react';
+import { User, Settings, MessageSquare, LogOut, X, Loader, LayoutDashboard, Volume2, VolumeX, Sun, Moon, Sparkles, Heart } from 'lucide-react';
 import { auth } from '../config/firebase';
 import { useStore } from '../store/useStore';
 import { getUnreadCount } from '../utils/messages';
@@ -31,50 +31,71 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [soundEnabled, setSoundEnabled] = useState(soundManager.isEnabled());
-  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0, bottom: undefined as number | undefined });
+  const [menuPosition, setMenuPosition] = useState({ 
+    top: 0, 
+    right: 0, 
+    bottom: undefined as number | undefined,
+    left: undefined as number | undefined
+  });
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Calcular posición del menú cuando se abre o cambia el scroll/ventana
   useEffect(() => {
+    // Solo ejecutar si el menú está realmente abierto
+    if (menuState !== 'open') {
+      return;
+    }
+
     const updatePosition = () => {
-      if (menuState === 'open' && buttonRef.current) {
-        const rect = buttonRef.current.getBoundingClientRect();
-        // Detectar si está en navbar móvil (verificar si el padre tiene la clase navbar-mobile-item--profile)
-        const parentElement = buttonRef.current.closest('.navbar-mobile-item--profile');
-        const isInMobileNavbar = !!parentElement;
+      // Verificación doble: estado y referencia del botón
+      if (menuState !== 'open' || !buttonRef.current) {
+        return;
+      }
+
+      const rect = buttonRef.current.getBoundingClientRect();
+      // Detectar si está en navbar móvil (verificar si el padre tiene la clase navbar-mobile-item--profile)
+      const parentElement = buttonRef.current.closest('.navbar-mobile-item--profile');
+      const isInMobileNavbar = !!parentElement;
+      
+      if (isInMobileNavbar) {
+        // En navbar móvil: abrir hacia arriba, centrado y con más espacio
+        const navbarHeight = 80; // Altura aproximada del navbar móvil
         
-        if (isInMobileNavbar) {
-          // En navbar móvil: abrir hacia arriba
-          // Calcular la distancia desde el bottom de la ventana hasta el top del botón
-          const distanceFromBottom = window.innerHeight - rect.top;
-          const menuHeight = 300; // Altura aproximada del menú
-          setMenuPosition({
-            top: undefined,
-            bottom: distanceFromBottom + 12, // Espacio desde el bottom del botón
-            right: window.innerWidth - rect.right - window.scrollX
-          });
-        } else {
-          // En navbar superior: abrir hacia abajo (comportamiento normal)
-          setMenuPosition({
-            top: rect.bottom + window.scrollY + 12,
-            bottom: undefined,
-            right: window.innerWidth - rect.right - window.scrollX
-          });
-        }
+        // Posicionar el menú más arriba para que no se corte
+        // Calcular posición dinámica basada en la altura disponible
+        const viewportHeight = window.innerHeight;
+        const safeBottom = navbarHeight + 32; // Espacio seguro sobre el navbar
+        
+        setMenuPosition({
+          top: undefined,
+          bottom: safeBottom, // Más espacio sobre el navbar para que no se corte
+          right: undefined,
+          left: undefined
+        });
+      } else {
+        // En navbar superior: abrir hacia abajo (comportamiento normal)
+        setMenuPosition({
+          top: rect.bottom + window.scrollY + 12,
+          bottom: undefined,
+          right: window.innerWidth - rect.right - window.scrollX
+        });
       }
     };
 
-    if (menuState === 'open') {
+    // Ejecutar inmediatamente solo si el botón está disponible
+    if (buttonRef.current) {
       updatePosition();
-      window.addEventListener('scroll', updatePosition, true);
-      window.addEventListener('resize', updatePosition);
-      
-      return () => {
-        window.removeEventListener('scroll', updatePosition, true);
-        window.removeEventListener('resize', updatePosition);
-      };
     }
+
+    // Agregar listeners solo cuando el menú está abierto
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+    
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
   }, [menuState]);
 
   // Cargar contador de mensajes no leídos
@@ -205,7 +226,13 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
     }
   }, [location.pathname, menuState, navigatingTo]);
 
-  const toggleMenu = () => {
+  const toggleMenu = (e?: React.MouseEvent) => {
+    // Prevenir propagación de eventos
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    
     if (menuState === 'open') {
       closeMenu();
     } else {
@@ -264,6 +291,12 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
         icon: User,
         path: '/perfil',
         onClick: () => handleNavigation('/perfil')
+      },
+      {
+        label: 'Mis Favoritos',
+        icon: Heart,
+        path: '/mis-favoritos',
+        onClick: () => handleNavigation('/mis-favoritos')
       },
       {
         label: 'Configuración',
@@ -330,12 +363,21 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
       style={{
         position: 'fixed',
         ...(menuPosition.bottom !== undefined 
-          ? { bottom: `${menuPosition.bottom}px`, top: 'auto' }
-          : { top: `${menuPosition.top}px`, bottom: 'auto' }
-        ),
-        ...(menuPosition.bottom !== undefined
-          ? { left: '50%', right: 'auto', transform: 'translateX(-50%)' }
-          : { right: `${menuPosition.right}px`, left: 'auto' }
+          ? { 
+              bottom: `${menuPosition.bottom}px`, 
+              top: 'auto',
+              left: '50%', 
+              right: 'auto',
+              transform: 'translateX(-50%)',
+              maxWidth: '90vw',
+              width: 'calc(100vw - 2rem)'
+            }
+          : { 
+              top: `${menuPosition.top}px`, 
+              bottom: 'auto',
+              right: `${menuPosition.right}px`, 
+              left: 'auto'
+            }
         ),
         zIndex: 99999
       }}
@@ -460,9 +502,17 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
       <button
         ref={buttonRef}
         className="avatar-menu-trigger"
-        onClick={toggleMenu}
+        onClick={(e) => {
+          e.stopPropagation();
+          toggleMenu(e);
+        }}
+        onMouseDown={(e) => {
+          // Prevenir que otros eventos abran el menú
+          e.stopPropagation();
+        }}
         aria-label="Menú de usuario"
         aria-expanded={menuState === 'open'}
+        type="button"
       >
         {avatarUrl && avatarUrl.startsWith('http') ? (
           <>

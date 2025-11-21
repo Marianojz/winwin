@@ -3,6 +3,7 @@ import { Upload, Image, Palette, Sparkles, Smile, Briefcase, X, Check, Loader, R
 import { uploadImage } from '../utils/imageUpload';
 import { auth } from '../config/firebase';
 import { compressAvatar, supportsWebP } from '../utils/imageCompression';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import './AvatarGallery.css';
 
 export interface AvatarOption {
@@ -20,6 +21,7 @@ interface AvatarGalleryProps {
 }
 
 const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps) => {
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState<'serios' | 'felices' | 'bizarros' | 'cyber' | 'punk' | 'monkey' | 'modernos' | 'upload' | 'google' | 'editor'>('serios');
   const [selectedAvatar, setSelectedAvatar] = useState<AvatarOption | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -594,6 +596,17 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
   };
 
   const currentAvatars = avatarGallery[activeTab] || [];
+  
+  // Combinar todos los avatares en una sola lista para móvil
+  const allAvatars = [
+    ...avatarGallery.serios,
+    ...avatarGallery.felices,
+    ...avatarGallery.bizarros,
+    ...avatarGallery.cyber,
+    ...avatarGallery.punk,
+    ...avatarGallery.monkey,
+    ...avatarGallery.modernos
+  ];
 
   return (
     <div className="avatar-gallery-overlay" onClick={onClose}>
@@ -608,39 +621,99 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
         </div>
 
         <div className="avatar-gallery-content">
-          {/* Vista previa - Movida arriba para móvil */}
+          {/* Vista previa - Reorganizada para móvil */}
           <div className="avatar-preview-section">
-            <h3>Vista Previa</h3>
-            <div className="preview-container">
-              {previewUrl ? (
-                <img src={previewUrl} alt="Preview" className="preview-image" />
-              ) : (
-                <div className="preview-placeholder">
-                  <Image size={32} />
-                  <span>Seleccioná un avatar</span>
+            <div className="preview-wrapper">
+              {/* Título centrado sobre la vista previa */}
+              <div className="preview-title-wrapper">
+                <h3>Vista Previa</h3>
+              </div>
+              
+              <div className="preview-content-wrapper">
+                <div className="preview-container">
+                  {previewUrl ? (
+                    <img src={previewUrl} alt="Preview" className="preview-image" />
+                  ) : (
+                    <div className="preview-placeholder">
+                      <Image size={32} />
+                      <span>Seleccioná un avatar</span>
+                    </div>
+                  )}
                 </div>
+                
+                {/* Botones de Editor, Subir y Confirmar al lado en móvil */}
+                {isMobile && (
+                  <div className="preview-actions">
+                    <button
+                      className="btn-action btn-editor"
+                      onClick={() => setActiveTab('editor')}
+                      title="Editor de Avatar"
+                    >
+                      <Palette size={18} />
+                      <span>Editor</span>
+                    </button>
+                    <label
+                      htmlFor="avatar-upload"
+                      className="btn-action btn-upload"
+                      title="Subir Imagen"
+                    >
+                      <Upload size={18} />
+                      <span>Subir</span>
+                      <input
+                        type="file"
+                        id="avatar-upload"
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                    <button
+                      className="btn-action btn-confirm-action"
+                      onClick={handleConfirm}
+                      disabled={!previewUrl || uploading}
+                      title="Confirmar Avatar"
+                    >
+                      {uploading ? (
+                        <>
+                          <Loader className="animate-spin" size={18} />
+                          <span>Subiendo...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check size={18} />
+                          <span>Confirmar</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              {/* Botón de confirmar para desktop */}
+              {!isMobile && (
+                <button
+                  className="btn-confirm"
+                  onClick={handleConfirm}
+                  disabled={!previewUrl || uploading}
+                >
+                  {uploading ? (
+                    <>
+                      <Loader className="animate-spin" size={18} />
+                      Subiendo...
+                    </>
+                  ) : (
+                    <>
+                      <Check size={18} />
+                      Confirmar Avatar
+                    </>
+                  )}
+                </button>
               )}
             </div>
-            <button
-              className="btn-confirm"
-              onClick={handleConfirm}
-              disabled={!previewUrl || uploading}
-            >
-              {uploading ? (
-                <>
-                  <Loader className="animate-spin" size={18} />
-                  Subiendo...
-                </>
-              ) : (
-                <>
-                  <Check size={18} />
-                  Confirmar Avatar
-                </>
-              )}
-            </button>
           </div>
 
-          {/* Tabs */}
+          {/* Tabs - Ocultos en móvil */}
+          {!isMobile && (
           <div className="avatar-tabs">
             <button
               className={`tab ${activeTab === 'serios' ? 'active' : ''}`}
@@ -713,45 +786,125 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
               Editor
             </button>
           </div>
+          )}
 
           {/* Contenido según tab activo */}
           <div className="avatar-gallery-body">
-            {activeTab !== 'upload' && activeTab !== 'google' && activeTab !== 'editor' && (
-              <div className="avatar-grid">
-                {currentAvatars.map((avatar) => (
-                  <div
-                    key={avatar.id}
-                    className={`avatar-card ${selectedAvatar?.id === avatar.id ? 'selected' : ''}`}
-                    onClick={() => handleAvatarSelect(avatar)}
-                  >
-                    <div className="avatar-preview">
-                      {avatar.imageUrl ? (
-                        <img src={avatar.imageUrl} alt={avatar.name} />
-                      ) : (
-                        <div className="avatar-placeholder">{avatar.name[0]}</div>
-                      )}
+            {/* En móvil: mostrar todos los avatares incluyendo Google, o editor/upload si están activos */}
+            {isMobile ? (
+              <>
+                {/* Si editor o upload están activos, mostrar solo esa sección */}
+                {activeTab === 'editor' || activeTab === 'upload' ? (
+                  <>
+                    {/* Botón para volver */}
+                    <div style={{ padding: '1rem', borderBottom: '1px solid var(--border)' }}>
+                      <button
+                        onClick={() => setActiveTab('serios')}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--primary)',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          fontWeight: 600
+                        }}
+                      >
+                        ← Volver
+                      </button>
                     </div>
-                    <div className="avatar-info">
-                      <h4>{avatar.name}</h4>
-                      <p>{avatar.description}</p>
-                      <span className="avatar-style">{avatar.style}</span>
+                  </>
+                ) : (
+                  <>
+                    {/* Todos los avatares incluyendo Google en scroll */}
+                    <div className="all-avatars-section-mobile">
+                      <h4 className="section-title-mobile">Avatares Disponibles</h4>
+                      <div className="avatar-grid-mobile">
+                        {/* Google como primer avatar si está disponible */}
+                        {auth.currentUser?.photoURL && (
+                          <div
+                            className={`avatar-card-mobile ${previewUrl === auth.currentUser.photoURL ? 'selected' : ''}`}
+                            onClick={handleGoogleAvatar}
+                          >
+                            <div className="avatar-preview-mobile">
+                              <img src={auth.currentUser.photoURL} alt="Google Avatar" />
+                            </div>
+                            <div className="avatar-info-mobile">
+                              <h4>Foto de Google</h4>
+                              <p>Usa tu foto de perfil de Google</p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Resto de avatares */}
+                        {allAvatars.map((avatar) => (
+                          <div
+                            key={avatar.id}
+                            className={`avatar-card-mobile ${selectedAvatar?.id === avatar.id ? 'selected' : ''}`}
+                            onClick={() => handleAvatarSelect(avatar)}
+                          >
+                            <div className="avatar-preview-mobile">
+                              {avatar.imageUrl ? (
+                                <img src={avatar.imageUrl} alt={avatar.name} />
+                              ) : (
+                                <div className="avatar-placeholder-mobile">{avatar.name[0]}</div>
+                              )}
+                            </div>
+                            <div className="avatar-info-mobile">
+                              <h4>{avatar.name}</h4>
+                              <p>{avatar.description}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Desktop: comportamiento original con tabs */}
+                {activeTab !== 'upload' && activeTab !== 'google' && activeTab !== 'editor' && (
+                  <div className="avatar-grid">
+                    {currentAvatars.map((avatar) => (
+                      <div
+                        key={avatar.id}
+                        className={`avatar-card ${selectedAvatar?.id === avatar.id ? 'selected' : ''}`}
+                        onClick={() => handleAvatarSelect(avatar)}
+                      >
+                        <div className="avatar-preview">
+                          {avatar.imageUrl ? (
+                            <img src={avatar.imageUrl} alt={avatar.name} />
+                          ) : (
+                            <div className="avatar-placeholder">{avatar.name[0]}</div>
+                          )}
+                        </div>
+                        <div className="avatar-info">
+                          <h4>{avatar.name}</h4>
+                          <p>{avatar.description}</p>
+                          <span className="avatar-style">{avatar.style}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
 
+            {/* Secciones de upload, google y editor */}
             {activeTab === 'upload' && (
               <div className="upload-section">
                 <div className="upload-area">
                   <input
                     type="file"
-                    id="avatar-upload"
+                    id="avatar-upload-desktop"
                     accept="image/*"
                     onChange={handleFileUpload}
                     style={{ display: 'none' }}
                   />
-                  <label htmlFor="avatar-upload" className="upload-label">
+                  <label htmlFor="avatar-upload-desktop" className="upload-label">
                     {uploading ? (
                       <>
                         <Loader className="animate-spin" size={32} />
@@ -769,7 +922,7 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
               </div>
             )}
 
-            {activeTab === 'google' && (
+            {activeTab === 'google' && !isMobile && (
               <div className="google-section">
                 {auth.currentUser?.photoURL ? (
                   <div className="google-avatar-preview">
@@ -788,6 +941,7 @@ const AvatarGallery = ({ currentAvatar, onSelect, onClose }: AvatarGalleryProps)
               </div>
             )}
 
+            {/* Editor: mostrar cuando está activo (desde botón en móvil o tab en desktop) */}
             {activeTab === 'editor' && (
               <div className="editor-section">
                 <div className="editor-controls">

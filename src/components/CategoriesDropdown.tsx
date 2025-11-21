@@ -16,26 +16,37 @@ const CategoriesDropdown = () => {
 
   // Calcular posición del menú cuando se abre o cambia el scroll/ventana
   useEffect(() => {
+    // Solo ejecutar si el dropdown está realmente abierto
+    if (!isOpen) {
+      return;
+    }
+
     const updatePosition = () => {
-      if (isOpen && buttonRef.current) {
-        const rect = buttonRef.current.getBoundingClientRect();
-        setMenuPosition({
-          top: rect.bottom + window.scrollY + 8,
-          left: rect.left + window.scrollX
-        });
+      // Verificación doble: estado y referencia del botón
+      if (!isOpen || !buttonRef.current) {
+        return;
       }
+
+      const rect = buttonRef.current.getBoundingClientRect();
+      setMenuPosition({
+        top: rect.bottom + window.scrollY + 8,
+        left: rect.left + window.scrollX
+      });
     };
 
-    if (isOpen) {
+    // Ejecutar inmediatamente solo si el botón está disponible
+    if (buttonRef.current) {
       updatePosition();
-      window.addEventListener('scroll', updatePosition, true);
-      window.addEventListener('resize', updatePosition);
-      
-      return () => {
-        window.removeEventListener('scroll', updatePosition, true);
-        window.removeEventListener('resize', updatePosition);
-      };
     }
+
+    // Agregar listeners solo cuando el dropdown está abierto
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+    
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
   }, [isOpen]);
 
   // Cerrar el dropdown al hacer clic fuera
@@ -120,8 +131,16 @@ const CategoriesDropdown = () => {
       <button
         ref={buttonRef}
         className="categories-dropdown-button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
         onMouseEnter={() => !isMobile && setIsOpen(true)}
+        onMouseDown={(e) => {
+          // Prevenir que otros eventos abran el dropdown
+          e.stopPropagation();
+        }}
+        type="button"
         style={{
           display: 'flex',
           alignItems: 'center',
