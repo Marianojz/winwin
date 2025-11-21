@@ -587,9 +587,9 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
                 <span style={{ color: 'var(--primary)', fontWeight: 700 }}>✓</span>
                 <span>
                   Precio: {formatCurrency(product.price)} por unidad
-                  {product.unidades && product.bultos && (
+                  {product.unitsPerBundle && product.bundles && (
                     <span style={{ display: 'block', marginTop: '0.25rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                      ({product.bultos} bulto{product.bultos !== 1 ? 's' : ''} disponibles, {product.unidades} unidades por bulto)
+                      ({product.bundles} bulto{product.bundles !== 1 ? 's' : ''} disponibles, {product.unitsPerBundle} unidades por bulto)
                     </span>
                   )}
                 </span>

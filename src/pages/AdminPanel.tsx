@@ -1418,7 +1418,10 @@ const [auctionForm, setAuctionForm] = useState({
         badges: [] as string[],
         stickers: [] as string[],
         active: true,
-        featured: false
+        featured: false,
+        unitsPerBundle: 1,
+        bundles: 0,
+        sellOnlyByBundle: false
       });
 
       setActiveTab('products');
@@ -4604,7 +4607,10 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   allowExtension: true,
                   scheduled: false,
                   scheduledDate: '',
-                  scheduledTime: ''
+                  scheduledTime: '',
+                  unitsPerBundle: 1,
+                  bundles: 0,
+                  sellOnlyByBundle: false
                 });
                 setEditingAuction(null);
                 setActiveTab('create-auction');
