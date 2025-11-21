@@ -25,25 +25,31 @@ const firebaseConfig = {
 };
 
 // Validar que las credenciales estén configuradas
-if (import.meta.env.DEV) {
-  const requiredVars = [
-    'VITE_FIREBASE_API_KEY',
-    'VITE_FIREBASE_AUTH_DOMAIN',
-    'VITE_FIREBASE_PROJECT_ID',
-    'VITE_FIREBASE_STORAGE_BUCKET',
-    'VITE_FIREBASE_MESSAGING_SENDER_ID',
-    'VITE_FIREBASE_APP_ID',
-    'VITE_FIREBASE_DATABASE_URL'
-  ];
-  
-  const missingVars = requiredVars.filter(varName => !import.meta.env[varName]);
-  
-  if (missingVars.length > 0) {
-    console.error('❌ Variables de entorno de Firebase faltantes:', missingVars);
+const requiredVars = [
+  'VITE_FIREBASE_API_KEY',
+  'VITE_FIREBASE_AUTH_DOMAIN',
+  'VITE_FIREBASE_PROJECT_ID',
+  'VITE_FIREBASE_STORAGE_BUCKET',
+  'VITE_FIREBASE_MESSAGING_SENDER_ID',
+  'VITE_FIREBASE_APP_ID',
+  'VITE_FIREBASE_DATABASE_URL'
+];
+
+const missingVars = requiredVars.filter(varName => !import.meta.env[varName]);
+
+if (missingVars.length > 0) {
+  console.error('❌ Variables de entorno de Firebase faltantes:', missingVars);
+  if (import.meta.env.DEV) {
     console.error('   Crea un archivo .env con las variables necesarias (ver .env.example)');
   } else {
-    console.log('✅ Todas las variables de entorno de Firebase están configuradas');
+    console.error('   ⚠️ PRODUCCIÓN: Configura las variables de entorno en Vercel:');
+    console.error('   1. Ve a https://vercel.com/dashboard');
+    console.error('   2. Selecciona tu proyecto → Settings → Environment Variables');
+    console.error('   3. Agrega todas las variables que empiecen con VITE_FIREBASE_');
+    console.error('   4. Haz un nuevo deploy después de agregar las variables');
   }
+} else {
+  console.log('✅ Todas las variables de entorno de Firebase están configuradas');
 }
 
 // Inicializar Firebase
