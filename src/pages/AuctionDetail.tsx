@@ -493,34 +493,34 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
 {isActive ? (
   <div
     style={{
-      padding: '1rem 0.75rem',
+      padding: '0.75rem 0.5rem',
       background: lessThanOneMinute ? '#ffa726' : 'var(--bg-tertiary)',
       borderRadius: '0.75rem',
       boxShadow: lessThanOneMinute
         ? '0 0 35px 5px #FFA50080, 0 0 15px #ff5722, inset 0 0 20px rgba(255, 87, 34, 0.3)' : '0 2px 8px #0001',
       border: lessThanOneMinute ? '3px solid #e65100' : '2px solid var(--primary)',
       color: lessThanOneMinute ? '#fff' : 'var(--text-primary)',
-      marginBottom: '1.25rem',
       position: 'relative',
       textAlign: 'center',
       transition: 'all .33s cubic-bezier(.6,-0.01,0,1.01)',
-      animation: lessThanTenSeconds ? 'container-panic 0.5s infinite' : (lessThanOneMinute ? 'container-pulse 1.5s ease-in-out infinite' : undefined)
+      animation: lessThanTenSeconds ? 'container-panic 0.5s infinite' : (lessThanOneMinute ? 'container-pulse 1.5s ease-in-out infinite' : undefined),
+      flexShrink: 0
     }}
   >
     <div
       className="countdown-container"
       style={{
-        marginBottom: '0.5rem',
+        marginBottom: '0.375rem',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: '1rem',
+        gap: '0.75rem',
         flexWrap: 'wrap',
         animation: lessThanTenSeconds ? 'shake-intense 0.25s infinite' : (lessThanOneMinute ? 'pulse-urgent-intense 0.8s ease-in-out infinite' : undefined)
       }}
     >
       <Clock 
-        size={lessThanOneMinute ? 48 : 40} 
+        size={lessThanOneMinute ? 36 : 32} 
         className="countdown-clock"
         style={{ 
           color: lessThanOneMinute ? '#fff7a7' : 'var(--primary)', 
@@ -533,9 +533,9 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
         className="countdown-text"
         style={{
           fontWeight: '900',
-          fontSize: lessThanOneMinute ? '3rem' : '2.5rem',
+          fontSize: lessThanOneMinute ? '2rem' : '1.75rem',
           color: lessThanOneMinute ? '#fff' : 'var(--primary)',
-          letterSpacing: '2px',
+          letterSpacing: '1px',
           transition: 'all .3s',
           animation: lessThanOneMinute ? 'blinker-intense 0.6s steps(2) infinite' : undefined,
           textShadow: lessThanOneMinute ? '0 0 30px rgba(255, 255, 255, 1), 0 0 60px rgba(255, 247, 167, 0.8), 0 0 90px rgba(255, 247, 167, 0.4)' : '0 4px 12px rgba(255, 107, 0, 0.4)',
@@ -547,7 +547,7 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
       </span>
     </div>
     <div style={{
-      fontSize: '1rem', 
+      fontSize: '0.875rem', 
       fontWeight: 600,
       animation: lessThanOneMinute ? 'text-pulse 1s ease-in-out infinite' : undefined,
       wordWrap: 'break-word',
@@ -636,13 +636,17 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
             {(auction.status === 'active' && auction.endTime && new Date(auction.endTime) > new Date()) ? (
               <div style={{ 
                 background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%)', 
-                padding: '2rem', 
+                padding: '1.25rem', 
                 borderRadius: '1rem', 
-                marginBottom: '1.5rem',
                 border: '2px solid var(--primary)',
                 boxShadow: '0 0 20px rgba(255, 107, 0, 0.3)',
                 position: 'relative',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                flex: '1 1 auto',
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 0,
+                maxHeight: '100%'
               }}>
                 <div style={{
                   position: 'absolute',
@@ -655,13 +659,13 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
                   pointerEvents: 'none',
                   zIndex: 0
                 }} />
-                <div style={{ position: 'relative', zIndex: 1 }}>
-                  <h3 style={{ marginBottom: '1.5rem', fontSize: '1.5rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Gavel size={24} />
+                <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }}>
+                  <h3 style={{ marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Gavel size={20} />
                     Realizar Oferta
                   </h3>
                   
-                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
                     <input
                       type="number"
                       value={bidAmount}
@@ -669,25 +673,25 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
                       placeholder="Ingresa tu oferta"
                       style={{
                         flex: 1,
-                        padding: '1rem',
+                        padding: '0.75rem',
                         borderRadius: '0.5rem',
                         border: '2px solid var(--primary)',
                         background: 'var(--bg-tertiary)',
                         color: 'var(--text-primary)',
-                        fontSize: '1.125rem',
+                        fontSize: '1rem',
                         fontWeight: 600
                       }}
                     />
                   </div>
 
-                  <div className="bid-increment-buttons" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-                    <button onClick={() => incrementBid(500)} className="btn btn-secondary" style={{ flex: '1 1 auto', minWidth: '80px' }}>+$500</button>
-                    <button onClick={() => incrementBid(1000)} className="btn btn-secondary" style={{ flex: '1 1 auto', minWidth: '80px' }}>+$1.000</button>
-                    <button onClick={() => incrementBid(5000)} className="btn btn-secondary" style={{ flex: '1 1 auto', minWidth: '80px' }}>+$5.000</button>
+                  <div className="bid-increment-buttons" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+                    <button onClick={() => incrementBid(500)} className="btn btn-secondary" style={{ flex: '1 1 auto', minWidth: '70px', padding: '0.5rem', fontSize: '0.875rem' }}>+$500</button>
+                    <button onClick={() => incrementBid(1000)} className="btn btn-secondary" style={{ flex: '1 1 auto', minWidth: '70px', padding: '0.5rem', fontSize: '0.875rem' }}>+$1.000</button>
+                    <button onClick={() => incrementBid(5000)} className="btn btn-secondary" style={{ flex: '1 1 auto', minWidth: '70px', padding: '0.5rem', fontSize: '0.875rem' }}>+$5.000</button>
                   </div>
 
                   {showBidError && (
-                    <div style={{ color: 'var(--error)', marginBottom: '1rem', fontSize: '0.875rem', padding: '0.75rem', background: 'rgba(255, 0, 0, 0.1)', borderRadius: '0.5rem' }}>
+                    <div style={{ color: 'var(--error)', marginBottom: '0.75rem', fontSize: '0.75rem', padding: '0.5rem', background: 'rgba(255, 0, 0, 0.1)', borderRadius: '0.5rem' }}>
                       {showBidError}
                     </div>
                   )}
@@ -697,15 +701,16 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
                     className="btn btn-primary" 
                     style={{ 
                       width: '100%', 
-                      padding: '1.25rem',
-                      fontSize: '1.25rem',
+                      padding: '0.875rem',
+                      fontSize: '1rem',
                       fontWeight: 700,
                       background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
                       border: 'none',
                       boxShadow: '0 0 25px rgba(255, 107, 0, 0.5), 0 8px 16px rgba(255, 107, 0, 0.3)',
                       transition: 'all 0.3s ease',
                       position: 'relative',
-                      overflow: 'hidden'
+                      overflow: 'hidden',
+                      marginTop: 'auto'
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.boxShadow = '0 0 35px rgba(255, 107, 0, 0.7), 0 12px 24px rgba(255, 107, 0, 0.4)';
@@ -716,7 +721,7 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
                       e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   >
-                    <Gavel size={24} style={{ marginRight: '0.5rem' }} />
+                    <Gavel size={20} style={{ marginRight: '0.5rem' }} />
                     Realizar Oferta
                   </button>
                 </div>
@@ -733,34 +738,34 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
             {auction.buyNowPrice && isActive && (
               <div style={{ 
                 background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%)', 
-                padding: '1.5rem', 
+                padding: '1rem', 
                 borderRadius: '1rem', 
-                marginBottom: '1.5rem',
                 border: '2px solid var(--success)',
-                boxShadow: '0 4px 16px rgba(34, 197, 94, 0.2)'
+                boxShadow: '0 4px 16px rgba(34, 197, 94, 0.2)',
+                flex: '0 1 auto'
               }}>
-                <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: 600 }}>
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.375rem', fontWeight: 600 }}>
                     🛒 Compra Directa Disponible
                   </div>
-                  <div className="buy-now-price" style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--success)', marginBottom: '0.5rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                  <div className="buy-now-price" style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--success)', marginBottom: '0.375rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
                     {formatCurrency(auction.buyNowPrice)}
                   </div>
                   {auction.sellOnlyByBundle && auction.unitsPerBundle && auction.unitsPerBundle > 0 && (
                     <div style={{ 
-                      fontSize: '0.8125rem', 
+                      fontSize: '0.75rem', 
                       color: 'var(--warning)', 
                       fontWeight: 600,
-                      padding: '0.5rem',
+                      padding: '0.375rem',
                       background: 'rgba(255, 167, 38, 0.1)',
                       borderRadius: '0.5rem',
-                      marginBottom: '0.5rem'
+                      marginBottom: '0.375rem'
                     }}>
                       ⚠️ Solo se vende por bulto completo: {auction.unitsPerBundle} unidades
                     </div>
                   )}
                   {auction.unitsPerBundle && auction.unitsPerBundle > 0 && auction.bundles && auction.bundles > 0 && !auction.sellOnlyByBundle && (
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.375rem' }}>
                       📦 {auction.bundles} bulto{auction.bundles !== 1 ? 's' : ''} disponible{auction.bundles !== 1 ? 's' : ''} ({auction.unitsPerBundle} unidades por bulto)
                     </div>
                   )}
@@ -770,8 +775,8 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
                   className="btn btn-success" 
                   style={{ 
                     width: '100%',
-                    padding: '1rem',
-                    fontSize: '1.125rem',
+                    padding: '0.75rem',
+                    fontSize: '1rem',
                     fontWeight: 600,
                     boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)',
                     transition: 'all 0.3s ease'
@@ -785,7 +790,7 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
                     e.currentTarget.style.transform = 'translateY(0)';
                   }}
                 >
-                  <ShoppingCart size={22} style={{ marginRight: '0.5rem' }} />
+                  <ShoppingCart size={18} style={{ marginRight: '0.5rem' }} />
                   Comprar Ahora
                 </button>
               </div>
@@ -805,22 +810,32 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
         
 
             {lastThreeBids.length > 0 && (
-              <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem' }}>
-                <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <TrendingUp size={20} />
+              <div style={{ 
+                background: 'var(--bg-secondary)', 
+                padding: '1rem', 
+                borderRadius: '1rem',
+                flex: '1 1 auto',
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 0,
+                maxHeight: '100%',
+                overflow: 'hidden'
+              }}>
+                <h3 style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem' }}>
+                  <TrendingUp size={18} />
                   Últimas Ofertas
                 </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', overflow: 'auto', flex: '1 1 auto', minHeight: 0 }}>
                   {lastThreeBids.map((bid) => (
-                    <div key={bid.id} className="bid-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div key={bid.id} className="bid-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', minWidth: 0, flex: '1 1 auto' }}>
-                        <User size={16} style={{ flexShrink: 0 }} />
-                        <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>{bid.username}</span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                        <User size={14} style={{ flexShrink: 0 }} />
+                        <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word', fontSize: '0.875rem' }}>{bid.username}</span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                           {formatTimeAgo(bid.createdAt)}
                         </span>
                       </div>
-                      <div style={{ fontWeight: 600, color: 'var(--primary)', wordBreak: 'break-word', overflowWrap: 'break-word', flexShrink: 0 }}>
+                      <div style={{ fontWeight: 600, color: 'var(--primary)', wordBreak: 'break-word', overflowWrap: 'break-word', flexShrink: 0, fontSize: '0.875rem' }}>
                         {formatCurrency(bid.amount)}
                       </div>
                     </div>
@@ -882,12 +897,14 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 2rem;
-          align-items: start;
+          align-items: stretch;
         }
 
         .auction-images {
           position: sticky;
           top: 1rem;
+          display: flex;
+          flex-direction: column;
         }
 
         .auction-main-image {
@@ -899,6 +916,7 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
           display: flex;
           align-items: center;
           justify-content: center;
+          flex-shrink: 0;
         }
 
         .auction-main-image img {
@@ -911,6 +929,24 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 0.75rem;
+          flex-shrink: 0;
+        }
+
+        .auction-info {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+          height: 100%;
+          overflow: hidden;
+        }
+
+        .auction-price-box {
+          flex-shrink: 0;
+          padding: 1rem !important;
+        }
+
+        .auction-price-amount {
+          font-size: 2rem !important;
         }
 
         .auction-thumbnail {
@@ -945,7 +981,7 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
           background: var(--bg-secondary);
           padding: 1.5rem;
           border-radius: 1rem;
-          margin-bottom: 1.5rem;
+          flex-shrink: 0;
         }
 
         .auction-price-label {
