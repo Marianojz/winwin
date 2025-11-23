@@ -311,7 +311,7 @@ const AuctionManager = () => {
                     o.productId === auction.id && 
                     o.userId === winnerId && 
                     o.type === 'auction'
-                  );
+                  ) as any;
                   
                   if (existingOrder) {
                     console.log(`⏭️ Ya existe una orden para esta subasta (ID: ${auction.id}) y ganador (${winnerName}). Orden existente: ${existingOrder.id}`);

@@ -7877,6 +7877,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                     intervalMin: 5,
                     intervalMax: 15,
                     maxBidAmount: 5000,
+                    minIncrement: 500,
                     targetAuctions: []
                   });
                   setShowBotForm(true);
@@ -8169,6 +8170,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                         intervalMin: 5,
                         intervalMax: 15,
                         maxBidAmount: 5000,
+                        minIncrement: 500,
                         targetAuctions: []
                       });
                     }}

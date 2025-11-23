@@ -1269,7 +1269,7 @@ export const useStore = create<AppState>((set, get) => ({
             o.type === 'auction' &&
             o.productId === order.productId &&
             o.userId === order.userId
-          );
+          ) as any;
           
           if (existingOrder) {
             console.warn(`⚠️ Ya existe una orden en Firebase para esta subasta (productId: ${order.productId}) y usuario (${order.userId}). Orden existente: ${existingOrder.id}`);
