@@ -1013,6 +1013,7 @@ const [auctionForm, setAuctionForm] = useState({
     intervalMin: 5,
     intervalMax: 15,
     maxBidAmount: 5000,
+    minIncrement: 500, // Incremento mínimo por oferta
     targetAuctions: [] as string[]
   });
   const [showBotForm, setShowBotForm] = useState(false);
@@ -1055,29 +1056,36 @@ const [auctionForm, setAuctionForm] = useState({
     const delivered = orders.filter((o: { status: string; }) => o.status === 'delivered').length;
     
     // Ingresos - incluir pedidos de tienda y subastas
+    // Excluir pedidos de bots (ficticios)
+    const isNotBotOrder = (o: { userId?: string; }) => !o.userId || !o.userId.startsWith('bot-');
+    
     // Ingresos de pedidos de tienda (delivered)
     const storeOrdersRevenue = orders
-      .filter((o: { status: string; type?: string; }) => o.status === 'delivered' && o.type === 'store')
+      .filter((o: { status: string; type?: string; userId?: string; }) => 
+        o.status === 'delivered' && o.type === 'store' && isNotBotOrder(o))
       .reduce((sum: any, o: { amount: any; }) => sum + (o.amount || 0), 0);
     
     // Ingresos de subastas (pedidos de subastas entregados)
     const auctionOrdersRevenue = orders
-      .filter((o: { status: string; type?: string; }) => o.status === 'delivered' && o.type === 'auction')
+      .filter((o: { status: string; type?: string; userId?: string; }) => 
+        o.status === 'delivered' && o.type === 'auction' && isNotBotOrder(o))
       .reduce((sum: any, o: { amount: any; }) => sum + (o.amount || 0), 0);
     
     // Ingresos totales (pedidos confirmados/pagados)
     const totalRevenue = orders
-      .filter((o: { status: string; }) => ['payment_confirmed', 'processing', 'in_transit', 'delivered'].includes(o.status))
+      .filter((o: { status: string; userId?: string; }) => 
+        ['payment_confirmed', 'processing', 'in_transit', 'delivered'].includes(o.status) && isNotBotOrder(o))
       .reduce((sum: any, o: { amount: any; }) => sum + (o.amount || 0), 0);
     
     // Ingresos del mes
     const monthRevenue = orders
-      .filter((o: { createdAt: string | number | Date; status: string; }) => {
+      .filter((o: { createdAt: string | number | Date; status: string; userId?: string; }) => {
         const orderDate = new Date(o.createdAt);
         const now = new Date();
         return orderDate.getMonth() === now.getMonth() && 
                orderDate.getFullYear() === now.getFullYear() &&
-               ['payment_confirmed', 'processing', 'in_transit', 'delivered'].includes(o.status);
+               ['payment_confirmed', 'processing', 'in_transit', 'delivered'].includes(o.status) &&
+               isNotBotOrder(o);
       })
       .reduce((sum: any, o: { amount: any; }) => sum + (o.amount || 0), 0);
     
@@ -1647,6 +1655,52 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
   };
 
   // Funciones para Bots
+  const handleClearBotOrders = async () => {
+    const botOrders = orders.filter((order: Order) => order.userId && order.userId.startsWith('bot-'));
+    
+    if (botOrders.length === 0) {
+      alert('✅ No hay pedidos de bots para eliminar');
+      return;
+    }
+    
+    const confirm = window.confirm(
+      `¿Eliminar ${botOrders.length} pedido(s) de bots?\n\nEsta acción eliminará todos los pedidos ficticios creados por bots.`
+    );
+    
+    if (!confirm) return;
+    
+    try {
+      let deletedCount = 0;
+      let failedDeletions: string[] = [];
+      
+      for (const order of botOrders) {
+        try {
+          await remove(dbRef(realtimeDb, `orders/${order.id}`));
+          deletedCount++;
+          logOrderAction('Pedido de bot eliminado', order.id, user?.id, user?.username, {
+            status: order.status,
+            actionType: 'cleanup_bot'
+          });
+          await new Promise(resolve => setTimeout(resolve, 100)); // Pequeña pausa
+        } catch (error: any) {
+          console.error(`❌ Error eliminando pedido de bot ${order.id}:`, error);
+          failedDeletions.push(order.id);
+        }
+      }
+      
+      if (failedDeletions.length > 0) {
+        alert(`⚠️ Se eliminaron ${deletedCount} pedidos, pero ${failedDeletions.length} fallaron.`);
+      } else {
+        alert(`✅ Se eliminaron ${deletedCount} pedido(s) de bots correctamente`);
+      }
+      
+      logAdminAction(`Limpieza de pedidos de bots: ${deletedCount} eliminados`, user?.id, user?.username);
+    } catch (error: any) {
+      console.error('❌ Error en limpieza de pedidos de bots:', error);
+      alert('❌ Error al eliminar pedidos de bots. Por favor intenta nuevamente.');
+    }
+  };
+
   const handleAddBot = async () => {
     if (!botForm.name || !botForm.name.trim()) {
       alert('⚠️ Por favor ingresa un nombre para el bot');
@@ -1677,6 +1731,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         intervalMin: Number(botForm.intervalMin),
         intervalMax: Number(botForm.intervalMax),
         maxBidAmount: Number(botForm.maxBidAmount),
+        minIncrement: Number(botForm.minIncrement) || 500,
         isActive: true,
         targetAuctions: botForm.targetAuctions || []
       };
@@ -1690,6 +1745,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
         intervalMin: 5,
         intervalMax: 15,
         maxBidAmount: 5000,
+        minIncrement: 500,
         targetAuctions: []
       });
       
@@ -1887,11 +1943,37 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
   }, [selectedOrder, user?.isAdmin]);
 
   // Filtrar pedidos y eliminar duplicados
-  const uniqueOrders = orders.filter((order: Order, index: number, self: Order[]) => 
-    index === self.findIndex((o: Order) => o.id === order.id)
-  );
+  // Para órdenes de subastas, también verificar por productId + userId para evitar duplicados
+  const uniqueOrders = orders.filter((order: Order, index: number, self: Order[]) => {
+    // Primero filtrar por ID único
+    const sameIdIndex = self.findIndex((o: Order) => o.id === order.id);
+    if (index !== sameIdIndex) {
+      return false; // Duplicado por ID
+    }
+    
+    // Para órdenes de subastas, también verificar duplicados por productId + userId
+    if (order.type === 'auction' && order.productId) {
+      const duplicateByAuction = self.findIndex((o: Order) => 
+        o.type === 'auction' &&
+        o.productId === order.productId &&
+        o.userId === order.userId &&
+        o.id !== order.id // Diferente ID pero misma subasta y usuario
+      );
+      if (duplicateByAuction !== -1 && duplicateByAuction < index) {
+        // Si hay una orden anterior con la misma subasta y usuario, mantener solo la primera
+        return false;
+      }
+    }
+    
+    return true;
+  });
   
   const filteredOrders = uniqueOrders.filter((order: Order) => {
+    // Excluir pedidos de bots (los bots tienen userId que empieza con "bot-")
+    if (order.userId && order.userId.startsWith('bot-')) {
+      return false;
+    }
+    
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || 
                          order.id.toLowerCase().includes(searchLower) ||
@@ -1953,8 +2035,13 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
   // Estadísticas mejoradas: ingresos por subastas y tienda, más buscado, más cliqueado
   const getEnhancedStats = () => {
     // Ingresos por subastas (ventas ganadas) - usar la oferta ganadora real
+    // Excluir subastas ganadas por bots (ficticias)
     const auctionsWithWinner = getAuctionsWithWinner(auctions);
     const auctionRevenue = auctionsWithWinner.reduce((sum: number, a: Auction) => {
+      // Excluir si el ganador es un bot
+      if (a.winnerId && a.winnerId.startsWith('bot-')) {
+        return sum; // No contar ingresos de bots
+      }
       // Si hay ofertas, usar la oferta más alta (ganadora)
       if (a.bids && a.bids.length > 0) {
         const winningBid = a.bids.reduce((highest, current) => 
@@ -1967,8 +2054,10 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     }, 0);
 
     // Ingresos por tienda (pedidos entregados)
+    // Excluir pedidos de bots (ficticios)
     const storeRevenue = orders
-      .filter((o: { status: string; }) => o.status === 'delivered')
+      .filter((o: { status: string; userId?: string; }) => 
+        o.status === 'delivered' && (!o.userId || !o.userId.startsWith('bot-')))
       .reduce((sum: number, o: { amount: number }) => sum + (o.amount || 0), 0);
 
     // Egresos (gastos) - por ahora 0, pero se puede expandir
@@ -2003,6 +2092,13 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
   // Usar useMemo para recalcular cuando cambien los datos o refreshKey
   const enhancedStats = useMemo(() => getEnhancedStats(), [auctions, orders, refreshKey]);
   const orderStats = useMemo(() => getTotalStats(), [orders, refreshKey]);
+  
+  // Filtrar subastas duplicadas para evitar claves duplicadas en React
+  const uniqueAuctions = useMemo(() => {
+    return auctions.filter((auction: Auction, index: number, self: Auction[]) => 
+      index === self.findIndex((a: Auction) => a.id === auction.id)
+    );
+  }, [auctions]);
 
   // Debug: verificar que las estadísticas se calculan
   useEffect(() => {
@@ -4628,7 +4724,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
             gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))',
             gap: '1.5rem'
           }}>
-            {auctions.map((auction: Auction) => (
+            {uniqueAuctions.map((auction: Auction) => (
               <div key={auction.id} style={{
                 background: 'var(--bg-secondary)',
                 padding: '1.5rem',
@@ -6078,23 +6174,35 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                       });
                       
                       let deletedCount = 0;
+                      const errors: string[] = [];
                       for (const order of ordersToDelete) {
                         try {
-                          await remove(dbRef(realtimeDb, `orders/${order.id}`));
+                          // Verificar que el pedido existe antes de eliminarlo
+                          const orderRef = dbRef(realtimeDb, `orders/${order.id}`);
+                          await remove(orderRef);
                           deletedCount++;
                           logOrderAction('Pedido eliminado (limpieza >30 días)', order.id, user?.id, user?.username, { 
                             status: order.status,
                             actionType: 'cleanup_old'
                           });
-                        } catch (error) {
+                          // Pequeño delay para asegurar que Firebase procese la eliminación
+                          await new Promise(resolve => setTimeout(resolve, 100));
+                        } catch (error: any) {
                           console.error(`Error eliminando pedido ${order.id}:`, error);
+                          errors.push(`Pedido ${order.id}: ${error.message || 'Error desconocido'}`);
                         }
                       }
                       
+                      // Actualizar estado local después de todas las eliminaciones
                       const cleanedOrders = orders.filter((o: Order) => !ordersToDelete.find(d => d.id === o.id));
                       setOrders(cleanedOrders);
+                      
                       logAdminAction(`Limpieza de pedidos: ${deletedCount} eliminados de Firebase`, user?.id, user?.username);
-                      alert(`✅ ${deletedCount} pedidos antiguos eliminados de Firebase`);
+                      if (errors.length > 0) {
+                        alert(`⚠️ ${deletedCount} pedidos eliminados, ${errors.length} errores:\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? '\n...' : ''}`);
+                      } else {
+                        alert(`✅ ${deletedCount} pedidos antiguos eliminados de Firebase`);
+                      }
                     }
                   }}
                   className="btn btn-secondary"
@@ -6128,23 +6236,35 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                       }
                       
                       let deletedCount = 0;
+                      const errors: string[] = [];
                       for (const order of ordersToDelete) {
                         try {
-                          await remove(dbRef(realtimeDb, `orders/${order.id}`));
+                          // Verificar que el pedido existe antes de eliminarlo
+                          const orderRef = dbRef(realtimeDb, `orders/${order.id}`);
+                          await remove(orderRef);
                           deletedCount++;
                           logOrderAction('Pedido eliminado (limpieza <30 días)', order.id, user?.id, user?.username, { 
                             status: order.status,
                             actionType: 'cleanup_recent'
                           });
-                        } catch (error) {
+                          // Pequeño delay para asegurar que Firebase procese la eliminación
+                          await new Promise(resolve => setTimeout(resolve, 100));
+                        } catch (error: any) {
                           console.error(`Error eliminando pedido ${order.id}:`, error);
+                          errors.push(`Pedido ${order.id}: ${error.message || 'Error desconocido'}`);
                         }
                       }
                       
+                      // Actualizar estado local después de todas las eliminaciones
                       const cleanedOrders = orders.filter((o: Order) => !ordersToDelete.find(d => d.id === o.id));
                       setOrders(cleanedOrders);
+                      
                       logAdminAction(`Limpieza de pedidos recientes: ${deletedCount} eliminados de Firebase`, user?.id, user?.username);
-                      alert(`✅ ${deletedCount} pedidos recientes eliminados de Firebase`);
+                      if (errors.length > 0) {
+                        alert(`⚠️ ${deletedCount} pedidos eliminados, ${errors.length} errores:\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? '\n...' : ''}`);
+                      } else {
+                        alert(`✅ ${deletedCount} pedidos recientes eliminados de Firebase`);
+                      }
                     }
                   }}
                   className="btn btn-secondary"
@@ -7370,7 +7490,12 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                                   const orderDisplay = order.orderNumber || `#${order.id.slice(-8).toUpperCase()}`;
                                   if (window.confirm(`¿Eliminar permanentemente el pedido ${orderDisplay}?\n\nEsta acción no se puede deshacer.`)) {
                                     try {
-                                      await remove(dbRef(realtimeDb, `orders/${order.id}`));
+                                      const orderRef = dbRef(realtimeDb, `orders/${order.id}`);
+                                      await remove(orderRef);
+                                      
+                                      // Pequeño delay para asegurar que Firebase procese la eliminación
+                                      await new Promise(resolve => setTimeout(resolve, 200));
+                                      
                                       const remainingOrders = orders.filter(o => o.id !== order.id);
                                       setOrders(remainingOrders);
                                       logOrderAction('Pedido eliminado', order.id, user?.id, user?.username, { 
@@ -7378,9 +7503,13 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                                         actionType: 'delete'
                                       });
                                       alert('✅ Pedido eliminado de Firebase');
-                                    } catch (error) {
-                                      console.error('Error eliminando pedido:', error);
-                                      alert('❌ Error al eliminar el pedido');
+                                    } catch (error: any) {
+                                      console.error('❌ Error eliminando pedido:', error);
+                                      if (error?.code === 'PERMISSION_DENIED') {
+                                        alert(`❌ Error de permisos al eliminar el pedido.\n\nVerifica que:\n- Eres administrador\n- isAdmin está sincronizado en Realtime Database\n\nError: ${error.message}`);
+                                      } else {
+                                        alert(`❌ Error al eliminar el pedido: ${error.message || 'Error desconocido'}`);
+                                      }
                                     }
                                   }
                                 }}
@@ -7499,6 +7628,20 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   Desactivar Todos
                 </button>
                 <button
+                  onClick={handleClearBotOrders}
+                  className="btn btn-secondary"
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem',
+                    padding: '0.875rem 1.25rem',
+                    fontSize: '0.9375rem'
+                  }}
+                >
+                  <Trash2 size={18} />
+                  Limpiar Pedidos de Bots
+                </button>
+                <button
                   onClick={() => {
                     setBotForm({
                       name: '',
@@ -7506,6 +7649,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                       intervalMin: 5,
                       intervalMax: 15,
                       maxBidAmount: 5000,
+                      minIncrement: 500,
                       targetAuctions: []
                     });
                     setShowBotForm(true);
@@ -7707,6 +7851,25 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 Desactivar Todos
               </button>
               <button
+                onClick={handleClearBotOrders}
+                className="btn btn-secondary"
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  padding: '0.875rem 1rem',
+                  fontSize: '0.875rem',
+                  width: '100%',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-primary)'
+                }}
+              >
+                <Trash2 size={18} />
+                Limpiar Pedidos de Bots
+              </button>
+              <button
                 onClick={() => {
                   setBotForm({
                     name: '',
@@ -7809,6 +7972,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                       intervalMin: 5,
                       intervalMax: 15,
                       maxBidAmount: 5000,
+                      minIncrement: 500,
                       targetAuctions: []
                     });
                   }}
@@ -7884,6 +8048,31 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                         fontSize: isMobile ? '16px' : '1rem'
                       }}
                     />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      Incremento Mínimo por Oferta
+                    </label>
+                    <input
+                      type="number"
+                      min="100"
+                      step="100"
+                      value={botForm.minIncrement}
+                      onChange={(e) => setBotForm({ ...botForm, minIncrement: Number(e.target.value) })}
+                      placeholder="500"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '1rem'
+                      }}
+                    />
+                    <small style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
+                      El bot ofertará incrementando de a este monto (por defecto: $500)
+                    </small>
                   </div>
                   <div style={{ display: isMobile ? 'block' : 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                     <div>

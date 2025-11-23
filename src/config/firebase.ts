@@ -61,7 +61,7 @@ export const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence).catch(() => {/* ignore */});
 export const db = getFirestore(app);
 export const storage = getStorage(app);
-export const realtimeDb = getDatabase(app);  // <- NUEVA EXPORTACIÓN
+export const realtimeDb = getDatabase(app);
 
 export default app;
 

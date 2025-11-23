@@ -751,6 +751,52 @@ export const useStore = create<AppState>((set, get) => ({
       targetUserId = notification.userId || user.id;
     }
     
+    // Verificar si ya existe una notificación similar (mismo tipo, mismo mensaje, mismo usuario)
+    // Esto evita notificaciones duplicadas cuando el AuctionManager procesa la misma subasta múltiples veces
+    
+    // Primero verificar en el estado local
+    const existingNotifications = get().notifications;
+    const isDuplicateLocal = existingNotifications.some(n => 
+      n.type === notification.type &&
+      n.message === notification.message &&
+      n.userId === targetUserId &&
+      // Verificar que no sea muy antigua (menos de 10 minutos) para evitar falsos positivos
+      n.createdAt && (Date.now() - n.createdAt.getTime()) < 10 * 60 * 1000
+    );
+    
+    if (isDuplicateLocal) {
+      console.log(`⏭️ Notificación duplicada detectada localmente, omitiendo: ${notification.type} - ${notification.message?.substring(0, 50)}...`);
+      return; // No crear notificación duplicada
+    }
+    
+    // También verificar en Firebase para asegurarnos de que no existe
+    try {
+      const notificationsRef = ref(realtimeDb, `notifications/${targetUserId}`);
+      const snapshot = await firebaseGet(notificationsRef);
+      
+      if (snapshot.exists()) {
+        const firebaseNotifications = snapshot.val();
+        const isDuplicateFirebase = Object.values(firebaseNotifications).some((n: any) => {
+          const createdAt = n.createdAt ? new Date(n.createdAt).getTime() : 0;
+          const timeDiff = Date.now() - createdAt;
+          return (
+            n.type === notification.type &&
+            n.message === notification.message &&
+            n.userId === targetUserId &&
+            timeDiff < 10 * 60 * 1000 // Menos de 10 minutos
+          );
+        });
+        
+        if (isDuplicateFirebase) {
+          console.log(`⏭️ Notificación duplicada detectada en Firebase, omitiendo: ${notification.type} - ${notification.message?.substring(0, 50)}...`);
+          return; // No crear notificación duplicada
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Error verificando duplicados en Firebase, continuando con creación:', error);
+      // Continuar con la creación si hay un error al verificar
+    }
+    
     const newNotification = {
       ...notification,
       userId: targetUserId, // Asegurar que userId esté en la notificación
@@ -1187,6 +1233,19 @@ export const useStore = create<AppState>((set, get) => ({
       console.warn(`⚠️ Pedido con ID ${order.id} ya existe, no se agregará duplicado`);
       return;
     }
+    
+    // Para órdenes de subastas, verificar duplicados por productId + userId
+    if (order.type === 'auction' && order.productId) {
+      const duplicateOrder = currentOrders.find((o: Order) => 
+        o.type === 'auction' &&
+        o.productId === order.productId &&
+        o.userId === order.userId
+      );
+      if (duplicateOrder) {
+        console.warn(`⚠️ Ya existe una orden para esta subasta (productId: ${order.productId}) y usuario (${order.userId}). Orden existente: ${duplicateOrder.id}`);
+        return;
+      }
+    }
 
     // Guardar en Firebase Realtime Database
     try {
@@ -1196,6 +1255,30 @@ export const useStore = create<AppState>((set, get) => ({
       // Verificar que el usuario esté autenticado
       if (!user) {
         throw new Error('Usuario no autenticado');
+      }
+      
+      // Verificar en Firebase si ya existe una orden duplicada (para órdenes de subastas)
+      if (order.type === 'auction' && order.productId) {
+        try {
+          const ordersRef = ref(realtimeDb, 'orders');
+          const ordersSnapshot = await firebaseGet(ordersRef);
+          const existingOrders = ordersSnapshot.val() || {};
+          
+          // Buscar si ya existe una orden para esta subasta y este usuario
+          const existingOrder = Object.values(existingOrders).find((o: any) => 
+            o.type === 'auction' &&
+            o.productId === order.productId &&
+            o.userId === order.userId
+          );
+          
+          if (existingOrder) {
+            console.warn(`⚠️ Ya existe una orden en Firebase para esta subasta (productId: ${order.productId}) y usuario (${order.userId}). Orden existente: ${existingOrder.id}`);
+            return; // No crear orden duplicada
+          }
+        } catch (checkError) {
+          console.warn('⚠️ Error verificando órdenes duplicadas en Firebase, continuando con creación:', checkError);
+          // Continuar con la creación si hay error en la verificación
+        }
       }
       
       // Construir objeto sin valores undefined (Firebase no los acepta)

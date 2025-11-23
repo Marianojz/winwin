@@ -152,6 +152,7 @@ export interface Bot {
   intervalMin: number;
   intervalMax: number;
   maxBidAmount: number;
+  minIncrement?: number; // Incremento mínimo por oferta (por defecto 500)
   isActive: boolean;
   targetAuctions: string[];
   createdAt?: Date | string;

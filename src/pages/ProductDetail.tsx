@@ -241,21 +241,25 @@ const ProductDetail = () => {
         await logOrderCreated(order.id, orderNumber, user.id, user.username, order.amount);
 
         // Reducir stock temporalmente (se devolverá si no paga)
-        const updatedProducts = products.map(p => {
-          if (p.id === product.id) {
-            const updatedProduct: any = {
-              ...p,
-              stock: p.stock - quantity
-            };
-            // Solo actualizar bundles si el producto tiene unitsPerBundle
-            if (product.unitsPerBundle && product.unitsPerBundle > 0) {
-              updatedProduct.bundles = (product.bundles || 0) - Math.floor(quantity / product.unitsPerBundle);
+        // NO reducir stock si es un bot (compras ficticias)
+        const isBot = user.id.startsWith('bot-');
+        if (!isBot) {
+          const updatedProducts = products.map(p => {
+            if (p.id === product.id) {
+              const updatedProduct: any = {
+                ...p,
+                stock: p.stock - quantity
+              };
+              // Solo actualizar bundles si el producto tiene unitsPerBundle
+              if (product.unitsPerBundle && product.unitsPerBundle > 0) {
+                updatedProduct.bundles = (product.bundles || 0) - Math.floor(quantity / product.unitsPerBundle);
+              }
+              return updatedProduct;
             }
-            return updatedProduct;
-          }
-          return p;
-        });
-        setProducts(updatedProducts);
+            return p;
+          });
+          setProducts(updatedProducts);
+        }
 
         addNotification({
           userId: 'current',
@@ -320,21 +324,25 @@ const ProductDetail = () => {
         await logOrderCreated(order.id, orderNumber, user.id, user.username, order.amount);
 
         // Reducir stock (ya que el pedido está confirmado)
-        const updatedProducts = products.map(p => {
-          if (p.id === product.id) {
-            const updatedProduct: any = {
-              ...p,
-              stock: p.stock - quantity
-            };
-            // Solo actualizar bundles si el producto tiene unitsPerBundle
-            if (product.unitsPerBundle && product.unitsPerBundle > 0) {
-              updatedProduct.bundles = (product.bundles || 0) - Math.floor(quantity / product.unitsPerBundle);
+        // NO reducir stock si es un bot (compras ficticias)
+        const isBot = user.id.startsWith('bot-');
+        if (!isBot) {
+          const updatedProducts = products.map(p => {
+            if (p.id === product.id) {
+              const updatedProduct: any = {
+                ...p,
+                stock: p.stock - quantity
+              };
+              // Solo actualizar bundles si el producto tiene unitsPerBundle
+              if (product.unitsPerBundle && product.unitsPerBundle > 0) {
+                updatedProduct.bundles = (product.bundles || 0) - Math.floor(quantity / product.unitsPerBundle);
+              }
+              return updatedProduct;
             }
-            return updatedProduct;
-          }
-          return p;
-        });
-        setProducts(updatedProducts);
+            return p;
+          });
+          setProducts(updatedProducts);
+        }
 
         // Enviar mensaje de preparación al cliente
         const preparationMessage = await createAutoMessage(

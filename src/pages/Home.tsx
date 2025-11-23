@@ -73,9 +73,14 @@ const Home = () => {
     }
   }, []);
   
+  // Filtrar subastas duplicadas y activas
+  const uniqueActiveAuctions = auctions.filter((auction, index, self) => 
+    index === self.findIndex((a) => a.id === auction.id) && 
+    (!auction.status || auction.status === 'active')
+  );
+
   // Filtrar subastas destacadas y activas (primero destacadas, luego por fecha)
-  const featuredAuctions = auctions
-    .filter(a => a.status === 'active')
+  const featuredAuctions = uniqueActiveAuctions
     .sort((a, b) => {
       // Prioridad: destacadas primero
       if (a.featured && !b.featured) return -1;
@@ -116,7 +121,7 @@ const Home = () => {
               </div>
               <div className="hero-stats" style={{ marginTop: '0.75rem' }}>
                 <div className="stat-item">
-                  <span className="stat-number">{homeConfig.siteSettings?.heroStats?.auctions || auctions.length}</span>
+                  <span className="stat-number">{homeConfig.siteSettings?.heroStats?.auctions || uniqueActiveAuctions.length}</span>
                   <span className="stat-label">Subastas Activas</span>
                 </div>
                 <div className="stat-item">

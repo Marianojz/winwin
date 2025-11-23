@@ -104,18 +104,41 @@ const LogoManager = ({
       return;
     }
 
-    // Crear preview local
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      setPreview(result);
-      setConfig(prev => ({ ...prev, url: result }));
-    };
-    reader.readAsDataURL(file);
-
-    // Subir a Firebase con optimización de calidad
+    // Crear preview local y generar favicons ANTES de subir a Firebase
     setUploading(true);
     try {
+      // Leer archivo como data URL
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const result = e.target?.result as string;
+          resolve(result);
+        };
+        reader.onerror = () => reject(new Error('Error leyendo archivo'));
+        reader.readAsDataURL(file);
+      });
+      
+      // Mostrar preview
+      setPreview(dataUrl);
+      setConfig(prev => ({ ...prev, url: dataUrl }));
+      
+      // Generar favicons desde la data URL local (antes de subir a Firebase)
+      // Esto evita problemas de CORS con Firebase Storage
+      try {
+        const favicons = await generateMultipleFavicons(dataUrl, [16, 32, 180]);
+        updateAllFavicons(favicons);
+        
+        // Guardar favicons como data URLs en la configuración
+        if (onConfigChange) {
+          onConfigChange({ faviconUrl: favicons[32] || dataUrl });
+        }
+      } catch (faviconError) {
+        if (import.meta.env.DEV) {
+          console.warn('⚠️ Error generando favicon:', faviconError);
+        }
+        // No bloquear el proceso si falla el favicon
+      }
+      
       // Optimizar imagen manteniendo alta calidad (máximo 2048px para logos grandes)
       let optimizedFile: File | Blob = file;
       
@@ -129,20 +152,6 @@ const LogoManager = ({
       const uploadedUrl = await uploadImage(optimizedFile, 'logo');
       setConfig(prev => ({ ...prev, url: uploadedUrl }));
       onLogoChange(uploadedUrl);
-      
-      // Generar y actualizar favicon automáticamente
-      try {
-        const favicons = await generateMultipleFavicons(uploadedUrl, [16, 32, 180]);
-        updateAllFavicons(favicons);
-        
-        // Guardar URL del favicon en Firebase para persistencia
-        if (onConfigChange) {
-          onConfigChange({ faviconUrl: favicons[32] || uploadedUrl });
-        }
-      } catch (faviconError) {
-        console.warn('Error generando favicon:', faviconError);
-        // No bloquear el proceso si falla el favicon
-      }
       
       setPreview(null); // Limpiar preview local
       setError(null);
@@ -204,17 +213,41 @@ const LogoManager = ({
 
       if (!validateFile(file)) return;
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        setPreview(result);
-        setConfig(prev => ({ ...prev, url: result }));
-        setHasChanges(true);
-      };
-      reader.readAsDataURL(file);
-
       setUploading(true);
       try {
+        // Leer archivo como data URL
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const result = e.target?.result as string;
+            resolve(result);
+          };
+          reader.onerror = () => reject(new Error('Error leyendo archivo'));
+          reader.readAsDataURL(file);
+        });
+        
+        // Mostrar preview
+        setPreview(dataUrl);
+        setConfig(prev => ({ ...prev, url: dataUrl }));
+        setHasChanges(true);
+        
+        // Generar favicons desde la data URL local (antes de subir a Firebase)
+        // Esto evita problemas de CORS con Firebase Storage
+        try {
+          const favicons = await generateMultipleFavicons(dataUrl, [16, 32, 180]);
+          updateAllFavicons(favicons);
+          
+          // Guardar favicons como data URLs en la configuración
+          if (onConfigChange) {
+            onConfigChange({ faviconUrl: favicons[32] || dataUrl });
+          }
+        } catch (faviconError) {
+          if (import.meta.env.DEV) {
+            console.warn('⚠️ Error generando favicon:', faviconError);
+          }
+          // No bloquear el proceso si falla el favicon
+        }
+        
         // Optimizar imagen manteniendo alta calidad
         let optimizedFile: File | Blob = file;
         
@@ -228,20 +261,6 @@ const LogoManager = ({
         const uploadedUrl = await uploadImage(optimizedFile, 'logo');
         setConfig(prev => ({ ...prev, url: uploadedUrl }));
         onLogoChange(uploadedUrl);
-        
-        // Generar y actualizar favicon automáticamente
-        try {
-          const favicons = await generateMultipleFavicons(uploadedUrl, [16, 32, 180]);
-          updateAllFavicons(favicons);
-          
-          // Guardar URL del favicon en Firebase para persistencia
-          if (onConfigChange) {
-            onConfigChange({ faviconUrl: favicons[32] || uploadedUrl });
-          }
-        } catch (faviconError) {
-          console.warn('Error generando favicon:', faviconError);
-          // No bloquear el proceso si falla el favicon
-        }
         
         setPreview(null);
         setError(null);

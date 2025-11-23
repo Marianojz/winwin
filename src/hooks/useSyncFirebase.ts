@@ -53,6 +53,45 @@ const useSyncFirebase = () => {
             })) : [];
             
             // ✅ CORRECCIÓN: Estructura tipada correctamente
+            // Parsear endTime correctamente, validando que sea una fecha válida
+            let endTime: Date;
+            if (auctionData?.endTime) {
+              if (auctionData.endTime instanceof Date) {
+                endTime = auctionData.endTime;
+              } else if (typeof auctionData.endTime === 'string') {
+                endTime = new Date(auctionData.endTime);
+              } else {
+                console.warn(`⚠️ Subasta ${key} tiene endTime inválido:`, auctionData.endTime);
+                endTime = new Date(); // Fallback a fecha actual
+              }
+              
+              // Validar que la fecha sea válida
+              if (isNaN(endTime.getTime())) {
+                console.warn(`⚠️ Subasta ${key} tiene endTime inválido (NaN), usando fecha actual como fallback`);
+                endTime = new Date();
+              }
+            } else {
+              console.warn(`⚠️ Subasta ${key} no tiene endTime, usando fecha actual como fallback`);
+              endTime = new Date();
+            }
+            
+            // Parsear startTime de la misma manera
+            let startTime: Date;
+            if (auctionData?.startTime) {
+              if (auctionData.startTime instanceof Date) {
+                startTime = auctionData.startTime;
+              } else if (typeof auctionData.startTime === 'string') {
+                startTime = new Date(auctionData.startTime);
+              } else {
+                startTime = new Date();
+              }
+              if (isNaN(startTime.getTime())) {
+                startTime = new Date();
+              }
+            } else {
+              startTime = new Date();
+            }
+            
             return {
               id: key,
               title: auctionData?.title || 'Sin título',
@@ -61,8 +100,8 @@ const useSyncFirebase = () => {
               startingPrice: auctionData?.startingPrice || 0,
               currentPrice: auctionData?.currentPrice || 0,
               buyNowPrice: auctionData?.buyNowPrice,
-              startTime: new Date(auctionData?.startTime || new Date()),
-              endTime: new Date(auctionData?.endTime || new Date()),
+              startTime: startTime,
+              endTime: endTime,
               status: auctionData?.status || 'active',
               categoryId: auctionData?.categoryId || 'general',
               bids: bids,
@@ -76,8 +115,18 @@ const useSyncFirebase = () => {
           })
           .filter((auction): auction is any => auction !== null); // Filtrar nulls
         
-        console.log(`✅ Firebase - Subastas sincronizadas: ${auctionsArray.length} (filtradas ${Object.keys(data).length - auctionsArray.length} corruptas/antiguas)`);
-        setAuctions(auctionsArray);
+        // Eliminar duplicados por ID (por si acaso hay duplicados en Firebase)
+        const uniqueAuctions = Array.from(
+          new Map(auctionsArray.map(auction => [auction.id, auction])).values()
+        );
+        
+        const duplicatesCount = auctionsArray.length - uniqueAuctions.length;
+        if (duplicatesCount > 0) {
+          console.warn(`⚠️ Se encontraron ${duplicatesCount} subasta(s) duplicada(s), eliminadas`);
+        }
+        
+        console.log(`✅ Firebase - Subastas sincronizadas: ${uniqueAuctions.length} (filtradas ${Object.keys(data).length - uniqueAuctions.length} corruptas/antiguas/duplicadas)`);
+        setAuctions(uniqueAuctions);
       } else {
         console.log('📭 Firebase - No hay subastas');
         setAuctions([]);
@@ -125,8 +174,11 @@ const useSyncFirebase = () => {
       if (data) {
         const ordersArray = Object.keys(data).map(key => {
           const orderData = data[key];
+          // Usar el ID del objeto si existe, de lo contrario usar la clave
+          // Esto asegura que el ID sea consistente con cómo se guarda
+          const orderId = orderData?.id || key;
           return {
-            id: key,
+            id: orderId,
             userId: orderData?.userId || '',
             userName: orderData?.userName || '',
             productId: orderData?.productId || '',
@@ -142,7 +194,11 @@ const useSyncFirebase = () => {
             paidAt: orderData?.paidAt ? new Date(orderData.paidAt) : undefined,
             shippedAt: orderData?.shippedAt ? new Date(orderData.shippedAt) : undefined,
             deliveredAt: orderData?.deliveredAt ? new Date(orderData.deliveredAt) : undefined,
-            address: orderData?.address || { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } }
+            address: orderData?.address || { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } },
+            orderNumber: orderData?.orderNumber,
+            quantity: orderData?.quantity,
+            unitsPerBundle: orderData?.unitsPerBundle,
+            bundles: orderData?.bundles
           };
         });
         console.log('✅ Pedidos sincronizados desde Firebase:', ordersArray.length);

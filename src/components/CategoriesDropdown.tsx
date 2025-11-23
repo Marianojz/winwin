@@ -11,41 +11,77 @@ const CategoriesDropdown = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const lastPositionRef = useRef<{ top: number; left: number } | null>(null);
+  const rafIdRef = useRef<number | null>(null);
   const isMobile = useIsMobile();
 
   // Calcular posición del menú cuando se abre o cambia el scroll/ventana
   useEffect(() => {
     // Solo ejecutar si el dropdown está realmente abierto
     if (!isOpen) {
+      setMenuPosition(null);
+      lastPositionRef.current = null;
       return;
     }
 
     const updatePosition = () => {
       // Verificación doble: estado y referencia del botón
-      if (!isOpen || !buttonRef.current) {
+      if (!buttonRef.current) {
         return;
       }
 
       const rect = buttonRef.current.getBoundingClientRect();
-      setMenuPosition({
+      const newPosition = {
         top: rect.bottom + window.scrollY + 8,
         left: rect.left + window.scrollX
+      };
+
+      // Actualizar siempre la primera vez, luego solo si cambió significativamente
+      const isFirstUpdate = lastPositionRef.current === null;
+      const hasChanged = !lastPositionRef.current || 
+        Math.abs(newPosition.top - lastPositionRef.current.top) > 1 ||
+        Math.abs(newPosition.left - lastPositionRef.current.left) > 1;
+
+      if (isFirstUpdate || hasChanged) {
+        lastPositionRef.current = newPosition;
+        setMenuPosition(newPosition);
+      }
+    };
+
+    // Función throttled usando requestAnimationFrame para suavizar las actualizaciones
+    const throttledUpdate = () => {
+      if (rafIdRef.current !== null) {
+        return; // Ya hay una actualización pendiente
+      }
+      
+      rafIdRef.current = requestAnimationFrame(() => {
+        updatePosition();
+        rafIdRef.current = null;
       });
     };
 
-    // Ejecutar inmediatamente solo si el botón está disponible
-    if (buttonRef.current) {
-      updatePosition();
-    }
+    // Ejecutar inmediatamente cuando se abre el menú
+    // Usar requestAnimationFrame para asegurar que el DOM esté listo
+    rafIdRef.current = requestAnimationFrame(() => {
+      if (buttonRef.current) {
+        updatePosition();
+      }
+      rafIdRef.current = null;
+    });
 
     // Agregar listeners solo cuando el dropdown está abierto
-    window.addEventListener('scroll', updatePosition, true);
-    window.addEventListener('resize', updatePosition);
+    // Usar passive: true para mejor rendimiento
+    window.addEventListener('scroll', throttledUpdate, { passive: true });
+    window.addEventListener('resize', throttledUpdate, { passive: true });
     
     return () => {
-      window.removeEventListener('scroll', updatePosition, true);
-      window.removeEventListener('resize', updatePosition);
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      window.removeEventListener('scroll', throttledUpdate);
+      window.removeEventListener('resize', throttledUpdate);
     };
   }, [isOpen]);
 
@@ -71,7 +107,7 @@ const CategoriesDropdown = () => {
     };
   }, [isOpen]);
 
-  const dropdownMenu = isOpen ? (
+  const dropdownMenu = isOpen && menuPosition ? (
     <div 
       ref={menuRef}
       className="categories-dropdown-menu"
