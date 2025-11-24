@@ -349,38 +349,7 @@ const Navbar = () => {
             </span>
           </Link>
 
-          {/* 4. Notificaciones - Reordenado (primero) */}
-          {isAuthenticated && (
-            <Link 
-              to="/notificaciones" 
-              className="navbar-icon-btn" 
-              title="Notificaciones"
-              style={{
-                padding: isMobile ? '0.3rem' : '0.5rem',
-                minWidth: isMobile ? '28px' : '44px',
-                maxWidth: isMobile ? '28px' : '44px',
-                flexShrink: 0,
-                marginLeft: isMobile ? 'auto' : '0',
-                position: isMobile ? 'relative' : 'relative',
-                zIndex: isMobile ? 10 : 'auto',
-                order: isMobile ? 10 : 'auto'
-              }}
-            >
-              <Bell size={isMobile ? 18 : 24} />
-              {unreadCount > 0 && (
-                <span className="navbar-badge" style={{
-                  fontSize: isMobile ? '0.4rem' : '0.65rem',
-                  padding: isMobile ? '0.1rem 0.15rem' : '0.15rem 0.3rem',
-                  minWidth: isMobile ? '10px' : '16px',
-                  lineHeight: isMobile ? '1' : '1.2'
-                }}>
-                  {unreadCount}
-                </span>
-              )}
-            </Link>
-          )}
-
-          {/* 5. Carrito - Solo visible en desktop */}
+          {/* 4. Carrito - Solo visible en desktop */}
           {!isMobile && isAuthenticated && (
             <Link 
               to="/carrito" 
@@ -407,6 +376,33 @@ const Navbar = () => {
             </Link>
           )}
 
+          {/* 5. Notificaciones */}
+          {!isMobile && isAuthenticated && (
+            <Link 
+              to="/notificaciones" 
+              className="navbar-icon-btn" 
+              title="Notificaciones"
+              style={{
+                padding: '0.5rem',
+                minWidth: '44px',
+                maxWidth: '44px',
+                flexShrink: 0
+              }}
+            >
+              <Bell size={24} />
+              {unreadCount > 0 && (
+                <span className="navbar-badge" style={{
+                  fontSize: '0.65rem',
+                  padding: '0.15rem 0.3rem',
+                  minWidth: '16px',
+                  lineHeight: '1.2'
+                }}>
+                  {unreadCount}
+                </span>
+              )}
+            </Link>
+          )}
+
           {/* 6. Modos de colores - Reordenado (oculto en móvil) */}
           {!isMobile && (
             <div style={{ 
@@ -418,7 +414,7 @@ const Navbar = () => {
             </div>
           )}
 
-          {/* 8. Perfil - Solo visible en desktop, oculto en móvil */}
+          {/* 7. Perfil - Siempre al extremo derecho en desktop */}
           {!isMobile && (
             <>
               {isAuthenticated ? (
@@ -453,6 +449,37 @@ const Navbar = () => {
                 </Link>
               )}
             </>
+          )}
+
+          {/* Notificaciones en móvil - Mantener en móvil */}
+          {isMobile && isAuthenticated && (
+            <Link 
+              to="/notificaciones" 
+              className="navbar-icon-btn" 
+              title="Notificaciones"
+              style={{
+                padding: '0.3rem',
+                minWidth: '28px',
+                maxWidth: '28px',
+                flexShrink: 0,
+                marginLeft: 'auto',
+                position: 'relative',
+                zIndex: 10,
+                order: 10
+              }}
+            >
+              <Bell size={18} />
+              {unreadCount > 0 && (
+                <span className="navbar-badge" style={{
+                  fontSize: '0.4rem',
+                  padding: '0.1rem 0.15rem',
+                  minWidth: '10px',
+                  lineHeight: '1'
+                }}>
+                  {unreadCount}
+                </span>
+              )}
+            </Link>
           )}
         </div>
       </nav>

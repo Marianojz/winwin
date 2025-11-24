@@ -237,12 +237,6 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
             <span className="price-label">Oferta Actual</span>
             <span className="price-value">{formatCurrency(auction.currentPrice)}</span>
           </div>
-          {auction.buyNowPrice && isActive && (
-            <div className="price-buynow">
-              <span className="price-label">Compra Ya</span>
-              <span className="price-value">{formatCurrency(auction.buyNowPrice)}</span>
-            </div>
-          )}
         </div>
 
         {isActive ? (

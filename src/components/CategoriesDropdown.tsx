@@ -32,9 +32,10 @@ const CategoriesDropdown = () => {
       }
 
       const rect = buttonRef.current.getBoundingClientRect();
+      // Usar getBoundingClientRect directamente sin window.scrollY porque el navbar es sticky
       const newPosition = {
-        top: rect.bottom + window.scrollY + 8,
-        left: rect.left + window.scrollX
+        top: rect.bottom + 8,
+        left: rect.left
       };
 
       // Actualizar siempre la primera vez, luego solo si cambió significativamente

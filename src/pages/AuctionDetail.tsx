@@ -1,7 +1,7 @@
         import { soundManager } from '../utils/sounds';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Gavel, User, Clock, ShoppingCart, AlertCircle, TrendingUp, ChevronLeft } from 'lucide-react';
+import { Gavel, User, ShoppingCart, AlertCircle, TrendingUp, ChevronLeft } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { formatCurrency, formatTimeAgo } from '../utils/helpers';
 import { launchConfettiFromTop } from '../utils/celebrations';
@@ -474,78 +474,37 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
               </div>
             )}
             
-            <div className="auction-price-box">
-              <div className="auction-price-section">
-                <div className="auction-price-label">💰 Precio Actual de la Subasta</div>
-                <div className="auction-price-amount">
-                  {formatCurrency(auction.currentPrice)}
+            {/* Mejorar panel de estado según ACTIVA o FINALIZADA */}
+            {isActive ? (
+              <div
+                style={{
+                  padding: '0.75rem 0.5rem',
+                  background: lessThanOneMinute ? '#ffa726' : 'var(--bg-tertiary)',
+                  borderRadius: '0.75rem',
+                  boxShadow: lessThanOneMinute
+                    ? '0 0 35px 5px #FFA50080, 0 0 15px #ff5722, inset 0 0 20px rgba(255, 87, 34, 0.3)' : '0 2px 8px #0001',
+                  border: lessThanOneMinute ? '3px solid #e65100' : '2px solid var(--primary)',
+                  color: lessThanOneMinute ? '#fff' : 'var(--text-primary)',
+                  position: 'relative',
+                  textAlign: 'center',
+                  transition: 'all .33s cubic-bezier(.6,-0.01,0,1.01)',
+                  animation: lessThanTenSeconds ? 'container-panic 0.5s infinite' : (lessThanOneMinute ? 'container-pulse 1.5s ease-in-out infinite' : undefined),
+                  flexShrink: 0
+                }}
+              >
+                <div
+                  className="countdown-container"
+                  style={{
+                    marginBottom: '0.375rem',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    animation: lessThanTenSeconds ? 'shake-intense 0.25s infinite' : (lessThanOneMinute ? 'pulse-urgent-intense 0.8s ease-in-out infinite' : undefined)
+                  }}
+                >
+                  <Countdown endTime={auction.endTime} />
                 </div>
-              </div>
-
-              {auction.buyNowPrice && isActive && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Precio de Compra Directa</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--success)' }}>{formatCurrency(auction.buyNowPrice)}</div>
-                </div>
-              )}
-
-              {/* Mejorar panel de estado según ACTIVA o FINALIZADA */}
-{isActive ? (
-  <div
-    style={{
-      padding: '0.75rem 0.5rem',
-      background: lessThanOneMinute ? '#ffa726' : 'var(--bg-tertiary)',
-      borderRadius: '0.75rem',
-      boxShadow: lessThanOneMinute
-        ? '0 0 35px 5px #FFA50080, 0 0 15px #ff5722, inset 0 0 20px rgba(255, 87, 34, 0.3)' : '0 2px 8px #0001',
-      border: lessThanOneMinute ? '3px solid #e65100' : '2px solid var(--primary)',
-      color: lessThanOneMinute ? '#fff' : 'var(--text-primary)',
-      position: 'relative',
-      textAlign: 'center',
-      transition: 'all .33s cubic-bezier(.6,-0.01,0,1.01)',
-      animation: lessThanTenSeconds ? 'container-panic 0.5s infinite' : (lessThanOneMinute ? 'container-pulse 1.5s ease-in-out infinite' : undefined),
-      flexShrink: 0
-    }}
-  >
-    <div
-      className="countdown-container"
-      style={{
-        marginBottom: '0.375rem',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: '0.75rem',
-        flexWrap: 'wrap',
-        animation: lessThanTenSeconds ? 'shake-intense 0.25s infinite' : (lessThanOneMinute ? 'pulse-urgent-intense 0.8s ease-in-out infinite' : undefined)
-      }}
-    >
-      <Clock 
-        size={lessThanOneMinute ? 36 : 32} 
-        className="countdown-clock"
-        style={{ 
-          color: lessThanOneMinute ? '#fff7a7' : 'var(--primary)', 
-          transition: 'all .33s',
-          filter: lessThanOneMinute ? 'drop-shadow(0 0 15px rgba(255, 247, 167, 1)) drop-shadow(0 0 30px rgba(255, 247, 167, 0.6))' : undefined,
-          animation: lessThanTenSeconds ? 'clock-panic-intense 0.3s infinite' : (lessThanOneMinute ? 'clock-wobble 0.6s ease-in-out infinite' : undefined)
-        }} 
-      />
-      <span
-        className="countdown-text"
-        style={{
-          fontWeight: '900',
-          fontSize: lessThanOneMinute ? '2rem' : '1.75rem',
-          color: lessThanOneMinute ? '#fff' : 'var(--primary)',
-          letterSpacing: '1px',
-          transition: 'all .3s',
-          animation: lessThanOneMinute ? 'blinker-intense 0.6s steps(2) infinite' : undefined,
-          textShadow: lessThanOneMinute ? '0 0 30px rgba(255, 255, 255, 1), 0 0 60px rgba(255, 247, 167, 0.8), 0 0 90px rgba(255, 247, 167, 0.4)' : '0 4px 12px rgba(255, 107, 0, 0.4)',
-          fontFamily: 'monospace',
-          lineHeight: 1
-        }}
-      >
-        <Countdown endTime={auction.endTime} />
-      </span>
-    </div>
     <div style={{
       fontSize: '0.875rem', 
       fontWeight: 600,
@@ -628,9 +587,8 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
         Se ocultará en: {formatTime(timeRemaining)}
       </div>
     )}
-  </div>
-)}
-            </div>
+              </div>
+            )}
 
             {/* SOLO mostrar controles de oferta si la subasta está ACTIVA */}
             {(auction.status === 'active' && auction.endTime && new Date(auction.endTime) > new Date()) ? (
@@ -659,71 +617,209 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
                   pointerEvents: 'none',
                   zIndex: 0
                 }} />
-                <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }}>
-                  <h3 style={{ marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Gavel size={20} />
-                    Realizar Oferta
-                  </h3>
-                  
-                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                    <input
-                      type="number"
-                      value={bidAmount}
-                      onChange={(e) => setBidAmount(e.target.value)}
-                      placeholder="Ingresa tu oferta"
-                      style={{
-                        flex: 1,
+                <div style={{ 
+                  position: 'relative', 
+                  zIndex: 1, 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  flex: '1 1 auto', 
+                  minHeight: 0,
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '1rem',
+                  padding: '1rem',
+                  gap: '1rem',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+                  transition: 'background 0.3s ease, border-color 0.3s ease'
+                }}
+                className="glass">
+                  {/* Layout de dos columnas */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    {/* Columna Izquierda */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {/* Input Ingresar oferta */}
+                      <input
+                        type="number"
+                        value={bidAmount}
+                        onChange={(e) => setBidAmount(e.target.value)}
+                        placeholder="Ingresar oferta"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          borderRadius: '0.75rem',
+                          border: '2px solid rgba(255, 255, 255, 0.3)',
+                          background: 'rgba(255, 255, 255, 0.2)',
+                          backdropFilter: 'blur(10px)',
+                          WebkitBackdropFilter: 'blur(10px)',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.95rem',
+                          fontWeight: 600,
+                          textAlign: 'center',
+                          fontFamily: 'inherit',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = 'var(--primary)';
+                          e.target.style.background = 'rgba(255, 255, 255, 0.3)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                          e.target.style.background = 'rgba(255, 255, 255, 0.2)';
+                        }}
+                      />
+                      
+                      {/* Botón + 1000$ */}
+                      <button 
+                        onClick={() => incrementBid(1000)} 
+                        style={{ 
+                          width: '100%',
+                          padding: '0.75rem',
+                          borderRadius: '0.75rem',
+                          border: '2px solid rgba(255, 255, 255, 0.3)',
+                          background: 'rgba(255, 255, 255, 0.2)',
+                          backdropFilter: 'blur(10px)',
+                          WebkitBackdropFilter: 'blur(10px)',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.95rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                          e.currentTarget.style.borderColor = 'var(--primary)';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}
+                      >
+                        + 1000$
+                      </button>
+                      
+                      {/* Botón + 500$ */}
+                      <button 
+                        onClick={() => incrementBid(500)} 
+                        style={{ 
+                          width: '100%',
+                          padding: '0.75rem',
+                          borderRadius: '0.75rem',
+                          border: '2px solid rgba(255, 255, 255, 0.3)',
+                          background: 'rgba(255, 255, 255, 0.2)',
+                          backdropFilter: 'blur(10px)',
+                          WebkitBackdropFilter: 'blur(10px)',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.95rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                          e.currentTarget.style.borderColor = 'var(--primary)';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}
+                      >
+                        + 500$
+                      </button>
+                    </div>
+
+                    {/* Columna Derecha */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {/* Precio Actual */}
+                      <div style={{ 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
                         padding: '0.75rem',
-                        borderRadius: '0.5rem',
-                        border: '2px solid var(--primary)',
-                        background: 'var(--bg-tertiary)',
-                        color: 'var(--text-primary)',
-                        fontSize: '1rem',
-                        fontWeight: 600
-                      }}
-                    />
+                        borderRadius: '0.75rem',
+                        border: '2px solid rgba(255, 255, 255, 0.3)',
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        backdropFilter: 'blur(10px)',
+                        WebkitBackdropFilter: 'blur(10px)'
+                      }}>
+                        <div style={{ 
+                          fontSize: '2rem', 
+                          fontWeight: 700, 
+                          color: 'var(--text-primary)',
+                          fontFamily: 'monospace',
+                          marginBottom: '0.25rem'
+                        }}>
+                          {formatCurrency(auction.currentPrice).replace('$', '').replace(/\./g, '.')}
+                        </div>
+                        <div style={{ 
+                          fontSize: '0.75rem', 
+                          fontWeight: 600, 
+                          color: 'var(--text-secondary)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '1px'
+                        }}>
+                          PRECIO ACTUAL
+                        </div>
+                      </div>
+
+                      {/* Botón OFERTAR */}
+                      <button 
+                        onClick={handleBid} 
+                        style={{ 
+                          width: '100%',
+                          padding: '1rem',
+                          borderRadius: '0.75rem',
+                          border: '2px solid var(--primary)',
+                          background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+                          color: '#ffffff',
+                          fontSize: '1.25rem',
+                          fontWeight: 900,
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          textTransform: 'uppercase',
+                          letterSpacing: '1px',
+                          transition: 'all 0.3s ease',
+                          boxShadow: '0 4px 16px rgba(255, 107, 0, 0.3)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 6px 20px rgba(255, 107, 0, 0.4)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 4px 16px rgba(255, 107, 0, 0.3)';
+                        }}
+                      >
+                        OFERTAR
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="bid-increment-buttons" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-                    <button onClick={() => incrementBid(500)} className="btn btn-secondary" style={{ flex: '1 1 auto', minWidth: '70px', padding: '0.5rem', fontSize: '0.875rem' }}>+$500</button>
-                    <button onClick={() => incrementBid(1000)} className="btn btn-secondary" style={{ flex: '1 1 auto', minWidth: '70px', padding: '0.5rem', fontSize: '0.875rem' }}>+$1.000</button>
-                    <button onClick={() => incrementBid(5000)} className="btn btn-secondary" style={{ flex: '1 1 auto', minWidth: '70px', padding: '0.5rem', fontSize: '0.875rem' }}>+$5.000</button>
-                  </div>
-
+                  {/* Mensaje de error */}
                   {showBidError && (
-                    <div style={{ color: 'var(--error)', marginBottom: '0.75rem', fontSize: '0.75rem', padding: '0.5rem', background: 'rgba(255, 0, 0, 0.1)', borderRadius: '0.5rem' }}>
+                    <div style={{ 
+                      color: 'var(--error)', 
+                      fontSize: '0.875rem', 
+                      padding: '0.75rem', 
+                      background: 'rgba(255, 59, 48, 0.1)', 
+                      border: '1px solid rgba(255, 59, 48, 0.3)',
+                      borderRadius: '0.75rem',
+                      textAlign: 'center',
+                      fontWeight: 600,
+                      backdropFilter: 'blur(10px)',
+                      WebkitBackdropFilter: 'blur(10px)'
+                    }}>
                       {showBidError}
                     </div>
                   )}
-
-                  <button 
-                    onClick={handleBid} 
-                    className="btn btn-primary" 
-                    style={{ 
-                      width: '100%', 
-                      padding: '0.875rem',
-                      fontSize: '1rem',
-                      fontWeight: 700,
-                      background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
-                      border: 'none',
-                      boxShadow: '0 0 25px rgba(255, 107, 0, 0.5), 0 8px 16px rgba(255, 107, 0, 0.3)',
-                      transition: 'all 0.3s ease',
-                      position: 'relative',
-                      overflow: 'hidden',
-                      marginTop: 'auto'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.boxShadow = '0 0 35px rgba(255, 107, 0, 0.7), 0 12px 24px rgba(255, 107, 0, 0.4)';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.boxShadow = '0 0 25px rgba(255, 107, 0, 0.5), 0 8px 16px rgba(255, 107, 0, 0.3)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
-                  >
-                    <Gavel size={20} style={{ marginRight: '0.5rem' }} />
-                    Realizar Oferta
-                  </button>
                 </div>
                 <style>{`
                   @keyframes pulse-glow {

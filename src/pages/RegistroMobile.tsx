@@ -369,12 +369,21 @@ const RegistroMobile = () => {
           handleCodeInApp: false
         });
         
+        // Cerrar sesión para forzar verificación de email antes de login
+        await auth.signOut();
+        
         // Mostrar modal de verificación
         setRegisteredUser(user);
         setShowVerificationModal(true);
         setSuccess('¡Cuenta creada exitosamente! Verificá tu email para activar tu cuenta.');
       } catch (verificationError: any) {
         console.error('Error enviando email de verificación:', verificationError);
+        // Cerrar sesión incluso si hay error al enviar email
+        try {
+          await auth.signOut();
+        } catch (signOutError) {
+          console.error('Error al cerrar sesión:', signOutError);
+        }
         // Aún así mostrar el modal, el usuario puede reenviar
         setRegisteredUser(user);
         setShowVerificationModal(true);
@@ -509,6 +518,14 @@ const RegistroMobile = () => {
                 placeholder="Mínimo 6 caracteres"
                 value={formData.password}
                 onChange={handleChange}
+                onFocus={(e) => {
+                  // En móvil, hacer scroll al input cuando se enfoca
+                  if (window.innerWidth <= 768) {
+                    setTimeout(() => {
+                      e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 300);
+                  }
+                }}
                 required
                 minLength={6}
                 className={`form-input ${fieldValidation.password === 'valid' ? 'input-valid' : fieldValidation.password === 'invalid' ? 'input-invalid' : ''}`}
@@ -543,6 +560,14 @@ const RegistroMobile = () => {
                 placeholder="Repetí tu contraseña"
                 value={formData.confirmPassword}
                 onChange={handleChange}
+                onFocus={(e) => {
+                  // En móvil, hacer scroll al input cuando se enfoca
+                  if (window.innerWidth <= 768) {
+                    setTimeout(() => {
+                      e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 300);
+                  }
+                }}
                 required
                 minLength={6}
                 className={`form-input ${fieldValidation.confirmPassword === 'valid' ? 'input-valid' : fieldValidation.confirmPassword === 'invalid' ? 'input-invalid' : ''}`}
@@ -593,7 +618,7 @@ const RegistroMobile = () => {
             />
             
             {/* Campos principales de dirección - Primera línea */}
-            <div style={{ marginTop: '1.5rem', marginBottom: '0.75rem' }}>
+            <div style={{ marginTop: '0.75rem', marginBottom: '0.75rem' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 0.5rem 0' }}>
                 Completá tu dirección
               </h3>

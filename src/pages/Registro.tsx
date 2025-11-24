@@ -384,12 +384,21 @@ const Registro = () => {
           handleCodeInApp: false
         });
         
+        // Cerrar sesión para forzar verificación de email antes de login
+        await auth.signOut();
+        
         // Mostrar modal de verificación
         setRegisteredUser(user);
         setShowVerificationModal(true);
         setSuccess('¡Cuenta creada exitosamente! Verificá tu email para activar tu cuenta.');
       } catch (verificationError: any) {
         console.error('Error enviando email de verificación:', verificationError);
+        // Cerrar sesión incluso si hay error al enviar email
+        try {
+          await auth.signOut();
+        } catch (signOutError) {
+          console.error('Error al cerrar sesión:', signOutError);
+        }
         // Aún así mostrar el modal, el usuario puede reenviar
         setRegisteredUser(user);
         setShowVerificationModal(true);
@@ -598,7 +607,15 @@ const Registro = () => {
                     type={showPassword ? 'text' : 'password'} 
                     placeholder="••••••••" 
                     value={formData.password} 
-                    onChange={handleChange} 
+                    onChange={handleChange}
+                    onFocus={(e) => {
+                      // En móvil, hacer scroll al input cuando se enfoca
+                      if (window.innerWidth <= 768) {
+                        setTimeout(() => {
+                          e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }, 300);
+                      }
+                    }}
                     required 
                     style={{ 
                       width: '100%', 
@@ -644,7 +661,15 @@ const Registro = () => {
                     type={showConfirmPassword ? 'text' : 'password'} 
                     placeholder="••••••••" 
                     value={formData.confirmPassword} 
-                    onChange={handleChange} 
+                    onChange={handleChange}
+                    onFocus={(e) => {
+                      // En móvil, hacer scroll al input cuando se enfoca
+                      if (window.innerWidth <= 768) {
+                        setTimeout(() => {
+                          e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }, 300);
+                      }
+                    }}
                     required 
                     style={{ 
                       width: '100%', 

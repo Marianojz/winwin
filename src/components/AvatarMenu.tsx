@@ -75,10 +75,11 @@ const AvatarMenu = ({ user, avatarUrl, getUserInitial, onLogout }: AvatarMenuPro
         });
       } else {
         // En navbar superior: abrir hacia abajo (comportamiento normal)
+        // Usar getBoundingClientRect directamente sin window.scrollY porque el navbar es sticky
         setMenuPosition({
-          top: rect.bottom + window.scrollY + 12,
+          top: rect.bottom + 12,
           bottom: undefined,
-          right: window.innerWidth - rect.right - window.scrollX,
+          right: window.innerWidth - rect.right,
           left: undefined
         });
       }
