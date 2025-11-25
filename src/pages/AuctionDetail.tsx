@@ -16,7 +16,7 @@ import { Order } from '../types';
 const AuctionDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { auctions, user, isAuthenticated, addBid, addNotification, addOrder } = useStore();
+  const { auctions, user, isAuthenticated, addBid, addNotification, addOrder, products, updateAuction } = useStore();
   
   const auction = auctions.find(a => a.id === id);
   const [bidAmount, setBidAmount] = useState('');
@@ -105,6 +105,31 @@ const AuctionDetail = () => {
   }
 
   const isActive = auction.status === 'active';
+
+  // Función para verificar si hay stock disponible para compra directa
+  const hasStockForBuyNow = (auction: typeof auction) => {
+    if (!auction) return false;
+    
+    // Si tiene bundles y unitsPerBundle, verificar stock por bultos
+    if (auction.bundles !== undefined && auction.unitsPerBundle !== undefined && auction.unitsPerBundle > 0) {
+      if (auction.sellOnlyByBundle) {
+        // Si solo se vende por bulto, necesita al menos 1 bulto
+        return auction.bundles > 0;
+      } else {
+        // Si se puede vender por unidades, calcular stock total
+        const totalStock = auction.bundles * auction.unitsPerBundle;
+        return totalStock > 0;
+      }
+    }
+    
+    // Si no tiene bundles/unitsPerBundle definidos, buscar producto relacionado si existe
+    // Por ahora, si no tiene información de stock en la subasta, asumimos que hay stock
+    // (comportamiento por defecto para mantener compatibilidad)
+    return true;
+  };
+
+  // Verificar stock disponible para compra directa
+  const canShowBuyNow = auction && auction.buyNowPrice && isActive && hasStockForBuyNow(auction);
 
   // Agregar hooks/cálculos auxiliares para saber tiempo restante (en segundos)
   const now = Date.now();
@@ -259,6 +284,18 @@ const AuctionDetail = () => {
         // Registrar transacción en el log
         await logOrderCreated(order.id, orderNumber, user.id, user.username, order.amount);
 
+        // Reducir stock de la subasta
+        if (auction.bundles !== undefined && auction.unitsPerBundle !== undefined && auction.unitsPerBundle > 0) {
+          const bundlesToReduce = auction.sellOnlyByBundle ? 1 : Math.ceil(quantity / auction.unitsPerBundle);
+          const newBundles = Math.max(0, (auction.bundles || 0) - bundlesToReduce);
+          
+          await updateAuction(auction.id, {
+            bundles: newBundles
+          });
+          
+          console.log(`📦 Stock de subasta actualizado: ${auction.bundles} → ${newBundles} bultos`);
+        }
+
         const purchaseMessage = auction.sellOnlyByBundle && auction.unitsPerBundle && auction.unitsPerBundle > 0
           ? `Compraste "${auction.title}" (1 bulto de ${auction.unitsPerBundle} unidades) por ${formatCurrency(totalWithShipping)} (incluye envío). Tenés 48hs para completar el pago en MercadoPago.`
           : `Compraste "${auction.title}" por ${formatCurrency(totalWithShipping)} (incluye envío). Tenés 48hs para completar el pago en MercadoPago.`;
@@ -338,6 +375,18 @@ const AuctionDetail = () => {
         
         // Registrar transacción en el log
         await logOrderCreated(order.id, orderNumber, user.id, user.username, order.amount);
+
+        // Reducir stock de la subasta
+        if (auction.bundles !== undefined && auction.unitsPerBundle !== undefined && auction.unitsPerBundle > 0) {
+          const bundlesToReduce = auction.sellOnlyByBundle ? 1 : Math.ceil(quantity / auction.unitsPerBundle);
+          const newBundles = Math.max(0, (auction.bundles || 0) - bundlesToReduce);
+          
+          await updateAuction(auction.id, {
+            bundles: newBundles
+          });
+          
+          console.log(`📦 Stock de subasta actualizado: ${auction.bundles} → ${newBundles} bultos`);
+        }
 
         const productDescription = auction.sellOnlyByBundle && auction.unitsPerBundle && auction.unitsPerBundle > 0
           ? `${auction.title} (1 bulto de ${auction.unitsPerBundle} unidades)`
@@ -831,7 +880,7 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
             ) : null}
 
             {/* COMPRAR AHORA - Separado visualmente de las ofertas */}
-            {auction.buyNowPrice && isActive && (
+            {canShowBuyNow && (
               <div style={{ 
                 background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%)', 
                 padding: '1rem', 
@@ -965,7 +1014,7 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
                 <span style={{ color: 'var(--primary)', fontWeight: 700, flexShrink: 0 }}>✓</span>
                 <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Ganá ofertando más que otros</span>
               </li>
-              {auction.buyNowPrice && (
+              {canShowBuyNow && (
                 <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
                   <span style={{ color: 'var(--primary)', fontWeight: 700, flexShrink: 0 }}>✓</span>
                   <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>O comprá directo por {formatCurrency(auction.buyNowPrice)}</span>

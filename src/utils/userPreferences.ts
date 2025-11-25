@@ -30,7 +30,12 @@ export const loadUserPreferences = async (userId: string): Promise<UserPreferenc
     }
     
     return {};
-  } catch (error) {
+  } catch (error: any) {
+    // Si es un error de permisos, no es crítico - simplemente retornar objeto vacío
+    if (error?.code === 'PERMISSION_DENIED' || error?.message?.includes('permission')) {
+      console.warn('⚠️ No se pueden cargar preferencias (permisos). Esto es normal si las reglas aún no se han actualizado.');
+      return {};
+    }
     console.error('❌ Error cargando preferencias de usuario:', error);
     return {};
   }
@@ -78,7 +83,13 @@ export const updateUserPreference = async <K extends keyof UserPreferences>(
     await set(lastUpdatedRef, new Date().toISOString());
     
     console.log(`✅ Preferencia "${key}" actualizada en Firebase para usuario:`, userId);
-  } catch (error) {
+  } catch (error: any) {
+    // Si es un error de permisos, loguear pero no lanzar error crítico
+    if (error?.code === 'PERMISSION_DENIED' || error?.message?.includes('permission')) {
+      console.warn(`⚠️ No se puede actualizar preferencia "${key}" (permisos). Verifica que las reglas de Firebase estén actualizadas.`);
+      // No lanzar error para no interrumpir el flujo
+      return;
+    }
     console.error(`❌ Error actualizando preferencia "${key}":`, error);
     throw error;
   }

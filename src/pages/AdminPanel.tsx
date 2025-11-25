@@ -9076,13 +9076,17 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'rgba(0, 0, 0, 0.75)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10000,
-              padding: isMobile ? '1rem' : '2rem'
-            }}
+            background: 'rgba(0, 0, 0, 0.75)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            zIndex: 100000,
+            paddingTop: isMobile ? '80px' : '60px',
+            paddingLeft: isMobile ? '1rem' : '2rem',
+            paddingRight: isMobile ? '1rem' : '2rem',
+            paddingBottom: isMobile ? '1rem' : '2rem',
+            overflow: 'auto'
+          }}
             onClick={() => setSelectedUnifiedMessage(null)}
             >
               <div style={{
@@ -9090,13 +9094,14 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 borderRadius: '1rem',
                 width: '100%',
                 maxWidth: '700px',
-                maxHeight: '90vh',
+                maxHeight: 'calc(100vh - 80px)',
                 overflow: 'auto',
                 boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
-                border: '1px solid var(--border)'
+                border: '1px solid var(--border)',
+                marginTop: 0
               }}
               onClick={(e) => e.stopPropagation()}
-              >
+            >
                 <div style={{
                   padding: '1.5rem',
                   borderBottom: '1px solid var(--border)',
@@ -12717,10 +12722,13 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
             bottom: 0,
             background: 'rgba(0, 0, 0, 0.75)',
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             justifyContent: 'center',
-            zIndex: 10000,
-            padding: isMobile ? '1rem' : '2rem',
+            zIndex: 100000,
+            paddingTop: isMobile ? '80px' : '60px',
+            paddingLeft: isMobile ? '1rem' : '2rem',
+            paddingRight: isMobile ? '1rem' : '2rem',
+            paddingBottom: isMobile ? '1rem' : '2rem',
             overflow: 'auto'
           }}
           onClick={() => setSelectedOrder(null)}
@@ -12731,10 +12739,11 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               borderRadius: '1rem',
               width: '100%',
               maxWidth: '900px',
-              maxHeight: '90vh',
+              maxHeight: 'calc(100vh - 80px)',
               overflow: 'auto',
               boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
-              border: '1px solid var(--border)'
+              border: '1px solid var(--border)',
+              marginTop: 0
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -13582,10 +13591,14 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
           bottom: 0,
           background: 'rgba(0, 0, 0, 0.7)',
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           justifyContent: 'center',
-          zIndex: 10000,
-          padding: isMobile ? '1rem' : '2rem'
+          zIndex: 100000,
+          paddingTop: isMobile ? '80px' : '60px',
+          paddingLeft: isMobile ? '1rem' : '2rem',
+          paddingRight: isMobile ? '1rem' : '2rem',
+          paddingBottom: isMobile ? '1rem' : '2rem',
+          overflow: 'auto'
         }}>
           <div style={{
             background: 'var(--bg-primary)',
@@ -13593,8 +13606,11 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
             padding: isMobile ? '1.5rem' : '2rem',
             maxWidth: '500px',
             width: '100%',
+            maxHeight: 'calc(100vh - 80px)',
+            overflow: 'auto',
             boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
-            border: '1px solid var(--border)'
+            border: '1px solid var(--border)',
+            marginTop: 0
           }}>
             <h3 style={{
               margin: '0 0 1rem 0',

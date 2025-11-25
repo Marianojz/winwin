@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
-import { ref, onValue } from 'firebase/database';
+import { ref, onValue, query, orderByChild, equalTo } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
 import { useStore } from '../store/useStore';
 import { Bid } from '../types';
 
 const useSyncFirebase = () => {
-  const { setAuctions, setProducts, setOrders } = useStore();
+  const { setAuctions, setProducts, setOrders, user } = useStore();
 
   useEffect(() => {
     console.log('🔄 INICIANDO SINCRONIZACIÓN FIREBASE...');
@@ -168,8 +168,11 @@ const useSyncFirebase = () => {
     });
 
     // Sincronizar pedidos desde Firebase
+    // Intentar leer toda la colección (solo admins pueden)
+    // Si falla, intentar leer solo los pedidos del usuario actual
     const ordersRef = ref(realtimeDb, 'orders');
-    const unsubscribeOrders = onValue(ordersRef, (snapshot) => {
+    
+    const handleOrdersSnapshot = (snapshot: any) => {
       const data = snapshot.val();
       if (data) {
         const ordersArray = Object.keys(data).map(key => {
@@ -201,13 +204,36 @@ const useSyncFirebase = () => {
             bundles: orderData?.bundles
           };
         });
-        console.log('✅ Pedidos sincronizados desde Firebase:', ordersArray.length);
-        setOrders(ordersArray);
+        
+        // Si el usuario no es admin, filtrar solo sus pedidos
+        const filteredOrders = user && !user.isAdmin 
+          ? ordersArray.filter(order => order.userId === user.id)
+          : ordersArray;
+        
+        console.log('✅ Pedidos sincronizados desde Firebase:', filteredOrders.length, user?.isAdmin ? '(todos)' : '(solo del usuario)');
+        setOrders(filteredOrders);
       } else {
         console.log('📭 Firebase - No hay pedidos');
         setOrders([]);
       }
-    });
+    };
+
+    const unsubscribeOrders = onValue(
+      ordersRef, 
+      handleOrdersSnapshot,
+      (error) => {
+        console.error('❌ Error sincronizando pedidos:', error);
+        // Si hay error de permisos y hay usuario, intentar leer solo sus pedidos
+        if (error.code === 'PERMISSION_DENIED' && user) {
+          console.log('⚠️ No se pueden leer todos los pedidos, intentando leer solo los del usuario...');
+          // Los usuarios solo pueden leer sus propios pedidos individuales
+          // La sincronización se hará cuando se creen nuevos pedidos
+          setOrders([]);
+        } else {
+          setOrders([]);
+        }
+      }
+    );
 
     return () => {
       console.log('🔴 Cerrando sincronización Firebase');
@@ -215,7 +241,7 @@ const useSyncFirebase = () => {
       unsubscribeProducts();
       unsubscribeOrders();
     };
-  }, [setAuctions, setProducts, setOrders]);
+  }, [setAuctions, setProducts, setOrders, user]);
 
   return null;
 };

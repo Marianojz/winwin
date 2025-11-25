@@ -44,6 +44,30 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
   const isRecentlyEnded = shouldShowAfterEnd();
   const isHidden = (auction.status === 'ended' || auction.status === 'sold') && !isRecentlyEnded;
 
+  // Función para verificar si hay stock disponible para compra directa
+  const hasStockForBuyNow = (auction: typeof auction) => {
+    if (!auction) return false;
+    
+    // Si tiene bundles y unitsPerBundle, verificar stock por bultos
+    if (auction.bundles !== undefined && auction.unitsPerBundle !== undefined && auction.unitsPerBundle > 0) {
+      if (auction.sellOnlyByBundle) {
+        // Si solo se vende por bulto, necesita al menos 1 bulto
+        return auction.bundles > 0;
+      } else {
+        // Si se puede vender por unidades, calcular stock total
+        const totalStock = auction.bundles * auction.unitsPerBundle;
+        return totalStock > 0;
+      }
+    }
+    
+    // Si no tiene bundles/unitsPerBundle definidos, asumimos que hay stock
+    // (comportamiento por defecto para mantener compatibilidad)
+    return true;
+  };
+
+  // Verificar stock disponible para compra directa
+  const canShowBuyNow = auction.buyNowPrice && isActive && hasStockForBuyNow(auction);
+
   // Si la subasta está oculta, no renderizar nada
   if (isHidden) {
     return null;
@@ -220,7 +244,7 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
           )}
         </div>
 
-        {auction.buyNowPrice && isActive && (
+        {canShowBuyNow && (
           <div className="auction-card-buynow">
             <DollarSign size={16} />
             Compra Directa

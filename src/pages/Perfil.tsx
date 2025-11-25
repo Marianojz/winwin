@@ -1,5 +1,6 @@
-import { Mail, MapPin, FileText, Award, ShoppingBag, Gavel, LogOut, Send, MessageSquare, Camera, Settings, LayoutDashboard, TrendingUp, Bell, HelpCircle, Phone, Target, DollarSign, ShoppingCart, Clock } from 'lucide-react';
+import { Mail, MapPin, FileText, Award, ShoppingBag, Gavel, LogOut, Send, MessageSquare, Camera, Settings, LayoutDashboard, TrendingUp, Bell, HelpCircle, Phone, Target, DollarSign, ShoppingCart, Clock, Package } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { Order } from '../types';
 import { auth, db } from '../config/firebase';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
@@ -14,11 +15,11 @@ import DashboardCompact, { DashboardMetric, QuickAction, DashboardCard } from '.
 import AnnouncementWidget from '../components/AnnouncementWidget';
 
 const Perfil = () => {
-  const { user, auctions } = useStore();
+  const { user, auctions, orders } = useStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'messages' | 'settings'>(
-    tabParam === 'messages' ? 'messages' : tabParam === 'settings' ? 'settings' : 'dashboard'
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'messages' | 'settings' | 'orders'>(
+    tabParam === 'messages' ? 'messages' : tabParam === 'settings' ? 'settings' : tabParam === 'orders' ? 'orders' : 'dashboard'
   );
   const navigate = useNavigate();
   
@@ -28,10 +29,23 @@ const Perfil = () => {
       setActiveTab('messages');
     } else if (tabParam === 'settings') {
       setActiveTab('settings');
+    } else if (tabParam === 'orders') {
+      setActiveTab('orders');
     } else {
       setActiveTab('dashboard');
     }
   }, [tabParam]);
+
+  // Filtrar pedidos del usuario
+  const userOrders = useMemo(() => {
+    if (!user || !orders) return [];
+    return orders.filter((order: Order) => order.userId === user.id)
+      .sort((a: Order, b: Order) => {
+        const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
+        const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime();
+        return dateB - dateA; // Más recientes primero
+      });
+  }, [user, orders]);
   const [userMessages, setUserMessages] = useState<Message[]>([]);
   const [newMessageContent, setNewMessageContent] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
@@ -430,6 +444,42 @@ const Perfil = () => {
                 marginLeft: '0.25rem'
               }}>
                 {unreadCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('orders');
+              setSearchParams({ tab: 'orders' });
+            }}
+            className="btn"
+            style={{
+              background: activeTab === 'orders' ? 'var(--primary)' : 'var(--bg-secondary)',
+              color: activeTab === 'orders' ? 'white' : 'var(--text-primary)',
+              padding: '0.875rem 1.5rem',
+              borderRadius: '0.75rem',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              position: 'relative'
+            }}
+          >
+            <Package size={18} />
+            Mis Pedidos
+            {userOrders.length > 0 && (
+              <span style={{
+                background: 'var(--error)',
+                color: 'white',
+                padding: '0.125rem 0.5rem',
+                borderRadius: '1rem',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                marginLeft: '0.25rem'
+              }}>
+                {userOrders.length}
               </span>
             )}
           </button>
@@ -948,6 +998,146 @@ const Perfil = () => {
             
             return null;
           })()}
+        </div>
+      )}
+
+      {activeTab === 'orders' && (
+        <div style={{ background: 'var(--bg-secondary)', padding: isMobile ? '1.5rem' : '2rem', borderRadius: '1.5rem' }}>
+          <h2 style={{ marginBottom: '2rem', fontSize: isMobile ? '1.25rem' : '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Package size={28} />
+            Mis Pedidos
+          </h2>
+
+          {userOrders.length === 0 ? (
+            <div style={{ 
+              padding: '3rem', 
+              textAlign: 'center', 
+              background: 'var(--bg-tertiary)', 
+              borderRadius: '1rem',
+              border: '1px dashed var(--border)'
+            }}>
+              <Package size={64} color="var(--text-tertiary)" style={{ margin: '0 auto 1.5rem', opacity: 0.5 }} />
+              <h3 style={{ marginBottom: '0.5rem', color: 'var(--text-primary)' }}>No tenés pedidos aún</h3>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+                Cuando realices una compra o ganes una subasta, aparecerán aquí.
+              </p>
+              <button
+                onClick={() => navigate('/tienda')}
+                className="btn btn-primary"
+                style={{ padding: '0.875rem 1.5rem' }}
+              >
+                <ShoppingBag size={18} style={{ marginRight: '0.5rem' }} />
+                Ir a la Tienda
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {userOrders.map((order: Order) => {
+                const getStatusBadge = (status: string) => {
+                  const badges: Record<string, { label: string; className: string }> = {
+                    'pending_payment': { label: 'Pago Pendiente', className: 'badge-warning' },
+                    'paid': { label: 'Pagado', className: 'badge-success' },
+                    'shipped': { label: 'Enviado', className: 'badge-info' },
+                    'delivered': { label: 'Entregado', className: 'badge-success' },
+                    'cancelled': { label: 'Cancelado', className: 'badge-danger' },
+                    'expired': { label: 'Expirado', className: 'badge-secondary' }
+                  };
+                  return badges[status] || { label: status, className: 'badge-secondary' };
+                };
+
+                const statusInfo = getStatusBadge(order.status);
+                const orderDate = order.createdAt instanceof Date 
+                  ? order.createdAt 
+                  : new Date(order.createdAt);
+
+                return (
+                  <div
+                    key={order.id}
+                    style={{
+                      background: 'var(--bg-tertiary)',
+                      padding: isMobile ? '1rem' : '1.5rem',
+                      borderRadius: '1rem',
+                      border: '1px solid var(--border)',
+                      display: 'flex',
+                      flexDirection: isMobile ? 'column' : 'row',
+                      gap: '1rem'
+                    }}
+                  >
+                    {order.productImage && (
+                      <img
+                        src={order.productImage}
+                        alt={order.productName}
+                        style={{
+                          width: isMobile ? '100%' : '120px',
+                          height: isMobile ? '200px' : '120px',
+                          objectFit: 'cover',
+                          borderRadius: '0.75rem',
+                          flexShrink: 0
+                        }}
+                      />
+                    )}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                          <h3 style={{ margin: 0, marginBottom: '0.5rem', fontSize: isMobile ? '1rem' : '1.125rem' }}>
+                            {order.productName}
+                          </h3>
+                          {order.orderNumber && (
+                            <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                              Pedido #{order.orderNumber}
+                            </p>
+                          )}
+                          <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                            {orderDate.toLocaleDateString('es-AR', { 
+                              day: '2-digit', 
+                              month: 'short', 
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                        <span className={`badge ${statusInfo.className}`} style={{ flexShrink: 0 }}>
+                          {statusInfo.label}
+                        </span>
+                      </div>
+                      
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '0.5rem',
+                        paddingTop: '0.5rem',
+                        borderTop: '1px solid var(--border)'
+                      }}>
+                        <div>
+                          <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                            {order.quantity && order.quantity > 1 ? `${order.quantity} unidades` : '1 unidad'}
+                          </p>
+                          <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {formatCurrency(order.amount)}
+                          </p>
+                        </div>
+                        {order.type === 'auction' && (
+                          <span style={{ 
+                            padding: '0.375rem 0.75rem', 
+                            background: 'var(--primary-light)', 
+                            color: 'var(--primary)', 
+                            borderRadius: '0.5rem',
+                            fontSize: '0.875rem',
+                            fontWeight: 600
+                          }}>
+                            Subasta
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
