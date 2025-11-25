@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Gavel, DollarSign, Users } from 'lucide-react';
 import { Auction } from '../types';
-import { formatCurrency } from '../utils/helpers';
+import { formatCurrency, maskUsername } from '../utils/helpers';
 import Countdown from './Countdown';
 import './AuctionCard.css';
 import { trackAuctionClick } from '../utils/tracking';
@@ -290,7 +290,7 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
             <div className="bids-list">
               {lastThreeBids.map((bid) => (
                 <div key={bid.id} className="bid-item">
-                  <span className="bid-username">{bid.username}</span>
+                  <span className="bid-username">{maskUsername(bid.username)}</span>
                   <span className="bid-amount">{formatCurrency(bid.amount)}</span>
                 </div>
               ))}

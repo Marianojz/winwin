@@ -6,7 +6,7 @@ import { realtimeDb } from '../config/firebase';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Eye, Edit, Trash2, Users, Clock, AlertCircle, Activity, RefreshCw,
-  Gavel, Package, Bot, DollarSign, Plus, XCircle,
+  Gavel, Package, Bot, DollarSign, Plus, XCircle, X,
   TrendingUp, ShoppingCart, Bell, AlertTriangle,
   Search, Filter, ShoppingBag, MapPin, BarChart3,
   MousePointerClick, Image as ImageIcon, Save, Store, Mail, Send,
@@ -21,7 +21,8 @@ import UserDetailsModal from '../components/UserDetailsModal';
 import StatsCard from '../components/StatsCard';
 import { useStore } from '../store/useStore';
 import { formatCurrency, formatTimeAgo } from '../utils/helpers';
-import { Product, Auction, Order, OrderStatus } from '../types';
+import { Product, Auction, Order, OrderStatus, NotificationRule } from '../types';
+import { getAllNotificationRules, createNotificationRule, updateNotificationRule, deleteNotificationRule } from '../utils/notificationRules';
 import ImageUploader from '../components/ImageUploader';
 import { mockCategories } from '../utils/mockData';
 import { availableStickers, getStickerLabel } from '../utils/stickers';
@@ -125,6 +126,27 @@ const AdminPanel = (): React.ReactElement => {
   const [blogFilterCategory, setBlogFilterCategory] = useState<string>('all');
   const [blogCategories, setBlogCategories] = useState<string[]>([]);
   const [blogFilterPublished, setBlogFilterPublished] = useState<string>('all'); // all, published, draft
+  
+  // Estados para gestión de reglas de notificaciones
+  const [notificationRules, setNotificationRules] = useState<NotificationRule[]>([]);
+  const [ruleFilter, setRuleFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [ruleSearch, setRuleSearch] = useState('');
+  const [selectedRule, setSelectedRule] = useState<NotificationRule | null>(null);
+  const [showRuleEditor, setShowRuleEditor] = useState(false);
+  const [ruleForm, setRuleForm] = useState({
+    name: '',
+    eventType: 'new_message' as NotificationRule['eventType'],
+    title: '',
+    message: '',
+    link: '',
+    active: true,
+    conditions: {
+      minAmount: undefined as number | undefined,
+      maxAmount: undefined as number | undefined,
+      userRoles: [] as ('user' | 'admin')[],
+      productTypes: [] as ('auction' | 'store')[]
+    }
+  });
   
   // Referencia para hacer scroll al inicio cuando cambia la pestaña
   const panelHeaderRef = useRef<HTMLDivElement>(null);
@@ -625,6 +647,18 @@ const AdminPanel = (): React.ReactElement => {
       setAnnouncementMetrics([]);
     }
   }, [activeTab, showAnnouncementMetrics]);
+
+  // Cargar reglas de notificaciones cuando se cambia a la tab de anuncios
+  useEffect(() => {
+    if (activeTab === 'announcements') {
+      const unsubscribe = getAllNotificationRules((rules) => {
+        setNotificationRules(rules);
+      });
+      return () => unsubscribe();
+    } else {
+      setNotificationRules([]);
+    }
+  }, [activeTab]);
 
   // Función para eliminar anuncio
   const handleDeleteAnnouncement = async (announcementId: string) => {
@@ -2138,6 +2172,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       console.error('❌ Error creando notificación para usuario:', error);
     }
   };
+
 
   // Función para enviar mensaje
   const handleSendMessage = async () => {
@@ -6014,7 +6049,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                     position: 'relative',
                     overflow: 'hidden'
                   }}
-                  onClick={() => !isMobile && setSelectedUser(userItem)}
+                  onClick={() => setSelectedUser(userItem)}
                   onTouchStart={(e) => {
                     if (isMobile) {
                       const touch = e.touches[0];
@@ -6894,8 +6929,8 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 </div>
               ) : (
                 <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  display: 'flex',
+                  flexDirection: 'column',
                   gap: '0.75rem'
                 }}>
                   {filteredOrders.map((order: Order, index: number) => {
@@ -6929,16 +6964,17 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                           background: colors.bg,
                           color: colors.text,
                           borderRadius: '0.75rem',
-                          padding: '0.875rem',
-                          aspectRatio: '1',
+                          padding: '1rem',
                           display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'flex-start',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
                           cursor: 'pointer',
                           transition: 'all 0.2s',
                           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
                           position: 'relative',
-                          overflow: 'hidden'
+                          overflow: 'hidden',
+                          gap: '1rem'
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.transform = 'scale(1.05)';
@@ -6951,10 +6987,10 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                       >
                         {/* Checkbox de selección */}
                         <div style={{
-                          position: 'absolute',
-                          top: '0.5rem',
-                          left: '0.5rem',
-                          zIndex: 10
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minWidth: '24px'
                         }}
                         onClick={(e) => e.stopPropagation()}
                         >
@@ -6979,7 +7015,17 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                             }}
                           />
                         </div>
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: 0 }}>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: 0 }}>
+                          <div style={{ 
+                            fontSize: '0.75rem', 
+                            fontWeight: 700,
+                            lineHeight: '1.2',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {order.productName || 'Producto'}
+                          </div>
                           <div style={{ 
                             fontSize: '0.625rem', 
                             opacity: 0.9, 
@@ -6988,51 +7034,6 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                             letterSpacing: '0.5px'
                           }}>
                             {order.orderNumber ? `#${order.orderNumber.slice(-6)}` : `#${order.id.slice(-6).toUpperCase()}`}
-                          </div>
-                          <div style={{ 
-                            fontSize: '0.75rem', 
-                            fontWeight: 700,
-                            lineHeight: '1.2',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical'
-                          }}>
-                            {order.productName || 'Producto'}
-                          </div>
-                          {order.quantity && (
-                            <div style={{ 
-                              fontSize: '0.625rem', 
-                              opacity: 0.9,
-                              marginTop: '0.25rem'
-                            }}>
-                              Cantidad: {order.quantity}
-                            </div>
-                          )}
-                          {order.unitsPerBundle && order.unitsPerBundle > 0 && order.bundles !== undefined && (
-                            <div style={{ 
-                              fontSize: '0.625rem', 
-                              opacity: 0.85,
-                              marginTop: '0.125rem'
-                            }}>
-                              {order.unitsPerBundle} uxb, {order.bundles} bultos
-                            </div>
-                          )}
-                        </div>
-                        <div style={{ 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          gap: '0.25rem',
-                          marginTop: '0.5rem',
-                          marginBottom: '0.5rem'
-                        }}>
-                          <div style={{ 
-                            fontSize: '0.875rem', 
-                            fontWeight: 700,
-                            textShadow: '0 1px 2px rgba(0,0,0,0.2)'
-                          }}>
-                            {formatCurrency(order.amount)}
                           </div>
                           <div style={{ 
                             fontSize: '0.625rem', 
@@ -7045,25 +7046,38 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                             {orderDate}
                           </div>
                         </div>
-                        <div style={{
-                          position: 'absolute',
-                          top: '0.5rem',
-                          right: '0.5rem',
-                          fontSize: '0.625rem',
-                          opacity: 0.8,
-                          fontWeight: 600
+                        <div style={{ 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          alignItems: 'flex-end',
+                          gap: '0.25rem',
+                          minWidth: '80px'
                         }}>
-                          {statusBadge.text.split(' ')[0]}
+                          <div style={{ 
+                            fontSize: '0.875rem', 
+                            fontWeight: 700,
+                            textShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                          }}>
+                            {formatCurrency(order.amount)}
+                          </div>
+                          <div style={{
+                            fontSize: '0.625rem',
+                            opacity: 0.9,
+                            fontWeight: 600,
+                            padding: '0.25rem 0.5rem',
+                            background: 'rgba(255, 255, 255, 0.2)',
+                            borderRadius: '0.25rem'
+                          }}>
+                            {statusBadge.text}
+                          </div>
                         </div>
                         
-                        {/* Botones de acción - debajo del contenido */}
+                        {/* Botones de acción */}
                         <div style={{
                           display: 'flex',
                           gap: '0.5rem',
-                          justifyContent: 'center',
-                          width: '100%',
-                          marginTop: 'auto',
-                          paddingTop: '0.5rem'
+                          alignItems: 'center',
+                          minWidth: 'fit-content'
                         }}
                         onClick={(e) => e.stopPropagation()}
                         >
@@ -7100,7 +7114,6 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                                 fontSize: '0.625rem',
                                 fontWeight: 600,
                                 color: 'white',
-                                flex: 1,
                                 transition: 'all 0.2s'
                               }}
                               onMouseEnter={(e) => {
@@ -7147,7 +7160,6 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                               fontSize: '0.625rem',
                               fontWeight: 600,
                               color: 'white',
-                              flex: 1,
                               transition: 'all 0.2s'
                             }}
                             onMouseEnter={(e) => {
@@ -8229,7 +8241,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   <p>Crea tu primer bot o ajusta los filtros de búsqueda</p>
                 </div>
               ) : isMobile ? (
-                // Vista móvil: Grid de cuadros
+                // Vista móvil: Lista horizontal
                 <div style={{ 
                   background: 'var(--bg-secondary)', 
                   borderRadius: '1rem', 
@@ -8237,8 +8249,8 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   padding: '1rem'
                 }}>
                   <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    display: 'flex',
+                    flexDirection: 'column',
                     gap: '0.75rem'
                   }}>
                     {filteredBots.map((bot: any, index: number) => {
@@ -8254,16 +8266,17 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                             background: botColor,
                             color: 'white',
                             borderRadius: '0.75rem',
-                            padding: '0.875rem',
-                            aspectRatio: '1',
+                            padding: '1rem',
                             display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'flex-start',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
                             cursor: 'pointer',
                             transition: 'all 0.2s',
                             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
                             position: 'relative',
-                            overflow: 'hidden'
+                            overflow: 'hidden',
+                            gap: '1rem'
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.transform = 'scale(1.05)';
@@ -8274,41 +8287,38 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                             e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.15)';
                           }}
                         >
-                          {/* Estado en esquina superior derecha */}
-                          <div style={{
-                            position: 'absolute',
-                            top: '0.5rem',
-                            right: '0.5rem',
-                            fontSize: '0.625rem',
-                            opacity: 0.9,
-                            fontWeight: 600
-                          }}>
-                            {bot.isActive ? '✅' : '⏸️'}
-                          </div>
-                          
-                          {/* Contenido principal */}
-                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: 0 }}>
-                            <Bot size={20} style={{ marginBottom: '0.25rem', opacity: 0.9 }} />
+                          {/* Icono y nombre */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0, flex: 1 }}>
+                            <Bot size={20} style={{ opacity: 0.9, flexShrink: 0 }} />
                             <div style={{ 
-                              fontSize: '0.625rem', 
-                              opacity: 0.9, 
-                              fontWeight: 600,
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.5px',
+                              fontSize: '0.875rem', 
+                              fontWeight: 700,
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap'
                             }}>
                               {bot.name}
                             </div>
+                            <div style={{
+                              fontSize: '0.625rem',
+                              opacity: 0.9,
+                              fontWeight: 600,
+                              padding: '0.25rem 0.5rem',
+                              background: 'rgba(255, 255, 255, 0.2)',
+                              borderRadius: '0.25rem',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {bot.isActive ? '✅ Activo' : '⏸️ Inactivo'}
+                            </div>
                           </div>
                           
+                          {/* Balance y ofertas */}
                           <div style={{ 
                             display: 'flex', 
                             flexDirection: 'column', 
+                            alignItems: 'flex-end',
                             gap: '0.25rem',
-                            marginTop: '0.5rem',
-                            marginBottom: '0.5rem'
+                            minWidth: '100px'
                           }}>
                             <div style={{ 
                               fontSize: '0.875rem', 
@@ -8329,14 +8339,12 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                             </div>
                           </div>
                           
-                          {/* Botones de acción - debajo del contenido */}
+                          {/* Botones de acción */}
                           <div style={{
                             display: 'flex',
                             gap: '0.5rem',
-                            justifyContent: 'center',
-                            width: '100%',
-                            marginTop: 'auto',
-                            paddingTop: '0.5rem'
+                            alignItems: 'center',
+                            minWidth: 'fit-content'
                           }}
                           onClick={(e) => e.stopPropagation()}
                           >
@@ -8362,7 +8370,6 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                                 fontSize: '0.625rem',
                                 fontWeight: 600,
                                 color: 'white',
-                                flex: 1,
                                 transition: 'all 0.2s'
                               }}
                               onMouseEnter={(e) => {
@@ -8396,7 +8403,6 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                                 fontSize: '0.625rem',
                                 fontWeight: 600,
                                 color: 'white',
-                                flex: 1,
                                 transition: 'all 0.2s'
                               }}
                               onMouseEnter={(e) => {
@@ -10512,25 +10518,63 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               Sección Principal (Hero)
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                  Título Principal *
-                </label>
-                <input
-                  type="text"
-                  value={homeConfig.heroTitle}
-                  onChange={(e) => setHomeConfig({ ...homeConfig, heroTitle: e.target.value })}
-                  placeholder="Ej: Bienvenido a Clikio"
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem',
-                    borderRadius: '0.5rem',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                    fontSize: isMobile ? '16px' : '1rem'
-                  }}
-                />
+              {/* Sección de Bienvenida */}
+              <div style={{
+                background: 'var(--bg-tertiary)',
+                padding: '1.5rem',
+                borderRadius: '0.75rem',
+                border: '2px solid var(--primary)',
+                borderStyle: 'dashed'
+              }}>
+                <h4 style={{ 
+                  margin: 0, 
+                  marginBottom: '1rem', 
+                  color: 'var(--primary)', 
+                  fontSize: isMobile ? '1rem' : '1.125rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <span>👋</span>
+                  Texto de Bienvenida
+                </h4>
+                <p style={{ 
+                  margin: 0, 
+                  marginBottom: '1rem', 
+                  color: 'var(--text-secondary)', 
+                  fontSize: isMobile ? '0.875rem' : '0.9375rem' 
+                }}>
+                  Este es el texto principal que aparece en la página de inicio. Los usuarios verán este mensaje cuando ingresen a tu sitio.
+                </p>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Título de Bienvenida *
+                  </label>
+                  <input
+                    type="text"
+                    value={homeConfig.heroTitle}
+                    onChange={(e) => setHomeConfig({ ...homeConfig, heroTitle: e.target.value })}
+                    placeholder="Ej: Bienvenido a Clikio"
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: isMobile ? '16px' : '1rem',
+                      fontWeight: 500
+                    }}
+                  />
+                  <p style={{ 
+                    margin: '0.5rem 0 0 0', 
+                    color: 'var(--text-secondary)', 
+                    fontSize: '0.75rem' 
+                  }}>
+                    Este texto aparecerá como el título principal en la página de inicio
+                  </p>
+                </div>
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
@@ -12276,6 +12320,754 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 setShowAnnouncementCreator(false);
               }}
             />
+          )}
+
+          {/* Sección de Gestión de Reglas de Notificaciones */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            padding: '1.5rem',
+            borderRadius: '1rem',
+            border: '1px solid var(--border)',
+            marginTop: '2rem'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginBottom: '1.5rem',
+              flexWrap: 'wrap',
+              gap: '1rem'
+            }}>
+              <div>
+                <h3 style={{ 
+                  margin: 0, 
+                  marginBottom: '0.5rem', 
+                  color: 'var(--text-primary)',
+                  fontSize: isMobile ? '1.25rem' : '1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <Bell size={24} />
+                  Reglas de Notificaciones Automáticas
+                </h3>
+                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: isMobile ? '0.875rem' : '0.9375rem' }}>
+                  Gestioná las acciones que disparan notificaciones automáticas (campana, globo de conversación, mensajes, etc.)
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setRuleForm({
+                    name: '',
+                    eventType: 'new_message',
+                    title: '',
+                    message: '',
+                    link: '',
+                    active: true,
+                    conditions: {
+                      minAmount: undefined,
+                      maxAmount: undefined,
+                      userRoles: [],
+                      productTypes: []
+                    }
+                  });
+                  setSelectedRule(null);
+                  setShowRuleEditor(true);
+                }}
+                className="btn btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Plus size={20} />
+                Nueva Regla
+              </button>
+            </div>
+
+            {/* Filtros y búsqueda */}
+            <div style={{ 
+              display: 'flex', 
+              gap: '1rem', 
+              marginBottom: '1.5rem',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ flex: 1, minWidth: '200px' }}>
+                <input
+                  type="text"
+                  placeholder="Buscar reglas..."
+                  value={ruleSearch}
+                  onChange={(e) => setRuleSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: isMobile ? '16px' : '1rem'
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => setRuleFilter('all')}
+                  className={ruleFilter === 'all' ? 'btn btn-primary' : 'btn btn-secondary'}
+                  style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}
+                >
+                  Todas
+                </button>
+                <button
+                  onClick={() => setRuleFilter('active')}
+                  className={ruleFilter === 'active' ? 'btn btn-primary' : 'btn btn-secondary'}
+                  style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}
+                >
+                  Activas
+                </button>
+                <button
+                  onClick={() => setRuleFilter('inactive')}
+                  className={ruleFilter === 'inactive' ? 'btn btn-primary' : 'btn btn-secondary'}
+                  style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}
+                >
+                  Inactivas
+                </button>
+              </div>
+            </div>
+
+            {/* Información sobre reglas del sistema */}
+            <div style={{
+              padding: '1rem',
+              background: 'var(--bg-secondary)',
+              borderRadius: '0.5rem',
+              border: '1px solid var(--border)',
+              marginBottom: '1.5rem'
+            }}>
+              <p style={{ margin: 0, color: 'var(--text-primary)', fontSize: '0.875rem', lineHeight: '1.6' }}>
+                <strong>ℹ️ Información:</strong> Las reglas marcadas con <span style={{
+                  padding: '0.125rem 0.375rem',
+                  borderRadius: '0.25rem',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  fontSize: '0.75rem',
+                  fontWeight: 600
+                }}>⚙️ Sistema</span> son acciones automáticas que ya están implementadas en el código (ej: cuando se gana una subasta, cuando el admin envía un mensaje, etc.). Estas reglas muestran qué notificaciones se envían automáticamente. Podés crear reglas personalizadas basadas en ellas para personalizar los mensajes.
+              </p>
+            </div>
+
+            {/* Lista de reglas */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {notificationRules.length === 0 ? (
+                <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>
+                  No hay reglas de notificaciones. Las reglas del sistema se mostrarán automáticamente.
+                </p>
+              ) : (
+                notificationRules
+                  .filter((rule) => {
+                    const matchesFilter = ruleFilter === 'all' || 
+                      (ruleFilter === 'active' && rule.active) ||
+                      (ruleFilter === 'inactive' && !rule.active);
+                    const matchesSearch = !ruleSearch || 
+                      rule.name?.toLowerCase().includes(ruleSearch.toLowerCase()) ||
+                      rule.title?.toLowerCase().includes(ruleSearch.toLowerCase()) ||
+                      rule.message?.toLowerCase().includes(ruleSearch.toLowerCase()) ||
+                      rule.eventType?.toLowerCase().includes(ruleSearch.toLowerCase());
+                    return matchesFilter && matchesSearch;
+                  })
+                  .map((rule) => (
+                    <div
+                      key={rule.id}
+                      style={{
+                        padding: '1rem',
+                        background: rule.active ? 'var(--bg-primary)' : 'var(--bg-tertiary)',
+                        borderRadius: '0.5rem',
+                        border: `1px solid ${rule.active ? 'var(--success)' : 'var(--border)'}`,
+                        opacity: rule.active ? 1 : 0.7
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
+                            <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>{rule.name}</h4>
+                            {rule.isSystemRule && (
+                              <span style={{
+                                padding: '0.125rem 0.5rem',
+                                borderRadius: '0.25rem',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                color: 'white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.25rem'
+                              }}>
+                                <span>⚙️</span> Sistema
+                              </span>
+                            )}
+                            <span style={{
+                              padding: '0.125rem 0.5rem',
+                              borderRadius: '0.25rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              background: rule.active ? 'var(--success)' : 'var(--text-secondary)',
+                              color: 'white'
+                            }}>
+                              {rule.active ? 'Activa' : 'Inactiva'}
+                            </span>
+                            <span style={{
+                              padding: '0.125rem 0.5rem',
+                              borderRadius: '0.25rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              background: 'var(--primary)',
+                              color: 'white'
+                            }}>
+                              {rule.eventType}
+                            </span>
+                          </div>
+                          <p style={{ margin: '0.25rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem', fontWeight: 500 }}>
+                            Título: {rule.title}
+                          </p>
+                          <p style={{ margin: '0.25rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                            Mensaje: {rule.message.substring(0, 100)}{rule.message.length > 100 ? '...' : ''}
+                          </p>
+                          <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+                            <span>Creada: {rule.createdAt ? new Date(rule.createdAt).toLocaleString('es-AR') : 'N/A'}</span>
+                            <span>Actualizada: {rule.updatedAt ? new Date(rule.updatedAt).toLocaleString('es-AR') : 'N/A'}</span>
+                            {rule.conditions && (
+                              <>
+                                {rule.conditions.minAmount && <span>Mín: ${rule.conditions.minAmount}</span>}
+                                {rule.conditions.maxAmount && <span>Máx: ${rule.conditions.maxAmount}</span>}
+                                {rule.conditions.userRoles && rule.conditions.userRoles.length > 0 && (
+                                  <span>Roles: {rule.conditions.userRoles.join(', ')}</span>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                          <button
+                            onClick={() => {
+                              if (rule.isSystemRule) {
+                                // Para reglas del sistema, crear una copia personalizada
+                                if (window.confirm(`Las reglas del sistema no se pueden editar directamente.\n\n¿Querés crear una regla personalizada basada en esta?`)) {
+                                  setSelectedRule(null);
+                                  setRuleForm({
+                                    name: `${rule.name} (Personalizada)`,
+                                    eventType: rule.eventType,
+                                    title: rule.title,
+                                    message: rule.message,
+                                    link: rule.link || '',
+                                    active: rule.active,
+                                    conditions: rule.conditions || {
+                                      minAmount: undefined,
+                                      maxAmount: undefined,
+                                      userRoles: [],
+                                      productTypes: []
+                                    }
+                                  });
+                                  setShowRuleEditor(true);
+                                }
+                              } else {
+                                setSelectedRule(rule);
+                                setRuleForm({
+                                  name: rule.name,
+                                  eventType: rule.eventType,
+                                  title: rule.title,
+                                  message: rule.message,
+                                  link: rule.link || '',
+                                  active: rule.active,
+                                  conditions: rule.conditions || {
+                                    minAmount: undefined,
+                                    maxAmount: undefined,
+                                    userRoles: [],
+                                    productTypes: []
+                                  }
+                                });
+                                setShowRuleEditor(true);
+                              }
+                            }}
+                            className="btn btn-secondary"
+                            style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                            title={rule.isSystemRule ? 'Crear copia personalizada' : 'Editar regla'}
+                          >
+                            <Edit size={16} />
+                          </button>
+                          {!rule.isSystemRule && (
+                            <button
+                              onClick={async () => {
+                                if (window.confirm(`¿Eliminar la regla "${rule.name}"?`)) {
+                                  try {
+                                    await deleteNotificationRule(rule.id);
+                                    setNotificationRules(notificationRules.filter((r) => r.id !== rule.id));
+                                    alert('✅ Regla eliminada');
+                                  } catch (error: any) {
+                                    console.error('Error eliminando regla:', error);
+                                    alert(`❌ ${error.message || 'Error al eliminar'}`);
+                                  }
+                                }
+                              }}
+                              className="btn btn-danger"
+                              style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+          </div>
+
+          {/* Modal de creación/edición de regla */}
+          {showRuleEditor && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 100000,
+              padding: isMobile ? '1rem' : '2rem'
+            }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowRuleEditor(false);
+              }
+            }}
+            >
+              <div style={{
+                background: 'var(--bg-primary)',
+                borderRadius: '1rem',
+                padding: '2rem',
+                width: '100%',
+                maxWidth: '700px',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                border: '1px solid var(--border)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>
+                    {selectedRule ? 'Editar Regla de Notificación' : 'Nueva Regla de Notificación'}
+                  </h3>
+                  <button
+                    onClick={() => setShowRuleEditor(false)}
+                    className="btn btn-secondary"
+                    style={{ padding: '0.5rem' }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {/* Nombre de la regla */}
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      Nombre de la Regla *
+                    </label>
+                    <input
+                      type="text"
+                      value={ruleForm.name}
+                      onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })}
+                      placeholder="Ej: Notificación cuando alguien gana una subasta"
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '1rem'
+                      }}
+                    />
+                    <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                      Un nombre descriptivo para identificar esta regla
+                    </p>
+                  </div>
+
+                  {/* Tipo de evento */}
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      Tipo de Evento que Dispara la Notificación *
+                    </label>
+                    <select
+                      value={ruleForm.eventType}
+                      onChange={(e) => setRuleForm({ ...ruleForm, eventType: e.target.value as NotificationRule['eventType'] })}
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '1rem'
+                      }}
+                    >
+                      <option value="new_message">Nuevo Mensaje (globo de conversación)</option>
+                      <option value="auction_won">Subasta Ganada</option>
+                      <option value="auction_outbid">Fuiste Superado en Subasta</option>
+                      <option value="purchase">Compra Realizada</option>
+                      <option value="payment_reminder">Recordatorio de Pago</option>
+                      <option value="order_shipped">Pedido Enviado</option>
+                      <option value="order_delivered">Pedido Entregado</option>
+                      <option value="order_expired">Pedido Expirado</option>
+                    </select>
+                    <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                      Seleccioná cuándo se debe disparar esta notificación automáticamente
+                    </p>
+                  </div>
+
+                  {/* Título de la notificación */}
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      Título de la Notificación *
+                    </label>
+                    <input
+                      type="text"
+                      value={ruleForm.title}
+                      onChange={(e) => setRuleForm({ ...ruleForm, title: e.target.value })}
+                      placeholder="Ej: 🎉 ¡Ganaste la subasta!"
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '1rem'
+                      }}
+                    />
+                  </div>
+
+                  {/* Mensaje de la notificación */}
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      Mensaje de la Notificación *
+                    </label>
+                    <textarea
+                      value={ruleForm.message}
+                      onChange={(e) => setRuleForm({ ...ruleForm, message: e.target.value })}
+                      rows={5}
+                      placeholder="Ej: Ganaste '{{auctionTitle}}' por ${{amount}}. Tenés 48hs para pagar."
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '1rem',
+                        fontFamily: 'inherit',
+                        resize: 'vertical'
+                      }}
+                    />
+                    <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                      Podés usar variables como {'{'}{'{'}auctionTitle{'}'}{'}'}, {'{'}{'{'}amount{'}'}{'}'}, {'{'}{'{'}username{'}'}{'}'}, etc.
+                    </p>
+                  </div>
+
+                  {/* Enlace opcional */}
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                      Enlace (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={ruleForm.link}
+                      onChange={(e) => setRuleForm({ ...ruleForm, link: e.target.value })}
+                      placeholder="Ej: /subastas/{{auctionId}} o /notificaciones"
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: isMobile ? '16px' : '1rem'
+                      }}
+                    />
+                  </div>
+
+                  {/* Estado activo/inactivo */}
+                  <div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={ruleForm.active}
+                        onChange={(e) => setRuleForm({ ...ruleForm, active: e.target.checked })}
+                      />
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                        Regla Activa
+                      </span>
+                    </label>
+                    <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                      Si está inactiva, esta regla no se ejecutará y no se enviarán notificaciones
+                    </p>
+                  </div>
+
+                  {/* Condiciones opcionales */}
+                  <div style={{
+                    padding: '1rem',
+                    background: 'var(--bg-secondary)',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)'
+                  }}>
+                    <h4 style={{ margin: '0 0 1rem 0', color: 'var(--text-primary)', fontSize: '1rem' }}>
+                      Condiciones Opcionales
+                    </h4>
+                    <p style={{ margin: '0 0 1rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                      Definí condiciones adicionales para cuándo se debe aplicar esta regla
+                    </p>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: '150px' }}>
+                          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontSize: '0.875rem' }}>
+                            Monto Mínimo
+                          </label>
+                          <input
+                            type="number"
+                            value={ruleForm.conditions.minAmount || ''}
+                            onChange={(e) => setRuleForm({
+                              ...ruleForm,
+                              conditions: {
+                                ...ruleForm.conditions,
+                                minAmount: e.target.value ? Number(e.target.value) : undefined
+                              }
+                            })}
+                            placeholder="Ej: 1000"
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem',
+                              borderRadius: '0.5rem',
+                              border: '1px solid var(--border)',
+                              background: 'var(--bg-primary)',
+                              color: 'var(--text-primary)',
+                              fontSize: isMobile ? '16px' : '0.9375rem'
+                            }}
+                          />
+                        </div>
+                        <div style={{ flex: 1, minWidth: '150px' }}>
+                          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontSize: '0.875rem' }}>
+                            Monto Máximo
+                          </label>
+                          <input
+                            type="number"
+                            value={ruleForm.conditions.maxAmount || ''}
+                            onChange={(e) => setRuleForm({
+                              ...ruleForm,
+                              conditions: {
+                                ...ruleForm.conditions,
+                                maxAmount: e.target.value ? Number(e.target.value) : undefined
+                              }
+                            })}
+                            placeholder="Ej: 50000"
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem',
+                              borderRadius: '0.5rem',
+                              border: '1px solid var(--border)',
+                              background: 'var(--bg-primary)',
+                              color: 'var(--text-primary)',
+                              fontSize: isMobile ? '16px' : '0.9375rem'
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontSize: '0.875rem' }}>
+                          Roles de Usuario
+                        </label>
+                        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={ruleForm.conditions.userRoles?.includes('user')}
+                              onChange={(e) => {
+                                const currentRoles = ruleForm.conditions.userRoles || [];
+                                if (e.target.checked) {
+                                  setRuleForm({
+                                    ...ruleForm,
+                                    conditions: {
+                                      ...ruleForm.conditions,
+                                      userRoles: [...currentRoles, 'user']
+                                    }
+                                  });
+                                } else {
+                                  setRuleForm({
+                                    ...ruleForm,
+                                    conditions: {
+                                      ...ruleForm.conditions,
+                                      userRoles: currentRoles.filter((r) => r !== 'user')
+                                    }
+                                  });
+                                }
+                              }}
+                            />
+                            <span>Usuarios</span>
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={ruleForm.conditions.userRoles?.includes('admin')}
+                              onChange={(e) => {
+                                const currentRoles = ruleForm.conditions.userRoles || [];
+                                if (e.target.checked) {
+                                  setRuleForm({
+                                    ...ruleForm,
+                                    conditions: {
+                                      ...ruleForm.conditions,
+                                      userRoles: [...currentRoles, 'admin']
+                                    }
+                                  });
+                                } else {
+                                  setRuleForm({
+                                    ...ruleForm,
+                                    conditions: {
+                                      ...ruleForm.conditions,
+                                      userRoles: currentRoles.filter((r) => r !== 'admin')
+                                    }
+                                  });
+                                }
+                              }}
+                            />
+                            <span>Administradores</span>
+                          </label>
+                        </div>
+                        <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                          Si no seleccionás ninguno, se aplica a todos los roles
+                        </p>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontSize: '0.875rem' }}>
+                          Tipos de Producto
+                        </label>
+                        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={ruleForm.conditions.productTypes?.includes('auction')}
+                              onChange={(e) => {
+                                const currentTypes = ruleForm.conditions.productTypes || [];
+                                if (e.target.checked) {
+                                  setRuleForm({
+                                    ...ruleForm,
+                                    conditions: {
+                                      ...ruleForm.conditions,
+                                      productTypes: [...currentTypes, 'auction']
+                                    }
+                                  });
+                                } else {
+                                  setRuleForm({
+                                    ...ruleForm,
+                                    conditions: {
+                                      ...ruleForm.conditions,
+                                      productTypes: currentTypes.filter((t) => t !== 'auction')
+                                    }
+                                  });
+                                }
+                              }}
+                            />
+                            <span>Subastas</span>
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={ruleForm.conditions.productTypes?.includes('store')}
+                              onChange={(e) => {
+                                const currentTypes = ruleForm.conditions.productTypes || [];
+                                if (e.target.checked) {
+                                  setRuleForm({
+                                    ...ruleForm,
+                                    conditions: {
+                                      ...ruleForm.conditions,
+                                      productTypes: [...currentTypes, 'store']
+                                    }
+                                  });
+                                } else {
+                                  setRuleForm({
+                                    ...ruleForm,
+                                    conditions: {
+                                      ...ruleForm.conditions,
+                                      productTypes: currentTypes.filter((t) => t !== 'store')
+                                    }
+                                  });
+                                }
+                              }}
+                            />
+                            <span>Tienda</span>
+                          </label>
+                        </div>
+                        <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                          Si no seleccionás ninguno, se aplica a todos los tipos
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Botones */}
+                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => setShowRuleEditor(false)}
+                      className="btn btn-secondary"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!ruleForm.name || !ruleForm.title || !ruleForm.message) {
+                          alert('⚠️ Por favor completá todos los campos requeridos');
+                          return;
+                        }
+
+                        try {
+                          if (selectedRule) {
+                            // Editar regla existente
+                            await updateNotificationRule(selectedRule.id, {
+                              name: ruleForm.name,
+                              eventType: ruleForm.eventType,
+                              title: ruleForm.title,
+                              message: ruleForm.message,
+                              link: ruleForm.link || undefined,
+                              active: ruleForm.active,
+                              conditions: ruleForm.conditions
+                            });
+                            alert('✅ Regla actualizada correctamente');
+                          } else {
+                            // Crear nueva regla
+                            await createNotificationRule({
+                              name: ruleForm.name,
+                              eventType: ruleForm.eventType,
+                              title: ruleForm.title,
+                              message: ruleForm.message,
+                              link: ruleForm.link || undefined,
+                              active: ruleForm.active,
+                              conditions: ruleForm.conditions,
+                              createdBy: user?.id || 'admin'
+                            });
+                            alert('✅ Regla creada correctamente');
+                          }
+                          
+                          setShowRuleEditor(false);
+                          setSelectedRule(null);
+                        } catch (error) {
+                          console.error('Error guardando regla:', error);
+                          alert('❌ Error al guardar la regla');
+                        }
+                      }}
+                      className="btn btn-primary"
+                    >
+                      <Save size={18} style={{ marginRight: '0.5rem' }} />
+                      {selectedRule ? 'Guardar Cambios' : 'Crear Regla'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       )}

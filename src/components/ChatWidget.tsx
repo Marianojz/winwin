@@ -6,7 +6,8 @@ import {
   saveMessage, 
   createMessage,
   watchConversationStatus,
-  startConversation
+  startConversation,
+  markMessagesAsRead
 } from '../utils/messages';
 import { Message } from '../types';
 import { formatTimeAgo } from '../utils/helpers';
@@ -63,6 +64,14 @@ const ChatWidget = ({ onContactClick, onHelpCenterClick }: ChatWidgetProps) => {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isOpen, isMinimized]);
+
+  // Marcar mensajes como leídos cuando se abre el widget
+  useEffect(() => {
+    if (isOpen && !isMinimized && user && conversationId) {
+      // Marcar todos los mensajes no leídos como leídos cuando se abre el chat
+      markMessagesAsRead(conversationId, user.id);
+    }
+  }, [isOpen, isMinimized, user, conversationId]);
 
   // NO iniciar conversación automáticamente - solo el admin puede iniciarla
   // El usuario solo puede responder si la conversación ya existe y está abierta

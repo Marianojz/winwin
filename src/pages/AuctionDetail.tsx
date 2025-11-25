@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Gavel, User, ShoppingCart, AlertCircle, TrendingUp, ChevronLeft } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { formatCurrency, formatTimeAgo } from '../utils/helpers';
+import { formatCurrency, formatTimeAgo, maskUsername } from '../utils/helpers';
 import { launchConfettiFromTop } from '../utils/celebrations';
 import Countdown from '../components/Countdown';
 import { useSEO, generateAuctionStructuredData } from '../hooks/useSEO';
@@ -975,7 +975,7 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
                     <div key={bid.id} className="bid-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', minWidth: 0, flex: '1 1 auto' }}>
                         <User size={14} style={{ flexShrink: 0 }} />
-                        <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word', fontSize: '0.875rem' }}>{bid.username}</span>
+                        <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word', fontSize: '0.875rem' }}>{maskUsername(bid.username)}</span>
                         <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                           {formatTimeAgo(bid.createdAt)}
                         </span>

@@ -145,6 +145,26 @@ export interface Notification {
   link?: string;
 }
 
+export interface NotificationRule {
+  id: string;
+  name: string;
+  eventType: 'auction_won' | 'auction_outbid' | 'purchase' | 'payment_reminder' | 'new_message' | 'order_shipped' | 'order_delivered' | 'order_expired';
+  title: string;
+  message: string;
+  link?: string;
+  active: boolean;
+  isSystemRule?: boolean; // Indica si es una regla del sistema (no se puede eliminar)
+  conditions?: {
+    minAmount?: number;
+    maxAmount?: number;
+    userRoles?: ('user' | 'admin')[];
+    productTypes?: ('auction' | 'store')[];
+  };
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string;
+}
+
 export interface Bot {
   id: string;
   name: string;

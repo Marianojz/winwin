@@ -65,23 +65,23 @@ const Countdown = ({ endTime, onExpire }: CountdownProps) => {
         {days > 0 && (
           <FlipModule 
             value={String(days).padStart(2, '0')} 
-            label="DAYS"
+            label="DÍAS"
             prevValue={String(prevTime.days).padStart(2, '0')}
           />
         )}
         <FlipModule 
           value={String(hours).padStart(2, '0')} 
-          label="HOURS"
+          label="HORAS"
           prevValue={String(prevTime.hours).padStart(2, '0')}
         />
         <FlipModule 
           value={String(minutes).padStart(2, '0')} 
-          label="MINUTES"
+          label="MINUTOS"
           prevValue={String(prevTime.minutes).padStart(2, '0')}
         />
         <FlipModule 
           value={String(seconds).padStart(2, '0')} 
-          label="SECONDS"
+          label="SEGUNDOS"
           prevValue={String(prevTime.seconds).padStart(2, '0')}
         />
       </div>

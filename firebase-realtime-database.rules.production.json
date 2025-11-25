@@ -215,6 +215,10 @@
           ".validate": "!newData.exists() || (newData.hasChildren(['userId', 'timestamp']) && newData.child('userId').isString() && newData.child('timestamp').isString())"
         }
       }
+    },
+    "notificationRules": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
     }
   }
 }

@@ -48,6 +48,17 @@ export const truncateText = (text: string, maxLength: number): string => {
   return text.slice(0, maxLength) + '...';
 };
 
+/**
+ * Enmascara el nombre de usuario mostrando solo las primeras 3 letras por privacidad
+ * @param username - Nombre de usuario completo
+ * @returns Nombre enmascarado (ej: "Mariano" -> "Mar***")
+ */
+export const maskUsername = (username: string): string => {
+  if (!username || username.length === 0) return '***';
+  if (username.length <= 3) return username;
+  return username.slice(0, 3) + '***';
+};
+
 export const validateEmail = (email: string): boolean => {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return re.test(email);

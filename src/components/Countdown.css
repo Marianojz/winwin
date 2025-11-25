@@ -101,7 +101,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Glassmorphism for flip cards */
+  /* Glassmorphism base */
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -113,22 +113,29 @@
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 
-/* Dark theme for flip cards */
+/* Modo claro: fondo negro glass intenso */
+[data-theme="light"] .flip-card-front,
+[data-theme="light"] .flip-card-back,
+.light .flip-card-front,
+.light .flip-card-back {
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.4),
+    0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Modo oscuro: mantener estilo original */
 [data-theme="dark"] .flip-card-front,
 [data-theme="dark"] .flip-card-back,
 .dark .flip-card-front,
 .dark .flip-card-back {
   background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Light theme for flip cards */
-[data-theme="light"] .flip-card-front,
-[data-theme="light"] .flip-card-back,
-.light .flip-card-front,
-.light .flip-card-back {
-  background: rgba(255, 255, 255, 0.3);
-  border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .flip-card-back {
@@ -149,22 +156,22 @@
   transition: color 0.3s ease;
 }
 
-/* Dark theme numbers */
-[data-theme="dark"] .flip-number,
-.dark .flip-number {
+/* Modo claro: números blancos */
+[data-theme="light"] .flip-number,
+.light .flip-number {
   color: #ffffff;
   text-shadow: 
     0 0 10px rgba(255, 255, 255, 0.3),
     0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
-/* Light theme numbers */
-[data-theme="light"] .flip-number,
-.light .flip-number {
-  color: #1a1a1a;
+/* Modo oscuro: números blancos */
+[data-theme="dark"] .flip-number,
+.dark .flip-number {
+  color: #ffffff;
   text-shadow: 
-    0 0 10px rgba(0, 0, 0, 0.1),
-    0 2px 4px rgba(0, 0, 0, 0.2);
+    0 0 10px rgba(255, 255, 255, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 /* Horizontal divider line (flip clock effect) */
