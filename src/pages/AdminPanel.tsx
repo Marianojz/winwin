@@ -12555,11 +12555,16 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                                     message: rule.message,
                                     link: rule.link || '',
                                     active: rule.active,
-                                    conditions: rule.conditions || {
-                                      minAmount: undefined,
-                                      maxAmount: undefined,
-                                      userRoles: [],
-                                      productTypes: []
+                                    conditions: rule.conditions ? {
+                                      minAmount: rule.conditions.minAmount,
+                                      maxAmount: rule.conditions.maxAmount,
+                                      userRoles: rule.conditions.userRoles || [],
+                                      productTypes: rule.conditions.productTypes || []
+                                    } : {
+                                      minAmount: undefined as number | undefined,
+                                      maxAmount: undefined as number | undefined,
+                                      userRoles: [] as ('user' | 'admin')[],
+                                      productTypes: [] as ('auction' | 'store')[]
                                     }
                                   });
                                   setShowRuleEditor(true);
@@ -12573,11 +12578,16 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                                   message: rule.message,
                                   link: rule.link || '',
                                   active: rule.active,
-                                  conditions: rule.conditions || {
-                                    minAmount: undefined,
-                                    maxAmount: undefined,
-                                    userRoles: [],
-                                    productTypes: []
+                                  conditions: rule.conditions ? {
+                                    minAmount: rule.conditions.minAmount,
+                                    maxAmount: rule.conditions.maxAmount,
+                                    userRoles: rule.conditions.userRoles || [],
+                                    productTypes: rule.conditions.productTypes || []
+                                  } : {
+                                    minAmount: undefined as number | undefined,
+                                    maxAmount: undefined as number | undefined,
+                                    userRoles: [] as ('user' | 'admin')[],
+                                    productTypes: [] as ('auction' | 'store')[]
                                   }
                                 });
                                 setShowRuleEditor(true);
