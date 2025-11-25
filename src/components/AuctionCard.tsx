@@ -45,7 +45,7 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
   const isHidden = (auction.status === 'ended' || auction.status === 'sold') && !isRecentlyEnded;
 
   // Función para verificar si hay stock disponible para compra directa
-  const hasStockForBuyNow = (auction: typeof auction) => {
+  const hasStockForBuyNow = (auction: Auction) => {
     if (!auction) return false;
     
     // Si tiene bundles y unitsPerBundle, verificar stock por bultos

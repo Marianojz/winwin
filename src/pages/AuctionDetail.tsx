@@ -11,7 +11,7 @@ import PaymentOptionsModal from '../components/PaymentOptionsModal';
 import { createAutoMessage, saveMessage } from '../utils/messages';
 import { generateOrderNumber } from '../utils/orderNumberGenerator';
 import { logOrderCreated } from '../utils/orderTransactions';
-import { Order } from '../types';
+import { Order, Auction } from '../types';
 
 const AuctionDetail = () => {
   const { id } = useParams();
@@ -107,7 +107,7 @@ const AuctionDetail = () => {
   const isActive = auction.status === 'active';
 
   // Función para verificar si hay stock disponible para compra directa
-  const hasStockForBuyNow = (auction: typeof auction) => {
+  const hasStockForBuyNow = (auction: Auction) => {
     if (!auction) return false;
     
     // Si tiene bundles y unitsPerBundle, verificar stock por bultos

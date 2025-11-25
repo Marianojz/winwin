@@ -224,7 +224,7 @@ const useSyncFirebase = () => {
       (error) => {
         console.error('❌ Error sincronizando pedidos:', error);
         // Si hay error de permisos y hay usuario, intentar leer solo sus pedidos
-        if (error.code === 'PERMISSION_DENIED' && user) {
+        if ((error as any)?.code === 'PERMISSION_DENIED' && user) {
           console.log('⚠️ No se pueden leer todos los pedidos, intentando leer solo los del usuario...');
           // Los usuarios solo pueden leer sus propios pedidos individuales
           // La sincronización se hará cuando se creen nuevos pedidos
