@@ -21,7 +21,7 @@ import UserDetailsModal from '../components/UserDetailsModal';
 import StatsCard from '../components/StatsCard';
 import { useStore } from '../store/useStore';
 import { formatCurrency, formatTimeAgo, generateUlid } from '../utils/helpers';
-import { Product, Auction, Order, OrderStatus, NotificationRule, Shipment } from '../types';
+import { Product, Auction, Order, OrderStatus, NotificationRule, Shipment, ShipmentStatus } from '../types';
 import { getAllNotificationRules, createNotificationRule, updateNotificationRule, deleteNotificationRule } from '../utils/notificationRules';
 import ImageUploader from '../components/ImageUploader';
 import { mockCategories } from '../utils/mockData';
