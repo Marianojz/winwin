@@ -2,29 +2,34 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Trash2, ShoppingCart, CreditCard, Minus, Plus } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { formatCurrency } from '../utils/helpers';
+import { formatCurrency, generateUlid } from '../utils/helpers';
 import { Order } from '../types';
 import { createAutoMessage, saveMessage } from '../utils/messages';
 import { generateOrderNumber } from '../utils/orderNumberGenerator';
 import { logOrderCreated } from '../utils/orderTransactions';
 import PaymentOptionsModal from '../components/PaymentOptionsModal';
+import { validateCouponForAmount, incrementCouponUsage } from '../utils/coupons';
+import { reserveStock } from '../utils/stockReservations';
+import { triggerRuleBasedNotification } from '../utils/notificationRules';
 
 const Carrito = () => {
   const navigate = useNavigate();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponError, setCouponError] = useState<string | null>(null);
   const shippingCost = 5000; // Costo de envío fijo
   
   const { 
     cart, 
     user,
-    products,
     removeFromCart, 
     updateQuantity, 
     clearCart, 
     cartTotal,
     addOrder,
-    addNotification,
-    setProducts
+    addNotification
   } = useStore();
 
   const validateCart = (): boolean => {
@@ -88,15 +93,43 @@ const Carrito = () => {
 
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 horas para pagar
-    const totalWithShipping = cartTotal + shippingCost;
+    const totalWithShipping = Math.max(0, cartTotal + shippingCost - couponDiscount);
+
+    // Reservar stock de todos los productos antes de crear órdenes
+    const reservationErrors: string[] = [];
+    for (const item of cart) {
+      const res = await reserveStock(item.product.id, item.quantity, {
+        userId: user.id
+      });
+      if (!res.success) {
+        reservationErrors.push(
+          `- ${item.product.name}: ${res.message || 'No hay stock suficiente'}`
+        );
+      }
+    }
+
+    if (reservationErrors.length > 0) {
+      alert(
+        `No se pudo reservar stock para algunos productos:\n${reservationErrors.join(
+          '\n'
+        )}`
+      );
+      return;
+    }
 
     // Crear órdenes de forma asíncrona para generar números únicos
     const createOrders = async () => {
       for (const item of cart) {
         try {
           const orderNumber = await generateOrderNumber();
+          const nowDate = new Date();
+          const yyyy = nowDate.getFullYear();
+          const mm = String(nowDate.getMonth() + 1).padStart(2, '0');
+          const dd = String(nowDate.getDate()).padStart(2, '0');
+          const datePart = `${yyyy}${mm}${dd}`;
+
           const order: Order = {
-            id: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: `ORD-${datePart}-${generateUlid()}`,
             orderNumber,
             userId: user.id,
             userName: user.username,
@@ -105,13 +138,18 @@ const Carrito = () => {
             productImage: item.product.images[0] || '',
             productType: 'store',
             type: 'store',
-            amount: item.product.price * item.quantity,
+            amount:
+              item.product.price * item.quantity +
+              (shippingCost / cart.length) -
+              (couponDiscount / cart.length),
             quantity: item.quantity,
             status: 'pending_payment',
             deliveryMethod: 'shipping',
             createdAt: now,
             expiresAt: expiresAt,
             address: user.address || { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } },
+            couponCode: appliedCouponCode || undefined,
+            discountAmount: couponDiscount / cart.length,
             unitsPerBundle: item.product.unitsPerBundle,
             bundles: item.product.bundles
           };
@@ -121,24 +159,6 @@ const Carrito = () => {
           // Registrar transacción en el log
           await logOrderCreated(order.id, orderNumber, user.id, user.username, order.amount);
 
-          // Reducir stock temporalmente (se devolverá si no paga)
-          const updatedProducts = products.map(p => {
-            if (p.id === item.product.id) {
-              const updatedProduct = { ...p, stock: p.stock - item.quantity };
-              // Si tiene unidades por bulto y bultos, calcular cuántos bultos se vendieron
-              if (p.unitsPerBundle && p.unitsPerBundle > 0 && p.bundles && p.bundles > 0) {
-                const unidadesVendidas = item.quantity;
-                const bultosVendidos = Math.ceil(unidadesVendidas / p.unitsPerBundle);
-                updatedProduct.bundles = Math.max(0, p.bundles - bultosVendidos);
-                // Recalcular stock basado en bultos restantes
-                updatedProduct.stock = updatedProduct.bundles * p.unitsPerBundle;
-              }
-              return updatedProduct;
-            }
-            return p;
-          });
-          setProducts(updatedProducts);
-          
           // Crear mensaje automático para la compra
           try {
             const autoMsg = await createAutoMessage(
@@ -162,23 +182,24 @@ const Carrito = () => {
         }
       }
       
-      // Notificación para el usuario
-      addNotification({
-        userId: user.id,
-        type: 'purchase',
-        title: '🛍️ Compra Iniciada',
-        message: `Compraste ${cart.length} producto(s) por ${formatCurrency(totalWithShipping)} (incluye envío). Tenés 48hs para pagar.`,
-        read: false
-      });
+      // Notificación para el usuario basada en reglas
+      triggerRuleBasedNotification(
+        'purchase',
+        user.id,
+        addNotification,
+        {
+          amount: totalWithShipping,
+          productName: cart.length === 1 ? cart[0].product.name : `${cart.length} productos`
+        }
+      );
 
-      // Notificación para el admin
-      addNotification({
-        userId: 'admin',
-        type: 'purchase',
-        title: '🛍️ Nueva Compra',
-        message: `${user.username} inició una compra por ${formatCurrency(totalWithShipping)}. Esperando pago.`,
-        read: false
-      });
+      if (appliedCouponCode) {
+        try {
+          await incrementCouponUsage(appliedCouponCode);
+        } catch (e) {
+          console.warn('No se pudo incrementar el uso del cupón:', e);
+        }
+      }
 
       clearCart();
       
@@ -207,6 +228,34 @@ const Carrito = () => {
 
     const now = new Date();
 
+    // Reservar stock de todos los productos antes de crear órdenes
+    const reservationErrors: string[] = [];
+    for (const item of cart) {
+      // NO reservar stock para bots (compras ficticias)
+      const isBot = user.id.startsWith('bot-');
+      if (isBot) {
+        continue;
+      }
+
+      const res = await reserveStock(item.product.id, item.quantity, {
+        userId: user.id
+      });
+      if (!res.success) {
+        reservationErrors.push(
+          `- ${item.product.name}: ${res.message || 'No hay stock suficiente'}`
+        );
+      }
+    }
+
+    if (reservationErrors.length > 0) {
+      alert(
+        `No se pudo reservar stock para algunos productos:\n${reservationErrors.join(
+          '\n'
+        )}`
+      );
+      return;
+    }
+
     // Crear órdenes de forma asíncrona para generar números únicos
     const createOrders = async () => {
       for (const item of cart) {
@@ -217,8 +266,14 @@ const Carrito = () => {
             ? `${item.quantity / item.product.unitsPerBundle} bulto${item.quantity / item.product.unitsPerBundle !== 1 ? 's' : ''} (${item.quantity} unidades)`
             : `${item.quantity} unidad${item.quantity !== 1 ? 'es' : ''}`;
 
+          const nowDate = new Date();
+          const yyyy = nowDate.getFullYear();
+          const mm = String(nowDate.getMonth() + 1).padStart(2, '0');
+          const dd = String(nowDate.getDate()).padStart(2, '0');
+          const datePart = `${yyyy}${mm}${dd}`;
+
           const order: Order = {
-            id: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: `ORD-${datePart}-${generateUlid()}`,
             orderNumber,
             userId: user.id,
             userName: user.username,
@@ -227,12 +282,16 @@ const Carrito = () => {
             productImage: item.product.images[0] || '',
             productType: 'store',
             type: 'store',
-            amount: (item.product.price * item.quantity) + (shippingCost / cart.length), // Dividir envío entre productos
+            amount: (item.product.price * item.quantity) +
+              (shippingCost / cart.length) -
+              (couponDiscount / cart.length),
             quantity: item.quantity,
             status: 'preparing', // Estado de preparación para pago al recibir
             deliveryMethod: 'shipping',
             createdAt: now,
             address: user.address || { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } },
+            couponCode: appliedCouponCode || undefined,
+            discountAmount: couponDiscount / cart.length,
             unitsPerBundle: item.product.unitsPerBundle,
             bundles: item.product.bundles
           };
@@ -241,27 +300,6 @@ const Carrito = () => {
           
           // Registrar transacción en el log
           await logOrderCreated(order.id, orderNumber, user.id, user.username, order.amount);
-
-          // Reducir stock (ya que el pedido está confirmado)
-          // NO reducir stock si es un bot (compras ficticias)
-          const isBot = user.id.startsWith('bot-');
-          if (!isBot) {
-            const updatedProducts = products.map(p => {
-              if (p.id === item.product.id) {
-                const updatedProduct: any = {
-                  ...p,
-                  stock: p.stock - item.quantity
-                };
-                // Solo actualizar bundles si el producto tiene unitsPerBundle
-                if (item.product.unitsPerBundle && item.product.unitsPerBundle > 0) {
-                  updatedProduct.bundles = (item.product.bundles || 0) - Math.floor(item.quantity / item.product.unitsPerBundle);
-                }
-                return updatedProduct;
-              }
-              return p;
-            });
-            setProducts(updatedProducts);
-          }
 
           // Enviar mensaje de preparación al cliente
           const preparationMessage = await createAutoMessage(
@@ -411,10 +449,90 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
               <span>Envío</span>
               <span className="summary-value">{formatCurrency(shippingCost)}</span>
             </div>
+
+            {/* Cupón de descuento */}
+            <div style={{ marginTop: '1rem', marginBottom: '0.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem', fontWeight: 600 }}>
+                Código de cupón
+              </label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type="text"
+                  value={couponCode}
+                  onChange={(e) => {
+                    setCouponCode(e.target.value);
+                    setCouponError(null);
+                  }}
+                  placeholder="Ingresá tu cupón"
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.875rem'
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ whiteSpace: 'nowrap' }}
+                  onClick={async () => {
+                    setCouponError(null);
+                    if (!couponCode.trim()) {
+                      setCouponError('Ingresá un código.');
+                      return;
+                    }
+                    const subtotalWithShipping = cartTotal + shippingCost;
+                    try {
+                      const result = await validateCouponForAmount(
+                        couponCode,
+                        subtotalWithShipping
+                      );
+                      if (!result.valid) {
+                        setCouponDiscount(0);
+                        setAppliedCouponCode(null);
+                        setCouponError(result.errorMessage || 'Cupón no válido.');
+                        return;
+                      }
+                      setCouponDiscount(result.discountAmount);
+                      setAppliedCouponCode(couponCode.trim().toUpperCase());
+                    } catch (err: any) {
+                      console.error('Error validando cupón:', err);
+                      setCouponError(
+                        err?.message || 'No se pudo validar el cupón. Intentá nuevamente.'
+                      );
+                    }
+                  }}
+                >
+                  Aplicar
+                </button>
+              </div>
+              {couponError && (
+                <div style={{ marginTop: '0.25rem', fontSize: '0.8rem', color: 'var(--error)' }}>
+                  {couponError}
+                </div>
+              )}
+              {appliedCouponCode && couponDiscount > 0 && (
+                <div
+                  style={{
+                    marginTop: '0.5rem',
+                    fontSize: '0.8rem',
+                    color: 'var(--success)'
+                  }}
+                >
+                  Cupón <strong>{appliedCouponCode}</strong> aplicado: -
+                  {formatCurrency(couponDiscount)}
+                </div>
+              )}
+            </div>
             
             <div className="summary-total">
               <span>Total</span>
-              <span className="total-value">{formatCurrency(cartTotal + shippingCost)}</span>
+              <span className="total-value">
+                {formatCurrency(Math.max(0, cartTotal + shippingCost - couponDiscount))}
+              </span>
             </div>
             
             <button 

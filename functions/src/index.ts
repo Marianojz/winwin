@@ -24,10 +24,43 @@ interface Auction {
   currentPrice: number;
   startingPrice: number;
   createdBy: string;
+  buyNowPrice?: number;
+  endTime?: string;
+  images?: string[];
   bids?: Array<{
+    id?: string;
     userId: string;
+    username?: string;
     amount: number;
+    createdAt?: string;
+    isBot?: boolean;
   }>;
+}
+
+interface Order {
+  id: string;
+  userId: string;
+  userName: string;
+  productId: string;
+  productName: string;
+  productImage: string;
+  productType: 'auction' | 'store';
+  type: 'auction' | 'store';
+  amount: number;
+  status: string;
+  deliveryMethod: 'shipping' | 'pickup' | 'email';
+  createdAt: string;
+  expiresAt?: string;
+  address: {
+    street: string;
+    locality: string;
+    province: string;
+    location: { lat: number; lng: number };
+  };
+  orderNumber?: string;
+  quantity?: number;
+  unitsPerBundle?: number;
+  bundles?: number;
 }
 
 /**
@@ -108,6 +141,240 @@ export const executeBots = functions.pubsub
       return null;
     } catch (error) {
       console.error('❌ Error ejecutando bots:', error);
+      return null;
+    }
+  });
+
+/**
+ * Cloud Function programada que finaliza subastas vencidas en el servidor,
+ * asigna ganador y crea una orden básica si aún no existe.
+ * Esto actúa como red de seguridad adicional al AuctionManager del cliente.
+ */
+export const finalizeExpiredAuctions = functions.pubsub
+  .schedule('every 2 minutes')
+  .onRun(async () => {
+    console.log('⏱️ Iniciando verificación de subastas vencidas...');
+
+    try {
+      const now = Date.now();
+
+      // Leer todas las subastas
+      const snapshot = await db.ref('auctions').once('value');
+      const auctionsData = snapshot.val();
+
+      if (!auctionsData) {
+        console.log('📭 No hay subastas en la base de datos');
+        return null;
+      }
+
+      const auctions: Auction[] = Object.entries(auctionsData).map(
+        ([id, auction]: [string, any]) => ({
+          id,
+          ...auction,
+          status: auction.status || 'active',
+          currentPrice: auction.currentPrice || auction.startingPrice || 0,
+          startingPrice: auction.startingPrice || 0,
+          endTime: auction.endTime,
+          buyNowPrice: auction.buyNowPrice,
+          images: auction.images || [],
+          bids: auction.bids ? Object.values(auction.bids) : []
+        })
+      ) as Auction[];
+
+      // Filtrar candidatas: activas y con endTime pasado
+      const candidates = auctions.filter((auction) => {
+        if (auction.status !== 'active') return false;
+        if (!auction.endTime) return false;
+        const endTimeMs = new Date(auction.endTime).getTime();
+        return !isNaN(endTimeMs) && endTimeMs <= now;
+      });
+
+      if (candidates.length === 0) {
+        console.log('✅ No hay subastas vencidas para procesar');
+        return null;
+      }
+
+      console.log(`📌 Subastas candidatas a finalizar: ${candidates.length}`);
+
+      for (const auction of candidates) {
+        const auctionRef = db.ref(`auctions/${auction.id}`);
+
+        // Usar transaction para evitar condiciones de carrera
+        await auctionRef.transaction((current) => {
+          if (!current) return current;
+
+          const currentStatus = current.status || 'active';
+          const endTimeMs = current.endTime
+            ? new Date(current.endTime).getTime()
+            : NaN;
+
+          if (
+            currentStatus !== 'active' ||
+            !current.endTime ||
+            isNaN(endTimeMs) ||
+            endTimeMs > now
+          ) {
+            // Ya no es candidata o aún no venció
+            return current;
+          }
+
+          // Marcar como finalizada; el ganador y orden se manejarán después
+          return {
+            ...current,
+            status: 'ended'
+          };
+        });
+
+        // Volver a leer el estado final de la subasta
+        const finalSnap = await auctionRef.once('value');
+        const finalAuction: any = finalSnap.val();
+
+        if (!finalAuction) continue;
+
+        // Si ya tiene winnerId, asumimos que otra lógica (cliente u otra función) ya la procesó
+        if (finalAuction.winnerId) {
+          console.log(
+            `⏭️ Subasta ${auction.id} ya tiene winnerId (${finalAuction.winnerId}), no se crea nueva orden`
+          );
+          continue;
+        }
+
+        const bids: any[] = finalAuction.bids
+          ? Object.values(finalAuction.bids)
+          : [];
+
+        if (!bids.length) {
+          console.log(
+            `ℹ️ Subasta ${auction.id} finalizada sin ofertas, solo se marca status=ended`
+          );
+          continue;
+        }
+
+        // Elegir oferta ganadora (mayor amount)
+        const winningBid = bids.reduce((highest, current) =>
+          current.amount > highest.amount ? current : highest
+        );
+
+        const winnerId: string = winningBid.userId;
+        const winnerName: string = winningBid.username || 'Ganador';
+        const finalPrice: number = winningBid.amount;
+
+        // Ignorar bots para orden real (mantener la lógica de frontend)
+        if (winnerId.startsWith('bot-')) {
+          console.log(
+            `🤖 Subasta ${auction.id} ganada por bot (${winnerName}), no se crea orden real`
+          );
+
+          await auctionRef.update({
+            winnerId: winnerId
+          });
+
+          continue;
+        }
+
+        // Verificar si ya existe una orden para esta subasta y este ganador
+        const ordersSnap = await db.ref('orders').once('value');
+        const ordersData = ordersSnap.val() || {};
+        const existingOrder = Object.values(ordersData).find((o: any) => {
+          return (
+            o.type === 'auction' &&
+            o.productId === auction.id &&
+            o.userId === winnerId
+          );
+        }) as any;
+
+        if (existingOrder) {
+          console.log(
+            `⏭️ Ya existe una orden para subasta ${auction.id} y usuario ${winnerId}, no se crea duplicado`
+          );
+
+          // Asegurar que la subasta tenga winnerId en caso de que falte
+          if (!finalAuction.winnerId) {
+            await auctionRef.update({
+              winnerId: winnerId
+            });
+          }
+
+          continue;
+        }
+
+        // Crear orden básica para el ganador
+        const nowDate = new Date();
+        const expiresAt = new Date(nowDate.getTime() + 48 * 60 * 60 * 1000);
+        const orderId = `ORD-${Date.now()}-${Math.random()
+          .toString(36)
+          .substr(2, 9)}`;
+
+        const order: Order = {
+          id: orderId,
+          userId: winnerId,
+          userName: winnerName,
+          productId: auction.id,
+          productName: auction.title,
+          productImage:
+            (auction.images && auction.images[0]) ||
+            (finalAuction.images && finalAuction.images[0]) ||
+            '',
+          productType: 'auction',
+          type: 'auction',
+          amount: finalPrice,
+          status: 'pending_payment',
+          deliveryMethod: 'shipping',
+          createdAt: nowDate.toISOString(),
+          expiresAt: expiresAt.toISOString(),
+          address: {
+            street: '',
+            locality: '',
+            province: '',
+            location: { lat: 0, lng: 0 }
+          },
+          quantity: 1,
+          unitsPerBundle: finalAuction.unitsPerBundle,
+          bundles: finalAuction.bundles
+        };
+
+        // Guardar orden
+        await db.ref(`orders/${orderId}`).set(order);
+
+        // Marcar ganador en la subasta
+        await auctionRef.update({
+          winnerId: winnerId
+        });
+
+        console.log(
+          `📝 Orden ${orderId} creada para ganador ${winnerName} en subasta ${auction.id} por $${finalPrice.toLocaleString()}`
+        );
+
+        // Crear notificación simple para el ganador
+        const notificationId = `NOTIF-${Date.now()}-${Math.random()
+          .toString(36)
+          .substr(2, 9)}`;
+        const notificationRef = db.ref(
+          `notifications/${winnerId}/${notificationId}`
+        );
+
+        await notificationRef.set({
+          id: notificationId,
+          userId: winnerId,
+          type: 'auction_won',
+          title: '🎉 ¡Ganaste la subasta!',
+          message: `Ganaste "${auction.title}" por $${finalPrice.toLocaleString(
+            'es-AR'
+          )}. Tenés 48hs para pagar.`,
+          read: false,
+          createdAt: nowDate.toISOString(),
+          link: '/notificaciones'
+        });
+
+        console.log(
+          `🔔 Notificación de victoria creada para usuario ${winnerId} (subasta ${auction.id})`
+        );
+      }
+
+      console.log('✅ Proceso de finalización de subastas completado');
+      return null;
+    } catch (error) {
+      console.error('❌ Error finalizando subastas:', error);
       return null;
     }
   });

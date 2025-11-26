@@ -8,13 +8,17 @@ const useSyncFirebase = () => {
   const { setAuctions, setProducts, setOrders, user } = useStore();
 
   useEffect(() => {
-    console.log('🔄 INICIANDO SINCRONIZACIÓN FIREBASE...');
+    if (import.meta.env.DEV) {
+      console.log('🔄 INICIANDO SINCRONIZACIÓN FIREBASE...');
+    }
 
     // Sincronizar subastas
     const auctionsRef = ref(realtimeDb, 'auctions');
     const unsubscribeAuctions = onValue(auctionsRef, (snapshot) => {
       const data = snapshot.val();
-      console.log('📡 Firebase - Datos recibidos:', data);
+      if (import.meta.env.DEV) {
+        console.log('📡 Firebase - Datos recibidos:', data);
+      }
       
       if (data) {
         const now = Date.now();
@@ -28,7 +32,9 @@ const useSyncFirebase = () => {
             if (!auctionData?.title || 
                 auctionData.title === 'Sin título' || 
                 auctionData.title.trim() === '') {
-              console.log(`🗑️ Filtrando subasta corrupta: ${key} (sin título)`);
+              if (import.meta.env.DEV) {
+                console.log(`🗑️ Filtrando subasta corrupta: ${key} (sin título)`);
+              }
               return null;
             }
             
@@ -36,7 +42,9 @@ const useSyncFirebase = () => {
             if (auctionData.endTime) {
               const endTime = new Date(auctionData.endTime).getTime();
               if (endTime < threeDaysAgo && (auctionData.status === 'ended' || auctionData.status === 'sold')) {
-                console.log(`🗑️ Filtrando subasta antigua: ${key} (finalizada hace más de 3 días)`);
+                if (import.meta.env.DEV) {
+                  console.log(`🗑️ Filtrando subasta antigua: ${key} (finalizada hace más de 3 días)`);
+                }
                 return null;
               }
             }
@@ -61,17 +69,23 @@ const useSyncFirebase = () => {
               } else if (typeof auctionData.endTime === 'string') {
                 endTime = new Date(auctionData.endTime);
               } else {
-                console.warn(`⚠️ Subasta ${key} tiene endTime inválido:`, auctionData.endTime);
+                if (import.meta.env.DEV) {
+                  console.warn(`⚠️ Subasta ${key} tiene endTime inválido:`, auctionData.endTime);
+                }
                 endTime = new Date(); // Fallback a fecha actual
               }
               
               // Validar que la fecha sea válida
               if (isNaN(endTime.getTime())) {
+              if (import.meta.env.DEV) {
                 console.warn(`⚠️ Subasta ${key} tiene endTime inválido (NaN), usando fecha actual como fallback`);
+              }
                 endTime = new Date();
               }
             } else {
-              console.warn(`⚠️ Subasta ${key} no tiene endTime, usando fecha actual como fallback`);
+              if (import.meta.env.DEV) {
+                console.warn(`⚠️ Subasta ${key} no tiene endTime, usando fecha actual como fallback`);
+              }
               endTime = new Date();
             }
             
@@ -110,7 +124,9 @@ const useSyncFirebase = () => {
               isFlash: auctionData?.isFlash || false,
               condition: auctionData?.condition || 'good',
               createdBy: auctionData?.createdBy || 'unknown',
-              createdAt: auctionData?.createdAt ? new Date(auctionData.createdAt) : new Date()
+              createdAt: auctionData?.createdAt ? new Date(auctionData.createdAt) : new Date(),
+              // Relación opcional con producto de tienda si existe en Firebase
+              linkedProductId: auctionData?.linkedProductId
             };
           })
           .filter((auction): auction is any => auction !== null); // Filtrar nulls
@@ -121,14 +137,18 @@ const useSyncFirebase = () => {
         );
         
         const duplicatesCount = auctionsArray.length - uniqueAuctions.length;
-        if (duplicatesCount > 0) {
-          console.warn(`⚠️ Se encontraron ${duplicatesCount} subasta(s) duplicada(s), eliminadas`);
+        if (import.meta.env.DEV) {
+          if (duplicatesCount > 0) {
+            console.warn(`⚠️ Se encontraron ${duplicatesCount} subasta(s) duplicada(s), eliminadas`);
+          }
+          
+          console.log(`✅ Firebase - Subastas sincronizadas: ${uniqueAuctions.length} (filtradas ${Object.keys(data).length - uniqueAuctions.length} corruptas/antiguas/duplicadas)`);
         }
-        
-        console.log(`✅ Firebase - Subastas sincronizadas: ${uniqueAuctions.length} (filtradas ${Object.keys(data).length - uniqueAuctions.length} corruptas/antiguas/duplicadas)`);
         setAuctions(uniqueAuctions);
       } else {
-        console.log('📭 Firebase - No hay subastas');
+        if (import.meta.env.DEV) {
+          console.log('📭 Firebase - No hay subastas');
+        }
         setAuctions([]);
       }
     });
@@ -147,6 +167,8 @@ const useSyncFirebase = () => {
             images: productData?.images || [],
             price: productData?.price || 0,
             stock: productData?.stock || 0,
+            // stockTotal se usa como referencia histórica; si no existe, usar stock actual
+            stockTotal: productData?.stockTotal ?? productData?.stock ?? 0,
             categoryId: productData?.categoryId || '1',
             ratings: productData?.ratings || [],
             averageRating: productData?.averageRating || 0,
@@ -158,11 +180,15 @@ const useSyncFirebase = () => {
             updatedAt: productData?.updatedAt || productData?.createdAt || new Date().toISOString()
           };
         });
-        console.log('✅ Productos sincronizados desde Firebase:', productsArray.length);
+        if (import.meta.env.DEV) {
+          console.log('✅ Productos sincronizados desde Firebase:', productsArray.length);
+        }
         setProducts(productsArray, true); // skipFirebaseSync = true para evitar bucle infinito
       } else {
         // Si no hay datos en Firebase, limpiar productos (no usar localStorage)
-        console.log('📭 Firebase - No hay productos');
+        if (import.meta.env.DEV) {
+          console.log('📭 Firebase - No hay productos');
+        }
         setProducts([], true);
       }
     });
@@ -210,10 +236,14 @@ const useSyncFirebase = () => {
           ? ordersArray.filter(order => order.userId === user.id)
           : ordersArray;
         
-        console.log('✅ Pedidos sincronizados desde Firebase:', filteredOrders.length, user?.isAdmin ? '(todos)' : '(solo del usuario)');
+        if (import.meta.env.DEV) {
+          console.log('✅ Pedidos sincronizados desde Firebase:', filteredOrders.length, user?.isAdmin ? '(todos)' : '(solo del usuario)');
+        }
         setOrders(filteredOrders);
       } else {
-        console.log('📭 Firebase - No hay pedidos');
+        if (import.meta.env.DEV) {
+          console.log('📭 Firebase - No hay pedidos');
+        }
         setOrders([]);
       }
     };
@@ -236,7 +266,9 @@ const useSyncFirebase = () => {
     );
 
     return () => {
-      console.log('🔴 Cerrando sincronización Firebase');
+      if (import.meta.env.DEV) {
+        console.log('🔴 Cerrando sincronización Firebase');
+      }
       unsubscribeAuctions();
       unsubscribeProducts();
       unsubscribeOrders();

@@ -295,6 +295,29 @@ export const useStore = create<AppState>((set, get) => ({
       return;
     }
 
+    // LÓGICA ANTI-SNIPING: si faltan pocos segundos, extender el endTime
+    let extendedEndTime: string | undefined;
+    if (auction.endTime) {
+      const endTime =
+        auction.endTime instanceof Date
+          ? auction.endTime
+          : new Date(auction.endTime as any);
+      const now = new Date();
+      const timeRemainingMs = endTime.getTime() - now.getTime();
+      // Si faltan 30s o menos pero todavía no terminó, extendemos 30s
+      if (timeRemainingMs > 0 && timeRemainingMs <= 30000) {
+        const newEndTime = new Date(now.getTime() + 30000);
+        extendedEndTime = newEndTime.toISOString();
+        console.log(
+          `⏱️ Anti-sniping: extendiendo endTime de subasta ${auctionId} en 30s`,
+          {
+            before: endTime.toISOString(),
+            after: extendedEndTime
+          }
+        );
+      }
+    }
+
     const bid = {
       id: Date.now().toString(),
       auctionId,
@@ -310,11 +333,18 @@ export const useStore = create<AppState>((set, get) => ({
       console.log('🔗 URL de Firebase:', `auctions/${auctionId}`);
     }
     
-    await update(ref(realtimeDb, `auctions/${auctionId}`), {
+    const updatesPayload: any = {
       currentPrice: amount,
       lastBidAt: new Date().toISOString(),
       [`bids/${bid.id}`]: bid
-    });
+    };
+
+    // Si se activó anti-sniping, actualizar también el endTime
+    if (extendedEndTime) {
+      updatesPayload.endTime = extendedEndTime;
+    }
+
+    await update(ref(realtimeDb, `auctions/${auctionId}`), updatesPayload);
 
     if (!isBot) {
       console.log('✅ OFERTA GUARDADA EN FIREBASE EXITOSAMENTE');

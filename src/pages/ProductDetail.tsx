@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Star, Package, ChevronLeft, CreditCard, TrendingUp, AlertCircle, Heart } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { formatCurrency, formatTimeAgo } from '../utils/helpers';
+import { formatCurrency, formatTimeAgo, generateUlid } from '../utils/helpers';
 import { useSEO, generateProductStructuredData } from '../hooks/useSEO';
 import PaymentOptionsModal from '../components/PaymentOptionsModal';
 import { createAutoMessage, saveMessage } from '../utils/messages';
@@ -12,6 +12,8 @@ import { Order } from '../types';
 import { getSimilarProducts } from '../utils/recommendations';
 import ProductCard from '../components/ProductCard';
 import { likeProduct, unlikeProduct, isProductLiked } from '../utils/likes';
+import { reserveStock } from '../utils/stockReservations';
+import { triggerRuleBasedNotification } from '../utils/notificationRules';
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -213,9 +215,31 @@ const ProductDetail = () => {
         const now = new Date();
         const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 horas para pagar
         const orderNumber = await generateOrderNumber();
+
+        // NO reservar stock si es un bot (compras ficticias)
+        const isBot = user.id.startsWith('bot-');
+        if (!isBot) {
+          const reservation = await reserveStock(product.id, quantity, {
+            userId: user.id
+          });
+          if (!reservation.success) {
+            alert(
+              reservation.message ||
+                'No se pudo reservar stock para este producto. Intentá nuevamente.'
+            );
+            return;
+          }
+        }
         
+        const nowDate = new Date();
+        const yyyy = nowDate.getFullYear();
+        const mm = String(nowDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(nowDate.getDate()).padStart(2, '0');
+        const datePart = `${yyyy}${mm}${dd}`;
+        const ulid = generateUlid();
+
         const order: Order = {
-          id: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: `ORD-${datePart}-${ulid}`,
           orderNumber,
           userId: user.id,
           userName: user.username,
@@ -240,34 +264,17 @@ const ProductDetail = () => {
         // Registrar transacción en el log
         await logOrderCreated(order.id, orderNumber, user.id, user.username, order.amount);
 
-        // Reducir stock temporalmente (se devolverá si no paga)
-        // NO reducir stock si es un bot (compras ficticias)
-        const isBot = user.id.startsWith('bot-');
-        if (!isBot) {
-          const updatedProducts = products.map(p => {
-            if (p.id === product.id) {
-              const updatedProduct: any = {
-                ...p,
-                stock: p.stock - quantity
-              };
-              // Solo actualizar bundles si el producto tiene unitsPerBundle
-              if (product.unitsPerBundle && product.unitsPerBundle > 0) {
-                updatedProduct.bundles = (product.bundles || 0) - Math.floor(quantity / product.unitsPerBundle);
-              }
-              return updatedProduct;
-            }
-            return p;
-          });
-          setProducts(updatedProducts);
-        }
-
-        addNotification({
-          userId: 'current',
-          type: 'purchase',
-          title: 'Compra realizada',
-          message: `Compraste ${product.name} (${displayQuantity}) por ${formatCurrency(totalWithShipping)} (incluye envío)`,
-          read: false
-        });
+        // Notificación al usuario basada en reglas
+        triggerRuleBasedNotification(
+          'purchase',
+          user.id,
+          addNotification,
+          {
+            productName: product.name,
+            productId: product.id,
+            amount: totalWithShipping
+          }
+        );
         
         // Redirigir a MercadoPago (aquí iría la integración real)
         const mercadopagoLink = `https://www.mercadopago.com.ar/checkout/v1/payment?preference_id=MOCK-${product.id}-${Date.now()}`;
@@ -297,9 +304,31 @@ const ProductDetail = () => {
       try {
         const now = new Date();
         const orderNumber = await generateOrderNumber();
+
+        // NO reservar stock si es un bot (compras ficticias)
+        const isBot = user.id.startsWith('bot-');
+        if (!isBot) {
+          const reservation = await reserveStock(product.id, quantity, {
+            userId: user.id
+          });
+          if (!reservation.success) {
+            alert(
+              reservation.message ||
+                'No se pudo reservar stock para este producto. Intentá nuevamente.'
+            );
+            return;
+          }
+        }
         
+        const nowDate = new Date();
+        const yyyy = nowDate.getFullYear();
+        const mm = String(nowDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(nowDate.getDate()).padStart(2, '0');
+        const datePart = `${yyyy}${mm}${dd}`;
+        const ulid = generateUlid();
+
         const order: Order = {
-          id: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: `ORD-${datePart}-${ulid}`,
           orderNumber,
           userId: user.id,
           userName: user.username,
@@ -322,27 +351,6 @@ const ProductDetail = () => {
         
         // Registrar transacción en el log
         await logOrderCreated(order.id, orderNumber, user.id, user.username, order.amount);
-
-        // Reducir stock (ya que el pedido está confirmado)
-        // NO reducir stock si es un bot (compras ficticias)
-        const isBot = user.id.startsWith('bot-');
-        if (!isBot) {
-          const updatedProducts = products.map(p => {
-            if (p.id === product.id) {
-              const updatedProduct: any = {
-                ...p,
-                stock: p.stock - quantity
-              };
-              // Solo actualizar bundles si el producto tiene unitsPerBundle
-              if (product.unitsPerBundle && product.unitsPerBundle > 0) {
-                updatedProduct.bundles = (product.bundles || 0) - Math.floor(quantity / product.unitsPerBundle);
-              }
-              return updatedProduct;
-            }
-            return p;
-          });
-          setProducts(updatedProducts);
-        }
 
         // Enviar mensaje de preparación al cliente
         const preparationMessage = await createAutoMessage(
@@ -374,13 +382,17 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
 
         await saveMessage(preparationMessage);
 
-        addNotification({
-          userId: 'current',
-          type: 'purchase',
-          title: 'Pedido confirmado',
-          message: `Tu pedido de ${product.name} (${displayQuantity}) está siendo preparado. Total a pagar al recibir: ${formatCurrency(totalWithShipping)}`,
-          read: false
-        });
+        // Notificación al usuario basada en reglas
+        triggerRuleBasedNotification(
+          'purchase',
+          user.id,
+          addNotification,
+          {
+            productName: product.name,
+            productId: product.id,
+            amount: totalWithShipping
+          }
+        );
 
         alert(`✅ Pedido confirmado!\n\nNúmero de pedido: ${orderNumber}\n\nSe ha enviado un mensaje de preparación a tu bandeja de entrada.\n\nTotal a pagar al recibir: ${formatCurrency(totalWithShipping)}`);
       } catch (error) {

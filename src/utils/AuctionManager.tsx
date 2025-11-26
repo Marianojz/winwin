@@ -7,6 +7,8 @@ import { createAutoMessage, saveMessage } from './messages';
 import { loadUserPreferences, updateUserPreference } from './userPreferences';
 import { get as firebaseGet, ref as dbRef } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
+import { triggerRuleBasedNotification } from './notificationRules';
+import { generateUlid } from './helpers';
 
 /**
  * Gestor de subastas que actualiza estados, crea órdenes y detecta ofertas superadas
@@ -108,15 +110,18 @@ const AuctionManager = () => {
             if (currentWinningBid.amount > userLastBidAmount) {
               console.log(`🚨 Usuario ${user.username} fue superado en subasta ${auction.title}`);
               
-              // Notificar al usuario
-              addNotification({
-                userId: user.id,
-                type: 'auction_outbid',
-                title: '💔 Superaron tu oferta',
-                message: `Alguien ofertó $${currentWinningBid.amount.toLocaleString()} en "${auction.title}". ¡Podés mejorar tu oferta!`,
-                read: false,
-                link: `/subastas/${auction.id}`
-              });
+              // Notificar al usuario usando reglas
+              triggerRuleBasedNotification(
+                'auction_outbid',
+                user.id,
+                addNotification,
+                {
+                  amount: currentWinningBid.amount,
+                  auctionTitle: auction.title,
+                  auctionId: auction.id,
+                  link: `/subastas/${auction.id}`
+                }
+              );
 
               // Reproducir sonido
               soundManager.playOutbid();
@@ -325,8 +330,12 @@ const AuctionManager = () => {
                 // Crear orden de pago para el ganador (solo para usuarios reales)
                 const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000);
                 
-                // Generar ID único con timestamp y random string para evitar colisiones
-                const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                // Generar ID único basado en ULID y fecha
+                const yyyy = now.getFullYear();
+                const mm = String(now.getMonth() + 1).padStart(2, '0');
+                const dd = String(now.getDate()).padStart(2, '0');
+                const datePart = `${yyyy}${mm}${dd}`;
+                const orderId = `ORD-${datePart}-${generateUlid()}`;
                 
                 const order: Order = {
                   id: orderId,
@@ -351,16 +360,19 @@ const AuctionManager = () => {
                 });
                 console.log(`📝 Orden creada para ${winnerName}: ${finalPrice} (Subasta ID: ${auction.id}, Orden ID: ${orderId})`);
 
-                // Notificar al ganador
+                // Notificar al ganador usando reglas
                 console.log(`🔔 Creando notificación de victoria para ${winnerName} en subasta "${auction.title}" (ID: ${auction.id})`);
-                addNotification({
-                  userId: winnerId,
-                  type: 'auction_won',
-                  title: '🎉 ¡Ganaste la subasta!',
-                  message: `Ganaste "${auction.title}" por $${finalPrice.toLocaleString()}. Tenés 48hs para pagar.`,
-                  read: false,
-                  link: '/notificaciones'
-                });
+                triggerRuleBasedNotification(
+                  'auction_won',
+                  winnerId,
+                  addNotification,
+                  {
+                    auctionTitle: auction.title,
+                    auctionId: auction.id,
+                    amount: finalPrice,
+                    link: '/notificaciones'
+                  }
+                );
 
                 // Crear mensaje automático para el ganador
                 createAutoMessage(
@@ -407,14 +419,17 @@ const AuctionManager = () => {
                   }
                 }
 
-                // Notificar al admin
-                addNotification({
-                  userId: 'admin',
-                  type: 'auction_won',
-                  title: '🎯 Subasta Finalizada',
-                  message: `${winnerName} ganó "${auction.title}" por $${finalPrice.toLocaleString()}. Esperando pago.`,
-                  read: false
-                });
+                // Notificar al admin (se puede seguir usando un mensaje específico)
+                triggerRuleBasedNotification(
+                  'auction_won',
+                  'admin',
+                  addNotification,
+                  {
+                    auctionTitle: auction.title,
+                    auctionId: auction.id,
+                    amount: finalPrice
+                  }
+                );
 
                 // Marcar como procesada solo después de éxito
                 processedEndedAuctionsRef.current.add(auction.id);

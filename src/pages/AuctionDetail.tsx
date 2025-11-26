@@ -1,4 +1,4 @@
-        import { soundManager } from '../utils/sounds';
+import { soundManager } from '../utils/sounds';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Gavel, User, ShoppingCart, AlertCircle, TrendingUp, ChevronLeft } from 'lucide-react';
@@ -12,6 +12,7 @@ import { createAutoMessage, saveMessage } from '../utils/messages';
 import { generateOrderNumber } from '../utils/orderNumberGenerator';
 import { logOrderCreated } from '../utils/orderTransactions';
 import { Order, Auction } from '../types';
+import { generateUlid } from '../utils/helpers';
 
 const AuctionDetail = () => {
   const { id } = useParams();
@@ -258,8 +259,14 @@ const AuctionDetail = () => {
         
         const quantity = auction.sellOnlyByBundle && auction.unitsPerBundle ? auction.unitsPerBundle : 1;
         
+        const nowDate = new Date();
+        const yyyy = nowDate.getFullYear();
+        const mm = String(nowDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(nowDate.getDate()).padStart(2, '0');
+        const datePart = `${yyyy}${mm}${dd}`;
+
         const order: Order = {
-          id: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: `ORD-${datePart}-${generateUlid()}`,
           orderNumber,
           userId: user.id,
           userName: user.username,
@@ -351,8 +358,14 @@ const AuctionDetail = () => {
         const orderNumber = await generateOrderNumber();
         const quantity = auction.sellOnlyByBundle && auction.unitsPerBundle ? auction.unitsPerBundle : 1;
         
+        const nowDate = new Date();
+        const yyyy = nowDate.getFullYear();
+        const mm = String(nowDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(nowDate.getDate()).padStart(2, '0');
+        const datePart = `${yyyy}${mm}${dd}`;
+
         const order: Order = {
-          id: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: `ORD-${datePart}-${generateUlid()}`,
           orderNumber,
           userId: user.id,
           userName: user.username,

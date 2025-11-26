@@ -1,12 +1,14 @@
 import { useEffect } from 'react';
 import { useStore } from '../store/useStore';
+import { triggerRuleBasedNotification } from './notificationRules';
+import { restoreStockForOrder } from './stockReservations';
 
 /**
  * Gestor automático de órdenes
  * Revisa cada minuto si hay órdenes que expiraron
  */
 const OrderManager = () => {
-  const { orders, auctions, products, updateOrderStatus, setAuctions, setProducts, addNotification } = useStore();
+  const { orders, auctions, products, updateOrderStatus, setAuctions, addNotification } = useStore();
 
   useEffect(() => {
     const checkExpiredOrders = () => {
@@ -39,28 +41,22 @@ const OrderManager = () => {
               }
             }
 
-            // Si es un producto, volver a aumentar el stock
-            if (order.productType === 'store') {
-              const product = products.find(p => p.id === order.productId);
-              if (product) {
-                const updatedProducts = products.map(p =>
-                  p.id === order.productId
-                    ? { ...p, stock: p.stock + 1 }
-                    : p
-                );
-                setProducts(updatedProducts);
-                console.log(`♻️ Producto ${product.name} devuelto al stock`);
-              }
+            // Si es un producto de tienda, devolver stock utilizando el módulo de reservas
+            if (order.productType === 'store' && order.quantity && order.quantity > 0) {
+              restoreStockForOrder(order.productId, order.quantity);
             }
 
-            // Notificar al usuario que perdió la oportunidad
-            addNotification({
-              userId: order.userId,
-              type: 'payment_reminder',
-              title: '⌛ Orden Expirada',
-              message: `Tu orden de "${order.productName}" expiró por falta de pago. El producto volvió a estar disponible.`,
-              read: false
-            });
+            // Notificar al usuario que perdió la oportunidad usando reglas
+            triggerRuleBasedNotification(
+              'order_expired',
+              order.userId,
+              addNotification,
+              {
+                orderId: order.id,
+                amount: order.amount,
+                productName: order.productName
+              }
+            );
 
             // Notificar al admin
             addNotification({
@@ -82,7 +78,7 @@ const OrderManager = () => {
     const interval = setInterval(checkExpiredOrders, 60000);
 
     return () => clearInterval(interval);
-  }, [orders, auctions, products, updateOrderStatus, setAuctions, setProducts, addNotification]);
+  }, [orders, auctions, products, updateOrderStatus, setAuctions, addNotification]);
 
   return null;
 };

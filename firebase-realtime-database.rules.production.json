@@ -2,11 +2,45 @@
   "rules": {
     "auctions": {
       ".read": true,
-      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      "$auctionId": {
+        ".read": true,
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || (!newData.hasChild('title') && !newData.hasChild('description') && !newData.hasChild('status') && !newData.hasChild('endTime') && !newData.hasChild('startingPrice') && !newData.hasChild('createdBy')))",
+        "currentPrice": {
+          ".read": true,
+          ".write": "auth != null"
+        },
+        "lastBidAt": {
+          ".read": true,
+          ".write": "auth != null"
+        },
+        "bids": {
+          ".read": true,
+          ".write": "auth != null",
+          "$bidId": {
+            ".read": true,
+            ".write": "auth != null && (!data.exists() || data.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+            // Validación extra: el userId de la puja debe coincidir con el usuario autenticado
+            ".validate": "newData.hasChildren(['id', 'auctionId', 'userId', 'username', 'amount', 'createdAt']) && newData.child('userId').isString() && newData.child('username').isString() && newData.child('amount').isNumber() && newData.child('amount').val() > 0 && newData.child('userId').val() == auth.uid"
+          }
+        }
+      }
     },
     "products": {
       ".read": true,
       ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+    },
+    "stockReservations": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      ".write": "auth != null",
+      "$productId": {
+        ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+        ".write": "auth != null",
+        "$reservationId": {
+          ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || data.child('userId').val() == auth.uid)",
+          ".write": "auth != null && (newData.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)"
+        }
+      }
     },
     "orders": {
       ".read": "auth != null",
@@ -65,6 +99,10 @@
           ".write": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)"
         }
       }
+    },
+    "coupons": {
+      ".read": true,
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
     },
     "users": {
       "$userId": {

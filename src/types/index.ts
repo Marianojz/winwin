@@ -42,6 +42,8 @@ export interface Auction {
   unitsPerBundle?: number; // Unidades por bulto (uxb)
   bundles?: number; // Cantidad de bultos disponibles
   sellOnlyByBundle?: boolean; // Si es true, solo se puede vender por bulto completo
+  // Relación opcional con un producto de la tienda (para reportes / stock compartido)
+  linkedProductId?: string;
 }
 
 export interface Bid {
@@ -61,6 +63,8 @@ export interface Product {
   images: string[];
   price: number;
   stock: number;
+  // Stock total histórico (cantidad inicial); stock es el disponible actual
+  stockTotal?: number;
   categoryId: string;
   ratings: Rating[];
   averageRating: number;
@@ -76,6 +80,19 @@ export interface Product {
 }
 
 export interface Rating {
+  userId: string;
+  username: string;
+  rating: number;
+  comment: string;
+  createdAt: Date;
+}
+
+export interface ProductReview {
+  id: string;
+  orderId: string;
+  productId: string;
+  productName: string;
+  productImage?: string;
   userId: string;
   username: string;
   rating: number;
@@ -136,7 +153,16 @@ export interface Conversation {
 export interface Notification {
   id: string;
   userId: string;
-  type: 'auction_won' | 'auction_outbid' | 'purchase' | 'payment_reminder' | 'new_message';
+  type:
+    | 'auction_won'
+    | 'auction_outbid'
+    | 'purchase'
+    | 'payment_reminder'
+    | 'new_message'
+    | 'order_shipped'
+    | 'order_delivered'
+    | 'order_expired'
+    | 'ticket_updated';
   title: string;
   message: string;
   read: boolean;
@@ -148,7 +174,16 @@ export interface Notification {
 export interface NotificationRule {
   id: string;
   name: string;
-  eventType: 'auction_won' | 'auction_outbid' | 'purchase' | 'payment_reminder' | 'new_message' | 'order_shipped' | 'order_delivered' | 'order_expired';
+  eventType:
+    | 'auction_won'
+    | 'auction_outbid'
+    | 'purchase'
+    | 'payment_reminder'
+    | 'new_message'
+    | 'order_shipped'
+    | 'order_delivered'
+    | 'order_expired'
+    | 'ticket_updated';
   title: string;
   message: string;
   link?: string;
@@ -222,6 +257,8 @@ export interface Order {
   status: OrderStatus;
   paymentMethod?: string;
   deliveryMethod: DeliveryMethod;  // AGREGADO
+  couponCode?: string;
+  discountAmount?: number;
   createdAt: Date;
   paidAt?: Date;
   shippedAt?: Date;
@@ -264,6 +301,41 @@ export interface Report {
   cancelled: number;
   avgDeliveryTime: number;
   topSellingProducts: { id: string; name: string; sales: number }[];
+}
+
+// ========== SISTEMA DE ENVÍOS ==========
+
+export type ShipmentStatus =
+  | 'pending'        // Creado, esperando preparación
+  | 'preparing'      // Preparando paquete
+  | 'ready_to_ship'  // Listo para despachar
+  | 'in_transit'     // En camino
+  | 'delayed'        // Con demora
+  | 'delivered'      // Entregado
+  | 'returned'       // Devuelto
+  | 'cancelled';     // Envío cancelado
+
+export interface Shipment {
+  id: string;
+  orderId: string;
+  userId: string;
+  userName: string;
+  status: ShipmentStatus;
+  carrier?: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
+  // Copia de datos relevantes de la orden para acceso rápido
+  productId: string;
+  productName: string;
+  productImage?: string;
+  quantity?: number;
+  deliveryMethod: DeliveryMethod;
+  address: Address;
+  notes?: string;
+  createdAt: Date | string;
+  updatedAt?: Date | string;
+  shippedAt?: Date | string;
+  deliveredAt?: Date | string;
 }
 
 // ========== SISTEMA DE TICKETS / CENTRO DE AYUDA ==========

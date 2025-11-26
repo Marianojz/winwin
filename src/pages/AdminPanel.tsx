@@ -20,8 +20,8 @@ import { db } from '../config/firebase';
 import UserDetailsModal from '../components/UserDetailsModal';
 import StatsCard from '../components/StatsCard';
 import { useStore } from '../store/useStore';
-import { formatCurrency, formatTimeAgo } from '../utils/helpers';
-import { Product, Auction, Order, OrderStatus, NotificationRule } from '../types';
+import { formatCurrency, formatTimeAgo, generateUlid } from '../utils/helpers';
+import { Product, Auction, Order, OrderStatus, NotificationRule, Shipment } from '../types';
 import { getAllNotificationRules, createNotificationRule, updateNotificationRule, deleteNotificationRule } from '../utils/notificationRules';
 import ImageUploader from '../components/ImageUploader';
 import { mockCategories } from '../utils/mockData';
@@ -100,6 +100,9 @@ import {
   type UnifiedMessageType,
   type UnifiedMessagePriority
 } from '../utils/unifiedInbox';
+import { subscribeAllShipments, updateShipment as updateShipmentRecord } from '../utils/shipments';
+import { triggerRuleBasedNotification } from '../utils/notificationRules';
+import { Coupon, validateCouponForAmount } from '../utils/coupons';
 import './AdminPanel.css';
 
 const AdminPanel = (): React.ReactElement => {
@@ -1061,6 +1064,23 @@ const [auctionForm, setAuctionForm] = useState({
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderTransactions, setOrderTransactions] = useState<any[]>([]);
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set()); // Para selección masiva
+
+  // Estados para envíos
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [shipmentStatusFilter, setShipmentStatusFilter] = useState<'all' | 'pending' | 'preparing' | 'ready_to_ship' | 'in_transit' | 'delayed' | 'delivered' | 'returned' | 'cancelled'>('all');
+  const [shipmentSearch, setShipmentSearch] = useState('');
+  const [showAllOrders, setShowAllOrders] = useState(false);
+  const [showAllShipments, setShowAllShipments] = useState(false);
+
+  // Estado para cupones (Admin - Utilidades)
+  const [couponDraft, setCouponDraft] = useState<Partial<Coupon> & { code: string }>({
+    code: '',
+    discountType: 'percent',
+    value: 10,
+    minAmount: undefined,
+    maxUses: undefined,
+    active: true
+  });
   
   // ============================================
   // FUNCIONES PARA ESTADÍSTICAS DEL DASHBOARD
@@ -1236,6 +1256,22 @@ const [auctionForm, setAuctionForm] = useState({
   const lowStockProducts = products.filter((p: { stock: number; }) => p.stock > 0 && p.stock < 5);
   const outOfStockProducts = products.filter((p: { stock: number; }) => p.stock === 0);
   const totalInventoryValue = products.reduce((sum: number, p: { price: number; stock: number; }) => sum + (p.price * p.stock), 0);
+
+  // Suscribirse a envíos en tiempo real cuando la pestaña de Envíos está activa
+  useEffect(() => {
+    if (activeTab === 'shipments') {
+      const unsubscribe = subscribeAllShipments((data) => {
+        // Ordenar por fecha de creación (más recientes primero)
+        const sorted = [...data].sort((a, b) => {
+          const dateA = new Date(a.createdAt as any).getTime();
+          const dateB = new Date(b.createdAt as any).getTime();
+          return dateB - dateA;
+        });
+        setShipments(sorted);
+      });
+      return () => unsubscribe();
+    }
+  }, [activeTab]);
 
   // Cargar usuarios reales de Firebase
   const loadUsers = async () => {
@@ -2024,6 +2060,11 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
     return dateB - dateA;
   });
+
+  const visibleOrders =
+    showAllOrders || filteredOrders.length <= 100
+      ? filteredOrders
+      : filteredOrders.slice(0, 100);
 
   const getStatusBadge = (status: OrderStatus) => {
   const badges = {
@@ -2988,6 +3029,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     { id: 'products', label: 'Productos', icon: Package },
     { id: 'users', label: 'Usuarios', icon: Users },
     { id: 'orders', label: 'Pedidos', icon: ShoppingCart },
+    { id: 'shipments', label: 'Envíos', icon: Truck },
     { id: 'bots', label: 'Bots', icon: Bot },
     { id: 'blog', label: 'Blog', icon: BookOpen },
     { id: 'utilities', label: 'Utilidades', icon: Calculator },
@@ -3325,6 +3367,78 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Margen:</span>
                 <span style={{ fontWeight: 600, color: 'var(--success)' }}>{resultados.margenGanancia.toFixed(2)}%</span>
+              </div>
+            </div>
+
+            {/* Generador de QR para links o IDs */}
+            <div style={{
+              background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              border: '1px solid var(--border)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '0.75rem',
+                  background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white'
+                }}>
+                  <Activity size={24} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.25rem', fontWeight: 700 }}>
+                    Generador de QR
+                  </h3>
+                  <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    Creá un QR para compartir links de productos, subastas, órdenes o cualquier URL
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <input
+                  type="text"
+                  placeholder="Pegá una URL o ID (ej: link de subasta, producto, orden)"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '0.75rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.9rem'
+                  }}
+                  onChange={(e) => {
+                    const value = e.target.value.trim();
+                    const img = document.getElementById('admin-qr-preview') as HTMLImageElement | null;
+                    if (!img) return;
+                    if (!value) {
+                      img.src = '';
+                      img.style.display = 'none';
+                      return;
+                    }
+                    const encoded = encodeURIComponent(value);
+                    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encoded}`;
+                    img.style.display = 'block';
+                  }}
+                />
+
+                <div style={{ marginTop: '0.75rem', textAlign: 'center' }}>
+                  <img
+                    id="admin-qr-preview"
+                    alt="QR generado"
+                    style={{ display: 'none', margin: '0 auto', borderRadius: '0.75rem', background: 'white', padding: '0.5rem' }}
+                  />
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    Hacé clic derecho sobre el QR para guardarlo o copiarlo y compartirlo donde quieras.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -6909,6 +7023,29 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
           </div>
 
           {/* Lista de Pedidos - Tabla Profesional (Desktop) / Grid Compacto (Mobile) */}
+          {/* Limitar visualmente a los más recientes para evitar listas enormes */}
+          {filteredOrders.length > 100 && (
+            <div style={{ marginBottom: '1rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+              Mostrando {showAllOrders ? filteredOrders.length : 100} de {filteredOrders.length} pedidos.{' '}
+              <button
+                type="button"
+                onClick={() => setShowAllOrders(!showAllOrders)}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  color: 'var(--primary)',
+                  cursor: 'pointer',
+                  padding: 0,
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  textDecoration: 'underline'
+                }}
+              >
+                {showAllOrders ? 'Ver solo los más recientes' : 'Ver todos'}
+              </button>
+            </div>
+          )}
+
           {isMobile ? (
             // Vista móvil: Grid tipo tablero de ajedrez
             <div style={{ 
@@ -6917,7 +7054,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               border: '1px solid var(--border)',
               padding: '1rem'
             }}>
-              {filteredOrders.length === 0 ? (
+              {visibleOrders.length === 0 ? (
                 <div style={{
                   textAlign: 'center',
                   padding: '4rem 2rem',
@@ -6933,7 +7070,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   flexDirection: 'column',
                   gap: '0.75rem'
                 }}>
-                  {filteredOrders.map((order: Order, index: number) => {
+                  {visibleOrders.map((order: Order, index: number) => {
                     const statusBadge = getStatusBadge(order.status);
                     const orderDate = order.createdAt ? new Date(order.createdAt).toLocaleDateString('es-AR', { 
                       day: '2-digit', 
@@ -7026,25 +7163,25 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                           }}>
                             {order.productName || 'Producto'}
                           </div>
-                          <div style={{ 
-                            fontSize: '0.625rem', 
-                            opacity: 0.9, 
+                            <div style={{ 
+                              fontSize: '0.625rem', 
+                              opacity: 0.9,
                             fontWeight: 600,
                             textTransform: 'uppercase',
                             letterSpacing: '0.5px'
-                          }}>
+                            }}>
                             {order.orderNumber ? `#${order.orderNumber.slice(-6)}` : `#${order.id.slice(-6).toUpperCase()}`}
-                          </div>
-                          <div style={{ 
-                            fontSize: '0.625rem', 
+                            </div>
+                            <div style={{ 
+                              fontSize: '0.625rem', 
                             opacity: 0.9,
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.25rem'
-                          }}>
+                            }}>
                             <Calendar size={10} />
                             {orderDate}
-                          </div>
+                            </div>
                         </div>
                         <div style={{ 
                           display: 'flex', 
@@ -7060,8 +7197,8 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                           }}>
                             {formatCurrency(order.amount)}
                           </div>
-                          <div style={{
-                            fontSize: '0.625rem',
+                          <div style={{ 
+                            fontSize: '0.625rem', 
                             opacity: 0.9,
                             fontWeight: 600,
                             padding: '0.25rem 0.5rem',
@@ -7188,7 +7325,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               border: '1px solid var(--border)',
               overflow: isMobile ? 'auto' : 'hidden'
             }}>
-              {filteredOrders.length === 0 ? (
+              {visibleOrders.length === 0 ? (
                 <div style={{
                   textAlign: 'center',
                   padding: '4rem 2rem',
@@ -7216,12 +7353,12 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                       }}>
                         <input
                           type="checkbox"
-                          checked={filteredOrders.length > 0 && filteredOrders.every(o => selectedOrders.has(o.id))}
+                          checked={visibleOrders.length > 0 && visibleOrders.every(o => selectedOrders.has(o.id))}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setSelectedOrders(new Set(filteredOrders.map(o => o.id)));
+                              setSelectedOrders(new Set(visibleOrders.map(o => o.id)));
                             } else {
-                              const filteredIds = new Set(filteredOrders.map(o => o.id));
+                              const filteredIds = new Set(visibleOrders.map(o => o.id));
                               setSelectedOrders(new Set(Array.from(selectedOrders).filter(id => !filteredIds.has(id))));
                             }
                           }}
@@ -7581,6 +7718,532 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   {formatCurrency(filteredOrders.reduce((sum, o: Order) => sum + o.amount, 0))}
                 </span>
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Envíos Tab */}
+      {activeTab === 'shipments' && (
+        <div>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '2rem',
+              flexWrap: 'wrap',
+              gap: '1rem'
+            }}
+          >
+            <div>
+              <h2
+                style={{
+                  margin: 0,
+                  marginBottom: '0.5rem',
+                  color: 'var(--text-primary)',
+                  fontSize: isMobile ? '1.5rem' : '2rem'
+                }}
+              >
+                Gestión de Envíos
+              </h2>
+              <p
+                style={{
+                  margin: 0,
+                  color: 'var(--text-secondary)',
+                  fontSize: isMobile ? '0.875rem' : '1rem'
+                }}
+              >
+                Visualizá y actualizá el estado de todos los envíos de forma clara.
+              </p>
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                gap: '0.75rem',
+                flexWrap: 'wrap'
+              }}
+            >
+              <input
+                type="text"
+                placeholder="Buscar por pedido, usuario o tracking..."
+                value={shipmentSearch}
+                onChange={(e) => setShipmentSearch(e.target.value)}
+                style={{
+                  padding: '0.75rem 1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--border)',
+                  minWidth: isMobile ? '180px' : '260px',
+                  fontSize: '0.9rem',
+                  background: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)'
+                }}
+              />
+              <select
+                value={shipmentStatusFilter}
+                onChange={(e) =>
+                  setShipmentStatusFilter(e.target.value as any)
+                }
+                style={{
+                  padding: '0.75rem 1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--border)',
+                  minWidth: '160px',
+                  fontSize: '0.9rem',
+                  background: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)'
+                }}
+              >
+                <option value="all">Todos los estados</option>
+                <option value="pending">Pendiente</option>
+                <option value="preparing">Preparando</option>
+                <option value="ready_to_ship">Listo para enviar</option>
+                <option value="in_transit">En tránsito</option>
+                <option value="delayed">Con demora</option>
+                <option value="delivered">Entregado</option>
+                <option value="returned">Devuelto</option>
+                <option value="cancelled">Cancelado</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Grid de tarjetas de envíos */}
+          {/* Grid de tarjetas de envíos */}
+          {/* Limitar visualmente a los más recientes para evitar grillas enormes */}
+          {shipments.length > 100 && (
+            <div style={{ marginBottom: '1rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+              Mostrando {showAllShipments ? shipments.length : 100} de {shipments.length} envíos.{' '}
+              <button
+                type="button"
+                onClick={() => setShowAllShipments(!showAllShipments)}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  color: 'var(--primary)',
+                  cursor: 'pointer',
+                  padding: 0,
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  textDecoration: 'underline'
+                }}
+              >
+                {showAllShipments ? 'Ver solo los más recientes' : 'Ver todos'}
+              </button>
+            </div>
+          )}
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile
+                ? '1fr'
+                : 'repeat(auto-fit, minmax(320px, 1fr))',
+              gap: '1.25rem'
+            }}
+          >
+            {shipments
+              .filter((s) => {
+                if (shipmentStatusFilter !== 'all') {
+                  return s.status === shipmentStatusFilter;
+                }
+                return true;
+              })
+              .filter((s) => {
+                if (!shipmentSearch.trim()) return true;
+                const q = shipmentSearch.toLowerCase();
+                return (
+                  s.orderId.toLowerCase().includes(q) ||
+                  s.userName.toLowerCase().includes(q) ||
+                  s.productName.toLowerCase().includes(q) ||
+                  (s.trackingNumber || '').toLowerCase().includes(q)
+                );
+              })
+              .slice(0, showAllShipments ? shipments.length : 100)
+              .map((s) => {
+                const created =
+                  s.createdAt instanceof Date
+                    ? s.createdAt
+                    : new Date(s.createdAt as any);
+
+                const getStatusLabel = (status: string) => {
+                  switch (status) {
+                    case 'pending':
+                      return { label: 'Pendiente', className: 'badge-warning' };
+                    case 'preparing':
+                      return {
+                        label: 'Preparando',
+                        className: 'badge-info'
+                      };
+                    case 'ready_to_ship':
+                      return {
+                        label: 'Listo para enviar',
+                        className: 'badge-info'
+                      };
+                    case 'in_transit':
+                      return {
+                        label: 'En tránsito',
+                        className: 'badge-primary'
+                      };
+                    case 'delayed':
+                      return {
+                        label: 'Con demora',
+                        className: 'badge-warning'
+                      };
+                    case 'delivered':
+                      return {
+                        label: 'Entregado',
+                        className: 'badge-success'
+                      };
+                    case 'returned':
+                      return {
+                        label: 'Devuelto',
+                        className: 'badge-secondary'
+                      };
+                    case 'cancelled':
+                      return {
+                        label: 'Cancelado',
+                        className: 'badge-danger'
+                      };
+                    default:
+                      return { label: status, className: 'badge-secondary' };
+                  }
+                };
+
+                const statusInfo = getStatusLabel(s.status);
+
+                const handleQuickStatusChange = async (
+                  status: ShipmentStatus
+                ) => {
+                  try {
+                    const updates: Partial<Shipment> = { status };
+                    if (status === 'in_transit' && !s.shippedAt) {
+                      updates.shippedAt = new Date().toISOString();
+                    }
+                    if (status === 'delivered' && !s.deliveredAt) {
+                      updates.deliveredAt = new Date().toISOString();
+                    }
+                    await updateShipmentRecord(s.id, updates);
+
+                    // Disparar notificaciones basadas en reglas para eventos de envío
+                    if (status === 'in_transit') {
+                      triggerRuleBasedNotification(
+                        'order_shipped',
+                        s.userId,
+                        addNotification,
+                        {
+                          orderId: s.orderId,
+                          productName: s.productName,
+                          trackingNumber: updates.trackingNumber || s.trackingNumber
+                        }
+                      );
+                    }
+                    if (status === 'delivered') {
+                      triggerRuleBasedNotification(
+                        'order_delivered',
+                        s.userId,
+                        addNotification,
+                        {
+                          orderId: s.orderId,
+                          productName: s.productName
+                        }
+                      );
+                    }
+                  } catch (error) {
+                    console.error('Error actualizando envío:', error);
+                    alert(
+                      'No se pudo actualizar el estado del envío. Intentá nuevamente.'
+                    );
+                  }
+                };
+
+                return (
+                  <div
+                    key={s.id}
+                    style={{
+                      background: 'var(--bg-secondary)',
+                      borderRadius: '1rem',
+                      padding: '1.25rem',
+                      border: '1px solid var(--border)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.75rem',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.04)'
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        gap: '0.75rem'
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: '0.8rem',
+                            color: 'var(--text-secondary)',
+                            marginBottom: '0.25rem'
+                          }}
+                        >
+                          Pedido #{s.orderId}
+                        </div>
+                        <h3
+                          style={{
+                            margin: 0,
+                            fontSize: '1rem',
+                            color: 'var(--text-primary)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {s.productName}
+                        </h3>
+                        <div
+                          style={{
+                            fontSize: '0.8rem',
+                            color: 'var(--text-secondary)',
+                            marginTop: '0.25rem'
+                          }}
+                        >
+                          Cliente: <strong>{s.userName}</strong>
+                        </div>
+                      </div>
+                      <span
+                        className={`badge ${statusInfo.className}`}
+                        style={{ flexShrink: 0 }}
+                      >
+                        {statusInfo.label}
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.25rem',
+                        fontSize: '0.8rem',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      <div>
+                        Creado:{' '}
+                        {created.toLocaleString('es-AR', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </div>
+                      {s.shippedAt && (
+                        <div>
+                          Enviado:{' '}
+                          {new Date(s.shippedAt as any).toLocaleString(
+                            'es-AR',
+                            {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            }
+                          )}
+                        </div>
+                      )}
+                      {s.deliveredAt && (
+                        <div>
+                          Entregado:{' '}
+                          {new Date(s.deliveredAt as any).toLocaleString(
+                            'es-AR',
+                            {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            }
+                          )}
+                        </div>
+                      )}
+                      <div>
+                        Método:{' '}
+                        <strong>
+                          {s.deliveryMethod === 'shipping'
+                            ? 'Envío a domicilio'
+                            : s.deliveryMethod === 'pickup'
+                            ? 'Retiro'
+                            : 'Email'}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        marginTop: '0.5rem',
+                        paddingTop: '0.5rem',
+                        borderTop: '1px solid var(--border)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.35rem'
+                        }}
+                      >
+                        <label
+                          style={{
+                            fontSize: '0.75rem',
+                            color: 'var(--text-secondary)'
+                          }}
+                        >
+                          Tracking
+                        </label>
+                        <input
+                          type="text"
+                          defaultValue={s.trackingNumber || ''}
+                          placeholder="Número de seguimiento"
+                          onBlur={async (e) => {
+                            const value = e.target.value.trim();
+                            try {
+                              await updateShipmentRecord(s.id, {
+                                trackingNumber: value || undefined
+                              });
+                            } catch (error) {
+                              console.error(
+                                'Error actualizando tracking:',
+                                error
+                              );
+                            }
+                          }}
+                          style={{
+                            padding: '0.6rem 0.75rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid var(--border)',
+                            fontSize: '0.85rem',
+                            background: 'var(--bg-tertiary)',
+                            color: 'var(--text-primary)'
+                          }}
+                        />
+                        <input
+                          type="text"
+                          defaultValue={s.trackingUrl || ''}
+                          placeholder="URL de seguimiento (opcional)"
+                          onBlur={async (e) => {
+                            const value = e.target.value.trim();
+                            try {
+                              await updateShipmentRecord(s.id, {
+                                trackingUrl: value || undefined
+                              });
+                            } catch (error) {
+                              console.error(
+                                'Error actualizando URL de tracking:',
+                                error
+                              );
+                            }
+                          }}
+                          style={{
+                            padding: '0.6rem 0.75rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid var(--border)',
+                            fontSize: '0.85rem',
+                            background: 'var(--bg-tertiary)',
+                            color: 'var(--text-primary)'
+                          }}
+                        />
+                      </div>
+
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '0.5rem',
+                          marginTop: '0.25rem'
+                        }}
+                      >
+                        {['pending', 'preparing'].includes(s.status) && (
+                          <button
+                            className="btn btn-secondary"
+                            style={{
+                              padding: '0.5rem 0.75rem',
+                              fontSize: '0.8rem'
+                            }}
+                            onClick={() =>
+                              handleQuickStatusChange('ready_to_ship')
+                            }
+                          >
+                            Marcar listo para enviar
+                          </button>
+                        )}
+                        {['ready_to_ship', 'delayed'].includes(s.status) && (
+                          <button
+                            className="btn btn-secondary"
+                            style={{
+                              padding: '0.5rem 0.75rem',
+                              fontSize: '0.8rem'
+                            }}
+                            onClick={() =>
+                              handleQuickStatusChange('in_transit')
+                            }
+                          >
+                            Marcar en tránsito
+                          </button>
+                        )}
+                        {['in_transit', 'delayed'].includes(s.status) && (
+                          <button
+                            className="btn btn-primary"
+                            style={{
+                              padding: '0.5rem 0.75rem',
+                              fontSize: '0.8rem'
+                            }}
+                            onClick={() =>
+                              handleQuickStatusChange('delivered')
+                            }
+                          >
+                            Marcar entregado
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+
+          {shipments.length === 0 && (
+            <div
+              style={{
+                marginTop: '2rem',
+                padding: '2rem',
+                textAlign: 'center',
+                background: 'var(--bg-secondary)',
+                borderRadius: '1rem',
+                border: '1px dashed var(--border)'
+              }}
+            >
+              <Truck
+                size={48}
+                color="var(--text-tertiary)"
+                style={{ marginBottom: '1rem' }}
+              />
+              <h3 style={{ marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+                Aún no hay envíos
+              </h3>
+              <p
+                style={{
+                  margin: 0,
+                  color: 'var(--text-secondary)',
+                  fontSize: '0.9rem'
+                }}
+              >
+                Cuando crees envíos desde los pedidos, aparecerán aquí para
+                gestionar su estado.
+              </p>
             </div>
           )}
         </div>
@@ -8290,18 +8953,18 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                           {/* Icono y nombre */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0, flex: 1 }}>
                             <Bot size={20} style={{ opacity: 0.9, flexShrink: 0 }} />
-                            <div style={{ 
+                          <div style={{
                               fontSize: '0.875rem', 
                               fontWeight: 700,
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap'
-                            }}>
+                          }}>
                               {bot.name}
-                            </div>
-                            <div style={{
-                              fontSize: '0.625rem',
-                              opacity: 0.9,
+                          </div>
+                            <div style={{ 
+                              fontSize: '0.625rem', 
+                              opacity: 0.9, 
                               fontWeight: 600,
                               padding: '0.25rem 0.5rem',
                               background: 'rgba(255, 255, 255, 0.2)',
@@ -9082,17 +9745,17 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               left: 0,
               right: 0,
               bottom: 0,
-            background: 'rgba(0, 0, 0, 0.75)',
-            display: 'flex',
+              background: 'rgba(0, 0, 0, 0.75)',
+              display: 'flex',
             alignItems: 'flex-start',
-            justifyContent: 'center',
+              justifyContent: 'center',
             zIndex: 100000,
             paddingTop: isMobile ? '80px' : '60px',
             paddingLeft: isMobile ? '1rem' : '2rem',
             paddingRight: isMobile ? '1rem' : '2rem',
             paddingBottom: isMobile ? '1rem' : '2rem',
             overflow: 'auto'
-          }}
+            }}
             onClick={() => setSelectedUnifiedMessage(null)}
             >
               <div style={{
@@ -9107,7 +9770,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 marginTop: 0
               }}
               onClick={(e) => e.stopPropagation()}
-            >
+              >
                 <div style={{
                   padding: '1.5rem',
                   borderBottom: '1px solid var(--border)',
@@ -9905,6 +10568,350 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
 
               <CodeGenerator />
             </div>
+
+            {/* Generador de IDs ULID con prefijo */}
+            <div style={{
+              background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              border: '1px solid var(--border)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '0.75rem',
+                  background: 'linear-gradient(135deg, #0ea5e9, #0369a1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white'
+                }}>
+                  <Activity size={24} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.25rem', fontWeight: 700 }}>
+                    Generador de IDs ULID
+                  </h3>
+                  <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    PRD / SUB / ORD + fecha + ULID ordenable, ideal para e‑commerce y subastas
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.6 }}>
+                  Formato recomendado:{' '}
+                  <code style={{ fontSize: '0.8rem' }}>{'{TIPO}-{FECHA}-{ULID}'}</code>
+                </p>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {['PRD', 'SUB', 'ORD'].map((prefix) => (
+                    <button
+                      key={prefix}
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        const now = new Date();
+                        const yyyy = now.getFullYear();
+                        const mm = String(now.getMonth() + 1).padStart(2, '0');
+                        const dd = String(now.getDate()).padStart(2, '0');
+                        const datePart = `${yyyy}${mm}${dd}`;
+                        const ulid = generateUlid();
+                        const id = `${prefix}-${datePart}-${ulid}`;
+                        navigator.clipboard
+                          .writeText(id)
+                          .then(() => {
+                            alert(`ID copiado al portapapeles:\n\n${id}`);
+                          })
+                          .catch(() => {
+                            alert(`ID generado:\n\n${id}`);
+                          });
+                      }}
+                    >
+                      {prefix === 'PRD' && 'PRD - Producto'}
+                      {prefix === 'SUB' && 'SUB - Subasta'}
+                      {prefix === 'ORD' && 'ORD - Orden'}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  Ejemplos:
+                  <div style={{ marginTop: '0.25rem' }}>
+                    <code style={{ display: 'block', marginBottom: '0.25rem', wordBreak: 'break-all' }}>
+                      PRD-20251125-01HF3G2M6QH9WZ9T2J5C1NSP2M
+                    </code>
+                    <code style={{ display: 'block', marginBottom: '0.25rem', wordBreak: 'break-all' }}>
+                      SUB-20251125-01HF3G2N4XP7G5Y8Z1VR4P3HJD
+                    </code>
+                    <code style={{ display: 'block', wordBreak: 'break-all' }}>
+                      ORD-20251125-01HF3G2R5C9KBDQG8NQ2RF94VT
+                    </code>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Gestión rápida de cupones */}
+            <div style={{
+              background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              border: '1px solid var(--border)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '0.75rem',
+                  background: 'linear-gradient(135deg, #f97316, #ea580c)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white'
+                }}>
+                  <Percent size={24} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.25rem', fontWeight: 700 }}>
+                    Cupones de Descuento
+                  </h3>
+                  <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    Crear y testear códigos de descuento rápidamente
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.85rem', fontWeight: 600 }}>
+                    Código (se guarda en mayúsculas)
+                  </label>
+                  <input
+                    type="text"
+                    value={couponDraft.code}
+                    onChange={(e) =>
+                      setCouponDraft((prev) => ({
+                        ...prev,
+                        code: e.target.value.toUpperCase()
+                      }))
+                    }
+                    placeholder="EJ: BIENVENIDO10"
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem 0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.85rem', fontWeight: 600 }}>
+                      Tipo de descuento
+                    </label>
+                    <select
+                      value={couponDraft.discountType || 'percent'}
+                      onChange={(e) =>
+                        setCouponDraft((prev) => ({
+                          ...prev,
+                          discountType: e.target.value as Coupon['discountType']
+                        }))
+                      }
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      <option value="percent">% Porcentaje</option>
+                      <option value="amount">$ Monto fijo</option>
+                    </select>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.85rem', fontWeight: 600 }}>
+                      Valor
+                    </label>
+                    <input
+                      type="number"
+                      value={couponDraft.value ?? 0}
+                      onChange={(e) =>
+                        setCouponDraft((prev) => ({
+                          ...prev,
+                          value: Number(e.target.value) || 0
+                        }))
+                      }
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.85rem', fontWeight: 600 }}>
+                      Mínimo de compra (opcional)
+                    </label>
+                    <input
+                      type="number"
+                      value={couponDraft.minAmount ?? ''}
+                      onChange={(e) =>
+                        setCouponDraft((prev) => ({
+                          ...prev,
+                          minAmount: e.target.value ? Number(e.target.value) : undefined
+                        }))
+                      }
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.85rem', fontWeight: 600 }}>
+                      Máx. usos (opcional)
+                    </label>
+                    <input
+                      type="number"
+                      value={couponDraft.maxUses ?? ''}
+                      onChange={(e) =>
+                        setCouponDraft((prev) => ({
+                          ...prev,
+                          maxUses: e.target.value ? Number(e.target.value) : undefined
+                        }))
+                      }
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={couponDraft.active ?? true}
+                    onChange={(e) =>
+                      setCouponDraft((prev) => ({
+                        ...prev,
+                        active: e.target.checked
+                      }))
+                    }
+                  />
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    Cupón activo
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.75rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={async () => {
+                      if (!couponDraft.code || !couponDraft.value) {
+                        alert('Completá al menos el código y el valor del cupón.');
+                        return;
+                      }
+                      const amountTest = 50000;
+                      try {
+                        const result = await validateCouponForAmount(
+                          couponDraft.code,
+                          amountTest
+                        );
+                        if (!result.valid) {
+                          alert(
+                            `Cupón inválido para un carrito de prueba de ${amountTest.toLocaleString(
+                              'es-AR',
+                              { style: 'currency', currency: 'ARS' }
+                            )}:\n\n${result.errorMessage}`
+                          );
+                          return;
+                        }
+                        alert(
+                          `Cupón válido.\n\nDescuento para ${amountTest.toLocaleString(
+                            'es-AR',
+                            { style: 'currency', currency: 'ARS' }
+                          )}: ${result.discountAmount.toLocaleString('es-AR', {
+                            style: 'currency',
+                            currency: 'ARS'
+                          })}\nTotal final: ${result.finalAmount.toLocaleString('es-AR', {
+                            style: 'currency',
+                            currency: 'ARS'
+                          })}`
+                        );
+                      } catch (err: any) {
+                        console.error('Error testeando cupón:', err);
+                        alert(
+                          err?.message || 'No se pudo probar el cupón. Revisá los datos.'
+                        );
+                      }
+                    }}
+                  >
+                    Probar Cupón
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={async () => {
+                      if (!couponDraft.code || !couponDraft.value) {
+                        alert('Completá al menos el código y el valor del cupón.');
+                        return;
+                      }
+                      try {
+                        const normalized = couponDraft.code.trim().toUpperCase();
+                        const couponRef = dbRef(realtimeDb, `coupons/${normalized}`);
+                        await firebaseSet(couponRef, {
+                          code: normalized,
+                          description: couponDraft.description || '',
+                          discountType: couponDraft.discountType || 'percent',
+                          value: couponDraft.value,
+                          minAmount: couponDraft.minAmount ?? null,
+                          maxUses: couponDraft.maxUses ?? null,
+                          usedCount: 0,
+                          active: couponDraft.active ?? true,
+                          createdAt: new Date().toISOString()
+                        });
+                        alert('✅ Cupón guardado en Firebase');
+                      } catch (err: any) {
+                        console.error('Error guardando cupón:', err);
+                        alert(err?.message || '❌ Error al guardar el cupón.');
+                      }
+                    }}
+                  >
+                    Guardar Cupón
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -10547,26 +11554,26 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 }}>
                   Este es el texto principal que aparece en la página de inicio. Los usuarios verán este mensaje cuando ingresen a tu sitio.
                 </p>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
                     Título de Bienvenida *
-                  </label>
-                  <input
-                    type="text"
-                    value={homeConfig.heroTitle}
-                    onChange={(e) => setHomeConfig({ ...homeConfig, heroTitle: e.target.value })}
-                    placeholder="Ej: Bienvenido a Clikio"
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-primary)',
-                      color: 'var(--text-primary)',
+                </label>
+                <input
+                  type="text"
+                  value={homeConfig.heroTitle}
+                  onChange={(e) => setHomeConfig({ ...homeConfig, heroTitle: e.target.value })}
+                  placeholder="Ej: Bienvenido a Clikio"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
                       fontSize: isMobile ? '16px' : '1rem',
                       fontWeight: 500
-                    }}
-                  />
+                  }}
+                />
                   <p style={{ 
                     margin: '0.5rem 0 0 0', 
                     color: 'var(--text-secondary)', 
@@ -11837,43 +12844,25 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                             ticketResponse || undefined
                           );
                           
-                          // Enviar notificación al usuario directamente en Firebase
+                          // Notificación basada en reglas para cambios de estado de ticket
                           if (selectedTicket.userId) {
-                            let notificationTitle = '';
-                            let notificationMessage = '';
-                            
-                            switch (newStatus) {
-                              case 'visto':
-                                notificationTitle = 'Ticket Visto';
-                                notificationMessage = `Tu ticket ${selectedTicket.ticketNumber} ha sido visto por nuestro equipo.`;
-                                break;
-                              case 'revision':
-                                notificationTitle = 'Ticket en Revisión';
-                                notificationMessage = `Tu ticket ${selectedTicket.ticketNumber} está en revisión. Te contactaremos pronto.`;
-                                break;
-                              case 'resuelto':
-                                notificationTitle = 'Ticket Resuelto';
-                                notificationMessage = `Tu ticket ${selectedTicket.ticketNumber} ha sido resuelto.${ticketResponse ? ' Revisá la respuesta en el Centro de Ayuda.' : ''}`;
-                                break;
-                            }
-                            
-                            try {
-                              const notificationId = `NOTIF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                              const notificationRef = dbRef(realtimeDb, `notifications/${selectedTicket.userId}/${notificationId}`);
-                              await firebaseSet(notificationRef, {
-                                id: notificationId,
-                                userId: selectedTicket.userId,
-                                type: 'new_message',
-                                title: notificationTitle,
-                                message: notificationMessage,
-                                link: '/ayuda',
-                                read: false,
-                                createdAt: new Date().toISOString()
-                              });
-                              console.log(`✅ Notificación enviada a usuario ${selectedTicket.userId}`);
-                            } catch (notifError) {
-                              console.error('Error enviando notificación:', notifError);
-                            }
+                            const statusLabel =
+                              newStatus === 'visto'
+                                ? 'Visto'
+                                : newStatus === 'revision'
+                                ? 'En Revisión'
+                                : 'Resuelto';
+
+                            triggerRuleBasedNotification(
+                              'ticket_updated',
+                              selectedTicket.userId,
+                              addNotification,
+                              {
+                                ticketNumber: selectedTicket.ticketNumber,
+                                status: newStatus,
+                                statusLabel
+                              }
+                            );
                           }
                           
                           setTicketResponse('');
@@ -11957,25 +12946,26 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                           ticketResponse || undefined
                         );
                         
-                        // Enviar notificación si hay respuesta
+                        // Notificación basada en reglas si se agregó una respuesta
                         if (ticketResponse && selectedTicket.userId) {
-                          try {
-                            const notificationId = `NOTIF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                            const notificationRef = dbRef(realtimeDb, `notifications/${selectedTicket.userId}/${notificationId}`);
-                            await firebaseSet(notificationRef, {
-                              id: notificationId,
-                              userId: selectedTicket.userId,
-                              type: 'new_message',
-                              title: 'Respuesta a tu Ticket',
-                              message: `Tu ticket ${selectedTicket.ticketNumber} tiene una nueva respuesta. Revisá el Centro de Ayuda.`,
-                              link: '/ayuda',
-                              read: false,
-                              createdAt: new Date().toISOString()
-                            });
-                            console.log(`✅ Notificación enviada a usuario ${selectedTicket.userId}`);
-                          } catch (notifError) {
-                            console.error('Error enviando notificación:', notifError);
-                          }
+                          const statusLabel =
+                            selectedTicket.status === 'visto'
+                              ? 'Visto'
+                              : selectedTicket.status === 'revision'
+                              ? 'En Revisión'
+                              : 'Resuelto';
+
+                          triggerRuleBasedNotification(
+                            'ticket_updated',
+                            selectedTicket.userId,
+                            addNotification,
+                            {
+                              ticketNumber: selectedTicket.ticketNumber,
+                              status: selectedTicket.status,
+                              statusLabel,
+                              hasResponse: true
+                            }
+                          );
                         }
                         
                         setTicketResponse('');
@@ -12354,7 +13344,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: isMobile ? '0.875rem' : '0.9375rem' }}>
                   Gestioná las acciones que disparan notificaciones automáticas (campana, globo de conversación, mensajes, etc.)
                 </p>
-              </div>
+        </div>
               <button
                 onClick={() => {
                   setRuleForm({
@@ -12516,9 +13506,53 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                               fontSize: '0.75rem',
                               fontWeight: 600,
                               background: 'var(--primary)',
-                              color: 'white'
+                              color: 'white',
+                              textTransform: 'none'
                             }}>
                               {rule.eventType}
+                            </span>
+                            {/* Etiqueta por categoría de evento */}
+                            <span style={{
+                              padding: '0.125rem 0.5rem',
+                              borderRadius: '999px',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              background:
+                                rule.eventType === 'auction_won' || rule.eventType === 'auction_outbid'
+                                  ? 'rgba(236, 72, 153, 0.15)'
+                                  : rule.eventType === 'purchase' || rule.eventType === 'payment_reminder'
+                                  ? 'rgba(34, 197, 94, 0.15)'
+                                  : rule.eventType === 'order_shipped' ||
+                                    rule.eventType === 'order_delivered' ||
+                                    rule.eventType === 'order_expired'
+                                  ? 'rgba(59, 130, 246, 0.15)'
+                                  : rule.eventType === 'ticket_updated'
+                                  ? 'rgba(249, 115, 22, 0.15)'
+                                  : 'rgba(148, 163, 184, 0.15)',
+                              color:
+                                rule.eventType === 'auction_won' || rule.eventType === 'auction_outbid'
+                                  ? '#ec4899'
+                                  : rule.eventType === 'purchase' || rule.eventType === 'payment_reminder'
+                                  ? '#22c55e'
+                                  : rule.eventType === 'order_shipped' ||
+                                    rule.eventType === 'order_delivered' ||
+                                    rule.eventType === 'order_expired'
+                                  ? '#3b82f6'
+                                  : rule.eventType === 'ticket_updated'
+                                  ? '#f97316'
+                                  : '#64748b'
+                            }}>
+                              {rule.eventType === 'auction_won' || rule.eventType === 'auction_outbid'
+                                ? 'Subastas'
+                                : rule.eventType === 'purchase' || rule.eventType === 'payment_reminder'
+                                ? 'Compras'
+                                : rule.eventType === 'order_shipped' ||
+                                  rule.eventType === 'order_delivered' ||
+                                  rule.eventType === 'order_expired'
+                                ? 'Envíos'
+                                : rule.eventType === 'ticket_updated'
+                                ? 'Tickets'
+                                : 'Sistema'}
                             </span>
                           </div>
                           <p style={{ margin: '0.25rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem', fontWeight: 500 }}>
@@ -12723,6 +13757,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                       <option value="order_shipped">Pedido Enviado</option>
                       <option value="order_delivered">Pedido Entregado</option>
                       <option value="order_expired">Pedido Expirado</option>
+                      <option value="ticket_updated">Ticket Actualizado (Centro de Ayuda)</option>
                     </select>
                     <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
                       Seleccioná cuándo se debe disparar esta notificación automáticamente

@@ -1,5 +1,6 @@
 import { formatDistanceToNow, format, differenceInSeconds } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Rating } from '../types';
 
 export const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('es-AR', {
@@ -81,5 +82,49 @@ export const validatePassword = (password: string): { valid: boolean; message?: 
 };
 
 export const generateId = (): string => {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  // Mantener compatibilidad donde se use, pero basado en ULID para unicidad y orden
+  return generateUlid();
+};
+
+export const calculateAverageRating = (ratings: Rating[]): number => {
+  if (!ratings || ratings.length === 0) return 0;
+  const sum = ratings.reduce((acc, r) => acc + (r.rating || 0), 0);
+  return Math.round((sum / ratings.length) * 10) / 10;
+};
+
+// ULID helpers (base32 Crockford)
+const ULID_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+const encodeTime = (time: number, length: number): string => {
+  let str = '';
+  for (let i = length - 1; i >= 0; i--) {
+    const mod = time % 32;
+    str = ULID_ALPHABET[mod] + str;
+    time = (time - mod) / 32;
+  }
+  return str;
+};
+
+const encodeRandom = (length: number): string => {
+  let str = '';
+  const cryptoObj = typeof crypto !== 'undefined' && 'getRandomValues' in crypto ? crypto : null;
+  for (let i = 0; i < length; i++) {
+    let randomValue: number;
+    if (cryptoObj) {
+      const arr = new Uint8Array(1);
+      cryptoObj.getRandomValues(arr);
+      randomValue = arr[0] % 32;
+    } else {
+      randomValue = Math.floor(Math.random() * 32);
+    }
+    str += ULID_ALPHABET[randomValue];
+  }
+  return str;
+};
+
+export const generateUlid = (): string => {
+  const time = Date.now();
+  const timePart = encodeTime(time, 10); // 48 bits de tiempo
+  const randomPart = encodeRandom(16); // 80 bits de aleatorio
+  return timePart + randomPart;
 };

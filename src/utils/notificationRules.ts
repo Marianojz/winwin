@@ -1,6 +1,6 @@
 import { ref, onValue, set as firebaseSet, remove, get as firebaseGet } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
-import { NotificationRule } from '../types';
+import { NotificationRule, Notification } from '../types';
 
 // Reglas por defecto del sistema (acciones automáticas que ya existen en el código)
 export const getSystemNotificationRules = (): NotificationRule[] => {
@@ -104,6 +104,19 @@ export const getSystemNotificationRules = (): NotificationRule[] => {
       title: '⏱️ Pedido expirado',
       message: 'Tu pedido {orderId} ha expirado. Por favor, contactanos para reactivarlo.',
       link: '/perfil?tab=orders',
+      active: true,
+      isSystemRule: true,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: 'system'
+    },
+    {
+      id: 'system_ticket_updated',
+      name: 'Actualización de Ticket',
+      eventType: 'ticket_updated',
+      title: '🎫 Actualización en tu ticket',
+      message: 'Tu ticket {ticketNumber} fue actualizado. Estado: {statusLabel}. Revisá el Centro de Ayuda para ver los detalles.',
+      link: '/ayuda',
       active: true,
       isSystemRule: true,
       createdAt: now,
@@ -234,5 +247,140 @@ export const getActiveRuleByEventType = async (eventType: NotificationRule['even
   const systemRule = systemRules.find(rule => rule.eventType === eventType && rule.active);
   
   return systemRule || null;
+};
+
+// ===============================
+// MOTOR DE NOTIFICACIONES POR REGLAS
+// ===============================
+
+// Mapea tipo de evento → tipo de notificación almacenada
+const mapEventTypeToNotificationType = (
+  eventType: NotificationRule['eventType']
+): Notification['type'] => {
+  switch (eventType) {
+    case 'auction_won':
+      return 'auction_won';
+    case 'auction_outbid':
+      return 'auction_outbid';
+    case 'purchase':
+      return 'purchase';
+    case 'payment_reminder':
+      return 'payment_reminder';
+    case 'new_message':
+      return 'new_message';
+    case 'order_shipped':
+      return 'order_shipped';
+    case 'order_delivered':
+      return 'order_delivered';
+    case 'order_expired':
+      return 'order_expired';
+    case 'ticket_updated':
+      return 'ticket_updated';
+    default:
+      return 'purchase';
+  }
+};
+
+// Reemplaza placeholders {var} y ${var} en textos usando el payload
+const applyTemplate = (template: string, payload: Record<string, any>): string => {
+  if (!template) return '';
+
+  let result = template;
+
+  // Reemplazo para {clave}
+  result = result.replace(/\{(\w+)\}/g, (_, key) => {
+    const value = payload[key];
+    return value !== undefined && value !== null ? String(value) : `{${key}}`;
+  });
+
+  // Reemplazo para ${clave}
+  result = result.replace(/\$\{(\w+)\}/g, (_, key) => {
+    const value = payload[key];
+    return value !== undefined && value !== null ? String(value) : `\${${key}}`;
+  });
+
+  return result;
+};
+
+export interface NotificationEventPayload {
+  amount?: number;
+  amountFormatted?: string;
+  auctionTitle?: string;
+  auctionId?: string;
+  productName?: string;
+  productId?: string;
+  orderId?: string;
+  trackingNumber?: string;
+  messagePreview?: string;
+  [key: string]: any;
+}
+
+/**
+ * Dispara una notificación basada en reglas.
+ * Recibe la función addNotification del store para no acoplarse a React.
+ */
+export const triggerRuleBasedNotification = async (
+  eventType: NotificationRule['eventType'],
+  userId: string,
+  addNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => Promise<void>,
+  payload: NotificationEventPayload = {}
+): Promise<void> => {
+  try {
+    const rule = await getActiveRuleByEventType(eventType);
+
+    if (!rule || !rule.active) {
+      // Sin regla activa: no enviamos nada para evitar spam inesperado
+      return;
+    }
+
+    // Evaluar condiciones básicas (monto mínimo/máximo, tipo de producto, rol)
+    if (rule.conditions) {
+      const { minAmount, maxAmount, userRoles, productTypes } = rule.conditions;
+
+      if (minAmount !== undefined && (payload.amount || 0) < minAmount) {
+        return;
+      }
+      if (maxAmount !== undefined && (payload.amount || 0) > maxAmount) {
+        return;
+      }
+      if (userRoles && userRoles.length > 0) {
+        const role: 'user' | 'admin' = payload.isAdmin ? 'admin' : 'user';
+        if (!userRoles.includes(role)) {
+          return;
+        }
+      }
+      if (productTypes && productTypes.length > 0 && payload.productType) {
+        if (!productTypes.includes(payload.productType)) {
+          return;
+        }
+      }
+    }
+
+    // Preparar helpers de formateo
+    const enrichedPayload = {
+      ...payload,
+      amountFormatted:
+        payload.amountFormatted ||
+        (typeof payload.amount === 'number'
+          ? payload.amount.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })
+          : undefined)
+    };
+
+    const title = applyTemplate(rule.title, enrichedPayload);
+    const message = applyTemplate(rule.message, enrichedPayload);
+
+    const notificationType = mapEventTypeToNotificationType(eventType);
+
+    await addNotification({
+      userId,
+      type: notificationType,
+      title,
+      message,
+      read: false,
+      link: rule.link
+    });
+  } catch (error) {
+    console.error('❌ Error disparando notificación basada en reglas:', error);
+  }
 };
 
