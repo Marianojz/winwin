@@ -255,7 +255,7 @@ export interface Order {
   amount: number;
   quantity?: number;              // Cantidad de productos en el pedido
   status: OrderStatus;
-  paymentMethod?: string;
+  paymentMethod?: 'mercadopago' | 'bank_transfer' | 'cash_on_delivery';
   deliveryMethod: DeliveryMethod;  // AGREGADO
   couponCode?: string;
   discountAmount?: number;
@@ -270,6 +270,12 @@ export interface Order {
   shippingAddress?: ShippingAddress; // AGREGADO para compatibilidad con AdminPanel
   unitsPerBundle?: number;        // NUEVO: Unidades por bulto del producto
   bundles?: number;               // NUEVO: Bultos del producto al momento del pedido
+  // Datos adicionales para transferencias bancarias
+  bankAccountId?: string;
+  bankAccountAlias?: string;
+  bankAccountCbu?: string;
+  paymentProofUrl?: string;
+  paymentVerificationStatus?: 'pending' | 'approved' | 'rejected';
 }
 
 // Interfaz para el log de transacciones

@@ -8,6 +8,8 @@ import { createAutoMessage, saveMessage } from '../utils/messages';
 import { generateOrderNumber } from '../utils/orderNumberGenerator';
 import { logOrderCreated } from '../utils/orderTransactions';
 import PaymentOptionsModal from '../components/PaymentOptionsModal';
+import PaymentProofModal from '../components/PaymentProofModal';
+import { getNextBankAccount, BankAccount } from '../utils/bankAccounts';
 import { validateCouponForAmount, incrementCouponUsage } from '../utils/coupons';
 import { reserveStock } from '../utils/stockReservations';
 import { triggerRuleBasedNotification } from '../utils/notificationRules';
@@ -15,6 +17,9 @@ import { triggerRuleBasedNotification } from '../utils/notificationRules';
 const Carrito = () => {
   const navigate = useNavigate();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showProofModal, setShowProofModal] = useState(false);
+  const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
+  const [createdBankAccount, setCreatedBankAccount] = useState<BankAccount | null>(null);
   const [couponCode, setCouponCode] = useState('');
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
   const [couponDiscount, setCouponDiscount] = useState(0);
@@ -95,30 +100,44 @@ const Carrito = () => {
     const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 horas para pagar
     const totalWithShipping = Math.max(0, cartTotal + shippingCost - couponDiscount);
 
-    // Reservar stock de todos los productos antes de crear órdenes
-    const reservationErrors: string[] = [];
-    for (const item of cart) {
-      const res = await reserveStock(item.product.id, item.quantity, {
-        userId: user.id
-      });
-      if (!res.success) {
-        reservationErrors.push(
-          `- ${item.product.name}: ${res.message || 'No hay stock suficiente'}`
-        );
-      }
-    }
+    try {
+      const bankAccount = await getNextBankAccount();
 
-    if (reservationErrors.length > 0) {
-      alert(
-        `No se pudo reservar stock para algunos productos:\n${reservationErrors.join(
-          '\n'
-        )}`
+      const confirm = window.confirm(
+        `¿Confirmás la compra de ${cart.length} producto(s) por ${formatCurrency(cartTotal)}?\n\n` +
+        `Costo de envío: ${formatCurrency(shippingCost)}\n` +
+        `Descuento: ${formatCurrency(couponDiscount)}\n` +
+        `Total a transferir: ${formatCurrency(totalWithShipping)}`
       );
-      return;
-    }
 
-    // Crear órdenes de forma asíncrona para generar números únicos
-    const createOrders = async () => {
+      if (!confirm) return;
+
+      // Reservar stock de todos los productos antes de crear órdenes
+      const reservationErrors: string[] = [];
+      for (const item of cart) {
+        const res = await reserveStock(item.product.id, item.quantity, {
+          userId: user.id
+        });
+        if (!res.success) {
+          reservationErrors.push(
+            `- ${item.product.name}: ${res.message || 'No hay stock suficiente'}`
+          );
+        }
+      }
+
+      if (reservationErrors.length > 0) {
+        alert(
+          `No se pudo reservar stock para algunos productos:\n${reservationErrors.join(
+            '\n'
+          )}`
+        );
+        return;
+      }
+
+      // Crear órdenes de forma asíncrona para generar números únicos
+      const createOrders = async () => {
+      let firstOrder: Order | null = null;
+      
       for (const item of cart) {
         try {
           const orderNumber = await generateOrderNumber();
@@ -144,6 +163,7 @@ const Carrito = () => {
               (couponDiscount / cart.length),
             quantity: item.quantity,
             status: 'pending_payment',
+            paymentMethod: 'bank_transfer',
             deliveryMethod: 'shipping',
             createdAt: now,
             expiresAt: expiresAt,
@@ -151,10 +171,19 @@ const Carrito = () => {
             couponCode: appliedCouponCode || undefined,
             discountAmount: couponDiscount / cart.length,
             unitsPerBundle: item.product.unitsPerBundle,
-            bundles: item.product.bundles
+            bundles: item.product.bundles,
+            bankAccountId: bankAccount.id,
+            bankAccountAlias: bankAccount.alias,
+            bankAccountCbu: bankAccount.cbu,
+            paymentVerificationStatus: 'pending'
           };
 
           await addOrder(order);
+          
+          // Guardar la primera orden para mostrar el modal
+          if (!firstOrder) {
+            firstOrder = order;
+          }
           
           // Registrar transacción en el log
           await logOrderCreated(order.id, orderNumber, user.id, user.username, order.amount);
@@ -203,14 +232,20 @@ const Carrito = () => {
 
       clearCart();
       
-      // Redirigir a MercadoPago (aquí iría la integración real)
-      const mercadopagoLink = `https://www.mercadopago.com.ar/checkout/v1/payment?preference_id=MOCK-CART-${Date.now()}`;
-      alert(`✅ Pedido creado exitosamente!\n\nTotal a pagar: ${formatCurrency(totalWithShipping)}\n\nRedirigiendo a MercadoPago...`);
-      // window.location.href = mercadopagoLink; // Descomentar cuando tengas la integración real
-      navigate('/notificaciones');
-    };
+      // Si hay múltiples órdenes, mostrar el modal para la primera
+      // El usuario puede subir comprobantes para las demás desde "Mis pedidos"
+      if (firstOrder) {
+        setCreatedOrder(firstOrder);
+        setCreatedBankAccount(bankAccount);
+        setShowProofModal(true);
+      }
+      };
 
-    createOrders();
+      await createOrders();
+    } catch (error) {
+      console.error('Error en pago por transferencia desde carrito:', error);
+      alert('Hubo un error al procesar la compra por transferencia. Intentá nuevamente.');
+    }
   };
 
   const handlePayOnDelivery = async () => {
@@ -814,6 +849,29 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
         totalAmount={cartTotal}
         shippingCost={shippingCost}
       />
+
+      {createdOrder && createdBankAccount && (
+        <PaymentProofModal
+          isOpen={showProofModal}
+          onClose={() => {
+            setShowProofModal(false);
+            setCreatedOrder(null);
+            setCreatedBankAccount(null);
+          }}
+          order={createdOrder}
+          bankAccount={createdBankAccount}
+          onSuccess={() => {
+            // Opcional: redirigir o mostrar mensaje adicional
+            addNotification({
+              userId: 'current',
+              type: 'purchase',
+              title: 'Pago confirmado',
+              message: `Tu comprobante fue subido y el pago fue aprobado. ${cart.length > 1 ? 'Podés subir comprobantes para los demás pedidos desde "Mis pedidos".' : 'Tu pedido está siendo procesado.'}`,
+              read: false
+            });
+          }}
+        />
+      )}
     </div>
   );
 };

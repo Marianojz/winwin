@@ -1,4 +1,4 @@
-import { Mail, MapPin, FileText, Award, ShoppingBag, Gavel, LogOut, Send, MessageSquare, Camera, Settings, LayoutDashboard, TrendingUp, Bell, HelpCircle, Phone, Target, DollarSign, ShoppingCart, Clock, Package, Truck } from 'lucide-react';
+import { Mail, MapPin, FileText, Award, ShoppingBag, Gavel, LogOut, Send, MessageSquare, Camera, Settings, LayoutDashboard, TrendingUp, Bell, HelpCircle, Phone, Target, DollarSign, ShoppingCart, Clock, Package, Truck, XCircle } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Order, Shipment, Ticket } from '../types';
 import { auth, db } from '../config/firebase';
@@ -7,7 +7,10 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getUserConversations, saveMessage, markMessagesAsRead, getUnreadCount, createMessage, watchConversationStatus } from '../utils/messages';
 import { Message } from '../types';
 import { formatTimeAgo, formatCurrency } from '../utils/helpers';
+import { uploadImage } from '../utils/imageUpload';
+import { createPaymentForOrder } from '../utils/payments';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { cancelOrder, canCancelOrder } from '../utils/orderCancellation';
 import { doc, updateDoc } from 'firebase/firestore';
 import { getUserAvatarUrl } from '../utils/avatarHelper';
 import AvatarGallery from '../components/AvatarGallery';
@@ -50,15 +53,61 @@ const Perfil = () => {
   }, [tabParam]);
 
   // Filtrar pedidos del usuario
+  // Incluir también orders que están referenciados en shipments pero que podrían no estar en la lista
   const userOrders = useMemo(() => {
     if (!user || !orders) return [];
-    return orders.filter((order: Order) => order.userId === user.id)
-      .sort((a: Order, b: Order) => {
-        const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
-        const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime();
-        return dateB - dateA; // Más recientes primero
+    
+    // Obtener orderIds de shipments del usuario
+    const shipmentOrderIds = new Set(
+      shipments
+        .filter(s => s.userId === user.id)
+        .map(s => s.orderId)
+    );
+    
+    // Filtrar orders del usuario
+    const filteredOrders = orders.filter((order: Order) => order.userId === user.id);
+    
+    // Agregar orders que están en shipments pero no en la lista (por si hay problemas de sincronización)
+    // Esto asegura que si hay un shipment, el order aparezca
+    const ordersFromShipments = shipments
+      .filter(s => s.userId === user.id && !filteredOrders.some(o => o.id === s.orderId))
+      .map(s => {
+        // Crear un order básico desde el shipment si no existe
+        return {
+          id: s.orderId,
+          orderNumber: s.orderId,
+          userId: s.userId,
+          userName: s.userName,
+          productId: s.productId,
+          productName: s.productName,
+          productImage: s.productImage || '',
+          productType: 'store' as const,
+          type: 'store' as const,
+          amount: 0, // No tenemos el monto en el shipment
+          quantity: s.quantity,
+          status: s.status === 'in_transit' ? 'in_transit' as const : 
+                  s.status === 'delivered' ? 'delivered' as const :
+                  s.status === 'preparing' ? 'preparing' as const :
+                  'shipped' as const,
+          deliveryMethod: s.deliveryMethod,
+          createdAt: s.createdAt instanceof Date ? s.createdAt : new Date(s.createdAt as any),
+          address: s.address,
+          trackingNumber: s.trackingNumber
+        } as Order;
       });
-  }, [user, orders]);
+    
+    // Combinar y eliminar duplicados
+    const allOrders = [...filteredOrders, ...ordersFromShipments];
+    const uniqueOrders = allOrders.filter((order, index, self) => 
+      index === self.findIndex(o => o.id === order.id)
+    );
+    
+    return uniqueOrders.sort((a: Order, b: Order) => {
+      const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
+      const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime();
+      return dateB - dateA; // Más recientes primero
+    });
+  }, [user, orders, shipments]);
   const [userMessages, setUserMessages] = useState<Message[]>([]);
   const [newMessageContent, setNewMessageContent] = useState('');
   const [conversationUnreadCount, setConversationUnreadCount] = useState(0);
@@ -1230,8 +1279,13 @@ const Perfil = () => {
                 const getStatusBadge = (status: string) => {
                   const badges: Record<string, { label: string; className: string }> = {
                     'pending_payment': { label: 'Pago Pendiente', className: 'badge-warning' },
+                    'payment_expired': { label: 'Pago Expirado', className: 'badge-secondary' },
+                    'payment_confirmed': { label: 'Pago Confirmado', className: 'badge-success' },
+                    'processing': { label: 'Procesando', className: 'badge-info' },
+                    'preparing': { label: 'Preparando', className: 'badge-info' },
                     'paid': { label: 'Pagado', className: 'badge-success' },
                     'shipped': { label: 'Enviado', className: 'badge-info' },
+                    'in_transit': { label: 'En Tránsito', className: 'badge-primary' },
                     'delivered': { label: 'Entregado', className: 'badge-success' },
                     'cancelled': { label: 'Cancelado', className: 'badge-danger' },
                     'expired': { label: 'Expirado', className: 'badge-secondary' }
@@ -1348,6 +1402,133 @@ const Perfil = () => {
                               }}
                             >
                               Dejar reseña
+                            </button>
+                          )}
+
+                          {/* Subir comprobante para transferencias bancarias */}
+                          {order.paymentMethod === 'bank_transfer' &&
+                            order.status === 'pending_payment' && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    const input = document.createElement('input');
+                                    input.type = 'file';
+                                    input.accept = 'image/*';
+
+                                    input.onchange = async () => {
+                                      const file = input.files?.[0];
+                                      if (!file) return;
+
+                                      if (file.size > 5 * 1024 * 1024) {
+                                        alert('El comprobante debe pesar menos de 5MB.');
+                                        return;
+                                      }
+
+                                      const confirm = window.confirm(
+                                        '¿Confirmás que este comprobante corresponde a la transferencia realizada para este pedido?'
+                                      );
+                                      if (!confirm) return;
+
+                                      try {
+                                        const url = await uploadImage(
+                                          file,
+                                          `paymentProofs/${order.id}`
+                                        );
+
+                                        // Aprobación automática básica basada en la carga del comprobante
+                                        await createPaymentForOrder(order, url, {
+                                          autoApprove: true
+                                        });
+
+                                        alert(
+                                          '✅ Comprobante subido y pago marcado como aprobado.\n' +
+                                            'Si hubiera algún problema, el administrador podrá revisarlo y ajustar el estado.'
+                                        );
+                                      } catch (error: any) {
+                                        console.error(
+                                          'Error subiendo comprobante:',
+                                          error
+                                        );
+                                        alert(
+                                          `No se pudo subir el comprobante: ${
+                                            error.message || 'Error desconocido'
+                                          }`
+                                        );
+                                      }
+                                    };
+
+                                    input.click();
+                                  } catch (error) {
+                                    console.error(
+                                      'Error preparando carga de comprobante:',
+                                      error
+                                    );
+                                  }
+                                }}
+                                style={{
+                                  padding: '0.375rem 0.75rem',
+                                  borderRadius: '0.5rem',
+                                  border: '1px solid var(--success)',
+                                  background: 'transparent',
+                                  color: 'var(--success)',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Subir comprobante
+                              </button>
+                            )}
+
+                          {/* Botón para cancelar pedido */}
+                          {canCancelOrder(order) && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const orderDisplay = order.orderNumber || `#${order.id.slice(-8).toUpperCase()}`;
+                                const confirm = window.confirm(
+                                  `¿Estás seguro de que querés cancelar el pedido ${orderDisplay}?\n\n` +
+                                    `Producto: ${order.productName}\n` +
+                                    `Monto: ${formatCurrency(order.amount)}\n\n` +
+                                    `Si el pedido ya tiene stock reservado, se devolverá al inventario.`
+                                );
+                                
+                                if (!confirm) return;
+
+                                try {
+                                  const result = await cancelOrder(order, {
+                                    userId: user?.id,
+                                    userName: user?.username,
+                                    reason: 'Cancelado por el usuario'
+                                  });
+
+                                  if (result.success) {
+                                    alert('✅ Pedido cancelado correctamente');
+                                  } else {
+                                    alert(`❌ ${result.message}`);
+                                  }
+                                } catch (error: any) {
+                                  console.error('Error cancelando pedido:', error);
+                                  alert(`❌ Error al cancelar el pedido: ${error.message || 'Error desconocido'}`);
+                                }
+                              }}
+                              style={{
+                                padding: '0.375rem 0.75rem',
+                                borderRadius: '0.5rem',
+                                border: '1px solid var(--danger)',
+                                background: 'transparent',
+                                color: 'var(--danger)',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.375rem'
+                              }}
+                            >
+                              <XCircle size={14} />
+                              Cancelar pedido
                             </button>
                           )}
                         </div>

@@ -4,6 +4,8 @@ import { realtimeDb } from '../config/firebase';
 
 // Otras importaciones de Lucide, React, etc.
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Circle, useMapEvents } from 'react-leaflet';
+import type { LatLngExpression } from 'leaflet';
 import { 
   Eye, Edit, Trash2, Users, Clock, AlertCircle, Activity, RefreshCw,
   Gavel, Package, Bot, DollarSign, Plus, XCircle, X,
@@ -21,18 +23,23 @@ import UserDetailsModal from '../components/UserDetailsModal';
 import StatsCard from '../components/StatsCard';
 import { useStore } from '../store/useStore';
 import { formatCurrency, formatTimeAgo, generateUlid } from '../utils/helpers';
+import { calculateShippingCost, DEFAULT_SHIPPING_ZONES, ShippingZone } from '../utils/shippingCalculator';
+import { geocodeAddress, reverseGeocode, GeocodingResult } from '../utils/geocoding';
 import { Product, Auction, Order, OrderStatus, NotificationRule, Shipment, ShipmentStatus } from '../types';
 import { getAllNotificationRules, createNotificationRule, updateNotificationRule, deleteNotificationRule } from '../utils/notificationRules';
 import ImageUploader from '../components/ImageUploader';
 import { mockCategories } from '../utils/mockData';
 import { availableStickers, getStickerLabel } from '../utils/stickers';
 import { logAdminAction, logAuctionAction, logProductAction, logOrderAction, logUserAction } from '../utils/actionLogger';
+import { cancelOrder, canCancelOrder } from '../utils/orderCancellation';
 import { logOrderStatusChange, loadOrderTransactions } from '../utils/orderTransactions';
 import { storage } from '../config/firebase';
 import { ref as storageRef, listAll, deleteObject } from 'firebase/storage';
 import { uploadImage } from '../utils/imageUpload';
 import { HomeConfig, defaultHomeConfig, LogoSticker, ThemeColors } from '../types/homeConfig';
 import { specialEvents, getCurrentSpecialEvents, getStickerForEvent } from '../utils/dateSpecialEvents';
+import { getAllBankAccounts, createBankAccount, updateBankAccount, deleteBankAccount, BankAccount } from '../utils/bankAccounts';
+import { getPayments, updatePaymentStatus, PaymentOperation } from '../utils/payments';
 import { 
   getAllConversations, 
   getMessages, 
@@ -100,7 +107,7 @@ import {
   type UnifiedMessageType,
   type UnifiedMessagePriority
 } from '../utils/unifiedInbox';
-import { subscribeAllShipments, updateShipment as updateShipmentRecord } from '../utils/shipments';
+import { subscribeAllShipments, updateShipment as updateShipmentRecord, createShipmentFromOrder } from '../utils/shipments';
 import { triggerRuleBasedNotification } from '../utils/notificationRules';
 import { Coupon, validateCouponForAmount } from '../utils/coupons';
 import './AdminPanel.css';
@@ -120,6 +127,15 @@ const AdminPanel = (): React.ReactElement => {
   const [refreshKey, setRefreshKey] = useState(0); // Para forzar re-render sin recargar
   const [clearedActivityTimestamp, setClearedActivityTimestamp] = useState<number>(0); // Timestamp de actividad limpiada
   const [republishModal, setRepublishModal] = useState<{ show: boolean; auction: Auction | null }>({ show: false, auction: null });
+  // Estados para pagos y cuentas bancarias
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [bankAccountsLoading, setBankAccountsLoading] = useState(false);
+  const [bankForm, setBankForm] = useState<Partial<BankAccount> | null>(null);
+  const [editingBankId, setEditingBankId] = useState<string | null>(null);
+  const [payments, setPayments] = useState<PaymentOperation[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentSearch, setPaymentSearch] = useState('');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   
   // Estados para gestión de blog
   const [blogPosts, setBlogPosts] = useState<any[]>([]);
@@ -161,6 +177,30 @@ const AdminPanel = (): React.ReactElement => {
       // Log silencioso - funcionalidad oculta del admin
     }
   }, [user?.isAdmin, loadBots]);
+
+  // Cargar cuentas bancarias y pagos cuando el admin abra la pestaña de pagos
+  useEffect(() => {
+    const loadPaymentsData = async () => {
+      if (!user?.isAdmin || activeTab !== 'payments') return;
+      try {
+        setBankAccountsLoading(true);
+        setPaymentsLoading(true);
+        const [accounts, ops] = await Promise.all([
+          getAllBankAccounts(),
+          getPayments()
+        ]);
+        setBankAccounts(accounts);
+        setPayments(ops);
+      } catch (error) {
+        console.error('Error cargando datos de pagos:', error);
+      } finally {
+        setBankAccountsLoading(false);
+        setPaymentsLoading(false);
+      }
+    };
+
+    loadPaymentsData();
+  }, [user?.isAdmin, activeTab]);
 
   // Cargar preferencias desde Firebase cuando el usuario esté autenticado
   useEffect(() => {
@@ -1260,16 +1300,25 @@ const [auctionForm, setAuctionForm] = useState({
   // Suscribirse a envíos en tiempo real cuando la pestaña de Envíos está activa
   useEffect(() => {
     if (activeTab === 'shipments') {
+      console.log('📦 Suscribiéndose a shipments...');
       const unsubscribe = subscribeAllShipments((data) => {
+        console.log('📦 Shipments recibidos:', data.length);
         // Ordenar por fecha de creación (más recientes primero)
         const sorted = [...data].sort((a, b) => {
           const dateA = new Date(a.createdAt as any).getTime();
           const dateB = new Date(b.createdAt as any).getTime();
           return dateB - dateA;
         });
+        console.log('📦 Shipments ordenados:', sorted.length);
         setShipments(sorted);
       });
-      return () => unsubscribe();
+      return () => {
+        console.log('📦 Desuscribiéndose de shipments');
+        unsubscribe();
+      };
+    } else {
+      // Limpiar shipments cuando se cambia de pestaña para evitar datos obsoletos
+      setShipments([]);
     }
   }, [activeTab]);
 
@@ -3029,6 +3078,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
     { id: 'products', label: 'Productos', icon: Package },
     { id: 'users', label: 'Usuarios', icon: Users },
     { id: 'orders', label: 'Pedidos', icon: ShoppingCart },
+    { id: 'payments', label: 'Pagos', icon: CreditCard },
     { id: 'shipments', label: 'Envíos', icon: Truck },
     { id: 'bots', label: 'Bots', icon: Bot },
     { id: 'blog', label: 'Blog', icon: BookOpen },
@@ -3466,6 +3516,965 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
           <RefreshCw size={16} />
           Limpiar Todo
         </button>
+      </div>
+    );
+  };
+
+  // Calculadora de costos de envío (distancia + zonas + radio 100 km)
+  const ShippingCostCalculator = () => {
+    // Estados para origen
+    const [originLat, setOriginLat] = useState<string>('-34.6037'); // Ej: CABA
+    const [originLng, setOriginLng] = useState<string>('-58.3816');
+    const [originAddress, setOriginAddress] = useState<string>('');
+    const [originSearchResults, setOriginSearchResults] = useState<GeocodingResult[]>([]);
+    const [originSearching, setOriginSearching] = useState(false);
+    const [originDisplayName, setOriginDisplayName] = useState<string>('');
+    
+    // Estados para destino
+    const [destLat, setDestLat] = useState<string>('');
+    const [destLng, setDestLng] = useState<string>('');
+    const [destAddress, setDestAddress] = useState<string>('');
+    const [destSearchResults, setDestSearchResults] = useState<GeocodingResult[]>([]);
+    const [destSearching, setDestSearching] = useState(false);
+    const [destDisplayName, setDestDisplayName] = useState<string>('');
+    
+    // Estados para mapa
+    const [mapClickMode, setMapClickMode] = useState<'origin' | 'dest' | null>(null);
+    
+    const [selectedZoneId, setSelectedZoneId] = useState<string | 'auto'>('auto');
+    const [zones] = useState<ShippingZone[]>(DEFAULT_SHIPPING_ZONES);
+    const [maxRadiusKm] = useState<number>(100);
+
+    const result = useMemo(() => {
+      const oLat = parseFloat(originLat);
+      const oLng = parseFloat(originLng);
+      const dLat = parseFloat(destLat);
+      const dLng = parseFloat(destLng);
+
+      if (
+        !originLat ||
+        !originLng ||
+        !destLat ||
+        !destLng ||
+        Number.isNaN(oLat) ||
+        Number.isNaN(oLng) ||
+        Number.isNaN(dLat) ||
+        Number.isNaN(dLng)
+      ) {
+        return null;
+      }
+
+      const customZones =
+        selectedZoneId === 'auto' ? zones : zones.filter((z) => z.id === selectedZoneId);
+
+      return calculateShippingCost({
+        origin: { lat: oLat, lng: oLng },
+        destination: { lat: dLat, lng: dLng },
+        zones: customZones,
+        maxRadiusKm
+      });
+    }, [originLat, originLng, destLat, destLng, zones, selectedZoneId, maxRadiusKm]);
+
+    const activeZone =
+      selectedZoneId === 'auto'
+        ? result?.zone
+        : zones.find((z) => z.id === selectedZoneId) || null;
+
+    const distanceDisplay = result ? `${result.distanceKm.toFixed(2)} km` : '—';
+
+    // Función para buscar dirección de origen
+    const handleOriginSearch = async () => {
+      if (!originAddress.trim()) {
+        setOriginSearchResults([]);
+        return;
+      }
+
+      setOriginSearching(true);
+      try {
+        const results = await geocodeAddress(originAddress);
+        setOriginSearchResults(results);
+      } catch (error: any) {
+        console.error('Error buscando dirección de origen:', error);
+        alert(`Error al buscar dirección: ${error.message || 'Error desconocido'}`);
+      } finally {
+        setOriginSearching(false);
+      }
+    };
+
+    // Función para buscar dirección de destino
+    const handleDestSearch = async () => {
+      if (!destAddress.trim()) {
+        setDestSearchResults([]);
+        return;
+      }
+
+      setDestSearching(true);
+      try {
+        const results = await geocodeAddress(destAddress);
+        setDestSearchResults(results);
+      } catch (error: any) {
+        console.error('Error buscando dirección de destino:', error);
+        alert(`Error al buscar dirección: ${error.message || 'Error desconocido'}`);
+      } finally {
+        setDestSearching(false);
+      }
+    };
+
+    // Función para seleccionar resultado de búsqueda de origen
+    const selectOriginResult = (result: GeocodingResult) => {
+      setOriginLat(result.lat.toString());
+      setOriginLng(result.lng.toString());
+      setOriginDisplayName(result.displayName);
+      setOriginSearchResults([]);
+      setOriginAddress('');
+    };
+
+    // Función para seleccionar resultado de búsqueda de destino
+    const selectDestResult = (result: GeocodingResult) => {
+      setDestLat(result.lat.toString());
+      setDestLng(result.lng.toString());
+      setDestDisplayName(result.displayName);
+      setDestSearchResults([]);
+      setDestAddress('');
+    };
+
+    // Función para obtener dirección desde coordenadas (reverse geocoding)
+    const updateAddressFromCoords = async (lat: number, lng: number, type: 'origin' | 'dest') => {
+      try {
+        const result = await reverseGeocode(lat, lng);
+        if (result) {
+          if (type === 'origin') {
+            setOriginDisplayName(result.displayName);
+          } else {
+            setDestDisplayName(result.displayName);
+          }
+        }
+      } catch (error) {
+        console.error('Error obteniendo dirección desde coordenadas:', error);
+      }
+    };
+
+    // Componente para detectar clicks en el mapa
+    const MapClickHandler = ({ type }: { type: 'origin' | 'dest' }) => {
+      useMapEvents({
+        click: async (e) => {
+          if (mapClickMode === type) {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            if (type === 'origin') {
+              setOriginLat(lat.toString());
+              setOriginLng(lng.toString());
+              await updateAddressFromCoords(lat, lng, 'origin');
+            } else {
+              setDestLat(lat.toString());
+              setDestLng(lng.toString());
+              await updateAddressFromCoords(lat, lng, 'dest');
+            }
+            setMapClickMode(null);
+          }
+        }
+      });
+      return null;
+    };
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* Información sobre qué calcula */}
+        <div
+          style={{
+            padding: '1rem',
+            background: 'linear-gradient(135deg, var(--primary-light) 0%, var(--secondary-light) 100%)',
+            borderRadius: '0.75rem',
+            border: '1px solid var(--primary)'
+          }}
+        >
+          <h4 style={{ margin: '0 0 0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Calculator size={20} />
+            ¿Qué calcula esta herramienta?
+          </h4>
+          <div style={{ fontSize: '0.875rem', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <div>📏 <strong>Distancia:</strong> Calcula la distancia en línea recta (Haversine) entre origen y destino</div>
+            <div>💰 <strong>Costo de envío:</strong> Aplica zonas de precio según la distancia (base + variable por km)</div>
+            <div>🎯 <strong>Zona automática:</strong> Selecciona automáticamente la zona según la distancia</div>
+            <div>⚠️ <strong>Validación:</strong> Verifica que el destino esté dentro del radio máximo de {maxRadiusKm} km</div>
+          </div>
+        </div>
+
+        {/* Origen (Depósito / Tienda) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+            <MapPin size={18} color="var(--primary)" />
+            <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Origen (Depósito / Tienda)</h4>
+          </div>
+          
+          {/* Búsqueda por dirección */}
+          <div style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                type="text"
+                value={originAddress}
+                onChange={(e) => setOriginAddress(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleOriginSearch();
+                  }
+                }}
+                placeholder="Ej: Av. Corrientes 1234, CABA"
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.9rem'
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleOriginSearch}
+                disabled={originSearching || !originAddress.trim()}
+                style={{
+                  padding: '0.75rem 1.25rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  background: originSearching ? 'var(--bg-tertiary)' : 'var(--primary)',
+                  color: 'white',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  cursor: originSearching ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Search size={16} />
+                {originSearching ? 'Buscando...' : 'Buscar'}
+              </button>
+            </div>
+            
+            {/* Resultados de búsqueda */}
+            {originSearchResults.length > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  marginTop: '0.25rem',
+                  background: 'var(--bg-primary)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '0.5rem',
+                  maxHeight: '200px',
+                  overflowY: 'auto',
+                  zIndex: 1000,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                }}
+              >
+                {originSearchResults.map((result, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => selectOriginResult(result)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      textAlign: 'left',
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      borderBottom: idx < originSearchResults.length - 1 ? '1px solid var(--border)' : 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--bg-secondary)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                      {result.address?.street || result.address?.city || 'Ubicación'}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      {result.displayName}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Coordenadas manuales */}
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '140px' }}>
+              <label
+                style={{
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  color: 'var(--text-primary)',
+                  fontWeight: 500,
+                  fontSize: '0.875rem'
+                }}
+              >
+                Latitud
+              </label>
+              <input
+                type="number"
+                step="any"
+                value={originLat}
+                onChange={(e) => {
+                  setOriginLat(e.target.value);
+                  setOriginDisplayName('');
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.9rem'
+                }}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: '140px' }}>
+              <label
+                style={{
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  color: 'var(--text-primary)',
+                  fontWeight: 500,
+                  fontSize: '0.875rem'
+                }}
+              >
+                Longitud
+              </label>
+              <input
+                type="number"
+                step="any"
+                value={originLng}
+                onChange={(e) => {
+                  setOriginLng(e.target.value);
+                  setOriginDisplayName('');
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.9rem'
+                }}
+              />
+            </div>
+          </div>
+          
+          {/* Dirección encontrada */}
+          {originDisplayName && (
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+              📍 {originDisplayName}
+            </div>
+          )}
+        </div>
+
+        {/* Destino (Cliente) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+            <MapPin size={18} color="var(--success)" />
+            <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Destino (Cliente)</h4>
+          </div>
+          
+          {/* Búsqueda por dirección */}
+          <div style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                type="text"
+                value={destAddress}
+                onChange={(e) => setDestAddress(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleDestSearch();
+                  }
+                }}
+                placeholder="Ej: Av. Santa Fe 4567, Palermo, CABA"
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.9rem'
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleDestSearch}
+                disabled={destSearching || !destAddress.trim()}
+                style={{
+                  padding: '0.75rem 1.25rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  background: destSearching ? 'var(--bg-tertiary)' : 'var(--success)',
+                  color: 'white',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  cursor: destSearching ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Search size={16} />
+                {destSearching ? 'Buscando...' : 'Buscar'}
+              </button>
+            </div>
+            
+            {/* Resultados de búsqueda */}
+            {destSearchResults.length > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  marginTop: '0.25rem',
+                  background: 'var(--bg-primary)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '0.5rem',
+                  maxHeight: '200px',
+                  overflowY: 'auto',
+                  zIndex: 1000,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                }}
+              >
+                {destSearchResults.map((result, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => selectDestResult(result)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      textAlign: 'left',
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      borderBottom: idx < destSearchResults.length - 1 ? '1px solid var(--border)' : 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--bg-secondary)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                      {result.address?.street || result.address?.city || 'Ubicación'}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      {result.displayName}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Coordenadas manuales */}
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '140px' }}>
+              <label
+                style={{
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  color: 'var(--text-primary)',
+                  fontWeight: 500,
+                  fontSize: '0.875rem'
+                }}
+              >
+                Latitud
+              </label>
+              <input
+                type="number"
+                step="any"
+                value={destLat}
+                onChange={(e) => {
+                  setDestLat(e.target.value);
+                  setDestDisplayName('');
+                }}
+                placeholder="-34.9..."
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.9rem'
+                }}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: '140px' }}>
+              <label
+                style={{
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  color: 'var(--text-primary)',
+                  fontWeight: 500,
+                  fontSize: '0.875rem'
+                }}
+              >
+                Longitud
+              </label>
+              <input
+                type="number"
+                step="any"
+                value={destLng}
+                onChange={(e) => {
+                  setDestLng(e.target.value);
+                  setDestDisplayName('');
+                }}
+                placeholder="-58.7..."
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.9rem'
+                }}
+              />
+            </div>
+          </div>
+          
+          {/* Dirección encontrada */}
+          {destDisplayName && (
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+              📍 {destDisplayName}
+            </div>
+          )}
+        </div>
+
+        {/* Mapa interactivo */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Modo de selección en mapa:</span>
+            <button
+              type="button"
+              onClick={() => setMapClickMode(mapClickMode === 'origin' ? null : 'origin')}
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '0.5rem',
+                border: `2px solid ${mapClickMode === 'origin' ? 'var(--primary)' : 'var(--border)'}`,
+                background: mapClickMode === 'origin' ? 'var(--primary-light)' : 'transparent',
+                color: mapClickMode === 'origin' ? 'var(--primary)' : 'var(--text-primary)',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <MapPin size={16} />
+              Seleccionar Origen
+            </button>
+            <button
+              type="button"
+              onClick={() => setMapClickMode(mapClickMode === 'dest' ? null : 'dest')}
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '0.5rem',
+                border: `2px solid ${mapClickMode === 'dest' ? 'var(--success)' : 'var(--border)'}`,
+                background: mapClickMode === 'dest' ? 'rgba(34,197,94,0.1)' : 'transparent',
+                color: mapClickMode === 'dest' ? 'var(--success)' : 'var(--text-primary)',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <MapPin size={16} />
+              Seleccionar Destino
+            </button>
+            {mapClickMode && (
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                👆 Hacé clic en el mapa para seleccionar la ubicación
+              </span>
+            )}
+          </div>
+          
+          <div
+            style={{
+              borderRadius: '0.75rem',
+              border: '1px solid var(--border)',
+              overflow: 'hidden',
+              position: 'relative'
+            }}
+          >
+            <MapContainer
+              center={[parseFloat(originLat) || -34.6037, parseFloat(originLng) || -58.3816] as LatLngExpression}
+              zoom={9}
+              style={{ height: '350px', width: '100%' }}
+              scrollWheelZoom={true}
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <MapClickHandler type="origin" />
+              <MapClickHandler type="dest" />
+              
+              {/* Círculo de radio máximo */}
+              <Circle
+                center={[parseFloat(originLat) || -34.6037, parseFloat(originLng) || -58.3816] as LatLngExpression}
+                radius={maxRadiusKm * 1000}
+                pathOptions={{
+                  color: '#3b82f6',
+                  fillColor: '#3b82f6',
+                  fillOpacity: 0.12,
+                  weight: 2
+                }}
+              />
+              
+              {/* Marcador de origen */}
+              <Marker
+                position={[parseFloat(originLat) || -34.6037, parseFloat(originLng) || -58.3816] as LatLngExpression}
+              />
+              
+              {/* Marcador de destino (si está definido) */}
+              {destLat && destLng && !Number.isNaN(parseFloat(destLat)) && !Number.isNaN(parseFloat(destLng)) && (
+                <Marker
+                  position={[parseFloat(destLat), parseFloat(destLng)] as LatLngExpression}
+                />
+              )}
+            </MapContainer>
+            
+            {/* Leyenda del mapa */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '10px',
+                left: '10px',
+                background: 'rgba(255, 255, 255, 0.95)',
+                padding: '0.5rem 0.75rem',
+                borderRadius: '0.5rem',
+                fontSize: '0.75rem',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                zIndex: 1000
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <div>🔵 Radio máximo: {maxRadiusKm} km</div>
+                <div>📍 Origen (azul)</div>
+                <div>📍 Destino (verde)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Selector de zona */}
+        <div>
+          <label
+            style={{
+              display: 'block',
+              marginBottom: '0.5rem',
+              color: 'var(--text-primary)',
+              fontWeight: 500,
+              fontSize: '0.875rem'
+            }}
+          >
+            Zona de Envío
+          </label>
+          <select
+            value={selectedZoneId}
+            onChange={(e) => setSelectedZoneId(e.target.value as string | 'auto')}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              borderRadius: '0.5rem',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-primary)',
+              color: 'var(--text-primary)',
+              fontSize: '0.9rem'
+            }}
+          >
+            <option value="auto">Automático por distancia</option>
+            {zones.map((zone) => (
+              <option key={zone.id} value={zone.id}>
+                {zone.name} (hasta {zone.maxDistanceKm} km)
+              </option>
+            ))}
+          </select>
+          {activeZone && (
+            <p
+              style={{
+                margin: '0.25rem 0 0 0',
+                fontSize: '0.8rem',
+                color: 'var(--text-secondary)'
+              }}
+            >
+              Base: {formatCurrency(activeZone.basePrice)} • Min: {formatCurrency(activeZone.minPrice)} •
+              Variable: ${activeZone.pricePerKm} / km
+              {activeZone.description && (
+                <>
+                  <br />
+                  {activeZone.description}
+                </>
+              )}
+            </p>
+          )}
+        </div>
+
+        {/* Resultado */}
+        {result && (
+          <div
+            style={{
+              marginTop: '0.75rem',
+              padding: '1.5rem',
+              borderRadius: '0.75rem',
+              background: result.ok 
+                ? 'linear-gradient(135deg, rgba(34,197,94,0.1) 0%, rgba(59,130,246,0.1) 100%)'
+                : 'rgba(248,113,113,0.08)',
+              border: `2px solid ${result.ok ? 'var(--success)' : '#ef4444'}`,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            }}
+          >
+            {result.ok ? (
+              <>
+                {/* Encabezado con distancia y costo */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    marginBottom: '1rem',
+                    gap: '1rem',
+                    flexWrap: 'wrap'
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: '0.75rem',
+                        color: 'var(--text-secondary)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        fontWeight: 600,
+                        marginBottom: '0.25rem'
+                      }}
+                    >
+                      📏 Distancia Calculada
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '1.5rem',
+                        fontWeight: 700,
+                        color: 'var(--text-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      {distanceDisplay}
+                    </div>
+                  </div>
+                  {result.cost !== undefined && (
+                    <div
+                      style={{
+                        textAlign: 'right'
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: '0.75rem',
+                          color: 'var(--text-secondary)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          fontWeight: 600,
+                          marginBottom: '0.25rem'
+                        }}
+                      >
+                        💰 Costo de Envío
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '2rem',
+                          fontWeight: 700,
+                          color: 'var(--primary)',
+                          lineHeight: 1
+                        }}
+                      >
+                        {formatCurrency(result.cost)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Desglose detallado */}
+                {result.breakdown && result.zone && (
+                  <div
+                    style={{
+                      marginTop: '1rem',
+                      padding: '1rem',
+                      background: 'var(--bg-primary)',
+                      borderRadius: '0.5rem',
+                      border: '1px solid var(--border)'
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        marginBottom: '0.75rem',
+                        color: 'var(--text-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <BarChart3 size={16} />
+                      Desglose del Cálculo
+                    </div>
+                    
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.5rem',
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem', background: 'var(--bg-secondary)', borderRadius: '0.25rem' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Zona aplicada:</span>
+                        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{result.zone.name}</span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Precio base:</span>
+                        <span style={{ fontWeight: 500 }}>{formatCurrency(result.breakdown.basePrice)}</span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>
+                          Variable ({result.zone.pricePerKm} $/km × {result.distanceKm.toFixed(2)} km):
+                        </span>
+                        <span style={{ fontWeight: 500 }}>{formatCurrency(result.breakdown.variablePrice)}</span>
+                      </div>
+                      
+                      <div
+                        style={{
+                          marginTop: '0.5rem',
+                          padding: '0.75rem',
+                          background: 'rgba(34,197,94,0.1)',
+                          borderRadius: '0.5rem',
+                          border: '1px solid var(--success)',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          fontWeight: 600
+                        }}
+                      >
+                        <span>Total:</span>
+                        <span style={{ color: 'var(--success)', fontSize: '1.1rem' }}>
+                          {formatCurrency(result.cost || 0)}
+                        </span>
+                      </div>
+                      
+                      {result.breakdown.appliedMinPrice && (
+                        <div
+                          style={{
+                            marginTop: '0.5rem',
+                            padding: '0.5rem 0.75rem',
+                            borderRadius: '0.5rem',
+                            background: 'rgba(34,197,94,0.08)',
+                            color: 'var(--success)',
+                            fontSize: '0.8rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                          }}
+                        >
+                          <CheckCircle size={14} />
+                          Se aplicó el precio mínimo de zona para cubrir combustible + tiempo de viaje
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem'
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '1rem',
+                    fontWeight: 600,
+                    color: '#ef4444'
+                  }}
+                >
+                  <AlertCircle size={20} />
+                  No se puede calcular el envío
+                </div>
+                
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-primary)' }}>
+                  {result.reason === 'OUT_OF_RADIUS' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div>
+                        El destino está <strong>fuera del radio máximo</strong> de {maxRadiusKm} km.
+                      </div>
+                      <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.5)', borderRadius: '0.5rem' }}>
+                        <strong>Distancia calculada:</strong> {distanceDisplay}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                        💡 Podés derivar este envío a correo o logística externa.
+                      </div>
+                    </div>
+                  )}
+                  {result.reason === 'INVALID_COORDINATES' && (
+                    <div>
+                      Revisá que las coordenadas de origen y destino sean válidas. Asegurate de que ambos campos estén completos.
+                    </div>
+                  )}
+                  {result.reason === 'NO_ZONE_MATCH' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div>
+                        No se encontró una zona configurada para la distancia estimada.
+                      </div>
+                      <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.5)', borderRadius: '0.5rem' }}>
+                        <strong>Distancia calculada:</strong> {distanceDisplay}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                        💡 Ajustá los límites de tus zonas o creá una nueva zona que cubra esta distancia.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -7218,23 +8227,27 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                         }}
                         onClick={(e) => e.stopPropagation()}
                         >
-                          {order.status !== 'cancelled' && order.status !== 'delivered' && (
+                          {canCancelOrder(order) && (
                             <button
                               onClick={async (e) => {
                                 e.stopPropagation();
-                                if (window.confirm(`¿Cancelar el pedido ${order.orderNumber || `#${order.id.slice(-6)}`}?`)) {
+                                const orderDisplay = order.orderNumber || `#${order.id.slice(-6)}`;
+                                if (window.confirm(`¿Cancelar el pedido ${orderDisplay}?\n\nEl stock será restaurado automáticamente si corresponde.`)) {
                                   try {
-                                    await update(dbRef(realtimeDb, `orders/${order.id}`), { status: 'cancelled' });
-                                    updateOrderStatus(order.id, 'cancelled');
-                                    logOrderAction('Pedido cancelado', order.id, user?.id, user?.username, { 
-                                      oldStatus: order.status,
-                                      newStatus: 'cancelled',
-                                      actionType: 'cancel'
+                                    const result = await cancelOrder(order, {
+                                      userId: user?.id,
+                                      userName: user?.username,
+                                      reason: 'Cancelado por administrador'
                                     });
-                                    alert('✅ Pedido cancelado');
-                                  } catch (error) {
+                                    
+                                    if (result.success) {
+                                      alert('✅ Pedido cancelado correctamente');
+                                    } else {
+                                      alert(`❌ ${result.message}`);
+                                    }
+                                  } catch (error: any) {
                                     console.error('Error cancelando pedido:', error);
-                                    alert('❌ Error al cancelar');
+                                    alert(`❌ Error al cancelar: ${error.message || 'Error desconocido'}`);
                                   }
                                 }
                               }}
@@ -7538,7 +8551,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                               </button>
                               {nextStatus && (
                                 <button
-                                  onClick={() => {
+                                  onClick={async () => {
                                     const statusLabels: Record<OrderStatus, string> = {
                                       pending_payment: 'Confirmar Pago',
                                       payment_confirmed: 'Iniciar Procesamiento',
@@ -7558,6 +8571,40 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                                     if (window.confirm(confirmMessage)) {
                                       const previousStatus = order.status;
                                       updateOrderStatus(order.id, nextStatus);
+                                      
+                                      // Si el nuevo estado es relacionado con envío, crear/actualizar shipment
+                                      if (['in_transit', 'shipped'].includes(nextStatus)) {
+                                        try {
+                                          console.log('📦 Creando/actualizando shipment para order:', order.id);
+                                          // Verificar si ya existe un shipment para este order
+                                          const existingShipment = shipments.find(s => s.orderId === order.id);
+                                          
+                                          if (existingShipment) {
+                                            console.log('✅ Shipment existente encontrado, actualizando:', existingShipment.id);
+                                            // Actualizar shipment existente
+                                            const shipmentStatus: ShipmentStatus = nextStatus === 'in_transit' ? 'in_transit' : 'ready_to_ship';
+                                            await updateShipmentRecord(existingShipment.id, {
+                                              status: shipmentStatus,
+                                              shippedAt: nextStatus === 'in_transit' ? new Date().toISOString() : undefined
+                                            });
+                                            console.log('✅ Shipment actualizado correctamente');
+                                          } else {
+                                            console.log('🆕 Creando nuevo shipment para order:', order.id);
+                                            // Crear nuevo shipment
+                                            const shipmentStatus: ShipmentStatus = nextStatus === 'in_transit' ? 'in_transit' : 'preparing';
+                                            const newShipment = await createShipmentFromOrder(order, {
+                                              status: shipmentStatus,
+                                              shippedAt: nextStatus === 'in_transit' ? new Date().toISOString() : undefined,
+                                              trackingNumber: order.trackingNumber
+                                            });
+                                            console.log('✅ Shipment creado correctamente:', newShipment.id);
+                                            alert(`✅ Envío creado correctamente. ID: ${newShipment.id}`);
+                                          }
+                                        } catch (error: any) {
+                                          console.error('❌ Error creando/actualizando shipment:', error);
+                                          alert(`❌ Error al crear/actualizar el envío: ${error.message || 'Error desconocido'}\n\nRevisá la consola para más detalles.`);
+                                        }
+                                      }
                                       
                                       // Registrar en log de acciones
                                       logOrderAction('Estado actualizado', order.id, user?.id, user?.username, { 
@@ -7598,24 +8645,27 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                                   {!isMobile && 'Siguiente'}
                                 </button>
                               )}
-                              {order.status !== 'cancelled' && order.status !== 'delivered' && (
+                              {canCancelOrder(order) && (
                                 <button
                                   onClick={async (e) => {
                                     e.stopPropagation();
                                     const orderDisplay = order.orderNumber || `#${order.id.slice(-8).toUpperCase()}`;
-                                    if (window.confirm(`¿Cancelar el pedido ${orderDisplay}?\n\nEsta acción cambiará el estado a "Cancelado".`)) {
+                                    if (window.confirm(`¿Cancelar el pedido ${orderDisplay}?\n\nEl stock será restaurado automáticamente si corresponde.`)) {
                                       try {
-                                        await update(dbRef(realtimeDb, `orders/${order.id}`), { status: 'cancelled' });
-                                        updateOrderStatus(order.id, 'cancelled');
-                                        logOrderAction('Pedido cancelado', order.id, user?.id, user?.username, { 
-                                          oldStatus: order.status,
-                                          newStatus: 'cancelled',
-                                          actionType: 'cancel'
+                                        const result = await cancelOrder(order, {
+                                          userId: user?.id,
+                                          userName: user?.username,
+                                          reason: 'Cancelado por administrador'
                                         });
-                                        alert('✅ Pedido cancelado');
-                                      } catch (error) {
+                                        
+                                        if (result.success) {
+                                          alert('✅ Pedido cancelado correctamente');
+                                        } else {
+                                          alert(`❌ ${result.message}`);
+                                        }
+                                      } catch (error: any) {
                                         console.error('Error cancelando pedido:', error);
-                                        alert('❌ Error al cancelar el pedido');
+                                        alert(`❌ Error al cancelar: ${error.message || 'Error desconocido'}`);
                                       }
                                     }
                                   }}
@@ -7909,7 +8959,14 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   }
                 };
 
-                const statusInfo = getStatusLabel(s.status);
+                // Asegurar que el status existe, si no usar 'pending' por defecto
+                const shipmentStatus = s.status || 'pending';
+                const statusInfo = getStatusLabel(shipmentStatus);
+                
+                // Debug: verificar que el status se está obteniendo correctamente
+                if (!s.status) {
+                  console.warn('⚠️ Shipment sin status:', s.id, s);
+                }
 
                 const handleQuickStatusChange = async (
                   status: ShipmentStatus
@@ -8012,9 +9069,17 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                       </div>
                       <span
                         className={`badge ${statusInfo.className}`}
-                        style={{ flexShrink: 0 }}
+                        style={{ 
+                          flexShrink: 0,
+                          padding: '0.375rem 0.75rem',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          display: 'inline-block'
+                        }}
+                        title={`Estado: ${shipmentStatus}`}
                       >
-                        {statusInfo.label}
+                        {statusInfo.label || shipmentStatus}
                       </span>
                     </div>
 
@@ -10467,6 +11532,40 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               <CostCalculator />
             </div>
 
+            {/* Calculadora de Envíos (distancia + zonas) */}
+            <div style={{
+              background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%)',
+              padding: '1.5rem',
+              borderRadius: '1rem',
+              border: '1px solid var(--border)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '0.75rem',
+                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white'
+                }}>
+                  <Truck size={24} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.25rem', fontWeight: 700 }}>
+                    Calculadora de Envíos
+                  </h3>
+                  <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    Estimá costos por distancia, zonas y radio máximo de 100 km
+                  </p>
+                </div>
+              </div>
+
+              <ShippingCostCalculator />
+            </div>
+
             {/* Calculadora de Margen */}
             <div style={{
               background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%)',
@@ -10910,6 +12009,745 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                     Guardar Cupón
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pagos / Transferencias Tab */}
+      {activeTab === 'payments' && (
+        <div>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '2rem',
+              flexWrap: 'wrap',
+              gap: '1rem'
+            }}
+          >
+            <div>
+              <h2
+                style={{
+                  margin: 0,
+                  marginBottom: '0.5rem',
+                  color: 'var(--text-primary)',
+                  fontSize: isMobile ? '1.5rem' : '2rem'
+                }}
+              >
+                💳 Pagos y Transferencias
+              </h2>
+              <p
+                style={{
+                  margin: 0,
+                  color: 'var(--text-secondary)',
+                  fontSize: isMobile ? '0.875rem' : '1rem'
+                }}
+              >
+                Gestioná cuentas bancarias (CBUs), comprobantes y estados de pago
+              </p>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.1fr) minmax(0, 1.5fr)',
+              gap: '1.5rem',
+              marginBottom: '2rem'
+            }}
+          >
+            {/* Gestión de cuentas bancarias */}
+            <div
+              style={{
+                background: 'var(--bg-secondary)',
+                padding: isMobile ? '1.5rem' : '2rem',
+                borderRadius: '1rem',
+                border: '1px solid var(--border)'
+              }}
+            >
+              <h3
+                style={{
+                  margin: 0,
+                  marginBottom: '1.5rem',
+                  color: 'var(--text-primary)',
+                  fontSize: isMobile ? '1.25rem' : '1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <CreditCard size={24} />
+                Cuentas bancarias (CBU / Alias)
+              </h3>
+
+              <p
+                style={{
+                  margin: '0 0 1rem 0',
+                  color: 'var(--text-secondary)',
+                  fontSize: '0.875rem'
+                }}
+              >
+                Estas cuentas se usan en forma rotativa para las compras con transferencia bancaria.
+              </p>
+
+              {/* Formulario de alta/edición */}
+              <div
+                style={{
+                  marginBottom: '1.5rem',
+                  padding: '1rem',
+                  borderRadius: '0.75rem',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border)'
+                }}
+              >
+                <h4
+                  style={{
+                    margin: 0,
+                    marginBottom: '0.75rem',
+                    fontSize: '0.95rem',
+                    color: 'var(--text-primary)'
+                  }}
+                >
+                  {editingBankId ? 'Editar cuenta bancaria' : 'Nueva cuenta bancaria'}
+                </h4>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+                    gap: '0.75rem'
+                  }}
+                >
+                  <div>
+                    <label
+                      style={{
+                        display: 'block',
+                        marginBottom: '0.25rem',
+                        fontSize: '0.8rem',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      Banco *
+                    </label>
+                    <input
+                      type="text"
+                      value={bankForm?.bankName || ''}
+                      onChange={(e) =>
+                        setBankForm((prev) => ({
+                          ...(prev || {}),
+                          bankName: e.target.value
+                        }))
+                      }
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.85rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      style={{
+                        display: 'block',
+                        marginBottom: '0.25rem',
+                        fontSize: '0.8rem',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      Titular *
+                    </label>
+                    <input
+                      type="text"
+                      value={bankForm?.holderName || ''}
+                      onChange={(e) =>
+                        setBankForm((prev) => ({
+                          ...(prev || {}),
+                          holderName: e.target.value
+                        }))
+                      }
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.85rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      style={{
+                        display: 'block',
+                        marginBottom: '0.25rem',
+                        fontSize: '0.8rem',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      CBU *
+                    </label>
+                    <input
+                      type="text"
+                      value={bankForm?.cbu || ''}
+                      onChange={(e) =>
+                        setBankForm((prev) => ({
+                          ...(prev || {}),
+                          cbu: e.target.value
+                        }))
+                      }
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.85rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      style={{
+                        display: 'block',
+                        marginBottom: '0.25rem',
+                        fontSize: '0.8rem',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      Alias
+                    </label>
+                    <input
+                      type="text"
+                      value={bankForm?.alias || ''}
+                      onChange={(e) =>
+                        setBankForm((prev) => ({
+                          ...(prev || {}),
+                          alias: e.target.value
+                        }))
+                      }
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.85rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      style={{
+                        display: 'block',
+                        marginBottom: '0.25rem',
+                        fontSize: '0.8rem',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      Moneda
+                    </label>
+                    <input
+                      type="text"
+                      value={bankForm?.currency || 'ARS'}
+                      onChange={(e) =>
+                        setBankForm((prev) => ({
+                          ...(prev || {}),
+                          currency: e.target.value
+                        }))
+                      }
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.85rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      style={{
+                        display: 'block',
+                        marginBottom: '0.25rem',
+                        fontSize: '0.8rem',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      Descripción
+                    </label>
+                    <input
+                      type="text"
+                      value={bankForm?.description || ''}
+                      onChange={(e) =>
+                        setBankForm((prev) => ({
+                          ...(prev || {}),
+                          description: e.target.value
+                        }))
+                      }
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.85rem'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: '0.75rem',
+                    display: 'flex',
+                    gap: '0.5rem',
+                    justifyContent: 'flex-end',
+                    flexWrap: 'wrap'
+                  }}
+                >
+                  {editingBankId && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        setEditingBankId(null);
+                        setBankForm(null);
+                      }}
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={async () => {
+                      if (!bankForm?.bankName || !bankForm?.holderName || !bankForm?.cbu) {
+                        alert('Completá Banco, Titular y CBU.');
+                        return;
+                      }
+                      try {
+                        if (editingBankId) {
+                          await updateBankAccount(editingBankId, {
+                            bankName: bankForm.bankName,
+                            holderName: bankForm.holderName,
+                            cbu: bankForm.cbu,
+                            alias: bankForm.alias,
+                            description: bankForm.description,
+                            currency: bankForm.currency
+                          });
+                          setBankAccounts((prev) =>
+                            prev.map((acc) =>
+                              acc.id === editingBankId
+                                ? {
+                                    ...acc,
+                                    bankName: bankForm.bankName!,
+                                    holderName: bankForm.holderName!,
+                                    cbu: bankForm.cbu!,
+                                    alias: bankForm.alias,
+                                    description: bankForm.description,
+                                    currency: bankForm.currency
+                                  }
+                                : acc
+                            )
+                          );
+                          alert('Cuenta actualizada.');
+                        } else {
+                          const created = await createBankAccount({
+                            bankName: bankForm.bankName,
+                            holderName: bankForm.holderName,
+                            cbu: bankForm.cbu,
+                            alias: bankForm.alias,
+                            description: bankForm.description,
+                            currency: bankForm.currency || 'ARS'
+                          });
+                          setBankAccounts((prev) => [...prev, created]);
+                          alert('Cuenta creada.');
+                        }
+                        setEditingBankId(null);
+                        setBankForm(null);
+                      } catch (error) {
+                        console.error('Error guardando cuenta bancaria:', error);
+                        alert('No se pudo guardar la cuenta. Revisá la consola.');
+                      }
+                    }}
+                  >
+                    {editingBankId ? 'Guardar cambios' : 'Agregar cuenta'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Tabla de cuentas existentes */}
+              <div
+                style={{
+                  maxHeight: '260px',
+                  overflowY: 'auto',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-tertiary)'
+                }}
+              >
+                {bankAccountsLoading ? (
+                  <div style={{ padding: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    Cargando cuentas bancarias...
+                  </div>
+                ) : bankAccounts.length === 0 ? (
+                  <div style={{ padding: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    No hay cuentas configuradas todavía.
+                  </div>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                          Banco
+                        </th>
+                        <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                          Titular
+                        </th>
+                        <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                          CBU
+                        </th>
+                        <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                          Alias
+                        </th>
+                        <th style={{ textAlign: 'right', padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                          Acciones
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bankAccounts.map((acc) => (
+                        <tr key={acc.id}>
+                          <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                            {acc.bankName}
+                          </td>
+                          <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                            {acc.holderName}
+                          </td>
+                          <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                            <code style={{ fontSize: '0.75rem' }}>{acc.cbu}</code>
+                          </td>
+                          <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                            <code style={{ fontSize: '0.75rem' }}>{acc.alias || '-'}</code>
+                          </td>
+                          <td
+                            style={{
+                              padding: '0.5rem',
+                              borderBottom: '1px solid var(--border)',
+                              textAlign: 'right'
+                            }}
+                          >
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', marginRight: '0.25rem' }}
+                              onClick={() => {
+                                setEditingBankId(acc.id);
+                                setBankForm(acc);
+                              }}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-danger"
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                              onClick={async () => {
+                                if (!window.confirm('¿Eliminar esta cuenta bancaria?')) return;
+                                try {
+                                  await deleteBankAccount(acc.id);
+                                  setBankAccounts((prev) => prev.filter((a) => a.id !== acc.id));
+                                } catch (error) {
+                                  console.error('Error eliminando cuenta bancaria:', error);
+                                  alert('No se pudo eliminar la cuenta. Revisá la consola.');
+                                }
+                              }}
+                            >
+                              Eliminar
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            {/* Operaciones de pago */}
+            <div
+              style={{
+                background: 'var(--bg-secondary)',
+                padding: isMobile ? '1.5rem' : '2rem',
+                borderRadius: '1rem',
+                border: '1px solid ' + 'var(--border)'
+              }}
+            >
+              <h3
+                style={{
+                  margin: 0,
+                  marginBottom: '1.5rem',
+                  color: 'var(--text-primary)',
+                  fontSize: isMobile ? '1.25rem' : '1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <Search size={24} />
+                Búsqueda y estado de pagos
+              </h3>
+
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '0.5rem',
+                  marginBottom: '0.75rem'
+                }}
+              >
+                <input
+                  type="text"
+                  placeholder="Buscar por ID de pago, pedido, usuario o CBU..."
+                  value={paymentSearch}
+                  onChange={(e) => setPaymentSearch(e.target.value)}
+                  style={{
+                    flex: 1,
+                    minWidth: '180px',
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.85rem'
+                  }}
+                />
+                <select
+                  value={paymentStatusFilter}
+                  onChange={(e) =>
+                    setPaymentStatusFilter(e.target.value as 'all' | 'pending' | 'approved' | 'rejected')
+                  }
+                  style={{
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  <option value="all">Todos los estados</option>
+                  <option value="pending">Pendiente</option>
+                  <option value="approved">Aprobado</option>
+                  <option value="rejected">Rechazado</option>
+                </select>
+              </div>
+
+              <div
+                style={{
+                  maxHeight: '320px',
+                  overflowY: 'auto',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-tertiary)'
+                }}
+              >
+                {paymentsLoading ? (
+                  <div style={{ padding: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    Cargando pagos...
+                  </div>
+                ) : payments.length === 0 ? (
+                  <div style={{ padding: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    Aún no hay pagos registrados.
+                  </div>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                          ID Pago
+                        </th>
+                        <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                          Pedido
+                        </th>
+                        <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                          Usuario
+                        </th>
+                        <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                          Monto
+                        </th>
+                        <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                          CBU / Alias
+                        </th>
+                        <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                          Estado
+                        </th>
+                        <th style={{ textAlign: 'right', padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                          Acciones
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {payments
+                        .filter((p) => {
+                          if (paymentStatusFilter !== 'all' && p.status !== paymentStatusFilter) return false;
+                          if (!paymentSearch.trim()) return true;
+                          const q = paymentSearch.toLowerCase();
+                          return (
+                            p.id.toLowerCase().includes(q) ||
+                            p.orderId.toLowerCase().includes(q) ||
+                            p.userName.toLowerCase().includes(q) ||
+                            (p.bankAccountCbu || '').toLowerCase().includes(q) ||
+                            (p.bankAccountAlias || '').toLowerCase().includes(q)
+                          );
+                        })
+                        .map((p) => (
+                          <tr key={p.id}>
+                            <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                              <code style={{ fontSize: '0.75rem' }}>{p.id}</code>
+                            </td>
+                            <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                              <code style={{ fontSize: '0.75rem' }}>{p.orderId}</code>
+                            </td>
+                            <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                              {p.userName}
+                            </td>
+                            <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                              {formatCurrency(p.amount)}
+                            </td>
+                            <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                {p.bankAccountCbu && (
+                                  <code style={{ fontSize: '0.75rem' }}>{p.bankAccountCbu}</code>
+                                )}
+                                {p.bankAccountAlias && (
+                                  <code style={{ fontSize: '0.75rem' }}>{p.bankAccountAlias}</code>
+                                )}
+                              </div>
+                            </td>
+                            <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                              <span
+                                style={{
+                                  padding: '0.25rem 0.5rem',
+                                  borderRadius: '0.5rem',
+                                  fontSize: '0.75rem',
+                                  background:
+                                    p.status === 'approved'
+                                      ? 'rgba(34,197,94,0.15)'
+                                      : p.status === 'rejected'
+                                      ? 'rgba(239,68,68,0.15)'
+                                      : 'rgba(234,179,8,0.15)',
+                                  color:
+                                    p.status === 'approved'
+                                      ? '#16a34a'
+                                      : p.status === 'rejected'
+                                      ? '#dc2626'
+                                      : '#ca8a04'
+                                }}
+                              >
+                                {p.status === 'approved'
+                                  ? 'Aprobado'
+                                  : p.status === 'rejected'
+                                  ? 'Rechazado'
+                                  : 'Pendiente'}
+                              </span>
+                            </td>
+                            <td
+                              style={{
+                                padding: '0.5rem',
+                                borderBottom: '1px solid var(--border)',
+                                textAlign: 'right'
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  gap: '0.25rem',
+                                  justifyContent: 'flex-end',
+                                  flexWrap: 'wrap'
+                                }}
+                              >
+                                {p.proofUrl && (
+                                  <a
+                                    href={p.proofUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="btn btn-secondary"
+                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                  >
+                                    Ver comprobante
+                                  </a>
+                                )}
+                                {p.status !== 'approved' && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                    onClick={async () => {
+                                      if (!window.confirm('¿Marcar este pago como Aprobado?')) return;
+                                      try {
+                                        await updatePaymentStatus(p.id, 'approved', {
+                                          notes: 'Aprobado manualmente por admin'
+                                        });
+                                        setPayments((prev) =>
+                                          prev.map((x) =>
+                                            x.id === p.id ? { ...x, status: 'approved' } : x
+                                          )
+                                        );
+                                      } catch (error) {
+                                        console.error('Error aprobando pago:', error);
+                                        alert('No se pudo aprobar el pago. Revisá la consola.');
+                                      }
+                                    }}
+                                  >
+                                    Aprobar
+                                  </button>
+                                )}
+                                {p.status !== 'rejected' && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-danger"
+                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                    onClick={async () => {
+                                      if (!window.confirm('¿Marcar este pago como Rechazado?')) return;
+                                      try {
+                                        await updatePaymentStatus(p.id, 'rejected', {
+                                          notes: 'Rechazado manualmente por admin'
+                                        });
+                                        setPayments((prev) =>
+                                          prev.map((x) =>
+                                            x.id === p.id ? { ...x, status: 'rejected' } : x
+                                          )
+                                        );
+                                      } catch (error) {
+                                        console.error('Error rechazando pago:', error);
+                                        alert('No se pudo rechazar el pago. Revisá la consola.');
+                                      }
+                                    }}
+                                  >
+                                    Rechazar
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
           </div>

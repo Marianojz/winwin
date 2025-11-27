@@ -158,6 +158,18 @@
       ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
       ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
     },
+    "bankAccounts": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+    },
+    "bankAccountsMeta": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+    },
+    "payments": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      ".write": "auth != null"
+    },
     "orderTransactions": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
       ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
@@ -175,6 +187,7 @@
     "tickets": {
       ".read": "auth != null",
       ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      ".indexOn": ["userId"],
       "$ticketId": {
         ".read": "auth != null && (data.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
         ".write": "auth != null && (newData.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
@@ -257,6 +270,14 @@
     "notificationRules": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
       ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+    },
+    "shipments": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      "$shipmentId": {
+        ".read": "auth != null && (data.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+      }
     }
   }
 }

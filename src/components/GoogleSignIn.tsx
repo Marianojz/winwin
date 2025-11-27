@@ -106,23 +106,22 @@ const GoogleSignIn = () => {
         });
       }
       
-      // ✅ SOLUCIÓN: USAR REDIRECT POR DEFECTO EN LUGAR DE POPUP
-      if (isSessionStorageAvailable()) {
+      // Estrategia actual:
+      // - En dispositivos móviles: usar redirect (más estable con navegadores móviles)
+      // - En desktop: usar popup para evitar problemas de redirect que vuelve sin usuario
+      if (isMobileDevice()) {
         if (import.meta.env.DEV) {
-          console.log('🔄 [GOOGLE SIGN-IN] Usando redirect (evita errores COOP)...');
+          console.log('🔄 [GOOGLE SIGN-IN] Móvil detectado, usando redirect...');
         }
         setStatusMessage('Redirigiendo a Google...');
         toast.info('Redirigiendo a Google', 3000);
-        
         await signInWithRedirect(auth, provider);
-        return; // Importante: salir aquí, el redirect manejará el resto
+        return;
       } else {
-        // Solo usar popup si sessionStorage no está disponible (caso raro)
         if (import.meta.env.DEV) {
-          console.log('🪟 [GOOGLE SIGN-IN] SessionStorage no disponible, usando popup...');
+          console.log('🪟 [GOOGLE SIGN-IN] Desktop detectado, usando popup...');
         }
         setStatusMessage('Abriendo ventana de Google...');
-        
         const result = await signInWithPopup(auth, provider);
         if (import.meta.env.DEV) {
           console.log('✅ [GOOGLE SIGN-IN] Popup exitoso, procesando usuario...', result.user.uid);

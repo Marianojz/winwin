@@ -20,7 +20,6 @@
           "$bidId": {
             ".read": true,
             ".write": "auth != null && (!data.exists() || data.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
-            // Validación extra: el userId de la puja debe coincidir con el usuario autenticado
             ".validate": "newData.hasChildren(['id', 'auctionId', 'userId', 'username', 'amount', 'createdAt']) && newData.child('userId').isString() && newData.child('username').isString() && newData.child('amount').isNumber() && newData.child('amount').val() > 0 && newData.child('userId').val() == auth.uid"
           }
         }
@@ -158,6 +157,18 @@
       ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
       ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
     },
+    "bankAccounts": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+    },
+    "bankAccountsMeta": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+    },
+    "payments": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      ".write": "auth != null"
+    },
     "adminSettings": {
       "$userId": {
         ".read": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
@@ -167,6 +178,7 @@
     "tickets": {
       ".read": "auth != null",
       ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      ".indexOn": ["userId"],
       "$ticketId": {
         ".read": "auth != null && (data.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
         ".write": "auth != null && (newData.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
@@ -249,6 +261,14 @@
     "notificationRules": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
       ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+    },
+    "shipments": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      "$shipmentId": {
+        ".read": "auth != null && (data.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+      }
     }
   }
 }

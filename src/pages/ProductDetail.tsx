@@ -5,6 +5,7 @@ import { useStore } from '../store/useStore';
 import { formatCurrency, formatTimeAgo, generateUlid } from '../utils/helpers';
 import { useSEO, generateProductStructuredData } from '../hooks/useSEO';
 import PaymentOptionsModal from '../components/PaymentOptionsModal';
+import PaymentProofModal from '../components/PaymentProofModal';
 import { createAutoMessage, saveMessage } from '../utils/messages';
 import { generateOrderNumber } from '../utils/orderNumberGenerator';
 import { logOrderCreated } from '../utils/orderTransactions';
@@ -13,6 +14,7 @@ import { getSimilarProducts } from '../utils/recommendations';
 import ProductCard from '../components/ProductCard';
 import { likeProduct, unlikeProduct, isProductLiked } from '../utils/likes';
 import { reserveStock } from '../utils/stockReservations';
+import { getNextBankAccount, BankAccount } from '../utils/bankAccounts';
 import { triggerRuleBasedNotification } from '../utils/notificationRules';
 
 const ProductDetail = () => {
@@ -23,6 +25,9 @@ const ProductDetail = () => {
   const product = products.find(p => p.id === id);
   const [selectedImage, setSelectedImage] = useState(0);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showProofModal, setShowProofModal] = useState(false);
+  const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
+  const [createdBankAccount, setCreatedBankAccount] = useState<BankAccount | null>(null);
   const [similarProducts, setSimilarProducts] = useState<any[]>([]);
   const [isLiked, setIsLiked] = useState(false);
   const [liking, setLiking] = useState(false);
@@ -206,11 +211,20 @@ const ProductDetail = () => {
       ? `${quantity / product.unitsPerBundle} bulto${quantity / product.unitsPerBundle !== 1 ? 's' : ''} (${quantity} unidades)`
       : `${quantity} unidad${quantity !== 1 ? 'es' : ''}`;
 
-    const confirm = window.confirm(
-      `¿Confirmas la compra de ${displayQuantity} por ${formatCurrency(totalAmount)}?\n\nCosto de envío: ${formatCurrency(shippingCost)}\nTotal a pagar: ${formatCurrency(totalWithShipping)}\n\nSerás redirigido a MercadoPago para completar el pago.`
-    );
+    if (!user) return;
 
-    if (confirm && user) {
+    try {
+      // Obtener la próxima cuenta bancaria a usar (rotativa)
+      const bankAccount = await getNextBankAccount();
+
+      const confirm = window.confirm(
+        `¿Confirmás la compra de ${displayQuantity} por ${formatCurrency(totalAmount)}?\n\n` +
+        `Costo de envío: ${formatCurrency(shippingCost)}\n` +
+        `Total a transferir: ${formatCurrency(totalWithShipping)}`
+      );
+
+      if (!confirm) return;
+
       try {
         const now = new Date();
         const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 horas para pagar
@@ -251,12 +265,17 @@ const ProductDetail = () => {
           amount: totalWithShipping,
           quantity: quantity,
           status: 'pending_payment',
+          paymentMethod: 'bank_transfer',
           deliveryMethod: 'shipping',
           createdAt: now,
           expiresAt: expiresAt,
           address: user.address || { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } },
           unitsPerBundle: product.unitsPerBundle,
-          bundles: product.bundles
+          bundles: product.bundles,
+          bankAccountId: bankAccount.id,
+          bankAccountAlias: bankAccount.alias,
+          bankAccountCbu: bankAccount.cbu,
+          paymentVerificationStatus: 'pending'
         };
 
         await addOrder(order);
@@ -276,14 +295,19 @@ const ProductDetail = () => {
           }
         );
         
-        // Redirigir a MercadoPago (aquí iría la integración real)
-        const mercadopagoLink = `https://www.mercadopago.com.ar/checkout/v1/payment?preference_id=MOCK-${product.id}-${Date.now()}`;
-        alert(`✅ Pedido creado exitosamente!\n\nTotal a pagar: ${formatCurrency(totalWithShipping)}\n\nRedirigiendo a MercadoPago...`);
-        // window.location.href = mercadopagoLink; // Descomentar cuando tengas la integración real
+        // Guardar orden y cuenta bancaria para el modal
+        setCreatedOrder(order);
+        setCreatedBankAccount(bankAccount);
+        
+        // Abrir modal de comprobante
+        setShowProofModal(true);
       } catch (error) {
         console.error('Error creando pedido:', error);
         alert('Hubo un error al crear el pedido. Por favor, intentá nuevamente.');
       }
+    } catch (error) {
+      console.error('Error seleccionando cuenta bancaria:', error);
+      alert('No se pudo obtener una cuenta bancaria para la transferencia. Intentá nuevamente.');
     }
   };
 
@@ -775,6 +799,29 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
         totalAmount={product.price * quantity}
         shippingCost={shippingCost}
       />
+
+      {createdOrder && createdBankAccount && (
+        <PaymentProofModal
+          isOpen={showProofModal}
+          onClose={() => {
+            setShowProofModal(false);
+            setCreatedOrder(null);
+            setCreatedBankAccount(null);
+          }}
+          order={createdOrder}
+          bankAccount={createdBankAccount}
+          onSuccess={() => {
+            // Opcional: redirigir o mostrar mensaje adicional
+            addNotification({
+              userId: 'current',
+              type: 'purchase',
+              title: 'Pago confirmado',
+              message: `Tu comprobante fue subido y el pago fue aprobado. Tu pedido está siendo procesado.`,
+              read: false
+            });
+          }}
+        />
+      )}
 
       <style>{`
         .product-detail-grid {
