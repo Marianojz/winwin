@@ -53,6 +53,13 @@ Aplicación web moderna de subastas y tienda online desarrollada con React + Typ
 - **Gestión de stock** automática
 - **Stickers visuales** para productos
 - **Badges:** Nuevo, Oferta, 50% OFF, Destacado, etc.
+- **Sistema de pagos por transferencia bancaria:**
+  - Rotación automática de CBUs
+  - Subida de comprobante de pago
+  - Validación automática con pre-aprobación
+  - Gestión de cuentas bancarias desde panel admin
+- **Cancelación de pedidos:** Los usuarios pueden cancelar pedidos pendientes con restauración automática de stock
+- **Sistema ULID:** IDs únicos y ordenables para todas las entidades
 
 #### ✅ Sistema de Notificaciones Inteligente
 - **Bandeja de notificaciones** completa
@@ -124,6 +131,20 @@ Aplicación web moderna de subastas y tienda online desarrollada con React + Typ
   - Sistema de avance de estado con confirmaciones
   - Botón "Siguiente" para avanzar estado automáticamente
   - Resumen de totales (cantidad y valor total)
+  - Creación automática de shipments al cambiar estado a "in_transit"
+  - Cancelación de pedidos con restauración de stock
+- **Gestión de Envíos (Shipments):**
+  - Vista completa de todos los envíos
+  - Estados: preparing, ready_to_ship, in_transit, delivered
+  - Sincronización automática con pedidos
+  - Tracking de envíos por usuario
+- **Gestión de Pagos:**
+  - CRUD completo de cuentas bancarias (CBUs)
+  - Rotación automática de CBUs en cada compra
+  - Tabla de pagos con filtros avanzados
+  - Aprobación/rechazo de comprobantes
+  - Validación automática con pre-aprobación
+  - Búsqueda por ID de operación, cliente, monto, estado
 - **Sistema de Bots (Completamente Profesionalizado):**
   - Dashboard con estadísticas rápidas (Activos, Balance Total, Ofertas Máx, En Subastas)
   - Botón "Desactivar Todos" para acción masiva
@@ -182,6 +203,18 @@ Aplicación web moderna de subastas y tienda online desarrollada con React + Typ
   - Registro de todas las acciones admin
   - Logs de subastas, productos, pedidos, usuarios
   - Historial completo con timestamps
+- **Sección de Utilidades:**
+  - **Calculadora de Envíos Mejorada:**
+    - Búsqueda de direcciones por geocoding (OpenStreetMap)
+    - Mapa interactivo con selección por clic
+    - Cálculo de distancia (Haversine)
+    - Sistema de zonas de precio (A, B, C)
+    - Desglose detallado de costos (base + variable)
+    - Validación de radio máximo (100 km)
+    - Visualización mejorada de resultados
+  - **Generador de ULID:** Genera IDs únicos y ordenables
+  - **Generador de QR Codes:** Crea códigos QR personalizables
+  - **Calculadora de Margen:** Calcula márgenes de ganancia
 - **Sección de Configuración (Mejorada):**
   - Templates de mensajes editables
   - Estadísticas del sistema con cards con gradientes
@@ -321,7 +354,8 @@ winwin/
 │   │   ├── UserDetailsModal.tsx # Modal de detalles de usuario
 │   │   ├── MapPicker.tsx        # Selector de mapa
 │   │   ├── ImageUploader.tsx    # Subida de imágenes
-│   │   └── StatsCard.tsx        # Tarjeta de estadísticas
+│   │   ├── StatsCard.tsx        # Tarjeta de estadísticas
+│   │   └── PaymentProofModal.tsx # Modal de comprobante de pago (NUEVO)
 │   │
 │   ├── pages/               # Páginas principales
 │   │   ├── Home.tsx             # Página de inicio (editable)
@@ -366,7 +400,14 @@ winwin/
 │   │   ├── DataCleanupManager.tsx # Gestor de limpieza
 │   │   ├── toast.ts            # Sistema de toasts
 │   │   ├── sounds.ts           # Efectos de sonido
-│   │   └── celebrations.ts     # Efectos visuales
+│   │   ├── celebrations.ts     # Efectos visuales
+│   │   ├── bankAccounts.ts     # Gestión de cuentas bancarias (NUEVO)
+│   │   ├── payments.ts         # Sistema de pagos (NUEVO)
+│   │   ├── orderCancellation.ts # Cancelación de pedidos (NUEVO)
+│   │   ├── shipments.ts        # Gestión de envíos (NUEVO)
+│   │   ├── shippingCalculator.ts # Calculadora de envíos (NUEVO)
+│   │   ├── geocoding.ts        # Geocoding de direcciones (NUEVO)
+│   │   └── coupons.ts          # Sistema de cupones (NUEVO)
 │   │
 │   ├── hooks/               # Custom hooks
 │   │   ├── useSyncFirebase.ts     # Sincronización Firebase
@@ -409,6 +450,8 @@ winwin/
 - **Responsive Design** - Mobile-first approach
 - **Animaciones CSS** - Transiciones suaves
 - **React Leaflet** - Mapas interactivos
+- **OpenStreetMap / Nominatim** - Geocoding de direcciones
+- **QR Code Generator** - Generación de códigos QR
 
 ## 🎨 Características de Diseño
 
@@ -442,14 +485,17 @@ winwin/
 
 ## 📊 Estadísticas del Proyecto
 
-- **Archivos de código:** 55+
-- **Componentes React:** 15+
+- **Archivos de código:** 65+
+- **Componentes React:** 16+
 - **Páginas:** 12
-- **Utilidades:** 17+
-- **Tipos TypeScript:** 25+
+- **Utilidades:** 25+
+- **Tipos TypeScript:** 30+
 - **Categorías de productos:** 15
 - **Templates de mensajes:** 6 tipos editables
 - **Sistema de tracking:** Completo (clicks y búsquedas)
+- **Sistema de pagos:** Transferencia bancaria con rotación de CBUs
+- **Calculadora de envíos:** Con geocoding y mapa interactivo
+- **Sistema de shipments:** Gestión completa de envíos
 
 ## 🔒 Seguridad
 
@@ -530,7 +576,8 @@ Los archivos optimizados se generarán en `dist/`.
 - [ ] **Sistema de reputación** de usuarios
 - [ ] **Chat entre usuarios** (no solo admin)
 - [ ] **Sistema de reseñas** de productos más completo
-- [ ] **Integración real con MercadoPago** (actualmente mock)
+- [ ] **Integración con APIs de envío** (OCA, Andreani, etc.) para cálculo de costos reales
+- [ ] **Tracking de envíos** con integración de APIs de correo
 - [ ] **App móvil** (React Native)
 
 ### Técnicas
@@ -621,19 +668,45 @@ Para consultas o soporte técnico, contacta a través de los canales oficiales d
 
 ---
 
-**Versión:** 2.0.0  
-**Última actualización:** Diciembre 2024  
+**Versión:** 2.1.0  
+**Última actualización:** Enero 2025  
 **Estado:** ✅ En desarrollo activo - Funcional
 
-## 🆕 Últimas Actualizaciones (v2.0.0)
+## 🆕 Últimas Actualizaciones (v2.1.0)
 
 ### ✨ Nuevas Funcionalidades
-- **Sistema de Templates de Mensajes Automáticos:** Editor completo para personalizar mensajes automáticos con variables dinámicas
-- **Editor de Página de Inicio Renovado:** Drag & drop de imágenes, gestión completa de banners y promociones
-- **Sistema de Tracking:** Seguimiento de clicks y búsquedas con estadísticas en Dashboard
-- **Sección de Bots Profesionalizada:** Dashboard, tabla profesional, gestión avanzada
-- **Sección de Pedidos Mejorada:** Dashboard con estadísticas, tabla profesional, acciones rápidas
-- **Mejoras en Configuración:** Templates editables, estadísticas mejoradas, limpieza profesionalizada
+- **Sistema de Pagos por Transferencia Bancaria:**
+  - Rotación automática de CBUs en cada compra
+  - CRUD completo de cuentas bancarias desde panel admin
+  - Subida de comprobante de pago integrada en flujo de compra
+  - Validación automática con pre-aprobación
+  - Gestión de pagos con filtros y acciones aprobar/rechazar
+- **Calculadora de Envíos Mejorada:**
+  - Búsqueda de direcciones por geocoding (OpenStreetMap/Nominatim)
+  - Mapa interactivo con selección por clic
+  - Sistema de zonas de precio (A, B, C) con cálculo automático
+  - Desglose detallado de costos (base + variable por km)
+  - Validación de radio máximo (100 km)
+  - Visualización mejorada de resultados con información completa
+- **Sistema de Cancelación de Pedidos:**
+  - Cancelación por usuarios de pedidos pendientes
+  - Restauración automática de stock
+  - Disponible desde perfil y modal de pago
+- **Gestión de Envíos (Shipments):**
+  - Creación automática al cambiar estado de pedido a "in_transit"
+  - Vista completa de envíos en panel admin
+  - Sincronización con pedidos
+  - Estados: preparing, ready_to_ship, in_transit, delivered
+- **Sistema ULID:**
+  - IDs únicos y ordenables para todas las entidades
+  - Generador integrado en utilidades del panel admin
+- **Generador de QR Codes:**
+  - Generación de códigos QR personalizables
+  - Integrado en sección de utilidades
+- **Sistema de Cupones:**
+  - CRUD completo de cupones de descuento
+  - Validación automática en compras
+  - Gestión desde panel admin
 
 ### 🐛 Correcciones Importantes
 - ✅ Sistema de notificaciones: Persistencia correcta del estado de lectura
@@ -641,6 +714,8 @@ Para consultas o soporte técnico, contacta a través de los canales oficiales d
 - ✅ Filtrado automático de subastas corruptas
 - ✅ Mejoras en proceso de login (especialmente móvil)
 - ✅ Optimización responsive en todo el panel admin
+- ✅ Corrección de errores de build (imports y orden de declaraciones)
+- ✅ Sincronización de shipments con pedidos
 
 ### 📈 Mejoras de UX/UI
 - ✅ Drag & drop de imágenes en Editor Home
@@ -649,3 +724,14 @@ Para consultas o soporte técnico, contacta a través de los canales oficiales d
 - ✅ Vista previa de templates con datos de ejemplo
 - ✅ Cards con gradientes en estadísticas
 - ✅ Tablas profesionales en todas las secciones
+- ✅ Flujo de compra mejorado con modal de comprobante integrado
+- ✅ Mapa interactivo en calculadora de envíos con selección por clic
+- ✅ Búsqueda de direcciones con autocompletado
+- ✅ Visualización mejorada de resultados de cálculo de envíos
+
+### 🔧 Mejoras Técnicas
+- ✅ Integración de geocoding con OpenStreetMap (gratuito, sin API key)
+- ✅ Sistema de rotación de CBUs para pagos
+- ✅ Validación automática de comprobantes con pre-aprobación
+- ✅ Firebase Realtime Database rules actualizadas para shipments y pagos
+- ✅ Sistema de logging mejorado para shipments
