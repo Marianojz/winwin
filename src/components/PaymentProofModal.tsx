@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Upload, Copy, CheckCircle2, Building2, User, CreditCard, FileText, XCircle } from 'lucide-react';
-import { Order, BankAccount } from '../types';
+import { Order } from '../types';
+import { BankAccount } from '../utils/bankAccounts';
 import { formatCurrency } from '../utils/helpers';
 import { uploadImage } from '../utils/imageUpload';
 import { createPaymentForOrder } from '../utils/payments';

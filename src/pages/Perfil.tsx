@@ -52,6 +52,9 @@ const Perfil = () => {
     }
   }, [tabParam]);
 
+  // Declarar shipments antes de usarlo en useMemo
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+
   // Filtrar pedidos del usuario
   // Incluir también orders que están referenciados en shipments pero que podrían no estar en la lista
   const userOrders = useMemo(() => {
@@ -117,7 +120,6 @@ const Perfil = () => {
   const [conversationStatus, setConversationStatus] = useState<'open' | 'closed' | null>(null);
   const [conversationExists, setConversationExists] = useState(false);
   const isMobile = useIsMobile();
-  const [shipments, setShipments] = useState<Shipment[]>([]);
   const [userTickets, setUserTickets] = useState<Ticket[]>([]);
   const [reviewModalOrder, setReviewModalOrder] = useState<Order | null>(null);
   const [reviewRating, setReviewRating] = useState(5);
