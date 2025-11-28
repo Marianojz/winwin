@@ -1004,13 +1004,72 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
           </div>
         </div>
 
-        <div className="auction-description-section" style={{ marginTop: '2rem', background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem' }}>
-          <h2 className="section-title" style={{ marginBottom: '1rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>Descripción</h2>
-          <p className="description-text" style={{ fontSize: '1rem', lineHeight: '1.8', color: 'var(--text-secondary)', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
-            {auction.description}
-          </p>
 
-          <div className="how-it-works" style={{ marginTop: '1.5rem', padding: '1.25rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
+        {/* Productos del Combo */}
+        {auction.auctionType === 'combo' && auction.comboProducts && auction.comboProducts.length > 0 && (
+          <div className="auction-description-section" style={{ marginTop: '2rem', background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem' }}>
+            <h2 className="section-title" style={{ marginBottom: '1rem', wordWrap: 'break-word', overflowWrap: 'break-word', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              📦 Productos del Combo
+            </h2>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+              {auction.comboProducts.map((comboProduct, index) => (
+                <div key={index} style={{
+                  padding: '1rem',
+                  background: 'var(--bg-tertiary)',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem'
+                }}>
+                  {comboProduct.image && (
+                    <img 
+                      src={comboProduct.image} 
+                      alt={comboProduct.productName}
+                      style={{
+                        width: '100%',
+                        height: '120px',
+                        objectFit: 'cover',
+                        borderRadius: '0.5rem',
+                        marginBottom: '0.5rem'
+                      }}
+                    />
+                  )}
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.9375rem' }}>
+                    {comboProduct.productName}
+                  </div>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    Cantidad: <strong>{comboProduct.quantity}</strong>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {auction.isMystery && isActive && !isRevealed ? (
+          <div className="auction-description-section" style={{ marginTop: '2rem', background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem' }}>
+            <h2 className="section-title" style={{ marginBottom: '1rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>🎁 Subasta Misteriosa</h2>
+            <p className="description-text" style={{ fontSize: '1rem', lineHeight: '1.8', color: 'var(--text-secondary)', wordWrap: 'break-word', overflowWrap: 'break-word', fontStyle: 'italic' }}>
+              El nombre, la imagen y la descripción se revelarán cuando finalice la subasta. ¡Puja y descubre qué es!
+            </p>
+          </div>
+        ) : (
+          <div className="auction-description-section" style={{ 
+            marginTop: '2rem', 
+            background: 'var(--bg-secondary)', 
+            padding: '1.5rem', 
+            borderRadius: '1rem',
+            animation: isRevealed && auction.isMystery ? 'fadeInReveal 1s ease-in' : undefined
+          }}>
+            <h2 className="section-title" style={{ marginBottom: '1rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>Descripción</h2>
+            <p className="description-text" style={{ fontSize: '1rem', lineHeight: '1.8', color: 'var(--text-secondary)', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+              {auction.description}
+            </p>
+          </div>
+        )}
+
+        <div className="how-it-works" style={{ marginTop: '1.5rem', padding: '1.25rem', background: 'var(--bg-tertiary)', borderRadius: '0.75rem' }}>
             <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
               📖 ¿Cómo funciona?
             </h3>
@@ -1047,10 +1106,8 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
               </li>
             </ul>
           </div>
-        </div>
-      </div>
 
-      <style>{`
+        <style>{`
         .auction-detail-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -1340,6 +1397,7 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
         />
       )}
     </div>
+  </div>
   );
 };
 

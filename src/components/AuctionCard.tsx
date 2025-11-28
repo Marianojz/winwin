@@ -7,6 +7,7 @@ import './AuctionCard.css';
 import { trackAuctionClick } from '../utils/tracking';
 import { useStore } from '../store/useStore';
 import { getStickerById } from '../utils/stickers';
+import AuctionTypeBanner from './AuctionTypeBanner';
 
 interface AuctionCardProps {
   auction: Auction;
@@ -43,6 +44,7 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
   const isActive = auction.status === 'active';
   const isRecentlyEnded = shouldShowAfterEnd();
   const isHidden = (auction.status === 'ended' || auction.status === 'sold') && !isRecentlyEnded;
+  const isMystery = auction.isMystery && isActive; // Solo ocultar si es misteriosa y está activa
 
   // Función para verificar si hay stock disponible para compra directa
   const hasStockForBuyNow = (auction: Auction) => {
@@ -94,7 +96,40 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
       }}
     >
       <div className="auction-card-image">
-        <img src={auction.images[0]} alt={auction.title} loading="lazy" />
+        <AuctionTypeBanner auction={auction} size="small" position="top-left" />
+        {isMystery ? (
+          <div style={{
+            width: '100%',
+            height: '100%',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              background: 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.1) 10px, rgba(255,255,255,0.1) 20px)',
+              animation: 'shimmer 2s linear infinite'
+            }} />
+            <div style={{
+              position: 'relative',
+              zIndex: 1,
+              textAlign: 'center',
+              color: 'white',
+              padding: '2rem'
+            }}>
+              <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🎁</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, textShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>SUBASTA MISTERIOSA</div>
+              <div style={{ fontSize: '0.875rem', marginTop: '0.5rem', opacity: 0.9 }}>Se revelará al finalizar</div>
+            </div>
+          </div>
+        ) : (
+          <img src={auction.images[0]} alt={auction.title} loading="lazy" />
+        )}
 
         {/* Stickers de subasta destacada - Solo iconos pequeños en esquinas */}
         {auction.featured && isActive && (
@@ -253,8 +288,30 @@ const AuctionCard = ({ auction }: AuctionCardProps) => {
       </div>
 
       <div className="auction-card-content">
-        <h3 className="auction-card-title">{auction.title}</h3>
-        <p className="auction-card-description">{auction.description}</p>
+        {isMystery ? (
+          <>
+            <h3 className="auction-card-title" style={{ 
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              fontWeight: 700
+            }}>
+              🎁 Subasta Misteriosa
+            </h3>
+            <p className="auction-card-description" style={{ 
+              fontStyle: 'italic',
+              color: 'var(--text-secondary)'
+            }}>
+              El nombre y la imagen se revelarán cuando finalice la subasta. ¡Puja y descubre qué es!
+            </p>
+          </>
+        ) : (
+          <>
+            <h3 className="auction-card-title">{auction.title}</h3>
+            <p className="auction-card-description">{auction.description}</p>
+          </>
+        )}
 
         <div className="auction-card-price">
           <div className="price-current">

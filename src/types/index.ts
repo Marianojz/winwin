@@ -44,6 +44,16 @@ export interface Auction {
   sellOnlyByBundle?: boolean; // Si es true, solo se puede vender por bulto completo
   // Relación opcional con un producto de la tienda (para reportes / stock compartido)
   linkedProductId?: string;
+  isMystery?: boolean; // Si es true, la subasta es misteriosa (oculta imagen y título hasta que finalice)
+  auctionType?: 'normal' | 'featured' | 'flash' | 'combo' | 'nocturnal' | 'special'; // Tipo de subasta para banners/plantillas
+  comboProducts?: ComboProduct[]; // Productos incluidos en el combo (solo para tipo 'combo')
+}
+
+export interface ComboProduct {
+  productId: string; // ID del producto de la tienda
+  productName: string; // Nombre del producto (copia para referencia rápida)
+  quantity: number; // Cantidad de este producto en el combo
+  productImage?: string; // Imagen del producto (opcional, para mostrar en el combo)
 }
 
 export interface Bid {
@@ -384,4 +394,33 @@ export interface ContactMessage {
   read: boolean;
   readAt?: Date | string;
   adminResponse?: string;
+}
+
+// ========== SISTEMA DE CALENDARIO ==========
+
+export type CalendarEventType = 
+  | 'auction_start'      // Inicio de subasta
+  | 'auction_end'         // Finalización de subasta
+  | 'purchase'            // Compra de producto
+  | 'campaign'            // Campaña promocional
+  | 'event'               // Evento personalizado
+  | 'order_delivery'      // Entrega de pedido
+  | 'campaign_start'      // Inicio de campaña
+  | 'campaign_end';       // Fin de campaña
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description?: string;
+  type: CalendarEventType;
+  startDate: Date | string;
+  endDate?: Date | string; // Opcional para eventos de un solo día
+  color?: string; // Color personalizado para el evento
+  isAutomatic?: boolean; // Si es true, se genera automáticamente y no se puede editar/borrar manualmente
+  relatedAuctionId?: string;
+  relatedOrderId?: string;
+  relatedProductId?: string;
+  createdBy?: string; // ID del admin que creó el evento (si no es automático)
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
 }

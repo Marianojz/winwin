@@ -9,6 +9,7 @@ import { get as firebaseGet, ref as dbRef } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
 import { triggerRuleBasedNotification } from './notificationRules';
 import { generateUlid } from './helpers';
+import { reserveComboStock } from './comboStockManager';
 
 /**
  * Gestor de subastas que actualiza estados, crea órdenes y detecta ofertas superadas
@@ -353,6 +354,18 @@ const AuctionManager = () => {
                   expiresAt: expiresAt,
                   address: { street: '', locality: '', province: '', location: { lat: 0, lng: 0 } }
                 };
+
+                // Si es un combo, reservar stock de todos los productos antes de crear la orden
+                if (auction.auctionType === 'combo' && auction.comboProducts && auction.comboProducts.length > 0) {
+                  const stockResult = await reserveComboStock(auction.comboProducts, orderId);
+                  if (!stockResult.success) {
+                    console.error(`❌ Error reservando stock del combo para subasta ${auction.id}:`, stockResult.message);
+                    // Continuar con la creación de la orden pero registrar el error
+                    // El admin deberá manejar esto manualmente
+                  } else {
+                    console.log(`✅ Stock del combo reservado correctamente para subasta ${auction.id}`);
+                  }
+                }
 
                 // Crear orden
                 addOrder(order).catch(err => {

@@ -192,6 +192,16 @@
   }
 }
 
+/* Animación shimmer para subastas misteriosas */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 @media (max-width: 768px) {
   .auction-card-title {
     font-size: 1.125rem;

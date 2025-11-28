@@ -81,6 +81,8 @@ import AnnouncementCreator from '../components/AnnouncementCreator';
 import { Announcement } from '../types/announcements';
 import { getAllAnnouncements, deleteAnnouncement } from '../utils/announcements';
 import { getAllAnnouncementsMetrics, AnnouncementMetrics } from '../utils/announcementAnalytics';
+import CalendarView from '../components/CalendarView';
+import { syncAuctionEvents, syncOrderEvents } from '../utils/calendarEvents';
 import { 
   loadQuickReplies, 
   addQuickReply, 
@@ -973,13 +975,22 @@ const newAuction: Auction = {
   categoryId: auctionForm.categoryId,
   bids: [],
   featured: auctionForm.featured || false,
-  isFlash: totalMinutes <= 60, // Si dura 1 hora o menos, es flash
+  isFlash: totalMinutes <= 60 || auctionForm.auctionType === 'flash', // Si dura 1 hora o menos, es flash
   condition: auctionForm.condition || 'new',
   createdBy: user.id,
   createdAt: new Date(),  // ← AGREGAR createdAt
   unitsPerBundle: auctionForm.unitsPerBundle > 0 ? auctionForm.unitsPerBundle : undefined,
   bundles: auctionForm.bundles > 0 ? auctionForm.bundles : undefined,
-  sellOnlyByBundle: auctionForm.sellOnlyByBundle || false
+  sellOnlyByBundle: auctionForm.sellOnlyByBundle || false,
+  auctionType: auctionForm.auctionType || 'normal',
+  comboProducts: auctionForm.auctionType === 'combo' && auctionForm.comboProducts && auctionForm.comboProducts.length > 0 
+    ? auctionForm.comboProducts.map(cp => ({
+        productId: cp.productId,
+        productName: cp.productName,
+        quantity: cp.quantity,
+        productImage: cp.productImage
+      }))
+    : undefined
 };
 
       // Guardar en Firebase usando la función del store
@@ -1027,7 +1038,9 @@ setAuctionForm({
   scheduledTime: '',
   unitsPerBundle: 1,
   bundles: 0,
-  sellOnlyByBundle: false
+  sellOnlyByBundle: false,
+  auctionType: 'normal',
+  comboProducts: []
 });
 
       // Volver a la lista de subastas
@@ -1080,7 +1093,10 @@ const [auctionForm, setAuctionForm] = useState({
   scheduledTime: '',
   unitsPerBundle: 1, // Unidades por bulto (uxb)
   bundles: 0, // Cantidad de bultos disponibles
-  sellOnlyByBundle: false // Solo se vende por bulto completo
+  sellOnlyByBundle: false, // Solo se vende por bulto completo
+  isMystery: false,
+  auctionType: 'normal' as 'normal' | 'featured' | 'flash' | 'combo' | 'mystery' | 'nocturnal' | 'special',
+  comboProducts: [] as { productId: string; productName: string; quantity: number; image?: string }[]
 });
 
   // Estados para bots
@@ -1619,7 +1635,10 @@ const [auctionForm, setAuctionForm] = useState({
   scheduledTime: '',
   unitsPerBundle: auction.unitsPerBundle || 1,
   bundles: auction.bundles || 0,
-  sellOnlyByBundle: auction.sellOnlyByBundle || false
+  sellOnlyByBundle: auction.sellOnlyByBundle || false,
+  isMystery: auction.isMystery || false,
+  auctionType: auction.auctionType || 'normal',
+  comboProducts: auction.comboProducts || []
 });
     setActiveTab('edit-auction');
   };
@@ -1662,10 +1681,20 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
           condition: auctionForm.condition,
           featured: auctionForm.featured,
           endTime: newEndTime,
-          isFlash: totalMinutes <= 60,
+          isFlash: totalMinutes <= 60 || auctionForm.auctionType === 'flash',
           unitsPerBundle: auctionForm.unitsPerBundle > 0 ? auctionForm.unitsPerBundle : undefined,
           bundles: auctionForm.bundles > 0 ? auctionForm.bundles : undefined,
-          sellOnlyByBundle: auctionForm.sellOnlyByBundle || false
+          sellOnlyByBundle: auctionForm.sellOnlyByBundle || false,
+          isMystery: auctionForm.isMystery || false,
+          auctionType: auctionForm.auctionType || 'normal',
+          comboProducts: auctionForm.auctionType === 'combo' && auctionForm.comboProducts && auctionForm.comboProducts.length > 0 
+            ? auctionForm.comboProducts.map(cp => ({
+                productId: cp.productId,
+                productName: cp.productName,
+                quantity: cp.quantity,
+                productImage: cp.productImage
+              }))
+            : undefined
         };
       }
       return a;
@@ -1687,7 +1716,13 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
           condition: auctionToUpdate.condition,
           featured: auctionToUpdate.featured,
           endTime: auctionToUpdate.endTime,
-          isFlash: auctionToUpdate.isFlash
+          isFlash: auctionToUpdate.isFlash,
+          unitsPerBundle: auctionToUpdate.unitsPerBundle,
+          bundles: auctionToUpdate.bundles,
+          sellOnlyByBundle: auctionToUpdate.sellOnlyByBundle,
+          isMystery: auctionToUpdate.isMystery,
+          auctionType: auctionToUpdate.auctionType,
+          comboProducts: auctionToUpdate.comboProducts
         });
       }
       setAuctions(updatedAuctions);
@@ -2236,6 +2271,26 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
       });
     }
   }, [activeTab, enhancedStats]);
+
+  // Sincronizar eventos automáticos del calendario
+  useEffect(() => {
+    if (user?.isAdmin && activeTab === 'dashboard') {
+      const syncEvents = async () => {
+        try {
+          await syncAuctionEvents(auctions);
+          await syncOrderEvents(orders);
+        } catch (error) {
+          console.error('Error sincronizando eventos del calendario:', error);
+        }
+      };
+
+      // Sincronizar al cargar el dashboard y cada 5 minutos
+      syncEvents();
+      const interval = setInterval(syncEvents, 5 * 60 * 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [user?.isAdmin, activeTab, auctions, orders]);
 
   // Función helper para crear notificación para otro usuario
   const createNotificationForUser = async (targetUserId: string, notification: {
@@ -5834,6 +5889,11 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
               )}
             </div>
           </div>
+
+          {/* Calendario de Eventos */}
+          <div style={{ marginTop: '2rem' }}>
+            <CalendarView auctions={auctions} orders={orders} />
+          </div>
         </div>
       )}
 
@@ -5864,7 +5924,8 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   scheduledTime: '',
                   unitsPerBundle: 1,
                   bundles: 0,
-                  sellOnlyByBundle: false
+                  sellOnlyByBundle: false,
+                  isMystery: false
                 });
                 setEditingAuction(null);
                 setActiveTab('create-auction');
@@ -6259,6 +6320,156 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 </div>
               </div>
 
+              {/* Tipo de Subasta */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  Tipo de Subasta *
+                </label>
+                <select
+                  value={auctionForm.auctionType}
+                  onChange={(e) => {
+                    const newType = e.target.value as 'normal' | 'featured' | 'flash' | 'combo' | 'nocturnal' | 'special';
+                    setAuctionForm({ 
+                      ...auctionForm, 
+                      auctionType: newType,
+                      // Si cambia a combo, mantener productos; si cambia de combo, limpiar
+                      comboProducts: newType === 'combo' ? auctionForm.comboProducts : []
+                    });
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '1rem'
+                  }}
+                >
+                  <option value="normal">🔨 Normal</option>
+                  <option value="featured">⭐ Destacada</option>
+                  <option value="flash">⚡ Relámpago</option>
+                  <option value="combo">📦 Combo</option>
+                  <option value="nocturnal">🌙 Nocturna</option>
+                  <option value="special">🎁 Especial</option>
+                </select>
+                <small style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
+                  El tipo determina el banner/plantilla visual de la subasta
+                </small>
+              </div>
+
+              {/* Productos del Combo (solo si es tipo combo) */}
+              {auctionForm.auctionType === 'combo' && (
+                <div style={{
+                  padding: '1rem',
+                  background: 'var(--bg-tertiary)',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border)'
+                }}>
+                  <label style={{ display: 'block', marginBottom: '0.75rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+                    Productos del Combo *
+                  </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {(auctionForm.comboProducts || []).map((comboProduct, index) => (
+                      <div key={index} style={{
+                        display: 'grid',
+                        gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr auto',
+                        gap: '0.75rem',
+                        padding: '0.75rem',
+                        background: 'var(--bg-secondary)',
+                        borderRadius: '0.5rem',
+                        alignItems: 'center'
+                      }}>
+                        <select
+                          value={comboProduct.productId}
+                          onChange={(e) => {
+                            const selectedProduct = products.find(p => p.id === e.target.value);
+                            if (selectedProduct) {
+                              const updated = [...auctionForm.comboProducts];
+                              updated[index] = {
+                                ...updated[index],
+                                productId: selectedProduct.id,
+                                productName: selectedProduct.name,
+                                productImage: selectedProduct.images[0]
+                              };
+                              setAuctionForm({ ...auctionForm, comboProducts: updated });
+                            }
+                          }}
+                          style={{
+                            padding: '0.5rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg-primary)',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.875rem'
+                          }}
+                        >
+                          <option value="">Seleccionar producto...</option>
+                          {products.filter(p => p.active !== false).map(product => (
+                            <option key={product.id} value={product.id}>
+                              {product.name} (Stock: {product.stock})
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          value={comboProduct.quantity}
+                          onChange={(e) => {
+                            const updated = [...auctionForm.comboProducts];
+                            updated[index] = { ...updated[index], quantity: Math.max(1, Number(e.target.value) || 1) };
+                            setAuctionForm({ ...auctionForm, comboProducts: updated });
+                          }}
+                          min="1"
+                          placeholder="Cantidad"
+                          style={{
+                            padding: '0.5rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg-primary)',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.875rem'
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = auctionForm.comboProducts.filter((_, i) => i !== index);
+                            setAuctionForm({ ...auctionForm, comboProducts: updated });
+                          }}
+                          style={{
+                            padding: '0.5rem',
+                            background: 'var(--error)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '0.5rem',
+                            cursor: 'pointer',
+                            fontSize: '0.875rem'
+                          }}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuctionForm({
+                          ...auctionForm,
+                          comboProducts: [...(auctionForm.comboProducts || []), { productId: '', productName: '', quantity: 1 }]
+                        });
+                      }}
+                      className="btn btn-secondary"
+                      style={{ width: '100%' }}
+                    >
+                      + Agregar Producto al Combo
+                    </button>
+                  </div>
+                  <small style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '0.5rem', display: 'block' }}>
+                    Selecciona los productos que forman parte del combo. El stock se reducirá automáticamente cuando se venda.
+                  </small>
+                </div>
+              )}
+
               {/* Opciones */}
               <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
@@ -6276,6 +6487,14 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                     onChange={(e) => setAuctionForm({ ...auctionForm, scheduled: e.target.checked })}
                   />
                   <span style={{ color: 'var(--text-primary)' }}>Programada</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={auctionForm.isMystery}
+                    onChange={(e) => setAuctionForm({ ...auctionForm, isMystery: e.target.checked })}
+                  />
+                  <span style={{ color: 'var(--text-primary)' }}>🎁 Subasta Misteriosa</span>
                 </label>
               </div>
 

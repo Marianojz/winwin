@@ -5,7 +5,7 @@
       ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
       "$auctionId": {
         ".read": true,
-        ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || (!newData.hasChild('title') && !newData.hasChild('description') && !newData.hasChild('status') && !newData.hasChild('endTime') && !newData.hasChild('startingPrice') && !newData.hasChild('createdBy')))",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || (!newData.hasChild('title') && !newData.hasChild('description') && !newData.hasChild('status') && !newData.hasChild('startingPrice') && !newData.hasChild('createdBy')) || (data.exists() && data.child('title').val() == newData.child('title').val() && data.child('description').val() == newData.child('description').val() && data.child('status').val() == newData.child('status').val() && data.child('startingPrice').val() == newData.child('startingPrice').val() && data.child('createdBy').val() == newData.child('createdBy').val()))",
         "currentPrice": {
           ".read": true,
           ".write": "auth != null"
@@ -20,7 +20,6 @@
           "$bidId": {
             ".read": true,
             ".write": "auth != null && (!data.exists() || data.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
-            // Validación extra: el userId de la puja debe coincidir con el usuario autenticado
             ".validate": "newData.hasChildren(['id', 'auctionId', 'userId', 'username', 'amount', 'createdAt']) && newData.child('userId').isString() && newData.child('username').isString() && newData.child('amount').isNumber() && newData.child('amount').val() > 0 && newData.child('userId').val() == auth.uid"
           }
         }
@@ -277,6 +276,30 @@
       "$shipmentId": {
         ".read": "auth != null && (data.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
         ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+      }
+    },
+    "reviews": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$userId": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid == $userId",
+        "$orderId": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid == $userId",
+          "$reviewId": {
+            ".read": "auth != null",
+            ".write": "auth != null && auth.uid == $userId && (!data.exists() || data.child('userId').val() == auth.uid)"
+          }
+        }
+      }
+    },
+    "calendarEvents": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+      "$eventId": {
+        ".read": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true && (!data.exists() || data.child('isAutomatic').val() != true)"
       }
     }
   }
