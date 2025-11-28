@@ -13,11 +13,13 @@ import { generateOrderNumber } from '../utils/orderNumberGenerator';
 import { logOrderCreated } from '../utils/orderTransactions';
 import { Order, Auction } from '../types';
 import { generateUlid } from '../utils/helpers';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 const AuctionDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { auctions, user, isAuthenticated, addBid, addNotification, addOrder, products, updateAuction } = useStore();
+  const isMobile = useIsMobile();
   
   const auction = auctions.find(a => a.id === id);
   const [bidAmount, setBidAmount] = useState('');
@@ -1022,9 +1024,9 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
                   flexDirection: 'column',
                   gap: '0.5rem'
                 }}>
-                  {comboProduct.image && (
+                  {comboProduct.productImage && (
                     <img 
-                      src={comboProduct.image} 
+                      src={comboProduct.productImage} 
                       alt={comboProduct.productName}
                       style={{
                         width: '100%',
@@ -1047,7 +1049,7 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
           </div>
         )}
 
-        {auction.isMystery && isActive && !isRevealed ? (
+        {auction.isMystery && isActive ? (
           <div className="auction-description-section" style={{ marginTop: '2rem', background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '1rem' }}>
             <h2 className="section-title" style={{ marginBottom: '1rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>🎁 Subasta Misteriosa</h2>
             <p className="description-text" style={{ fontSize: '1rem', lineHeight: '1.8', color: 'var(--text-secondary)', wordWrap: 'break-word', overflowWrap: 'break-word', fontStyle: 'italic' }}>
@@ -1060,7 +1062,7 @@ Te notificaremos cuando tu pedido esté listo para el envío. El pago se realiza
             background: 'var(--bg-secondary)', 
             padding: '1.5rem', 
             borderRadius: '1rem',
-            animation: isRevealed && auction.isMystery ? 'fadeInReveal 1s ease-in' : undefined
+            animation: !isActive && auction.isMystery ? 'fadeInReveal 1s ease-in' : undefined
           }}>
             <h2 className="section-title" style={{ marginBottom: '1rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>Descripción</h2>
             <p className="description-text" style={{ fontSize: '1rem', lineHeight: '1.8', color: 'var(--text-secondary)', wordWrap: 'break-word', overflowWrap: 'break-word' }}>

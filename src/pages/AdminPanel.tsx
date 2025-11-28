@@ -988,7 +988,7 @@ const newAuction: Auction = {
         productId: cp.productId,
         productName: cp.productName,
         quantity: cp.quantity,
-        productImage: cp.productImage
+        productImage: cp.productImage || undefined
       }))
     : undefined
 };
@@ -1039,8 +1039,9 @@ setAuctionForm({
   unitsPerBundle: 1,
   bundles: 0,
   sellOnlyByBundle: false,
-  auctionType: 'normal',
-  comboProducts: []
+  isMystery: false,
+  auctionType: 'normal' as 'normal' | 'featured' | 'flash' | 'combo' | 'nocturnal' | 'special',
+  comboProducts: [] as { productId: string; productName: string; quantity: number; productImage?: string }[]
 });
 
       // Volver a la lista de subastas
@@ -1095,8 +1096,8 @@ const [auctionForm, setAuctionForm] = useState({
   bundles: 0, // Cantidad de bultos disponibles
   sellOnlyByBundle: false, // Solo se vende por bulto completo
   isMystery: false,
-  auctionType: 'normal' as 'normal' | 'featured' | 'flash' | 'combo' | 'mystery' | 'nocturnal' | 'special',
-  comboProducts: [] as { productId: string; productName: string; quantity: number; image?: string }[]
+  auctionType: 'normal' as 'normal' | 'featured' | 'flash' | 'combo' | 'nocturnal' | 'special',
+  comboProducts: [] as { productId: string; productName: string; quantity: number; productImage?: string }[]
 });
 
   // Estados para bots
@@ -1692,7 +1693,7 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                 productId: cp.productId,
                 productName: cp.productName,
                 quantity: cp.quantity,
-                productImage: cp.productImage
+                productImage: cp.productImage || undefined
               }))
             : undefined
         };
@@ -5925,7 +5926,9 @@ if (editingAuction.bids.length > 0 && auctionForm.startingPrice !== editingAucti
                   unitsPerBundle: 1,
                   bundles: 0,
                   sellOnlyByBundle: false,
-                  isMystery: false
+                  isMystery: false,
+                  auctionType: 'normal' as 'normal' | 'featured' | 'flash' | 'combo' | 'nocturnal' | 'special',
+                  comboProducts: [] as { productId: string; productName: string; quantity: number; productImage?: string }[]
                 });
                 setEditingAuction(null);
                 setActiveTab('create-auction');

@@ -27,7 +27,7 @@ export const checkComboStock = async (
     // Verificar stock de cada producto del combo
     for (const comboProduct of comboProducts) {
       const productRef = ref(realtimeDb, `products/${comboProduct.productId}`);
-      const snapshot = await productRef.get();
+      const snapshot = await get(productRef);
       
       if (!snapshot.exists()) {
         failedProducts.push({

@@ -103,18 +103,23 @@ export const createCalendarEvent = async (
     const eventRef = ref(realtimeDb, `${CALENDAR_EVENTS_PATH}/${eventId}`);
     
     // Preparar datos para Firebase (sin valores undefined)
+    const startDate = newEvent.startDate instanceof Date ? newEvent.startDate : new Date(newEvent.startDate);
+    const createdAt = newEvent.createdAt instanceof Date ? newEvent.createdAt : new Date(newEvent.createdAt);
+    const updatedAt = newEvent.updatedAt instanceof Date ? newEvent.updatedAt : new Date(newEvent.updatedAt);
+    
     const firebaseData: any = {
       id: newEvent.id,
       title: newEvent.title,
       type: newEvent.type,
-      startDate: newEvent.startDate.toISOString(),
-      createdAt: newEvent.createdAt.toISOString(),
-      updatedAt: newEvent.updatedAt.toISOString()
+      startDate: startDate.toISOString(),
+      createdAt: createdAt.toISOString(),
+      updatedAt: updatedAt.toISOString()
     };
     
     // Solo incluir endDate si existe
     if (newEvent.endDate) {
-      firebaseData.endDate = newEvent.endDate.toISOString();
+      const endDate = newEvent.endDate instanceof Date ? newEvent.endDate : new Date(newEvent.endDate);
+      firebaseData.endDate = endDate.toISOString();
     }
     
     // Incluir campos opcionales solo si existen
